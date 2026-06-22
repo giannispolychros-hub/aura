@@ -1446,7 +1446,7 @@ export default function AURAv2() {
         .new-btn{background:none;border:1px solid var(--border-mid);color:var(--text-secondary);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:8px 14px;cursor:pointer;border-radius:2px;transition:all .2s;align-self:flex-start}
         .new-btn:hover{color:var(--text-primary);border-color:#383530}
 
-        .input-area{padding:14px 0 26px;border-top:1px solid var(--border);background:var(--bg);position:sticky;bottom:0}
+        .input-area{padding:14px 0 26px;border-top:1px solid var(--border);background:var(--bg);position:sticky;bottom:0;z-index:10;}
         .input-row{display:flex;align-items:flex-end;gap:10px}
         .textarea{flex:1;background:transparent;border:none;border-bottom:1px solid var(--border-mid);color:var(--text-primary);font-family:'DM Mono',monospace;font-size:12px;font-weight:300;line-height:1.7;padding:7px 0 9px;resize:none;outline:none;min-height:36px;max-height:140px;transition:border-color .2s}
         .textarea::placeholder{color:var(--text-dim)}
@@ -1711,6 +1711,7 @@ export default function AURAv2() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKey}
+                onFocus={() => setTimeout(() => textareaRef.current?.scrollIntoView({behavior:"smooth", block:"end"}), 300)}
                 placeholder="Τι σε απασχολεί αυτή τη στιγμή;"
                 rows={1}
                 disabled={loading}
