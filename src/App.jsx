@@ -1349,7 +1349,9 @@ export default function AURAv2() {
         .distillation-label{font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;}
         .distillation-text{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:300;font-style:italic;color:#d8d3c8;line-height:1.6;}
 
-        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 22px 120px 22px;display:flex;flex-direction:column;position:relative}
+        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 22px;display:flex;flex-direction:column;position:relative}
+        .input-area-placeholder{display:none}
+        .feed{flex:1;padding:32px 0 180px;display:flex;flex-direction:column;gap:26px}
         .header{padding:26px 0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
         .wordmark{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:300;font-style:italic;letter-spacing:.2em;color:#ddd8d0}
         .header-right{display:flex;align-items:center;gap:12px}
@@ -1376,7 +1378,7 @@ export default function AURAv2() {
         .mem-panel-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
         .mem-panel-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
 
-        .feed{flex:1;padding:32px 0 18px;display:flex;flex-direction:column;gap:26px}
+        .input-area-old{display:none}
 
         .return-anchor-card{padding:28px 0 20px;animation:fadeUp .6s ease;border-bottom:1px solid var(--border)}
         .return-label{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px}
