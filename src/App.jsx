@@ -830,6 +830,7 @@ export default function AURAv2() {
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState(null);
   const [mode, setMode]                 = useState("ANSWER");
+  const [sessionStarted, setSessionStarted] = useState(false);
   const [firstWhyPending, setFirstWhyPending] = useState(false);
   const [firstWhyMessage, setFirstWhyMessage] = useState("");
   const [activeLens, setActiveLens]           = useState("SIMPLIFY");
@@ -1234,6 +1235,7 @@ export default function AURAv2() {
   };
 
   const resetSession = () => {
+    setSessionStarted(false);
     const updated = { ...memory, sessionCount: (memory.sessionCount || 0) + 1 };
     if (memory.storageEnabled) saveMemory(updated);
     setMemory(updated);
@@ -1302,9 +1304,10 @@ export default function AURAv2() {
         .light-field.surge{background:#121211;transition:background .35s ease;}
 
         .vertical-identity{position:fixed;left:14px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:7px;z-index:1;pointer-events:none;}
-        .vertical-identity span{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--text-primary);opacity:.08;transition:opacity 1.8s ease;}
-        .vertical-identity span.lit{opacity:.85;}
-        .vertical-identity span.full{opacity:1;text-shadow:0 0 8px rgba(201,168,76,.25);}
+        .vertical-identity span{font-family:'DM Mono',monospace;font-size:13px;letter-spacing:.1em;color:var(--text-primary);opacity:.35;transition:opacity 1.8s ease;text-shadow:0 0 6px rgba(201,168,76,.2);}
+        .vertical-identity span.lit{opacity:.20;}
+        .vertical-identity span.full{opacity:1;text-shadow:0 0 8px rgba(201,168,76,.5);}
+        .vertical-identity span.flash{opacity:.85;transition:opacity .3s ease;text-shadow:0 0 10px rgba(201,168,76,.5);}
 
         .distillation{padding:28px 0 8px;margin-top:4px;border-top:1px solid var(--border);animation:fadeUp 1s ease;}
         .distillation.first-time{animation:fadeUp 1.8s ease;}
@@ -1349,9 +1352,9 @@ export default function AURAv2() {
         .first-why-q{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:300;font-style:italic;color:#5a5650;line-height:1.5}
 
         .empty{flex:1;display:flex;flex-direction:column;justify-content:center;padding:56px 0;animation:fadeUp .8s ease}
-        .empty-headline{font-family:'Cormorant Garamond',serif;font-size:40px;font-weight:300;font-style:italic;line-height:1.12;color:#1d1b18;margin-bottom:18px}
-        .empty-sub{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);line-height:2.2}
-        .empty-hint{font-size:11px;color:var(--text-dim);line-height:1.9;margin-top:20px;font-style:italic;opacity:.6}
+        .empty-headline{font-family:'Cormorant Garamond',serif;font-size:40px;font-weight:300;font-style:italic;line-height:1.12;color:#3a3730;margin-bottom:18px}
+        .empty-sub{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#6a6660;line-height:2.2}
+        .empty-hint{font-size:11px;color:#5a5650;line-height:1.9;margin-top:20px;font-style:italic;opacity:1}
 
         .turn{animation:fadeUp .3s ease}
         .turn-user{display:flex;flex-direction:column;align-items:flex-end}
@@ -1431,17 +1434,16 @@ export default function AURAv2() {
         <div className={`light-field ${illumLevel > 0 ? "clear" : ""} ${claritySurge ? "surge" : ""}`} />
 
         <div className="vertical-identity">
-          {"AURAERGOSUM".split("").map((ch, i) => {
-            const isLit  = illumLevel >= i + 1;
-            const isFull = illumLevel >= 11 && i === 10;
+          {["A","U","R","A","·","E","R","G","O","·","S","U","M"].map((ch, i) => {
+            const isFull = claritySurge;
+            const isDot = ch === "·";
             return (
-              <span key={i} className={isFull ? "full" : isLit ? "lit" : ""}>{ch}</span>
+              <span key={i} className={isFull ? "flash" : ""} style={isDot ? {opacity:0,height:"8px"} : {}}>{isDot ? "" : ch}</span>
             );
           })}
         </div>
 
         <header className="header">
-          <span className="wordmark">aura</span>
           <div className="header-right">
             {safetyMode && (
               <div className="mode-pill">
@@ -1523,10 +1525,27 @@ export default function AURAv2() {
           )}
 
           {isFirst && !returnAnchor && (
-            <div className="empty">
-              <div className="empty-headline">Μερικές φορές<br />το πρόβλημα<br />δεν είναι<br />η απάντηση.</div>
-              <div className="empty-sub">Είναι αυτό που συνεχίζει<br />να φέρνει πίσω την ερώτηση.</div>
-              <div className="empty-hint">Γράψε ό,τι έχεις στο μυαλό σου.<br />Ακόμα κι αν δεν ξέρεις πώς να το ορίσεις.</div>
+            <div className="empty" style={{position:"relative",justifyContent:"space-between",paddingTop:"40px",paddingBottom:"40px"}}>
+              {/* Πάνω δεξιά — μικρό κείμενο */}
+              <div style={{textAlign:"right",fontSize:"10px",color:"#4a4845",letterSpacing:".06em",lineHeight:1.8,fontStyle:"italic"}}>
+                Η καθαρή σκέψη έρχεται<br />μέσω αφαίρεσης του περιττού...
+              </div>
+              {/* Μέση — μεγάλο wordmark */}
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"72px",fontWeight:300,fontStyle:"italic",color:"#c4c0b8",letterSpacing:".15em",textAlign:"center",lineHeight:1}}>
+                Aura
+              </div>
+              {/* Κάτω — tagline ως κουμπί εκκίνησης */}
+              <div
+                onClick={() => setSessionStarted(true)}
+                style={{fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".18em",textTransform:"uppercase",color:"#c9a84c",textAlign:"center",lineHeight:2,opacity:.5,textShadow:"0 0 6px rgba(201,168,76,.2)",cursor:"pointer",transition:"opacity .3s ease"}}
+                onMouseEnter={e => e.currentTarget.style.opacity=".9"}
+                onMouseLeave={e => e.currentTarget.style.opacity=".5"}
+              >
+                Thinking with you,<br />not for you...
+              </div>
+              <div style={{fontFamily:"'DM Mono',monospace",fontSize:"8px",letterSpacing:".14em",color:"#3a3632",textAlign:"center",marginTop:"8px"}}>
+                άγγιξε για να ξεκινήσεις
+              </div>
             </div>
           )}
 
@@ -1649,7 +1668,7 @@ export default function AURAv2() {
           <div ref={bottomRef}/>
         </div>
 
-        {!sessionEnded && !layerGatePending && !pivotPending && !memoryPromptPending && !warningPending && !misfirePending && (
+        {!sessionEnded && !layerGatePending && !pivotPending && !memoryPromptPending && !warningPending && !misfirePending && sessionStarted && (
           <div className="input-area">
             <div className="input-row">
               <textarea
@@ -1658,7 +1677,7 @@ export default function AURAv2() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKey}
-                placeholder="Γράψε εδώ…"
+                placeholder="Τι σε απασχολεί αυτή τη στιγμή;"
                 rows={1}
                 disabled={loading}
                 enterKeyHint="send"
