@@ -1363,7 +1363,7 @@ export default function AURAv2() {
 
         .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 22px;display:flex;flex-direction:column;position:relative}
         .input-area-placeholder{display:none}
-        .feed{flex:1;padding:32px 0 200px;display:flex;flex-direction:column;gap:26px}
+        .feed{flex:1;padding:32px 0 40px;display:flex;flex-direction:column;gap:26px}
         .header{padding:26px 0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
         .wordmark{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:300;font-style:italic;letter-spacing:.2em;color:#ddd8d0}
         .header-right{display:flex;align-items:center;gap:12px}
@@ -1460,7 +1460,7 @@ export default function AURAv2() {
         .new-btn{background:none;border:1px solid var(--border-mid);color:var(--text-secondary);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:8px 14px;cursor:pointer;border-radius:2px;transition:all .2s;align-self:flex-start}
         .new-btn:hover{color:var(--text-primary);border-color:#383530}
 
-        .input-area{padding:14px 22px calc(26px + env(safe-area-inset-bottom));border-top:1px solid var(--border);background:var(--bg);position:fixed;bottom:0;left:0;right:0;width:100%;max-width:650px;margin:0 auto;z-index:100;box-sizing:border-box;left:50%;transform:translateX(-50%);}
+        .input-area{padding:14px 0 26px;border-top:1px solid var(--border);background:transparent;position:relative;bottom:auto;left:auto;right:auto;width:100%;transform:none;z-index:1;box-sizing:border-box;}
         .input-row{display:flex;align-items:flex-end;gap:10px}
         .textarea{flex:1;background:transparent;border:none;border-bottom:1px solid var(--border-mid);color:var(--text-primary);font-family:'DM Mono',monospace;font-size:12px;font-weight:300;line-height:1.7;padding:7px 0 9px;resize:none;outline:none;min-height:36px;max-height:140px;transition:border-color .2s}
         .textarea::placeholder{color:var(--text-dim)}
@@ -1736,10 +1736,7 @@ export default function AURAv2() {
             </div>
           )}
 
-          <div ref={bottomRef}/>
-        </div>
-
-        {!sessionEnded && !layerGatePending && !pivotPending && !memoryPromptPending && !warningPending && !misfirePending && sessionStarted && (
+          {!sessionEnded && !layerGatePending && !pivotPending && !memoryPromptPending && !warningPending && !misfirePending && sessionStarted && (
           <div className="input-area">
             <div className="input-row">
               <textarea
@@ -1748,7 +1745,7 @@ export default function AURAv2() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKey}
-                onFocus={() => setTimeout(() => textareaRef.current?.scrollIntoView({behavior:"smooth", block:"end"}), 300)}
+                onFocus={() => setTimeout(() => textareaRef.current?.scrollIntoView({behavior:"smooth", block:"center"}), 100)}
                 placeholder="Τι σε απασχολεί αυτή τη στιγμή;"
                 rows={1}
                 disabled={loading}
@@ -1769,7 +1766,10 @@ export default function AURAv2() {
             )}
             {error && <div className="err">Σφάλμα: {error}</div>}
           </div>
-        )}
+          )}
+
+          <div ref={bottomRef}/>
+        </div>
 
       </div>
     </>
