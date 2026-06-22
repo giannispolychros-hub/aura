@@ -1349,7 +1349,7 @@ export default function AURAv2() {
         .distillation-label{font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;}
         .distillation-text{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:300;font-style:italic;color:#d8d3c8;line-height:1.6;}
 
-        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 22px;display:flex;flex-direction:column;position:relative}
+        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 22px 120px 22px;display:flex;flex-direction:column;position:relative}
         .header{padding:26px 0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
         .wordmark{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:300;font-style:italic;letter-spacing:.2em;color:#ddd8d0}
         .header-right{display:flex;align-items:center;gap:12px}
@@ -1446,7 +1446,7 @@ export default function AURAv2() {
         .new-btn{background:none;border:1px solid var(--border-mid);color:var(--text-secondary);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:8px 14px;cursor:pointer;border-radius:2px;transition:all .2s;align-self:flex-start}
         .new-btn:hover{color:var(--text-primary);border-color:#383530}
 
-        .input-area{padding:14px 0 26px;border-top:1px solid var(--border);background:var(--bg);position:sticky;bottom:0;z-index:10;}
+        .input-area{padding:14px 22px 26px;border-top:1px solid var(--border);background:var(--bg);position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:650px;z-index:100;box-sizing:border-box;}
         .input-row{display:flex;align-items:flex-end;gap:10px}
         .textarea{flex:1;background:transparent;border:none;border-bottom:1px solid var(--border-mid);color:var(--text-primary);font-family:'DM Mono',monospace;font-size:12px;font-weight:300;line-height:1.7;padding:7px 0 9px;resize:none;outline:none;min-height:36px;max-height:140px;transition:border-color .2s}
         .textarea::placeholder{color:var(--text-dim)}
