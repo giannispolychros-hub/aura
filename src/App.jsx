@@ -882,6 +882,8 @@ export default function AURAv2() {
 
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
+  const bottomRef        = useRef(null);
+  const textareaRef      = useRef(null);
 
   const startListening = useCallback(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
