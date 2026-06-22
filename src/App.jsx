@@ -840,7 +840,7 @@ export default function AURAv2() {
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState(null);
   const [mode, setMode]                 = useState("ANSWER");
-  const [sessionStarted, setSessionStarted] = useState(true);
+  const [sessionStarted, setSessionStarted] = useState(false);
   const [firstWhyPending, setFirstWhyPending] = useState(false);
   const [firstWhyMessage, setFirstWhyMessage] = useState("");
   const [activeLens, setActiveLens]           = useState("SIMPLIFY");
@@ -1270,7 +1270,7 @@ export default function AURAv2() {
   };
 
   const resetSession = () => {
-    setSessionStarted(true);
+    setSessionStarted(false);
     const updated = { ...memory, sessionCount: (memory.sessionCount || 0) + 1 };
     if (memory.storageEnabled) saveMemory(updated);
     setMemory(updated);
@@ -1582,6 +1582,29 @@ export default function AURAv2() {
               <div style={{fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".18em",textTransform:"uppercase",color:"#c9a84c",textAlign:"center",lineHeight:2,opacity:.5,textShadow:"0 0 6px rgba(201,168,76,.2)"}}>
                 Thinking with you,<br />not for you...
               </div>
+              {/* ENTER κουμπί */}
+              <button
+                onClick={() => setSessionStarted(true)}
+                style={{
+                  display:"block",
+                  margin:"24px auto 0",
+                  background:"none",
+                  border:"1px solid #3a3632",
+                  color:"#6a6660",
+                  fontFamily:"'DM Mono',monospace",
+                  fontSize:"11px",
+                  letterSpacing:".2em",
+                  textTransform:"uppercase",
+                  padding:"10px 28px",
+                  cursor:"pointer",
+                  borderRadius:"2px",
+                  transition:"all .2s"
+                }}
+                onMouseEnter={e => {e.currentTarget.style.borderColor="#c9a84c";e.currentTarget.style.color="#c9a84c";}}
+                onMouseLeave={e => {e.currentTarget.style.borderColor="#3a3632";e.currentTarget.style.color="#6a6660";}}
+              >
+                ENTER
+              </button>
             </div>
           )}
 
