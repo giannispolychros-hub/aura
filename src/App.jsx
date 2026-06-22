@@ -880,8 +880,31 @@ export default function AURAv2() {
 
   const [isFirstDistillation, setIsFirstDistillation] = useState(false);
 
-  const bottomRef        = useRef(null);
-  const textareaRef      = useRef(null);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  const startListening = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'el-GR';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onstart = () => setIsListening(true);
+    recognition.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      setInput(prev => prev ? prev + ' ' + transcript : transcript);
+    };
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+  }, []);
+
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -1421,6 +1444,9 @@ export default function AURAv2() {
         .send-btn.ready{color:var(--text-secondary);border-color:var(--border-mid)}
         .send-btn.ready:hover{color:var(--text-primary);border-color:#383530}
         .send-btn:disabled{opacity:.18;cursor:not-allowed}
+        .mic-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;transition:all .2s;flex-shrink:0;margin-bottom:2px}
+        .mic-btn.active{border-color:#7a4a4a;color:#7a4a4a;animation:pulse 1.2s ease-in-out infinite}
+        .mic-btn:hover{color:var(--text-secondary);border-color:var(--border-mid)}
         .turn-counter{font-size:8px;letter-spacing:.1em;color:var(--text-dim);text-align:right;margin-top:5px}
         .err{font-size:10px;color:#4a1a1a;margin-top:7px;padding:6px 10px;border:1px solid #180000;border-radius:2px}
 
@@ -1682,6 +1708,14 @@ export default function AURAv2() {
                 disabled={loading}
                 enterKeyHint="send"
               />
+              <button
+                className={`mic-btn ${isListening ? "active" : ""}`}
+                onClick={isListening ? stopListening : startListening}
+                disabled={loading}
+                title={isListening ? "Σταμάτα" : "Μικρόφωνο"}
+              >
+                {isListening ? "◉" : "🎙"}
+              </button>
               <button className={`send-btn ${input.trim() ? "ready" : ""}`} onClick={handleSubmit} disabled={!input.trim() || loading}>↵</button>
             </div>
             {turnCount.current > 0 && (
