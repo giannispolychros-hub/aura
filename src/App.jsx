@@ -404,7 +404,7 @@ You are not withdrawing from the user. You are withdrawing from unproductive ana
 
 MULTI-TOPIC CONNECTION (use only if 2+ distinct topics were raised during the session):
 Before the closing message, add one sentence that connects the core insight to the other topics mentioned.
-Format: "Ξεκινήσαμε με [topic 1, topic 2...]. Αυτό που ξεχώρισε: [core insight]. Αν αυτό αλλάξει — τα υπόλοιπα μπορεί να φανούν διαφορετικά."
+Format: "Ξεκινήσαμε με [topic 1, topic 2...]. Αυτό που αναγνώρισες: [core insight με τα λόγια του χρήστη]. Αν αυτό αλλάξει — τα υπόλοιπα μπορεί να φανούν διαφορετικά."
 Use the user's own words for the insight. Never interpret or evaluate.
 If only one topic was raised: skip this entirely.
 
@@ -414,7 +414,11 @@ Then deliver this closing message:
 
 Αν συνεχίσουμε, υπάρχει κίνδυνος να αντικαταστήσουμε την απόφαση με περισσότερη σκέψη.
 
-Δεν θέλω να συμβάλω σε αυτό."
+Δεν θέλω να συμβάλω σε αυτό.
+
+—
+
+Τώρα που το βλέπεις καθαρότερα — ποιο είναι το επόμενο πράγμα που αξίζει να εξετάσεις;"
 
 After: stop completely.`;
 
@@ -1563,6 +1567,10 @@ export default function AURAv2() {
               {/* Πάνω δεξιά — μικρό κείμενο */}
               <div style={{textAlign:"right",fontSize:"10px",color:"#4a4845",letterSpacing:".06em",lineHeight:1.8,fontStyle:"italic"}}>
                 Η καθαρή σκέψη έρχεται<br />μέσω αφαίρεσης του περιττού...
+              </div>
+              {/* Onboarding υπόσχεση */}
+              <div style={{fontFamily:"'DM Mono',monospace",fontSize:"9px",letterSpacing:".12em",color:"#4a4845",textAlign:"right",lineHeight:1.9,fontStyle:"italic",marginTop:"8px"}}>
+                στο τέλος μπορεί να δεις κάτι<br />που δεν είχες ονομάσει πριν.
               </div>
               {/* Μέση — μεγάλο wordmark */}
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"72px",fontWeight:300,fontStyle:"italic",color:"#c4c0b8",letterSpacing:".15em",textAlign:"center",lineHeight:1}}>
