@@ -840,7 +840,7 @@ export default function AURAv2() {
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState(null);
   const [mode, setMode]                 = useState("ANSWER");
-  const [sessionStarted, setSessionStarted] = useState(false);
+  const [sessionStarted, setSessionStarted] = useState(true);
   const [firstWhyPending, setFirstWhyPending] = useState(false);
   const [firstWhyMessage, setFirstWhyMessage] = useState("");
   const [activeLens, setActiveLens]           = useState("SIMPLIFY");
@@ -1270,7 +1270,7 @@ export default function AURAv2() {
   };
 
   const resetSession = () => {
-    setSessionStarted(false);
+    setSessionStarted(true);
     const updated = { ...memory, sessionCount: (memory.sessionCount || 0) + 1 };
     if (memory.storageEnabled) saveMemory(updated);
     setMemory(updated);
@@ -1576,17 +1576,9 @@ export default function AURAv2() {
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"72px",fontWeight:300,fontStyle:"italic",color:"#c4c0b8",letterSpacing:".15em",textAlign:"center",lineHeight:1}}>
                 Aura
               </div>
-              {/* Κάτω — tagline ως κουμπί εκκίνησης */}
-              <div
-                onClick={() => setSessionStarted(true)}
-                style={{fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".18em",textTransform:"uppercase",color:"#c9a84c",textAlign:"center",lineHeight:2,opacity:.5,textShadow:"0 0 6px rgba(201,168,76,.2)",cursor:"pointer",transition:"opacity .3s ease"}}
-                onMouseEnter={e => e.currentTarget.style.opacity=".9"}
-                onMouseLeave={e => e.currentTarget.style.opacity=".5"}
-              >
+              {/* Κάτω — tagline */}
+              <div style={{fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".18em",textTransform:"uppercase",color:"#c9a84c",textAlign:"center",lineHeight:2,opacity:.5,textShadow:"0 0 6px rgba(201,168,76,.2)"}}>
                 Thinking with you,<br />not for you...
-              </div>
-              <div style={{fontFamily:"'DM Mono',monospace",fontSize:"8px",letterSpacing:".14em",color:"#3a3632",textAlign:"center",marginTop:"8px"}}>
-                άγγιξε για να ξεκινήσεις
               </div>
             </div>
           )}
