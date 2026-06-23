@@ -1350,8 +1350,8 @@ export default function AURAv2() {
         .light-field.clear{background:var(--field-clear);}
         .light-field.surge{background:#121211;transition:background .35s ease;}
 
-        .vertical-identity{position:fixed;left:14px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:7px;z-index:1;pointer-events:none;}
-        .vertical-identity span{font-family:'DM Mono',monospace;font-size:13px;letter-spacing:.1em;color:var(--text-primary);opacity:.35;transition:opacity 1.8s ease;text-shadow:0 0 6px rgba(201,168,76,.2);}
+        .vertical-identity{position:fixed;left:6px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:7px;z-index:1;pointer-events:none;}
+        .vertical-identity span{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;color:var(--text-primary);opacity:.35;transition:opacity 1.8s ease;text-shadow:0 0 6px rgba(201,168,76,.2);}
         .vertical-identity span.lit{opacity:.20;}
         .vertical-identity span.full{opacity:1;text-shadow:0 0 8px rgba(201,168,76,.5);}
         .vertical-identity span.flash{opacity:.85;transition:opacity .3s ease;text-shadow:0 0 10px rgba(201,168,76,.5);}
@@ -1361,7 +1361,7 @@ export default function AURAv2() {
         .distillation-label{font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;}
         .distillation-text{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:300;font-style:italic;color:#d8d3c8;line-height:1.6;}
 
-        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 22px;display:flex;flex-direction:column;position:relative}
+        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 22px 0 36px;display:flex;flex-direction:column;position:relative}
         .input-area-placeholder{display:none}
         .feed{flex:1;padding:32px 0 40px;display:flex;flex-direction:column;gap:26px}
         .header{padding:26px 0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
@@ -1596,7 +1596,7 @@ export default function AURAv2() {
               </div>
               {/* ENTER κουμπί */}
               <button
-                onClick={() => setSessionStarted(true)}
+                onClick={() => { setSessionStarted(true); setTimeout(() => textareaRef.current?.focus(), 100); }}
                 style={{
                   display:"block",
                   margin:"24px auto 0",
