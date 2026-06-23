@@ -1676,11 +1676,12 @@ export default function AURAv2() {
         .new-btn:hover{color:var(--text-primary);border-color:#383530}
 
         /* Input */
-        .input-area{padding:14px 0 26px;border-top:1px solid var(--border);background:var(--bg);position:sticky;bottom:0}
+        .input-area{padding:12px 0 12px;background:var(--bg);position:sticky;top:0;z-index:50;}
+        .input-divider{width:1px;background:var(--border-mid);position:fixed;left:32px;top:0;bottom:0;z-index:0;}
         .input-row{display:flex;align-items:flex-end;gap:10px}
-        .textarea{flex:1;background:transparent;border:none;border-bottom:1px solid var(--border-mid);color:var(--text-primary);font-family:'DM Mono',monospace;font-size:12px;font-weight:300;line-height:1.7;padding:7px 0 9px;resize:none;outline:none;min-height:36px;max-height:140px;transition:border-color .2s}
-        .textarea::placeholder{color:var(--text-dim)}
-        .textarea:focus{border-bottom-color:#282522}
+        .textarea{flex:1;background:rgba(255,255,255,0.03);border:1px solid var(--border-mid);border-radius:4px;color:var(--text-primary);font-family:'DM Mono',monospace;font-size:13px;font-weight:300;line-height:1.8;padding:12px;resize:none;outline:none;min-height:120px;max-height:240px;transition:border-color .2s}
+        .textarea::placeholder{color:var(--text-dim);font-style:italic}
+        .textarea:focus{border-color:#383530}
         .textarea:disabled{opacity:.3;cursor:not-allowed}
         .send-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;transition:all .2s;flex-shrink:0;margin-bottom:2px}
         .send-btn.ready{color:var(--text-secondary);border-color:var(--border-mid)}
@@ -1703,13 +1704,14 @@ export default function AURAv2() {
         <div className={`light-field ${illumLevel > 0 ? "clear" : ""} ${claritySurge ? "surge" : ""}`} />
 
         {/* ── Vertical Identity: AURA ERGO SUM (progressive illumination) ── */}
+        <div className="input-divider" />
+
         <div className="vertical-identity">
-          {"AURAERGOSUM".split("").map((ch, i) => {
-            const litThreshold = i + 1; // letter i lights at illumLevel >= i+1
-            const isLit  = illumLevel >= litThreshold;
-            const isFull = illumLevel >= 11 && i === 10; // final letter at full session close
+          {["A","U","R","A","·","E","R","G","O","·","S","U","M"].map((ch, i) => {
+            const isDot = ch === "·";
+            const isFlash = claritySurge;
             return (
-              <span key={i} className={isFull ? "full" : isLit ? "lit" : ""}>{ch}</span>
+              <span key={i} className={isFlash ? "flash" : ""} style={isDot ? {opacity:0,height:"6px",display:"block"} : {}}>{isDot ? "" : ch}</span>
             );
           })}
         </div>
@@ -1791,6 +1793,39 @@ export default function AURAv2() {
         )}
 
         {/* ── Feed ── */}
+        {!sessionEnded && !layerGatePending && !pivotPending && !memoryPromptPending && !warningPending && !misfirePending && sessionStarted && (
+          <div className="input-area">
+            <div className="input-row" style={{flexDirection:"column",gap:"8px",alignItems:"stretch"}}>
+              <textarea
+                ref={textareaRef}
+                className="textarea"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKey}
+                placeholder="Τι σε απασχολεί αυτή τη στιγμή;"
+                rows={5}
+                disabled={loading}
+                enterKeyHint="send"
+              />
+              <div style={{display:"flex",justifyContent:"flex-end",gap:"8px"}}>
+                <button
+                  className={`mic-btn ${isListening ? "active" : ""}`}
+                  onClick={isListening ? stopListening : startListening}
+                  disabled={loading}
+                  title={isListening ? "Σταμάτα" : "Μικρόφωνο"}
+                >
+                  {isListening ? "◉" : "🎙"}
+                </button>
+                <button className={`send-btn ${input.trim() ? "ready" : ""}`} onClick={handleSubmit} disabled={!input.trim() || loading}>↵</button>
+              </div>
+            </div>
+            {turnCount.current > 0 && (
+              <div className="turn-counter">{turnCount.current} {turnCount.current===1 ? "ανταλλαγή" : "ανταλλαγές"}</div>
+            )}
+            {error && <div className="err">Σφάλμα: {error}</div>}
+          </div>
+        )}
+
         <div className="feed">
 
           {isFirst && returnAnchor && (
@@ -1959,36 +1994,7 @@ export default function AURAv2() {
         </div>
 
         {/* ── Input ── */}
-        {!sessionEnded && !layerGatePending && !pivotPending && !memoryPromptPending && !warningPending && !misfirePending && sessionStarted && (
-          <div className="input-area">
-            <div className="input-row">
-              <textarea
-                ref={textareaRef}
-                className="textarea"
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder="Τι σε απασχολεί αυτή τη στιγμή;"
-                rows={1}
-                disabled={loading}
-                enterKeyHint="send"
-              />
-              <button
-                className={`mic-btn ${isListening ? "active" : ""}`}
-                onClick={isListening ? stopListening : startListening}
-                disabled={loading}
-                title={isListening ? "Σταμάτα" : "Μικρόφωνο"}
-              >
-                {isListening ? "◉" : "🎙"}
-              </button>
-              <button className={`send-btn ${input.trim() ? "ready" : ""}`} onClick={handleSubmit} disabled={!input.trim() || loading}>↵</button>
-            </div>
-            {turnCount.current > 0 && (
-              <div className="turn-counter">{turnCount.current} {turnCount.current===1 ? "ανταλλαγή" : "ανταλλαγές"}</div>
-            )}
-            {error && <div className="err">Σφάλμα: {error}</div>}
-          </div>
-        )}
+
 
       </div>
     </>
