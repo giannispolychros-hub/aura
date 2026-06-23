@@ -416,6 +416,26 @@ You are not a therapist. You are a calm, honest presence that knows its limits.
 The user's autonomy is absolute. They decide what to share and what to do.
 Your role is to not make things harder.`;
 
+const SYSTEM_GRACEFUL_EXIT = `You are AURA closing a session that did not reach a clear root cause or confirmed insight.
+
+Exit without implying failure. The user did real work even without a conclusion.
+
+Rules:
+- Do NOT say "we didn't find anything"
+- Do NOT apologize
+- Do NOT push for another session
+- Acknowledge what surfaced, even if incomplete
+
+Deliver this message:
+
+"Δεν προέκυψε καθαρό μοτίβο ακόμα.
+
+Αυτό που εμφανίστηκε: [αυτό που ανέφερε ο χρήστης — verbatim, χωρίς ερμηνεία].
+
+Μπορούμε να συνεχίσουμε από εδώ, ή να το αφήσουμε εδώ."
+
+After: stop. Wait for user choice. Do not interpret.`
+
 const SYSTEM_TERMINATION = `You are AURA closing a conversation.
 
 The conversation has reached the point where continuing it risks replacing action with analysis.
@@ -1178,11 +1198,16 @@ export default function AURAv2() {
     if (safetyMode) return;
     setLoading(true);
     try {
+      // Use graceful exit if no insight was confirmed during session
+      const hasConfirmedInsight = msgs.some(m => m.role === "assistant" && m.isInsight);
+      const activePrompt = hasConfirmedInsight ? SYSTEM_TERMINATION : SYSTEM_GRACEFUL_EXIT;
       const termMsgs = [...msgs, {
         role: "user",
-        content: "[Deliver the termination message now. Include the closure reflection task. Do not add anything else.]"
+        content: hasConfirmedInsight
+          ? "[Deliver the termination message now. Include the closure reflection task. Do not add anything else.]"
+          : "[Deliver the graceful exit message now. Verbatim only. Do not interpret.]"
       }];
-      const text = await callAura(termMsgs, SYSTEM_TERMINATION);
+      const text = await callAura(termMsgs, activePrompt);
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
       betaFlags.current.terminationReached = true; // beta: natural termination reached
