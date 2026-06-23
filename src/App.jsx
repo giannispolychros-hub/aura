@@ -1562,7 +1562,7 @@ export default function AURAv2() {
           font-style:italic; color:#d8d3c8; line-height:1.6;
         }
 
-        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 22px;display:flex;flex-direction:column;position:relative}
+        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 22px 0 40px;display:flex;flex-direction:column;position:relative}
 
         /* Header */
         .header{padding:26px 0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
@@ -1841,9 +1841,7 @@ export default function AURAv2() {
               <div style={{textAlign:"right",fontSize:"10px",color:"#4a4845",letterSpacing:".06em",lineHeight:1.8,fontStyle:"italic"}}>
                 Η καθαρή σκέψη έρχεται<br />μέσω αφαίρεσης του περιττού...
               </div>
-              <div style={{fontFamily:"'DM Mono',monospace",fontSize:"9px",letterSpacing:".12em",color:"#4a4845",textAlign:"right",lineHeight:1.9,fontStyle:"italic",marginTop:"8px"}}>
-                στο τέλος μπορεί να δεις κάτι<br />που δεν είχες ονομάσει πριν.
-              </div>
+
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"72px",fontWeight:300,fontStyle:"italic",color:"#c4c0b8",letterSpacing:".15em",textAlign:"center",lineHeight:1}}>
                 Aura
               </div>
