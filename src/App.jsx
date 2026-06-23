@@ -1562,7 +1562,7 @@ export default function AURAv2() {
           font-style:italic; color:#d8d3c8; line-height:1.6;
         }
 
-        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 22px 0 40px;display:flex;flex-direction:column;position:relative}
+        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 22px 0 60px;display:flex;flex-direction:column;position:relative}
 
         /* Header */
         .header{padding:26px 0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
