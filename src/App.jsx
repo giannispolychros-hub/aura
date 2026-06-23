@@ -918,13 +918,13 @@ export default function AURAv2() {
     setIsListening(false);
   }, []);
 
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
   useEffect(() => {
     const handleResize = () => {
-      if (document.activeElement?.tagName === 'TEXTAREA') {
-        setTimeout(() => {
-          document.activeElement.scrollIntoView({behavior: 'smooth', block: 'center'});
-        }, 100);
-      }
+      if (!window.visualViewport) return;
+      const ratio = window.visualViewport.height / window.screen.height;
+      setKeyboardOpen(ratio < 0.75);
     };
     window.visualViewport?.addEventListener('resize', handleResize);
     return () => window.visualViewport?.removeEventListener('resize', handleResize);
@@ -1632,7 +1632,7 @@ export default function AURAv2() {
             </div>
           )}
 
-          {messages.map((msg, i) => (
+          {(keyboardOpen ? messages.slice(-1) : messages).map((msg, i) => (
             <MessageBubble
               key={msg.id || i}
               msg={msg}
