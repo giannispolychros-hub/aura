@@ -868,7 +868,7 @@ function friendlyApiError(status) {
 let _activeCall = false;
 
 async function callAura(messages, systemPrompt, retries = 1) {
-  if (_activeCall) {
+  if (_activeCall && retries === 1) {
     throw new Error("Κάτι δεν λειτούργησε. Δοκίμασε ξανά.");
   }
   // FIX 1: AbortController — 30s timeout for mobile network stalls
@@ -956,6 +956,8 @@ export default function AURAv2() {
   const [error, setError]               = useState(null);
   const [mode, setMode]                 = useState("ANSWER");
   const [sessionStarted, setSessionStarted] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
   // First-Why protocol
   const [firstWhyPending, setFirstWhyPending] = useState(false);
   const [firstWhyMessage, setFirstWhyMessage] = useState("");
@@ -1017,33 +1019,10 @@ export default function AURAv2() {
   // First "To the point of mind" ever shown — slightly slower fade, no other change
   const [isFirstDistillation, setIsFirstDistillation] = useState(false);
 
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef(null);
   const bottomRef        = useRef(null);
   const textareaRef      = useRef(null);
-
-  const startListening = useCallback(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'el-GR';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.onstart = () => setIsListening(true);
-    recognition.onresult = (e) => {
-      const transcript = e.results[0][0].transcript;
-      setInput(prev => prev ? prev + ' ' + transcript : transcript);
-    };
-    recognition.onend = () => setIsListening(false);
-    recognition.onerror = () => setIsListening(false);
-    recognitionRef.current = recognition;
-    recognition.start();
-  }, []);
-
-  const stopListening = useCallback(() => {
-    recognitionRef.current?.stop();
-    setIsListening(false);
-  }, []);
+  const startListening = useCallback(() => { const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return; const r = new SR(); r.lang="el-GR"; r.continuous=false; r.interimResults=false; r.onstart=()=>setIsListening(true); r.onresult=(e)=>{const t=e.results[0][0].transcript;setInput(prev=>prev?prev+" "+t:t);}; r.onend=()=>setIsListening(false); r.onerror=()=>setIsListening(false); recognitionRef.current=r; r.start(); }, []);
+  const stopListening = useCallback(() => { recognitionRef.current?.stop(); setIsListening(false); }, []);
 
   useEffect(() => {
     // FIX 4: block:"end" is more reliable than smooth on iOS Safari
@@ -1059,7 +1038,6 @@ export default function AURAv2() {
 
   // ── Generate response ──
   const generateResponse = useCallback(async (msgs, currentMode) => {
-    if (sessionEnded) return;
     setLoading(true);
     try {
       // Track clarification rounds — force answer after 3 rounds
@@ -1141,7 +1119,7 @@ export default function AURAv2() {
     } finally {
       setLoading(false); // guaranteed cleanup — without this, callAura throw left loading=true permanently
     }
-  }, [safetyMode, memory, currentDomain, activeLens, sessionEnded]);
+  }, [safetyMode, memory, currentDomain, activeLens]);
   // First-time-only progressive illumination — same end state (illumLevel=11),
   // but reaches it over ~1.5s instead of instantly, exactly once per install.
   // No new content, no new UI, no protocol change — only how fast an existing
@@ -1530,18 +1508,17 @@ export default function AURAv2() {
 
         /* ── VERTICAL IDENTITY: AURA ERGO SUM ── */
         .vertical-identity{
-          position:fixed; left:14px; top:50%; transform:translateY(-50%);
-          display:flex; flex-direction:column; align-items:center; gap:7px;
-          z-index:1; pointer-events:none;
+          position:fixed; left:0; top:0; bottom:0; width:48px;
+          display:flex; flex-direction:column; align-items:center;
+          justify-content:space-evenly; padding:20px 0;
+          z-index:51; pointer-events:none;
         }
         .vertical-identity span{
-          font-family:'DM Mono',monospace; font-size:9px; letter-spacing:.1em;
-          color:var(--text-primary);
-          opacity:.08; /* baseline 8% — within 10-30% range, low end */
-          transition:opacity 1.8s ease;
+          font-family:'DM Mono',monospace; font-size:20px; font-weight:700;
+          color:#c9a84c; opacity:.85; transition:opacity .3s ease;
         }
         .vertical-identity span.lit{ opacity:.85; }
-        .vertical-identity span.full{ opacity:1; text-shadow:0 0 8px rgba(201,168,76,.25); }
+        .vertical-identity span.full{ opacity:1; text-shadow:0 0 10px rgba(201,168,76,.5); }
 
         /* ── CLOSING SYSTEM: To the point of mind ── */
         .distillation{
@@ -1562,7 +1539,7 @@ export default function AURAv2() {
           font-style:italic; color:#d8d3c8; line-height:1.6;
         }
 
-        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 22px 0 60px;display:flex;flex-direction:column;position:relative}
+        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 16px 0 56px;display:flex;flex-direction:column;position:relative}
 
         /* Header */
         .header{padding:26px 0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
@@ -1676,20 +1653,18 @@ export default function AURAv2() {
         .new-btn:hover{color:var(--text-primary);border-color:#383530}
 
         /* Input */
-        .input-area{padding:12px 0 12px;background:var(--bg);position:sticky;top:0;z-index:50;}
-        .input-divider{width:1px;background:var(--border-mid);position:fixed;left:32px;top:0;bottom:0;z-index:0;}
+        .input-area{padding:12px 0 12px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:50;}
         .input-row{display:flex;align-items:flex-end;gap:10px}
-        .textarea{flex:1;background:rgba(255,255,255,0.03);border:1px solid var(--border-mid);border-radius:4px;color:var(--text-primary);font-family:'DM Mono',monospace;font-size:13px;font-weight:300;line-height:1.8;padding:12px;resize:none;outline:none;min-height:120px;max-height:240px;transition:border-color .2s}
-        .textarea::placeholder{color:var(--text-dim);font-style:italic}
+        .textarea{flex:1;background:transparent;border:1px solid var(--border-mid);border-radius:4px;background:rgba(255,255,255,0.03);color:var(--text-primary);font-family:'DM Mono',monospace;font-size:13px;font-weight:300;line-height:1.8;padding:12px;resize:none;outline:none;min-height:120px;max-height:240px;transition:border-color .2s}
+        .textarea::placeholder{color:var(--text-dim)}
         .textarea:focus{border-color:#383530}
         .textarea:disabled{opacity:.3;cursor:not-allowed}
         .send-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;transition:all .2s;flex-shrink:0;margin-bottom:2px}
         .send-btn.ready{color:var(--text-secondary);border-color:var(--border-mid)}
         .send-btn.ready:hover{color:var(--text-primary);border-color:#383530}
         .send-btn:disabled{opacity:.18;cursor:not-allowed}
-        .mic-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;transition:all .2s;flex-shrink:0;margin-bottom:2px}
-        .mic-btn.active{border-color:#7a4a4a;color:#7a4a4a;animation:pulse 1.2s ease-in-out infinite}
-        .mic-btn:hover{color:var(--text-secondary);border-color:var(--border-mid)}
+        .mic-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;}
+        .mic-btn.active{border-color:#7a4a4a;color:#7a4a4a;}
         .turn-counter{font-size:8px;letter-spacing:.1em;color:var(--text-dim);text-align:right;margin-top:5px}
         .err{font-size:10px;color:#4a1a1a;margin-top:7px;padding:6px 10px;border:1px solid #180000;border-radius:2px}
 
@@ -1704,17 +1679,7 @@ export default function AURAv2() {
         <div className={`light-field ${illumLevel > 0 ? "clear" : ""} ${claritySurge ? "surge" : ""}`} />
 
         {/* ── Vertical Identity: AURA ERGO SUM (progressive illumination) ── */}
-        <div className="input-divider" />
-
-        <div className="vertical-identity">
-          {["A","U","R","A","·","E","R","G","O","·","S","U","M"].map((ch, i) => {
-            const isDot = ch === "·";
-            const isFlash = claritySurge;
-            return (
-              <span key={i} className={isFlash ? "flash" : ""} style={isDot ? {opacity:0,height:"6px",display:"block"} : {}}>{isDot ? "" : ch}</span>
-            );
-          })}
-        </div>
+        <div className="vertical-identity">{["A","U","R","A","·","E","R","G","O","·","S","U","M"].map((ch,i)=>{const isDot=ch==="·";return(<span key={i} style={isDot?{height:"14px",display:"block"}:{}}>{isDot?"":ch}</span>);})}</div>
 
         {/* ── Header ── */}
         <header className="header">
@@ -1793,39 +1758,6 @@ export default function AURAv2() {
         )}
 
         {/* ── Feed ── */}
-        {!sessionEnded && !layerGatePending && !pivotPending && !memoryPromptPending && !warningPending && !misfirePending && sessionStarted && (
-          <div className="input-area">
-            <div className="input-row" style={{flexDirection:"column",gap:"8px",alignItems:"stretch"}}>
-              <textarea
-                ref={textareaRef}
-                className="textarea"
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder="Τι σε απασχολεί αυτή τη στιγμή;"
-                rows={5}
-                disabled={loading}
-                enterKeyHint="send"
-              />
-              <div style={{display:"flex",justifyContent:"flex-end",gap:"8px"}}>
-                <button
-                  className={`mic-btn ${isListening ? "active" : ""}`}
-                  onClick={isListening ? stopListening : startListening}
-                  disabled={loading}
-                  title={isListening ? "Σταμάτα" : "Μικρόφωνο"}
-                >
-                  {isListening ? "◉" : "🎙"}
-                </button>
-                <button className={`send-btn ${input.trim() ? "ready" : ""}`} onClick={handleSubmit} disabled={!input.trim() || loading}>↵</button>
-              </div>
-            </div>
-            {turnCount.current > 0 && (
-              <div className="turn-counter">{turnCount.current} {turnCount.current===1 ? "ανταλλαγή" : "ανταλλαγές"}</div>
-            )}
-            {error && <div className="err">Σφάλμα: {error}</div>}
-          </div>
-        )}
-
         <div className="feed">
 
           {isFirst && returnAnchor && (
@@ -1836,28 +1768,7 @@ export default function AURAv2() {
             </div>
           )}
 
-          {isFirst && !returnAnchor && (
-            <div className="empty" style={{position:"relative",justifyContent:"space-between",paddingTop:"40px",paddingBottom:"40px"}}>
-              <div style={{textAlign:"right",fontSize:"10px",color:"#4a4845",letterSpacing:".06em",lineHeight:1.8,fontStyle:"italic"}}>
-                Η καθαρή σκέψη έρχεται<br />μέσω αφαίρεσης του περιττού...
-              </div>
-
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"72px",fontWeight:300,fontStyle:"italic",color:"#c4c0b8",letterSpacing:".15em",textAlign:"center",lineHeight:1}}>
-                Aura
-              </div>
-              <div style={{fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".18em",textTransform:"uppercase",color:"#c9a84c",textAlign:"center",lineHeight:2,opacity:.5,textShadow:"0 0 6px rgba(201,168,76,.2)"}}>
-                Thinking with you,<br />not for you...
-              </div>
-              <button
-                onClick={() => { setSessionStarted(true); setTimeout(() => textareaRef.current?.focus(), 100); }}
-                style={{display:"block",margin:"24px auto 0",background:"none",border:"1px solid #3a3632",color:"#6a6660",fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".2em",textTransform:"uppercase",padding:"10px 28px",cursor:"pointer",borderRadius:"2px",transition:"all .2s"}}
-                onMouseEnter={e => {e.currentTarget.style.borderColor="#c9a84c";e.currentTarget.style.color="#c9a84c";}}
-                onMouseLeave={e => {e.currentTarget.style.borderColor="#3a3632";e.currentTarget.style.color="#6a6660";}}
-              >
-                ENTER
-              </button>
-            </div>
-          )}
+          {isFirst && !returnAnchor && (<div className="empty" style={{justifyContent:"space-between",paddingTop:"40px",paddingBottom:"40px"}}><div style={{textAlign:"right",fontSize:"10px",color:"#4a4845",lineHeight:1.8,fontStyle:"italic"}}>Η καθαρή σκέψη έρχεται<br />μέσω αφαίρεσης του περιττού...</div><div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"64px",fontWeight:300,fontStyle:"italic",color:"#c4c0b8",textAlign:"center",lineHeight:1}}>Aura</div><div style={{fontFamily:"'DM Mono',monospace",fontSize:"10px",letterSpacing:".18em",textTransform:"uppercase",color:"#c9a84c",textAlign:"center",lineHeight:2,opacity:.5}}>Thinking with you,<br />not for you...</div><button onClick={()=>{setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),100);}} style={{display:"block",margin:"20px auto 0",background:"none",border:"1px solid #3a3632",color:"#6a6660",fontFamily:"'DM Mono',monospace",fontSize:"10px",letterSpacing:".2em",textTransform:"uppercase",padding:"8px 24px",cursor:"pointer",borderRadius:"2px"}}>ENTER</button></div>)}
 
           {/* First-Why pause — AURA asks one question before entering conversation */}
           {firstWhyPending && (
@@ -1890,6 +1801,7 @@ export default function AURAv2() {
                 onChange={e => setMisfireInput(e.target.value)}
                 onKeyDown={e => { if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleMisfireResponse(misfireInput);setMisfireInput("");}}}
                 enterKeyHint="send"
+                autoFocus
               />
               <div style={{display:"flex",gap:8}}>
                 <button className="choice-btn" onClick={() => { handleMisfireResponse(""); setMisfireInput(""); }}>Συνέχισε</button>
@@ -1992,7 +1904,28 @@ export default function AURAv2() {
         </div>
 
         {/* ── Input ── */}
-
+        {!sessionEnded && !layerGatePending && !pivotPending && !memoryPromptPending && !warningPending && !misfirePending && sessionStarted && (
+          <div className="input-area">
+            <div className="input-row" style={{flexDirection:"column",gap:"4px",alignItems:"stretch"}}>
+              <textarea
+                ref={textareaRef}
+                className="textarea"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKey}
+                placeholder="Τι σε απασχολεί αυτή τη στιγμή;"
+                rows={5}
+                disabled={loading}
+                enterKeyHint="send"
+              />
+              <div style={{display:"flex",justifyContent:"flex-end",gap:"8px",marginTop:"6px"}}><button className={`mic-btn ${isListening?"active":""}`} onClick={isListening?stopListening:startListening} disabled={loading}>{isListening?"◉":"🎙"}</button><button className={`send-btn ${input.trim()?"ready":""}`} onClick={handleSubmit} disabled={!input.trim()||loading}>↵</button></div>
+            </div>
+            {turnCount.current > 0 && (
+              <div className="turn-counter">{turnCount.current} {turnCount.current===1 ? "ανταλλαγή" : "ανταλλαγές"}</div>
+            )}
+            {error && <div className="err">Σφάλμα: {error}</div>}
+          </div>
+        )}
 
       </div>
     </>
