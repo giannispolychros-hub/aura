@@ -931,8 +931,12 @@ export default function AURAv2() {
   }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, loading, pivotPending, layerGatePending, memoryPromptPending, warningPending, misfirePending, firstWhyPending]);
+    if (messages.length > 0) {
+      setTimeout(() => {
+        textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 200);
+    }
+  }, [messages, loading]);
 
   useEffect(() => {
     const el = textareaRef.current;
