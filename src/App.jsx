@@ -225,6 +225,7 @@ Use sparingly. Only when genuine clarity was reached, not as a closing ritual.`;
 // ─────────────────────────────────────────────
 
 // Lens 1 — SIMPLIFY (default, highest priority)
+// Use when: confused, overwhelmed, too many variables, analysis paralysis
 const SYSTEM_LENS_SIMPLIFY = AURA_CORE_PERSONALITY + `
 
 CURRENT REASONING DIRECTION: reduce and simplify
@@ -252,6 +253,7 @@ Do not stack analysis. Do not continue after the lens response.
 If you have enough to be useful: be useful now.`;
 
 // Lens 2 — CHALLENGE
+// Use when: user knows what they want but avoids it, states certainties that deserve testing
 const SYSTEM_LENS_CHALLENGE = AURA_CORE_PERSONALITY + `
 
 CURRENT REASONING DIRECTION: test assumptions
@@ -279,6 +281,7 @@ Do not stack analysis. Do not continue after the lens response.
 If you have enough to be useful: be useful now.`;
 
 // Lens 3 — PERSPECTIVE
+// Use when: user is too close to the problem, emotional tunnel vision, short-term thinking
 const SYSTEM_LENS_PERSPECTIVE = AURA_CORE_PERSONALITY + `
 
 CURRENT REASONING DIRECTION: shift viewpoint
@@ -305,6 +308,7 @@ Do not stack analysis. Do not continue after the lens response.
 If you have enough to be useful: be useful now.`;
 
 // Lens 4 — EXPLORE
+// Use when: user is stuck in a narrow frame, has not considered all options, needs movement
 const SYSTEM_LENS_EXPLORE = AURA_CORE_PERSONALITY + `
 
 CURRENT REASONING DIRECTION: expand possibilities
@@ -402,35 +406,35 @@ RULES:
 
 You are not withdrawing from the user. You are withdrawing from unproductive analysis.
 
-MULTI-TOPIC CONNECTION (use only if 2+ distinct topics were raised during the session):
-Before the closing message, add one sentence that connects the core insight to the other topics mentioned.
-Format: "Ξεκινήσαμε με [topic 1, topic 2...]. Αυτό που αναγνώρισες: [core insight με τα λόγια του χρήστη]. Αν αυτό αλλάξει — τα υπόλοιπα μπορεί να φανούν διαφορετικά."
-Use the user's own words for the insight. Never interpret or evaluate.
-If only one topic was raised: skip this entirely.
-
-Then deliver this closing message:
+Deliver this message, then stop:
 
 "Έχουμε αρκετή καθαρότητα για τώρα.
 
 Αν συνεχίσουμε, υπάρχει κίνδυνος να αντικαταστήσουμε την απόφαση με περισσότερη σκέψη.
 
-Δεν θέλω να συμβάλω σε αυτό.
-
-—
-
-Τώρα που το βλέπεις καθαρότερα — ποιο είναι το επόμενο πράγμα που αξίζει να εξετάσεις;"
+Δεν θέλω να συμβάλω σε αυτό."
 
 After: stop completely.`;
 
 
 
 // ─────────────────────────────────────────────
+// FIRST-WHY TRIGGER DETECTION
+// ─────────────────────────────────────────────
+
+// ─────────────────────────────────────────────
 // QUESTION CLASSIFICATION (Clarification Protocol v3)
 // ─────────────────────────────────────────────
 
+// Classify question type — determines which protocol applies
+// Returns: "FACT" | "ANALYSIS" | "PERSONAL"
+// Correction 3: ANALYSIS requires absence of first-person subject,
+// personal decision, and personal consequence. Default: PERSONAL.
 function classifyQuestion(text) {
   const t = text.trim();
 
+  // PERSONAL — check first (highest priority)
+  // Any first-person subject, decision marker, or personal consequence = PERSONAL
   const personalPatterns = [
     /(\bI |\bmy |\bme |\bμου\b|\bεγώ\b|\bμένα\b)/i,
     /(should i|πρέπει να|want to|θέλω να|thinking of|σκέφτομαι να|don't know if|δεν ξέρω αν|need to decide|need to choose|χρειάζομαι να)/i,
@@ -439,43 +443,59 @@ function classifyQuestion(text) {
   ];
   if (personalPatterns.some(p => p.test(t))) return "PERSONAL";
 
+  // ANALYSIS — only if NO first-person subject, personal decision, or personal consequence
   const analysisPatterns = [
     /^(analyze|ανάλυσε|analysis of|what will happen (to|with) the|how likely is (a|the|war|world)|what causes|explain the|compare the)/i,
     /(economy|οικονομία|geopolit|world war|παγκόσμιος πόλεμος|global market|macro|κεντρική τράπεζα)/i,
   ];
   if (analysisPatterns.some(p => p.test(t))) return "ANALYSIS";
 
+  // FACT — direct knowledge question with no decision
   const factPatterns = [
     /^(what is |what are |who is |who are |how (many|much|does|do|did) |when (did|was|is) |where (is|are|was) |define |τι είναι |τι σημαίνει |πόσο |πότε |ποιος |πού )/i,
   ];
   if (factPatterns.some(p => p.test(t))) return "FACT";
   if (t.split(" ").length <= 4) return "FACT";
 
+  // Default: PERSONAL — never assume impersonal, never route to ANALYSIS without clear signal
   return "PERSONAL";
 }
 
+// Backward compat — used in a few places
 function isFactQuestion(text) {
   const q = classifyQuestion(text);
   return q === "FACT" || q === "ANALYSIS";
 }
 
+// Detect if first message warrants the First-Why pause
 function needsFirstWhy(text) {
   if (isFactQuestion(text)) return false;
+  // RT-08: long first messages already provide substantial context (C10) —
+  // First-WHY would discard it. 60 words is a conservative "substantial" threshold.
   if (text.trim().split(/\s+/).length > 60) return false;
+  // RT-21: high emotional weight (C9) — skip First-WHY's "one word, why does this
+  // matter" framing, which is tone-deaf for grief/loss/burnout/breakdown messages.
   if (/(grief|πένθος|θάνατος|έχασα|απώλεια|burnout|εξάντληση|breakdown|κατάρρευση|χωρισμός|χωρίζω)/i.test(text)) return false;
   const signals = [
+    // Dilemma / decision
     /(δεν ξέρω (αν|τι|πώς)|αδυνατώ να αποφασίσω|πρέπει να επιλέξω|to decide|don't know (if|what|how)|can't decide|should i|έχω δίλημμα|dilemma)/i,
+    // Goal / desired change
     /(θέλω να (αλλάξω|ξεκινήσω|φύγω|μείνω|κάνω)|want to (change|start|leave|stay|build)|trying to figure out)/i,
+    // Recurring frustration
     /(πάντα|ξανά και ξανά|δεν μπορώ να σταματήσω|keep (doing|thinking|going back)|always end up|συνέχεια)/i,
+    // Uncertainty
     /(δεν είμαι σίγουρος|δεν ξέρω τι θέλω|lost|confused|μπερδεμένος|αβέβαιος|uncertain)/i,
   ];
   return signals.some(p => p.test(text));
 }
 
+
 // ─────────────────────────────────────────────
-// LENS INFERENCE
+// LENS INFERENCE PROMPT (model-side, replaces client scoring)
 // ─────────────────────────────────────────────
 
+// Correction 7: No separate API call for lens inference.
+// Lens scoring — client-side heuristic, single function, no wrapper
 function inferLensFallback(firstMessage, whyWord) {
   const combined = (firstMessage + ' ' + whyWord).toLowerCase();
   const scores = { SIMPLIFY: 0, CHALLENGE: 0, PERSPECTIVE: 0, EXPLORE: 0 };
@@ -505,7 +525,7 @@ function getLensPrompt(lens) {
 }
 
 // ─────────────────────────────────────────────
-// SAFETY
+// SAFETY: crisis / emotional distress detection
 // ─────────────────────────────────────────────
 
 function detectSafetySignal(text) {
@@ -517,26 +537,94 @@ function detectSafetySignal(text) {
     /\b(grief|bereaved|bereavement|trauma|traumatic|abuse|abused|assault|crisis|breakdown|panic attack)\b/i,
     /\b(πένθος|τραύμα|κατάρρευση|κρίση|κακοποίηση|απώλεια αγαπημένου)\b/i,
   ];
+  // FIX 2: model-level safety fallback already in A6 prompt — client catches obvious misses only
   if (crisis.some(p => p.test(text))) return "CRISIS";
   if (distress.some(p => p.test(text))) return "DISTRESS";
   return null;
 }
 
 // ─────────────────────────────────────────────
-// MEMORY
+// MEMORY — Pattern Storage / Interpretation separation
+// Storage: automatic (with consent)
+// Interpretation: consent-gated per-event
 // ─────────────────────────────────────────────
 
 const MEMORY_KEY = "aura_v2_memory";
+
+// ─────────────────────────────────────────────
+// MEMORY SCHEMA — progress memory over fact memory (U1)
+// Remembers HOW thinking evolves, not just what exists
+// ─────────────────────────────────────────────
+
 const MEMORY_SCHEMA_VERSION = 1;
 
 const EMPTY_MEMORY = () => ({
   schemaVersion: MEMORY_SCHEMA_VERSION,
   storageEnabled: false,
+
+  // TRAJECTORY MEMORY (U1) — how thinking evolves, not facts
+  // Each trajectory is a recurring decision theme with thinking quality over time
   trajectories: [],
+  /*
+    trajectory: {
+      id: string,
+      category: string,            // career | relation | financial | health | identity | founder | life_change | personal
+      firstSeen: number,
+      lastSeen: number,
+      sessions: number,            // how many sessions touched this
+      thinkingQuality: number,     // 1–5: 1=reactive, 3=structured, 5=clear trade-off analysis
+      obstacleType: string|null,   // what keeps appearing: fear_of_failure | certainty_seeking | avoidance | values_conflict | null
+      obstacleConfidence: number,  // 0–1, requires 3+ occurrences before > 0.6 (U7)
+      resolved: boolean,
+    }
+  */
+
+  // OUTCOME TRACKING (U2) — what happened after the conversation
+  // Anchors store decisions + outcomes when user reports back
   anchors: [],
+  /*
+    anchor: {
+      id: string,
+      text: string,                // decision in user's words
+      category: string,
+      createdAt: number,
+      status: "open"|"completed"|"revised"|"released"|"paused",
+      closedAt: number|null,
+      outcome: string|null,        // what user reported happened (optional, user-provided)
+      outcomeAt: number|null,
+    }
+  */
+
+  // THINKING QUALITY LOG (U5,U6) — tracks clarity and confidence over time
+  // Not per-conversation content, just quality signals
   qualityLog: [],
+  /*
+    entry: {
+      sessionId: string,
+      category: string,
+      thinkingLevel: number,       // 1=reactive ("tell me what to do"), 5=structured ("I see 3 options, stuck here")
+      clarityGain: boolean,        // did confusion reduce this session?
+      confusionReduced: boolean,   // user expressed more clarity at end than start
+    }
+  */
+
+  // PATTERN STABILITY (U7) — obstacles require 3+ confirmed appearances
   obstacles: [],
+  /*
+    obstacle: {
+      type: string,                // fear_of_failure | certainty_seeking | avoidance | values_conflict
+      category: string,
+      confirmedCount: number,      // 0–N, only stable when >= 3
+      stable: boolean,             // true only when confirmedCount >= 3
+      firstSeen: number,
+      lastSeen: number,
+      corrections: number,         // user-rejected observations reduce confidence
+    }
+  */
+
+  // MISFIRES — rejected observations (reduces future confidence)
   misfires: [],
+
   sessionCount: 0,
 });
 
@@ -545,8 +633,10 @@ function loadMemory() {
     const raw = localStorage.getItem(MEMORY_KEY);
     if (!raw) return EMPTY_MEMORY();
     const parsed = JSON.parse(raw);
+    // B1: schema version mismatch — start fresh rather than risk type errors on old data
     if (parsed.schemaVersion !== MEMORY_SCHEMA_VERSION) return EMPTY_MEMORY();
     const merged = { ...EMPTY_MEMORY(), ...parsed };
+    // RT-18: defensive array coercion — corrupted/null fields would crash later .map()/.find() calls
     merged.trajectories = Array.isArray(merged.trajectories) ? merged.trajectories : [];
     merged.obstacles    = Array.isArray(merged.obstacles)    ? merged.obstacles    : [];
     merged.anchors      = Array.isArray(merged.anchors)      ? merged.anchors      : [];
@@ -557,9 +647,11 @@ function loadMemory() {
 
 let _saveMemoryTimer = null;
 function saveMemory(mem) {
+  // A2: debounce writes — multiple rapid updates collapse into one disk write
   if (_saveMemoryTimer) clearTimeout(_saveMemoryTimer);
   _saveMemoryTimer = setTimeout(() => {
     try {
+      // A2: cap unbounded arrays — keep most recently active entries
       const capped = {
         ...mem,
         trajectories: (mem.trajectories || []).slice(-50),
@@ -570,7 +662,15 @@ function saveMemory(mem) {
   }, 400);
 }
 
+// ── Trajectory recording (U1) ──
+// Records how user's thinking on a category evolves across sessions
 function recordTrajectory(mem, category, thinkingLevel, obstacleType) {
+  // RT-17: removed `if (!mem.storageEnabled) return mem;` early-return.
+  // This function computes in-memory trajectory/obstacle state regardless of consent —
+  // persistence (saveMemory) remains independently gated by storageEnabled at every call site.
+  // Without this change, obstacles never populate pre-consent, so getStableObstacle() always
+  // returns null, and memoryPromptPending can never fire — the consent flow was unreachable.
+  // BUG 8: deep-copy arrays to avoid mutating shared object references
   const trajectories = mem.trajectories.map(t => ({ ...t }));
   const obstacles    = mem.obstacles.map(o => ({ ...o }));
   const result = { ...mem, trajectories, obstacles };
@@ -608,14 +708,16 @@ function recordTrajectory(mem, category, thinkingLevel, obstacleType) {
   return result;
 }
 
+// ── Quality log entry (U5, U6) ──
+// Tracks thinking quality per session — not content, just signal
 function recordQualitySignal(mem, category, thinkingLevel, clarityGain, sessionId, duration, flags) {
   if (!mem.storageEnabled) return mem;
   mem.qualityLog = [
-    ...(mem.qualityLog || []).slice(-20),
+    ...(mem.qualityLog || []).slice(-20), // keep last 20 entries only
     {
       sessionId: sessionId || Date.now().toString(36),
-      duration: duration || 0,
-      ...(flags || {}),
+        duration: duration || 0, // seconds — no personal content
+        ...(flags || {}),  // firstWhyPassed, clarificationReached, terminationReached, snapshotShown
       category, thinkingLevel, clarityGain,
       confusionReduced: clarityGain,
       at: Date.now(),
@@ -624,12 +726,16 @@ function recordQualitySignal(mem, category, thinkingLevel, clarityGain, sessionI
   return mem;
 }
 
+// ── Anchor management ──
 function closeAnchor(mem, id, status) {
   const a = mem.anchors.find(a => a.id === id);
   if (a) { a.status = status; a.closedAt = Date.now(); }
   return mem;
 }
 
+// ── Stable obstacle check (U7) ──
+// Pattern is only stable when confirmed 3+ times
+// Records a user-rejected observation — reduces future confidence on that obstacle type
 function recordCorrection(mem, type, category = "\u03ac\u03bb\u03bb\u03bf") {
   const obstacles = mem.obstacles.map(o => ({ ...o }));
   const o = obstacles.find(x => x.type === type);
@@ -643,10 +749,12 @@ function getStableObstacle(mem, category) {
   ) || null;
 }
 
+// ── Open anchors ──
 function getOpenAnchors(mem) {
   return mem.anchors.filter(a => a.status === "open");
 }
 
+// ── Export (readable, no content) ──
 function exportMemory(mem) {
   const data = {
     exportedAt: new Date().toISOString(),
@@ -672,6 +780,8 @@ function exportMemory(mem) {
   URL.revokeObjectURL(url);
 }
 
+// ── Session context builder ──
+// Injects minimal relevant memory into system prompt (no facts, only trajectory signals)
 function buildMemoryContext(mem, category) {
   if (!mem.storageEnabled) return "";
   const traj = mem.trajectories.find(t => t.category === category);
@@ -687,7 +797,7 @@ function buildMemoryContext(mem, category) {
 }
 
 // ─────────────────────────────────────────────
-// DOMAIN DETECTION
+// DOMAIN DETECTION (lightweight keyword heuristic)
 // ─────────────────────────────────────────────
 
 function detectDomain(text) {
@@ -700,7 +810,7 @@ function detectDomain(text) {
 }
 
 // ─────────────────────────────────────────────
-// PATTERN DETECTION
+// CLIENT-SIDE PATTERN DETECTION
 // ─────────────────────────────────────────────
 
 function detectPattern(messages) {
@@ -733,6 +843,9 @@ function detectPattern(messages) {
   if (avoidWords.test(last) && !convergeWords.test(last) && userMsgs.length >= 4)
     return { type: "AVOIDANCE", confidence: 0.7 };
 
+  // RT-12: additive check for repeated one-word/short non-answers (e.g. "ναι"/"όχι"/"δεν ξέρω"),
+  // which the 5+-char similarity check above can never see. Does not alter existing matching —
+  // only catches a pattern that previously matched nothing.
   const shortNonAnswer = /^(ναι|όχι|ίσως|δεν ξέρω|δκ|ok|sure|maybe|i don'?t know|idk)\.?$/i;
   if (shortNonAnswer.test(last.trim()) && shortNonAnswer.test(prev.trim()) && shortNonAnswer.test(older.trim()))
     return { type: "AVOIDANCE", confidence: 0.7 };
@@ -744,6 +857,7 @@ function detectPattern(messages) {
 // API
 // ─────────────────────────────────────────────
 
+// A5: friendly, tone-consistent error messages — no raw status codes shown to user
 function friendlyApiError(status) {
   if (status === 429 || status === 529) return "Κάτι δεν λειτούργησε. Δοκίμασε ξανά σε λίγο.";
   if (status >= 500) return "Κάτι δεν λειτούργησε. Δοκίμασε ξανά σε λίγο.";
@@ -757,6 +871,7 @@ async function callAura(messages, systemPrompt, retries = 1) {
   if (_activeCall) {
     throw new Error("Κάτι δεν λειτούργησε. Δοκίμασε ξανά.");
   }
+  // FIX 1: AbortController — 30s timeout for mobile network stalls
   const controller = new AbortController();
   const timeoutId  = setTimeout(() => controller.abort(), 26000);
   _activeCall = true;
@@ -794,7 +909,7 @@ async function callAura(messages, systemPrompt, retries = 1) {
 
 
 // ─────────────────────────────────────────────
-// MESSAGE BUBBLE
+// MESSAGE BUBBLE (A1: memoized — avoids re-render of entire history on new message)
 // ─────────────────────────────────────────────
 const MessageBubble = memo(function MessageBubble({ msg, onMisfire }) {
   const isUser        = msg.role === "user";
@@ -841,53 +956,65 @@ export default function AURAv2() {
   const [error, setError]               = useState(null);
   const [mode, setMode]                 = useState("ANSWER");
   const [sessionStarted, setSessionStarted] = useState(false);
+  // First-Why protocol
   const [firstWhyPending, setFirstWhyPending] = useState(false);
   const [firstWhyMessage, setFirstWhyMessage] = useState("");
-  const [activeLens, setActiveLens]           = useState("SIMPLIFY");
+  const [activeLens, setActiveLens]           = useState("SIMPLIFY"); // SIMPLIFY | CHALLENGE | PERSPECTIVE | EXPLORE — never revealed
   const [sessionEnded, setSessionEnded] = useState(false);
-  const [safetyMode, setSafetyMode]     = useState(false);
+  const [safetyMode, setSafetyMode]     = useState(false); // disables termination when active
 
+  // Compression / pivot gate
   const [pivotPending, setPivotPending]         = useState(false);
   const [pivotType, setPivotType]               = useState(null);
   const [layerGatePending, setLayerGatePending] = useState(false);
   const [pendingUserMessage, setPendingUserMessage] = useState(null);
+
+  // Pre-termination warning
   const [warningPending, setWarningPending] = useState(false);
 
+  // Memory
   const [memory, setMemory]                       = useState(() => loadMemory());
   const [memoryPromptPending, setMemoryPromptPending] = useState(false);
   const [showMemoryPanel, setShowMemoryPanel]     = useState(false);
 
+  // Observation misfire — user rejected an observation
   const [misfirePending, setMisfirePending]   = useState(false);
   const [misfireType, setMisfireType]         = useState(null);
   const [misfireInput, setMisfireInput]       = useState("");
 
-  const [claritySurge, setClaritySurge]   = useState(false);
-  const [illumLevel, setIllumLevel]       = useState(0);
-  const [finalDistillation, setFinalDistillation] = useState(null);
-  const recentSurges = useRef([]);
+  // Pattern exploring state
 
+  // ── Visual & Closing System (presentation layer only) ──
+  const [claritySurge, setClaritySurge]   = useState(false); // brief pulse on clarity moment
+  const [illumLevel, setIllumLevel]       = useState(0);     // 0-11 letters lit, progressive
+  const [finalDistillation, setFinalDistillation] = useState(null); // "To the point of mind" sentence
+  const recentSurges = useRef([]); // timestamps — red-team safety: suppress if too frequent
+
+  // Red-team safety: trigger a clarity surge only if not over-frequent (max 2 per 60s)
   const triggerClaritySurge = useCallback(() => {
     const now = Date.now();
     recentSurges.current = recentSurges.current.filter(t => now - t < 60000);
-    if (recentSurges.current.length >= 2) return;
+    if (recentSurges.current.length >= 2) return; // auto-suppress — becoming predictable
     recentSurges.current.push(now);
     setClaritySurge(true);
     setTimeout(() => setClaritySurge(false), 900);
   }, []);
 
+  // Domain detection for current session
   const [currentDomain, setCurrentDomain] = useState("άλλο");
 
   const turnCount          = useRef(0);
-  const clarificationRound = useRef(0);
+  const clarificationRound = useRef(0); // tracks clarification depth — max 3
   const lastChallengeAt  = useRef(-99);
   const compressionCount = useRef(0);
   const warningIssued    = useRef(false);
-  const submittingRef    = useRef(false);
-  const currentSessionId   = useRef(Date.now().toString(36));
-  const sessionStartTime   = useRef(Date.now());
+  const submittingRef    = useRef(false); // RT-15: synchronous double-submit guard
+  const currentSessionId   = useRef(Date.now().toString(36)); // unique id per session
+  const sessionStartTime   = useRef(Date.now()); // beta: session duration tracking
   const betaFlags          = useRef({ firstWhyPassed: false, firstWhySkipped: false,
-    clarificationReached: false, terminationReached: false, snapshotShown: false });
+    clarificationReached: false, terminationReached: false, snapshotShown: false }); // beta observability
 
+  // First "To the point of mind" ever shown — slightly slower fade, no other change
   const [isFirstDistillation, setIsFirstDistillation] = useState(false);
 
   const [isListening, setIsListening] = useState(false);
@@ -918,25 +1045,10 @@ export default function AURAv2() {
     setIsListening(false);
   }, []);
 
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
-
   useEffect(() => {
-    const handleResize = () => {
-      if (!window.visualViewport) return;
-      const ratio = window.visualViewport.height / window.screen.height;
-      setKeyboardOpen(ratio < 0.75);
-    };
-    window.visualViewport?.addEventListener('resize', handleResize);
-    return () => window.visualViewport?.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => {
-        textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 200);
-    }
-  }, [messages, loading]);
+    // FIX 4: block:"end" is more reliable than smooth on iOS Safari
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, loading, pivotPending, layerGatePending, memoryPromptPending, warningPending, misfirePending, firstWhyPending]);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -950,11 +1062,15 @@ export default function AURAv2() {
     if (sessionEnded) return;
     setLoading(true);
     try {
+      // Track clarification rounds — force answer after 3 rounds
       if (currentMode !== "COMPRESSION" && currentMode !== "SUPPORTIVE") {
         clarificationRound.current += 1;
-        betaFlags.current.clarificationReached = true;
+      betaFlags.current.clarificationReached = true; // beta: clarification stage reached
       }
+      // U1/U3: Build memory context for current category (injected silently, never shown)
       const memCtx = buildMemoryContext(memory, currentDomain);
+      // B3: memory recall is itself a quiet signal — one illumination tick,
+      // distinct from clarity-surge (which marks insight, not recall).
       if (memCtx) setIllumLevel(prev => Math.min(11, prev + 1));
       const basePrompt =
         currentMode === "COMPRESSION" ? SYSTEM_COMPRESSION :
@@ -965,6 +1081,8 @@ export default function AURAv2() {
 
       if (currentMode === "COMPRESSION") {
         compressionCount.current += 1;
+        // C13: Re-evaluate lens after compression (major topic shift or loop confirmed)
+        // BUG 2.2 fix: use msgs (current call's full context) instead of stale `messages` closure
         if (msgs.length > 0) {
           const allUserText = msgs.filter(m => m.role === "user").map(m => m.content).join(" ");
           const freshLens = inferLensFallback(allUserText, "");
@@ -974,33 +1092,43 @@ export default function AURAv2() {
 
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: currentMode }]);
 
+      // ── Visual: clarity moment detection (presentation layer only) ──
+      // A clarity moment = Clarity Snapshot pattern OR compression resolution
       const hasSnapshot = /αυτό που φαίνεται πιο ξεκάθαρο/i.test(text) && /παραμένει ανοιχτό/i.test(text);
       if (hasSnapshot || currentMode === "COMPRESSION") {
-        triggerClaritySurge();
-        setIllumLevel(prev => Math.min(11, prev + 1));
+        triggerClaritySurge(); // red-team safe: auto-suppresses if over-frequent
+        setIllumLevel(prev => Math.min(11, prev + 1)); // one segment per clarity event, never per message
       }
 
+      // U5,U6: Record thinking quality signal (heuristic — no content stored)
+      // A3: only on "final" turns — skip intermediate clarification-question responses,
+      // so the trajectory reflects user thinking quality, not AURA's own questions.
       const looksLikeClarificationQuestion =
         currentMode !== "COMPRESSION" &&
         clarificationRound.current <= 2 &&
         /\?\s*$/.test(text.trim()) &&
-        /^\s*1[\.\ )]/m.test(text);
+        /^\s*1[\.\)]/m.test(text); // numbered-list clarification pattern
       if (memory.storageEnabled && currentMode !== "SUPPORTIVE" && msgs.length > 0 && !looksLikeClarificationQuestion) {
         const lastUser = [...msgs].reverse().find(m => m.role === "user")?.content || "";
+        // Thinking quality heuristic: structured framing = higher quality
         const hasStructure = /(option|trade.?off|on one hand|on the other|επιλογή|αντί|από τη μία|από την άλλη)/i.test(lastUser);
         const isReactive   = /(tell me what|just tell|απλά πες|πες μου τι)/i.test(lastUser);
         const thinkingLevel = isReactive ? 1 : hasStructure ? 4 : 2;
+        // Clarity gain: did AURA compress or identify the core issue?
         const clarityGain  = /(the core|the real question|what remains|αυτό που μένει|η ουσία)/i.test(text);
-        if (clarityGain) betaFlags.current.snapshotShown = true;
-        const sessionDuration = Math.round((Date.now() - sessionStartTime.current) / 1000);
+        if (clarityGain) betaFlags.current.snapshotShown = true; // beta: clarity snapshot signal
+        const sessionDuration = Math.round((Date.now() - sessionStartTime.current) / 1000); // seconds
         const updatedMem = recordQualitySignal({ ...memory }, currentDomain, thinkingLevel, clarityGain, currentSessionId.current, sessionDuration, { ...betaFlags.current });
         const updatedWithTraj = recordTrajectory(updatedMem, currentDomain, thinkingLevel, null);
         setMemory(updatedWithTraj);
         if (memory.storageEnabled) saveMemory(updatedWithTraj);
       }
 
+      // Termination logic — only if not in safety mode and warning was already issued
+      // FIX 3: broader termination signal detection — catches equivalent phrasings
       const modelSignalsEnd = /(action belongs to (you|the user)|we.ve reached the limit|the decision is yours|continuing.{0,30}(not|won.t) (help|serve)|η απόφαση (είναι|ανήκει) (δική σου|σε σένα)|έχουμε (φτάσει|αρκετή|αρκετό)|συνεχίζοντας.{0,30}δεν (βοηθ|εξυπηρετ))/i.test(text);
-      if (!safetyMode && (compressionCount.current >= 2 || modelSignalsEnd)) {
+      // C12: safetyMode can be exited if user explicitly requests decision help
+    if (!safetyMode && (compressionCount.current >= 2 || modelSignalsEnd)) {
         if (!warningIssued.current) {
           setWarningPending(true);
           warningIssued.current = true;
@@ -1011,11 +1139,14 @@ export default function AURAv2() {
     } catch(e) {
       setError(e.message);
     } finally {
-      setLoading(false);
+      setLoading(false); // guaranteed cleanup — without this, callAura throw left loading=true permanently
     }
   }, [safetyMode, memory, currentDomain, activeLens, sessionEnded]);
-
-  const illuminAnimCancelled = useRef(false);
+  // First-time-only progressive illumination — same end state (illumLevel=11),
+  // but reaches it over ~1.5s instead of instantly, exactly once per install.
+  // No new content, no new UI, no protocol change — only how fast an existing
+  // visual reaches its existing end state, the very first time it happens.
+  const illuminAnimCancelled = useRef(false); // cancels progressive animation on reset
 
   const applyTerminationIllumination = useCallback(() => {
     let seen = false;
@@ -1027,10 +1158,12 @@ export default function AURAv2() {
     }
     setIsFirstDistillation(true);
     try { localStorage.setItem("aura_first_distillation_seen", "1"); } catch {}
+    // Animate 0 -> 11 over ~1.5s (11 steps, ~135ms apart)
+    // illuminAnimCancelled.current is reset to false here and set to true on resetSession
     illuminAnimCancelled.current = false;
     let level = 0;
     const step = () => {
-      if (illuminAnimCancelled.current) return;
+      if (illuminAnimCancelled.current) return; // cancelled by resetSession
       level += 1;
       setIllumLevel(level);
       if (level < 11) setTimeout(step, 135);
@@ -1049,7 +1182,8 @@ export default function AURAv2() {
       const text = await callAura(termMsgs, SYSTEM_TERMINATION);
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
-      betaFlags.current.terminationReached = true;
+      betaFlags.current.terminationReached = true; // beta: natural termination reached
+      // Visual: session end — full illumination + distilled closing line
       applyTerminationIllumination();
       const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
       if (lines.length > 0) setFinalDistillation(lines[0]);
@@ -1064,13 +1198,16 @@ export default function AURAv2() {
     }
   }, [safetyMode, applyTerminationIllumination]);
 
+  // ── Misfire recovery — user rejected observation ──
   const handleMisfireResponse = useCallback(async (userCorrection) => {
     setMisfirePending(false);
+    // Record correction in memory
     if (memory.storageEnabled) {
       const updated = recordCorrection({ ...memory }, misfireType);
       setMemory(updated);
       saveMemory(updated);
     }
+    // Generate recovery response
     const correctionMsgs = [
       ...messages,
       { role: "user", content: userCorrection || "[User indicated the observation was inaccurate. Apply misfire recovery protocol.]" }
@@ -1085,6 +1222,7 @@ export default function AURAv2() {
     setMisfireType(null);
   }, [messages, memory, misfireType]);
 
+  // ── Layer gate ──
   const handleLayerChoice = useCallback(async (choice) => {
     if (!pendingUserMessage) return;
     const msgs = [...messages, { role: "user", content: pendingUserMessage }];
@@ -1098,6 +1236,7 @@ export default function AURAv2() {
     }
   }, [pendingUserMessage, messages, generateResponse]);
 
+  // ── Compression choice ──
   const handlePivotChoice = useCallback(async (accept) => {
     setPivotPending(false);
     lastChallengeAt.current = turnCount.current;
@@ -1113,18 +1252,23 @@ export default function AURAv2() {
       try {
         const text = await callAura(pivotMsgs, SYSTEM_COMPRESSION);
         setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "COMPRESSION", isInsight: true }]);
+        // BUG 7: compressionCount incremented in generateResponse only — removed duplicate here
+        // Visual: compression acceptance is a clarity moment
         triggerClaritySurge();
         setIllumLevel(prev => Math.min(11, prev + 1));
 
+        // U7: Record obstacle — stability requires 3+ confirmations before RCI
         const obstacleType = pivotType === "REPETITION" ? "avoidance"
           : pivotType === "AVOIDANCE" ? "certainty_seeking"
           : pivotType === "DECISION_PRESENT" ? "fear_of_commitment"
           : null;
         let updatedMem = recordTrajectory({ ...memory }, currentDomain, 2, obstacleType);
 
+        // Check if stable obstacle exists (3+ confirmations) — offer memory consent
         const stableObs = getStableObstacle(updatedMem, currentDomain);
         if (!memory.storageEnabled && stableObs) {
           setMemory(updatedMem);
+          // BUG 11: do not saveMemory before user grants consent
           setMemoryPromptPending(true);
         } else {
           setMemory(updatedMem);
@@ -1137,6 +1281,7 @@ export default function AURAv2() {
     }
   }, [messages, mode, pivotType, memory, generateResponse]);
 
+  // ── Memory consent ──
   const handleMemoryChoice = useCallback((accept) => {
     setMemoryPromptPending(false);
     if (accept) {
@@ -1144,19 +1289,25 @@ export default function AURAv2() {
       setMemory(updated);
       saveMemory(updated);
     }
+    // Declined: never ask again this session
   }, [memory]);
 
+  // (correlation gate removed in earlier patch — no longer referenced)
+
+  // ── Anchor close ──
   const closeAnchorHandler = useCallback((id, status) => {
     const updated = closeAnchor({ ...memory }, id, status);
     setMemory(updated);
     if (memory.storageEnabled) saveMemory(updated);
   }, [memory]);
 
+  // ── Warning: pre-termination ──
   const handleWarningChoice = useCallback(async (continueSession) => {
     setWarningPending(false);
     if (continueSession) {
+      // One final pass from a different angle — reset compression count
       compressionCount.current = 0;
-      warningIssued.current = false;
+      warningIssued.current = false;  // RT-05: allow a fair second warning before next termination
       const finalMsgs = [...messages, {
         role: "user",
         content: "[Final compression pass. Try a genuinely different angle before any termination consideration.]"
@@ -1170,114 +1321,129 @@ export default function AURAv2() {
   // ── Main submit ──
   const handleSubmit = useCallback(async () => {
     if (!input.trim() || loading || sessionEnded || submittingRef.current) return;
-    submittingRef.current = true;
+    submittingRef.current = true; // RT-15: close same-tick double-invocation window
     try {
-      const userText = input.trim();
-      setInput("");
-      setError(null);
+    const userText = input.trim();
+    setInput("");
+    setError(null);
 
-      const safetySignal = detectSafetySignal(userText);
-      if (safetySignal === "CRISIS") {
-        setSafetyMode(true);
-        setFirstWhyPending(false);
-        setCurrentDomain(detectDomain(userText));
-        const safeMsgs = [...messages, { id: nextMsgId(), role: "user", content: userText }];
-        setMessages(safeMsgs);
-        turnCount.current += 1;
-        await generateResponse(safeMsgs, "SUPPORTIVE");
-        return;
-      }
-      if (safetySignal === "DISTRESS") {
-        setFirstWhyPending(false);
-        const distressMsgs = [...messages, { id: nextMsgId(), role: "user", content: userText }];
-        setMessages(distressMsgs);
-        turnCount.current += 1;
-        setCurrentDomain(detectDomain(userText));
-        setActiveLens("PERSPECTIVE");
-        await generateResponse(distressMsgs, mode);
-        return;
-      }
+    // Safety check — gradient response (C8)
+    const safetySignal = detectSafetySignal(userText);
+    if (safetySignal === "CRISIS") {
+      // Level 3: full safety mode, supportive only
+      setSafetyMode(true);
+      setFirstWhyPending(false);  // BUG 6: clear pending state on safety override
+      setCurrentDomain(detectDomain(userText));  // RT-02: symmetric with DISTRESS branch
+      const safeMsgs = [...messages, { id: nextMsgId(), role: "user", content: userText }];
+      setMessages(safeMsgs);
+      turnCount.current += 1;
+      await generateResponse(safeMsgs, "SUPPORTIVE");
+      return;
+    }
+    if (safetySignal === "DISTRESS") {
+      // Level 2: gentle clarity — skip First-WHY, softer tone, user still gets help
+      setFirstWhyPending(false);  // BUG 6: clear pending state on safety override
+      const distressMsgs = [...messages, { id: nextMsgId(), role: "user", content: userText }];
+      setMessages(distressMsgs);
+      turnCount.current += 1;
+      setCurrentDomain(detectDomain(userText));  // BUG 9: set domain in distress path
+      // Inject distress context into normal flow — lens defaults to SIMPLIFY/PERSPECTIVE
+      setActiveLens("PERSPECTIVE");
+      await generateResponse(distressMsgs, mode);
+      return;
+    }
 
-      if (messages.length === 0 && !firstWhyPending && needsFirstWhy(userText)) {
-        setFirstWhyMessage(userText);
-        setMessages([{ id: nextMsgId(), role: "user", content: userText }]);
-        setFirstWhyPending(true);
-        return;
-      }
+    // First-Why trigger — only on first message of a new session
+    if (messages.length === 0 && !firstWhyPending && needsFirstWhy(userText)) {
+      setFirstWhyMessage(userText);
+      setMessages([{ id: nextMsgId(), role: "user", content: userText }]);
+      setFirstWhyPending(true);
+      return;
+    }
 
-      if (firstWhyPending) {
-        setFirstWhyPending(false);
-        const firstWhyRefusal = /^(δεν θέλω|δεν ξέρω πώς|skip|παράλειψε|απλά απάντα|απλά απάντησε|προχώρα|συνέχισε|pass|no thanks|never mind)[\.!;,]?$/i.test(userText.trim());
-        if (firstWhyRefusal) betaFlags.current.firstWhySkipped = true;
-        else betaFlags.current.firstWhyPassed = true;
-        const inferred = inferLensFallback(firstWhyMessage, firstWhyRefusal ? firstWhyMessage : userText);
-        setActiveLens(inferred);
-        const initMsgs = [
-          { id: nextMsgId(), role: "user", content: firstWhyMessage },
-          { id: nextMsgId(), role: "assistant", content: "Γιατί έχει σημασία αυτό για σένα;" },
-          { id: nextMsgId(), role: "user", content: userText },
-        ];
-        setMessages(initMsgs);
-        turnCount.current += 1;
-        setLoading(true);
-        try {
-          const memCtx = buildMemoryContext(memory, currentDomain);
-          const prompt = getLensPrompt(inferred) + (memCtx || "");
-          const text = await callAura(initMsgs, prompt);
-          setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "ANSWER" }]);
-          if (memory.storageEnabled) {
-            const updated = recordTrajectory({ ...memory }, currentDomain, 2, null);
-            setMemory(updated);
-            saveMemory(updated);
-          }
-        } catch(e) { setError(e.message); }
-        finally { setLoading(false); }
-        return;
-      }
+    // First-Why answer received — infer lens, then proceed
+    if (firstWhyPending) {
+      setFirstWhyPending(false);
+      // R2: graceful exit if user explicitly refuses First-WHY compression
+      // Does not make First-WHY optional — only handles explicit refusals.
+      // Refusal patterns: direct negation, skip requests, unrelated meta-responses.
+      const firstWhyRefusal = /^(δεν θέλω|δεν ξέρω πώς|skip|παράλειψε|απλά απάντα|απλά απάντησε|προχώρα|συνέχισε|pass|no thanks|never mind)[\.!;,]?$/i.test(userText.trim());
+      if (firstWhyRefusal) betaFlags.current.firstWhySkipped = true;
+      else betaFlags.current.firstWhyPassed = true;
+      const inferred = inferLensFallback(firstWhyMessage, firstWhyRefusal ? firstWhyMessage : userText);
+      setActiveLens(inferred);
+      const initMsgs = [
+        { id: nextMsgId(), role: "user", content: firstWhyMessage },
+        { id: nextMsgId(), role: "assistant", content: "Γιατί έχει σημασία αυτό για σένα;" },
+        { id: nextMsgId(), role: "user", content: userText },
+      ];
+      setMessages(initMsgs);
+      turnCount.current += 1;
+      setLoading(true);
+      try {
+        // U1/U3: Inject memory context for this category
+        const memCtx = buildMemoryContext(memory, currentDomain);
+        const prompt = getLensPrompt(inferred) + (memCtx || "");
+        const text = await callAura(initMsgs, prompt);
+        setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "ANSWER" }]);
+        // U1: Start trajectory for this category
+        if (memory.storageEnabled) {
+          const updated = recordTrajectory({ ...memory }, currentDomain, 2, null);
+          setMemory(updated);
+          saveMemory(updated);
+        }
+      } catch(e) { setError(e.message); }
+      finally { setLoading(false); }
+      return;
+    }
 
-      const nextMsgs  = [...messages, { id: nextMsgId(), role: "user", content: userText }];
-      const pattern   = detectPattern(nextMsgs);
-      const domain    = detectDomain(userText);
-      if (domain !== currentDomain && currentDomain !== "\u03ac\u03bb\u03bb\u03bf") {
-        compressionCount.current = 0;
-        warningIssued.current = false;
-      }
-      setCurrentDomain(domain);
-      const turn     = turnCount.current + 1;
+    const nextMsgs  = [...messages, { id: nextMsgId(), role: "user", content: userText }];
+    const pattern   = detectPattern(nextMsgs);
+    const domain    = detectDomain(userText);
+    // B2: new topic/category — compression history doesn't carry over
+    if (domain !== currentDomain && currentDomain !== "\u03ac\u03bb\u03bb\u03bf") {
+      compressionCount.current = 0;
+      warningIssued.current = false;
+    }
+    setCurrentDomain(domain);
+    const turn     = turnCount.current + 1;
 
-      const offerGate =
-        mode === "ANSWER" && turn >= 4 &&
-        (pattern.type === "REPETITION" || pattern.type === "AVOIDANCE") &&
-        pattern.confidence > 0.6 &&
-        (turn - lastChallengeAt.current) >= 4;
+    // Layer gate
+    const offerGate =
+      mode === "ANSWER" && turn >= 4 &&
+      (pattern.type === "REPETITION" || pattern.type === "AVOIDANCE") &&
+      pattern.confidence > 0.6 &&
+      (turn - lastChallengeAt.current) >= 4;
 
-      if (offerGate) {
-        lastChallengeAt.current = turn;
-        setPendingUserMessage(userText);
-        setMessages(nextMsgs);
-        turnCount.current += 1;
-        setLayerGatePending(true);
-        return;
-      }
-
+    if (offerGate) {
+      lastChallengeAt.current = turn;
+      setPendingUserMessage(userText);
       setMessages(nextMsgs);
       turnCount.current += 1;
+      setLayerGatePending(true);
+      return;
+    }
 
-      const offerPivot =
-        mode === "AUDIT" && turn >= 4 &&
-        (turn - lastChallengeAt.current) >= 3 &&
-        (pattern.type === "REPETITION" || pattern.type === "AVOIDANCE" || pattern.type === "DECISION_PRESENT") &&
-        pattern.confidence > 0.75;
+    setMessages(nextMsgs);
+    turnCount.current += 1;
 
-      if (offerPivot) {
-        setPivotPending(true);
-        setPivotType(pattern.type);
-        return;
-      }
+    // Compression offer — U4: only when confidence is high
+    // RCI raised threshold: requires strong signal (confidence > 0.75) (U4)
+    const offerPivot =
+      mode === "AUDIT" && turn >= 4 &&
+      (turn - lastChallengeAt.current) >= 3 &&
+      (pattern.type === "REPETITION" || pattern.type === "AVOIDANCE" || pattern.type === "DECISION_PRESENT") &&
+      pattern.confidence > 0.75;
 
-      await generateResponse(nextMsgs, mode);
+    if (offerPivot) {
+      setPivotPending(true);
+      setPivotType(pattern.type);
+      return;
+    }
+
+    await generateResponse(nextMsgs, mode);
     } finally {
-      submittingRef.current = false;
+      submittingRef.current = false; // RT-15: release guard regardless of which path returned
     }
   }, [input, loading, sessionEnded, messages, mode, generateResponse]);
 
@@ -1307,8 +1473,8 @@ export default function AURAv2() {
     setFirstWhyMessage("");
     setActiveLens("SIMPLIFY");
     turnCount.current = 0;
-    currentSessionId.current = Date.now().toString(36);
-    sessionStartTime.current = Date.now();
+    currentSessionId.current = Date.now().toString(36); // new id for new session
+    sessionStartTime.current = Date.now(); // reset duration timer
     betaFlags.current = { firstWhyPassed: false, firstWhySkipped: false,
       clarificationReached: false, terminationReached: false, snapshotShown: false };
     clarificationRound.current = 0;
@@ -1316,16 +1482,18 @@ export default function AURAv2() {
     compressionCount.current = 0;
     warningIssued.current = false;
     setError(null);
+    // Reset visual & closing system
     setClaritySurge(false);
     setIllumLevel(0);
     setIsFirstDistillation(false);
     setFinalDistillation(null);
     recentSurges.current = [];
-    illuminAnimCancelled.current = true;
+    illuminAnimCancelled.current = true; // cancel any in-progress progressive illumination
   };
 
   const openAnchors = getOpenAnchors(memory);
   const isFirst = messages.length === 0 && !layerGatePending && !pivotPending && !firstWhyPending;
+  // Return session: user has open anchor — show it as first thing
   const returnAnchor = isFirst && openAnchors.length > 0 ? openAnchors[0] : null;
 
   // ─────────────────────────────────────────────
@@ -1350,35 +1518,67 @@ export default function AURAv2() {
         @keyframes pulse{0%,100%{opacity:.15;transform:scale(.8)}40%{opacity:1;transform:scale(1.1)}}
         @keyframes goldGlow{0%,100%{box-shadow:0 0 0 0 rgba(201,168,76,0)}50%{box-shadow:0 0 16px 1px rgba(201,168,76,.08)}}
 
-        .light-field{position:fixed;inset:0;z-index:-1;background:var(--field-base);transition:background 1.4s ease;}
-        .light-field.clear{background:var(--field-clear);}
-        .light-field.surge{background:#121211;transition:background .35s ease;}
+        /* ── AURA LIGHT FIELD ── */
+        /* State-driven background clarity shift. No gradients-as-decor, no time-based loops. */
+        .light-field{
+          position:fixed; inset:0; z-index:-1;
+          background:var(--field-base);
+          transition:background 1.4s ease;
+        }
+        .light-field.clear{ background:var(--field-clear); }
+        .light-field.surge{ background:#121211; transition:background .35s ease; }
 
-        .vertical-identity{position:fixed;left:6px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:7px;z-index:1;pointer-events:none;}
-        .vertical-identity span{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;color:var(--text-primary);opacity:.35;transition:opacity 1.8s ease;text-shadow:0 0 6px rgba(201,168,76,.2);}
-        .vertical-identity span.lit{opacity:.20;}
-        .vertical-identity span.full{opacity:1;text-shadow:0 0 8px rgba(201,168,76,.5);}
-        .vertical-identity span.flash{opacity:.85;transition:opacity .3s ease;text-shadow:0 0 10px rgba(201,168,76,.5);}
+        /* ── VERTICAL IDENTITY: AURA ERGO SUM ── */
+        .vertical-identity{
+          position:fixed; left:14px; top:50%; transform:translateY(-50%);
+          display:flex; flex-direction:column; align-items:center; gap:7px;
+          z-index:1; pointer-events:none;
+        }
+        .vertical-identity span{
+          font-family:'DM Mono',monospace; font-size:9px; letter-spacing:.1em;
+          color:var(--text-primary);
+          opacity:.08; /* baseline 8% — within 10-30% range, low end */
+          transition:opacity 1.8s ease;
+        }
+        .vertical-identity span.lit{ opacity:.85; }
+        .vertical-identity span.full{ opacity:1; text-shadow:0 0 8px rgba(201,168,76,.25); }
 
-        .distillation{padding:28px 0 8px;margin-top:4px;border-top:1px solid var(--border);animation:fadeUp 1s ease;}
-        .distillation.first-time{animation:fadeUp 1.8s ease;}
-        .distillation-label{font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;}
-        .distillation-text{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:300;font-style:italic;color:#d8d3c8;line-height:1.6;}
+        /* ── CLOSING SYSTEM: To the point of mind ── */
+        .distillation{
+          padding:28px 0 8px; margin-top:4px;
+          border-top:1px solid var(--border);
+          animation:fadeUp 1s ease;
+        }
+        /* First time only — same fade, slightly slower. No new content, no new register. */
+        .distillation.first-time{
+          animation:fadeUp 1.8s ease;
+        }
+        .distillation-label{
+          font-size:8px; letter-spacing:.22em; text-transform:uppercase;
+          color:var(--text-dim); margin-bottom:10px;
+        }
+        .distillation-text{
+          font-family:'Cormorant Garamond',serif; font-size:21px; font-weight:300;
+          font-style:italic; color:#d8d3c8; line-height:1.6;
+        }
 
-        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 22px 0 36px;display:flex;flex-direction:column;position:relative}
-        .input-area-placeholder{display:none}
-        .feed{flex:1;padding:32px 0 40px;display:flex;flex-direction:column;gap:26px}
+        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 22px;display:flex;flex-direction:column;position:relative}
+
+        /* Header */
         .header{padding:26px 0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
         .wordmark{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:300;font-style:italic;letter-spacing:.2em;color:#ddd8d0}
         .header-right{display:flex;align-items:center;gap:12px}
         .mode-pill{display:flex;align-items:center;gap:6px;font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-secondary)}
         .mode-dot{width:4px;height:4px;border-radius:50%;background:#333;transition:background .5s}
+        .mode-dot.obs{background:var(--green);animation:pulse 2.4s ease-in-out infinite}
         .mode-dot.safe{background:var(--red);animation:pulse 1.5s ease-in-out infinite}
         .toggle-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;cursor:pointer;border-radius:1px;transition:all .2s}
+        .toggle-btn.on{color:var(--text-secondary);border-color:var(--border-mid)}
         .toggle-btn:hover{color:var(--text-secondary);border-color:var(--border-mid)}
         .icon-btn{background:none;border:none;color:var(--text-dim);font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;padding:3px 6px;cursor:pointer;transition:color .2s}
         .icon-btn:hover{color:var(--text-secondary)}
 
+        /* Anchors */
         .anchor-bar{padding:12px 0;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:7px}
         .anchor-bar-label{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim);margin-bottom:2px}
         .anchor-item{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
@@ -1389,26 +1589,32 @@ export default function AURAv2() {
         .anchor-btn.done:hover{color:var(--green);border-color:var(--green)}
         .anchor-btn.release:hover{color:#888;border-color:#444}
 
+        /* Memory panel */
         .mem-panel{padding:14px 0;border-bottom:1px solid var(--border);font-size:10px;color:var(--text-dim);line-height:1.8;animation:fadeUp .3s ease}
         .mem-panel-title{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px}
         .mem-panel-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
         .mem-panel-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
 
-        .input-area-old{display:none}
+        /* Feed */
+        .feed{flex:1;padding:32px 0 18px;display:flex;flex-direction:column;gap:26px}
 
+        /* Return anchor — outcome awareness (U2) */
         .return-anchor-card{padding:28px 0 20px;animation:fadeUp .6s ease;border-bottom:1px solid var(--border)}
         .return-label{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px}
         .return-text{font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:6px}
         .return-question{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;font-style:italic;color:#3a3632}
 
+        /* First-Why */
         .first-why-card{padding:32px 0 24px;animation:fadeUp .4s ease}
         .first-why-q{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:300;font-style:italic;color:#5a5650;line-height:1.5}
 
+        /* Empty */
         .empty{flex:1;display:flex;flex-direction:column;justify-content:center;padding:56px 0;animation:fadeUp .8s ease}
-        .empty-headline{font-family:'Cormorant Garamond',serif;font-size:40px;font-weight:300;font-style:italic;line-height:1.12;color:#3a3730;margin-bottom:18px}
-        .empty-sub{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#6a6660;line-height:2.2}
-        .empty-hint{font-size:11px;color:#5a5650;line-height:1.9;margin-top:20px;font-style:italic;opacity:1}
+        .empty-headline{font-family:'Cormorant Garamond',serif;font-size:40px;font-weight:300;font-style:italic;line-height:1.12;color:#1d1b18;margin-bottom:18px}
+        .empty-sub{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);line-height:2.2}
+        .empty-hint{font-size:11px;color:var(--text-dim);line-height:1.9;margin-top:20px;font-style:italic;opacity:.6}
 
+        /* Messages */
         .turn{animation:fadeUp .3s ease}
         .turn-user{display:flex;flex-direction:column;align-items:flex-end}
         .turn-aura{display:flex;flex-direction:column;align-items:flex-start}
@@ -1435,6 +1641,7 @@ export default function AURAv2() {
         .misfire-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;cursor:pointer;border-radius:1px;transition:all .2s;margin-top:6px;display:inline-block}
         .misfire-btn:hover{color:var(--text-secondary);border-color:var(--border-mid)}
 
+        /* Choice cards */
         .choice-card{animation:slideIn .35s ease;padding-left:14px}
         .choice-label{font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px}
         .choice-prompt{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:300;font-style:italic;color:#8a8680;line-height:1.65;margin-bottom:16px}
@@ -1444,27 +1651,32 @@ export default function AURAv2() {
         .choice-btn.prim{border-color:var(--gold-dim);color:var(--gold-dim)}
         .choice-btn.prim:hover{border-color:var(--gold);color:var(--gold);animation:goldGlow .4s ease}
 
+        /* Warning card */
         .warning-card{animation:slideIn .35s ease;padding-left:14px;border-left:1px solid #3a3a3a}
         .warning-label{font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:#3a3a3a;margin-bottom:10px}
         .warning-text{font-size:12px;color:#6a6660;line-height:1.75;margin-bottom:14px}
 
+        /* Memory prompt */
         .mem-card{animation:fadeUp .4s ease;padding-left:14px;border-left:1px solid var(--gold-dim)}
         .mem-label{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:9px}
         .mem-text{font-size:12px;color:#7a7670;line-height:1.7;margin-bottom:10px}
         .mem-note{font-size:10px;color:var(--text-dim);margin-bottom:14px;letter-spacing:.04em;line-height:1.7}
 
+        /* Typing */
         .typing{padding-left:14px;display:flex;align-items:center;gap:4px;animation:fadeUp .2s ease}
         .t-dot{width:4px;height:4px;border-radius:50%;background:#2a2a2a;animation:pulse 1.2s ease-in-out infinite}
         .t-dot:nth-child(2){animation-delay:.2s}
         .t-dot:nth-child(3){animation-delay:.4s}
 
+        /* Session end */
         .end-wrap{border-top:1px solid var(--border);padding:22px 0;display:flex;flex-direction:column;gap:11px;animation:fadeUp .4s ease}
         .end-label{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim)}
         .end-note{font-size:11px;color:var(--text-dim);letter-spacing:.04em;line-height:1.65;margin-top:2px}
         .new-btn{background:none;border:1px solid var(--border-mid);color:var(--text-secondary);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:8px 14px;cursor:pointer;border-radius:2px;transition:all .2s;align-self:flex-start}
         .new-btn:hover{color:var(--text-primary);border-color:#383530}
 
-        .input-area{padding:14px 0 26px;border-top:1px solid var(--border);background:transparent;position:relative;bottom:auto;left:auto;right:auto;width:100%;transform:none;z-index:1;box-sizing:border-box;}
+        /* Input */
+        .input-area{padding:14px 0 26px;border-top:1px solid var(--border);background:var(--bg);position:sticky;bottom:0}
         .input-row{display:flex;align-items:flex-end;gap:10px}
         .textarea{flex:1;background:transparent;border:none;border-bottom:1px solid var(--border-mid);color:var(--text-primary);font-family:'DM Mono',monospace;font-size:12px;font-weight:300;line-height:1.7;padding:7px 0 9px;resize:none;outline:none;min-height:36px;max-height:140px;transition:border-color .2s}
         .textarea::placeholder{color:var(--text-dim)}
@@ -1487,20 +1699,26 @@ export default function AURAv2() {
 
       <div className="root">
 
+        {/* ── AURA Light Field (background, state-driven) ── */}
         <div className={`light-field ${illumLevel > 0 ? "clear" : ""} ${claritySurge ? "surge" : ""}`} />
 
+        {/* ── Vertical Identity: AURA ERGO SUM (progressive illumination) ── */}
         <div className="vertical-identity">
-          {["A","U","R","A","·","E","R","G","O","·","S","U","M"].map((ch, i) => {
-            const isFull = claritySurge;
-            const isDot = ch === "·";
+          {"AURAERGOSUM".split("").map((ch, i) => {
+            const litThreshold = i + 1; // letter i lights at illumLevel >= i+1
+            const isLit  = illumLevel >= litThreshold;
+            const isFull = illumLevel >= 11 && i === 10; // final letter at full session close
             return (
-              <span key={i} className={isFull ? "flash" : ""} style={isDot ? {opacity:0,height:"8px"} : {}}>{isDot ? "" : ch}</span>
+              <span key={i} className={isFull ? "full" : isLit ? "lit" : ""}>{ch}</span>
             );
           })}
         </div>
 
+        {/* ── Header ── */}
         <header className="header">
+          <span className="wordmark">aura</span>
           <div className="header-right">
+            {/* Lens is invisible — no indicator shown to user */}
             {safetyMode && (
               <div className="mode-pill">
                 <span className="mode-dot safe" />
@@ -1511,6 +1729,7 @@ export default function AURAv2() {
           </div>
         </header>
 
+        {/* ── Memory management panel ── */}
         {showMemoryPanel && (
           <div className="mem-panel">
             <div className="mem-panel-title">μνήμη — {memory.storageEnabled ? "ενεργή" : "ανενεργή"}</div>
@@ -1554,6 +1773,7 @@ export default function AURAv2() {
           </div>
         )}
 
+        {/* ── Open anchors ── */}
         {openAnchors.length > 0 && !showMemoryPanel && (
           <div className="anchor-bar">
             <div className="anchor-bar-label">ανοιχτό</div>
@@ -1570,6 +1790,7 @@ export default function AURAv2() {
           </div>
         )}
 
+        {/* ── Feed ── */}
         <div className="feed">
 
           {isFirst && returnAnchor && (
@@ -1582,40 +1803,21 @@ export default function AURAv2() {
 
           {isFirst && !returnAnchor && (
             <div className="empty" style={{position:"relative",justifyContent:"space-between",paddingTop:"40px",paddingBottom:"40px"}}>
-              {/* Πάνω δεξιά — μικρό κείμενο */}
               <div style={{textAlign:"right",fontSize:"10px",color:"#4a4845",letterSpacing:".06em",lineHeight:1.8,fontStyle:"italic"}}>
                 Η καθαρή σκέψη έρχεται<br />μέσω αφαίρεσης του περιττού...
               </div>
-              {/* Onboarding υπόσχεση */}
               <div style={{fontFamily:"'DM Mono',monospace",fontSize:"9px",letterSpacing:".12em",color:"#4a4845",textAlign:"right",lineHeight:1.9,fontStyle:"italic",marginTop:"8px"}}>
                 στο τέλος μπορεί να δεις κάτι<br />που δεν είχες ονομάσει πριν.
               </div>
-              {/* Μέση — μεγάλο wordmark */}
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"72px",fontWeight:300,fontStyle:"italic",color:"#c4c0b8",letterSpacing:".15em",textAlign:"center",lineHeight:1}}>
                 Aura
               </div>
-              {/* Κάτω — tagline */}
               <div style={{fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".18em",textTransform:"uppercase",color:"#c9a84c",textAlign:"center",lineHeight:2,opacity:.5,textShadow:"0 0 6px rgba(201,168,76,.2)"}}>
                 Thinking with you,<br />not for you...
               </div>
-              {/* ENTER κουμπί */}
               <button
                 onClick={() => { setSessionStarted(true); setTimeout(() => textareaRef.current?.focus(), 100); }}
-                style={{
-                  display:"block",
-                  margin:"24px auto 0",
-                  background:"none",
-                  border:"1px solid #3a3632",
-                  color:"#6a6660",
-                  fontFamily:"'DM Mono',monospace",
-                  fontSize:"11px",
-                  letterSpacing:".2em",
-                  textTransform:"uppercase",
-                  padding:"10px 28px",
-                  cursor:"pointer",
-                  borderRadius:"2px",
-                  transition:"all .2s"
-                }}
+                style={{display:"block",margin:"24px auto 0",background:"none",border:"1px solid #3a3632",color:"#6a6660",fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".2em",textTransform:"uppercase",padding:"10px 28px",cursor:"pointer",borderRadius:"2px",transition:"all .2s"}}
                 onMouseEnter={e => {e.currentTarget.style.borderColor="#c9a84c";e.currentTarget.style.color="#c9a84c";}}
                 onMouseLeave={e => {e.currentTarget.style.borderColor="#3a3632";e.currentTarget.style.color="#6a6660";}}
               >
@@ -1624,6 +1826,7 @@ export default function AURAv2() {
             </div>
           )}
 
+          {/* First-Why pause — AURA asks one question before entering conversation */}
           {firstWhyPending && (
             <div className="first-why-card">
               <div className="first-why-q">
@@ -1632,7 +1835,8 @@ export default function AURAv2() {
             </div>
           )}
 
-          {(keyboardOpen ? messages.slice(-1) : messages).map((msg, i) => (
+          {/* Messages — A1: memoized bubbles, stable keys */}
+          {messages.map((msg, i) => (
             <MessageBubble
               key={msg.id || i}
               msg={msg}
@@ -1640,6 +1844,7 @@ export default function AURAv2() {
             />
           ))}
 
+          {/* Misfire recovery — inline input */}
           {misfirePending && (
             <div className="choice-card">
               <div className="choice-label">διόρθωση</div>
@@ -1660,6 +1865,7 @@ export default function AURAv2() {
             </div>
           )}
 
+          {/* Layer gate */}
           {layerGatePending && (
             <div className="choice-card">
               <div className="choice-label">aura</div>
@@ -1675,6 +1881,7 @@ export default function AURAv2() {
             </div>
           )}
 
+          {/* Compression offer */}
           {pivotPending && !layerGatePending && (
             <div className="choice-card" style={{borderLeft:"1px solid var(--gold-dim)",paddingLeft:14}}>
               <div className="choice-label" style={{color:"var(--gold-dim)"}}>συμπίεση</div>
@@ -1690,6 +1897,7 @@ export default function AURAv2() {
             </div>
           )}
 
+          {/* Pre-termination warning */}
           {warningPending && (
             <div className="warning-card">
               <div className="warning-label">παρατήρηση</div>
@@ -1705,6 +1913,7 @@ export default function AURAv2() {
             </div>
           )}
 
+          {/* Memory consent — earned, not requested */}
           {memoryPromptPending && (
             <div className="mem-card">
               <div className="mem-label">μνήμη</div>
@@ -1723,8 +1932,13 @@ export default function AURAv2() {
             </div>
           )}
 
+
+
+
+          {/* Typing */}
           {loading && <div className="typing"><div className="t-dot"/><div className="t-dot"/><div className="t-dot"/></div>}
 
+          {/* Closing System: "To the point of mind" — only on natural session end */}
           {sessionEnded && !loading && finalDistillation && (
             <div className={`distillation ${isFirstDistillation ? "first-time" : ""}`}>
               <div className="distillation-label">to the point of mind</div>
@@ -1732,6 +1946,7 @@ export default function AURAv2() {
             </div>
           )}
 
+          {/* Session end */}
           {sessionEnded && !loading && (
             <div className="end-wrap">
               <div className="end-label">η συνομιλία σταμάτησε εδώ</div>
@@ -1740,7 +1955,11 @@ export default function AURAv2() {
             </div>
           )}
 
-          {!sessionEnded && !layerGatePending && !pivotPending && !memoryPromptPending && !warningPending && !misfirePending && sessionStarted && (
+          <div ref={bottomRef}/>
+        </div>
+
+        {/* ── Input ── */}
+        {!sessionEnded && !layerGatePending && !pivotPending && !memoryPromptPending && !warningPending && !misfirePending && sessionStarted && (
           <div className="input-area">
             <div className="input-row">
               <textarea
@@ -1749,7 +1968,6 @@ export default function AURAv2() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKey}
-                onFocus={() => setTimeout(() => textareaRef.current?.scrollIntoView({behavior:"smooth", block:"center"}), 100)}
                 placeholder="Τι σε απασχολεί αυτή τη στιγμή;"
                 rows={1}
                 disabled={loading}
@@ -1770,10 +1988,7 @@ export default function AURAv2() {
             )}
             {error && <div className="err">Σφάλμα: {error}</div>}
           </div>
-          )}
-
-          <div ref={bottomRef}/>
-        </div>
+        )}
 
       </div>
     </>
