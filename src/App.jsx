@@ -1116,6 +1116,7 @@ export default function AURAv2() {
   // ── Generate response ──
   const generateResponse = useCallback(async (msgs, currentMode) => {
     setLoading(true);
+    const _loadingGuard = setTimeout(() => { setLoading(false); setError("Η σύνδεση άργησε. Δοκίμασε ξανά."); }, 30000);
     try {
       // Track clarification rounds — force answer after 3 rounds
       if (currentMode !== "COMPRESSION" && currentMode !== "SUPPORTIVE") {
@@ -1194,6 +1195,7 @@ export default function AURAv2() {
     } catch(e) {
       setError(e.message);
     } finally {
+      clearTimeout(_loadingGuard);
       setLoading(false); // guaranteed cleanup — without this, callAura throw left loading=true permanently
     }
   }, [safetyMode, memory, currentDomain, activeLens]);
