@@ -1033,6 +1033,7 @@ export default function AURAv2() {
   const [error, setError]               = useState(null);
   const [mode, setMode]                 = useState("ANSWER");
   const [sessionStarted, setSessionStarted] = useState(false);
+  const [introShown, setIntroShown] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
   // First-Why protocol
@@ -1747,6 +1748,14 @@ export default function AURAv2() {
         .send-btn.ready{color:var(--text-secondary);border-color:var(--border-mid)}
         .send-btn.ready:hover{color:var(--text-primary);border-color:#383530}
         .send-btn:disabled{opacity:.18;cursor:not-allowed}
+        .intro-screen{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:40px 32px;max-width:650px;margin:0 auto;}
+        .intro-text{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:300;color:#c4c0b8;line-height:1.9;max-width:480px;}
+        .intro-tagline{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#c9a84c;opacity:.7;margin-bottom:32px;}
+        .intro-actions{display:flex;align-items:center;gap:24px;margin-top:40px;}
+        .intro-continue{background:none;border:1px solid #3a3632;color:#c4c0b8;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;padding:10px 28px;cursor:pointer;border-radius:2px;transition:all .2s;}
+        .intro-continue:hover{border-color:#c9a84c;color:#c9a84c;}
+        .intro-skip{background:none;border:none;color:#3a3632;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;cursor:pointer;transition:color .2s;}
+        .intro-skip:hover{color:#6a6660;}
         .mic-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;}
         .mic-btn.active{border-color:#7a4a4a;color:#7a4a4a;}
         .turn-counter{font-size:8px;letter-spacing:.1em;color:var(--text-dim);text-align:right;margin-top:5px}
@@ -1756,6 +1765,25 @@ export default function AURAv2() {
         ::-webkit-scrollbar-track{background:transparent}
         ::-webkit-scrollbar-thumb{background:var(--border-mid)}
       `}</style>
+
+      {!introShown && (
+        <div className="intro-screen">
+          <div style={{width:"100%",maxWidth:"480px"}}>
+            <div className="intro-tagline">Thinking with you. Not for you.</div>
+            <div className="intro-text">
+              Δεν είμαι εδώ για να αποφασίσω για σένα.<br /><br />
+              Είμαι εδώ για να κάνω ερωτήσεις που αφαιρούν θόρυβο — έως ότου αυτό που ήδη ξέρεις να γίνει αρκετά ξεκάθαρο ώστε να το δεις μόνος σου.<br /><br />
+              Δεν θα σε ενθαρρύνω. Δεν θα επικυρώσω. Δεν θα γεμίσω το κενό με συμβουλές.<br /><br />
+              Αν έχεις μπερδευτεί, θα βρούμε πού. Αν κάνεις κύκλους για να βρεις τι φταίει, θα το εντοπίσουμε. Αν νομίζεις ότι ψάχνεις ένα πράγμα ενώ στην πραγματικότητα ψάχνεις άλλο, θα το δεις.<br /><br />
+              Φεύγεις έχοντας όχι τη δική μου γνώμη, αλλά τη δική σου σκέψη — χωρίς την ομίχλη που την έκρυβε.
+            </div>
+            <div className="intro-actions">
+              <button className="intro-continue" onClick={() => setIntroShown(true)}>Συνέχεια</button>
+              <button className="intro-skip" onClick={() => { setIntroShown(true); setSessionStarted(true); }}>skip</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="root">
 
