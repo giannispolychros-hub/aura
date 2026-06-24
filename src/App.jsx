@@ -55,6 +55,14 @@ Do NOT guess. Say:
 
 Never apply more than ONE intervention per turn.
 Never name the pattern to the user — apply it silently.
+GREEKLISH DETECTION:
+If the user writes in greeklish (Latin characters spelling Greek words, e.g. "den ksero", "ti na kano", "exo provlima"):
+- Understand and respond normally in Greek
+- Do NOT ask them to switch to Greek keyboard
+- Do NOT comment on the writing style
+- Simply continue the session as if they wrote in Greek
+Examples: "den tha kano allages" = "δεν θα κάνω αλλαγές", "exo aporia" = "έχω απορία"
+
 
 INSIGHT VERIFICATION (before any resolution closure):
 Never treat a simple "ναι" or "σωστό" as confirmed insight.
@@ -1748,10 +1756,10 @@ export default function AURAv2() {
         .send-btn.ready{color:var(--text-secondary);border-color:var(--border-mid)}
         .send-btn.ready:hover{color:var(--text-primary);border-color:#383530}
         .send-btn:disabled{opacity:.18;cursor:not-allowed}
-        .intro-screen{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:40px 32px;max-width:650px;margin:0 auto;}
+        .intro-screen{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;flex-direction:column;align-items:center;padding:40px 32px 80px;overflow-y:auto;}
         .intro-text{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:300;color:#c4c0b8;line-height:1.9;max-width:480px;}
         .intro-tagline{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#c9a84c;opacity:.7;margin-bottom:32px;}
-        .intro-actions{display:flex;align-items:center;gap:24px;margin-top:40px;}
+        .intro-actions{display:flex;align-items:center;gap:24px;margin-top:40px;position:sticky;bottom:20px;}
         .intro-continue{background:none;border:1px solid #3a3632;color:#c4c0b8;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;padding:10px 28px;cursor:pointer;border-radius:2px;transition:all .2s;}
         .intro-continue:hover{border-color:#c9a84c;color:#c9a84c;}
         .intro-skip{background:none;border:none;color:#3a3632;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;cursor:pointer;transition:color .2s;}
