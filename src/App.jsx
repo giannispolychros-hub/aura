@@ -1764,8 +1764,9 @@ export default function AURAv2() {
         <div className="vertical-identity">{["A","U","R","A","·","E","R","G","O","·","S","U","M"].map((ch,i)=>{const isDot=ch==="·";return(<span key={i} style={isDot?{height:"14px",display:"block"}:{}}>{isDot?"":ch}</span>);})}</div>
 
         {/* ── Header ── */}
-        <header className="header">
+        <header className="header" style={{flexDirection:"column",alignItems:"flex-start",gap:"2px",paddingBottom:"6px"}}>
           <span className="wordmark">aura</span>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:"8px",letterSpacing:".05em",color:"#2e2c2a",lineHeight:1.6,fontStyle:"italic"}}>Most AI tools answer questions. Aura removes the ones that don't matter.</span>
           <div className="header-right">
             {/* Lens is invisible — no indicator shown to user */}
             {safetyMode && (
@@ -1850,7 +1851,8 @@ export default function AURAv2() {
             </div>
           )}
 
-          {isFirst && !returnAnchor && (<div className="empty" style={{justifyContent:"space-between",paddingTop:"40px",paddingBottom:"40px"}}><div style={{textAlign:"right",fontSize:"10px",color:"#4a4845",lineHeight:1.8,fontStyle:"italic"}}>Η καθαρή σκέψη έρχεται<br />μέσω αφαίρεσης του περιττού...</div><div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"64px",fontWeight:300,fontStyle:"italic",color:"#c4c0b8",textAlign:"center",lineHeight:1}}>Aura</div><div style={{fontFamily:"'DM Mono',monospace",fontSize:"10px",letterSpacing:".18em",textTransform:"uppercase",color:"#c9a84c",textAlign:"center",lineHeight:2,opacity:.5}}>Thinking with you,<br />not for you...</div><button onClick={()=>{setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),100);}} style={{display:"block",margin:"20px auto 0",background:"none",border:"1px solid #3a3632",color:"#6a6660",fontFamily:"'DM Mono',monospace",fontSize:"10px",letterSpacing:".2em",textTransform:"uppercase",padding:"8px 24px",cursor:"pointer",borderRadius:"2px"}}>ENTER</button></div>)}
+          {isFirst && !returnAnchor && (<div className="empty" style={{justifyContent:"space-between",paddingTop:"40px",paddingBottom:"40px"}}><div style={{textAlign:"right",fontSize:"10px",color:"#4a4845",lineHeight:1.8,fontStyle:"italic"}}>Η καθαρή σκέψη έρχεται<br />μέσω αφαίρεσης του περιττού...</div><div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"64px",fontWeight:300,fontStyle:"italic",color:"#c4c0b8",textAlign:"center",lineHeight:1}}>Aura</div><div style={{fontFamily:"'DM Mono',monospace",fontSize:"10px",letterSpacing:".18em",textTransform:"uppercase",color:"#c9a84c",textAlign:"center",lineHeight:2,opacity:.5}}>Thinking with you,<br />not for you...</div>
+<div style={{fontFamily:"'DM Mono',monospace",fontSize:"9px",letterSpacing:".08em",color:"#3a3835",textAlign:"center",lineHeight:1.8,marginTop:"12px",fontStyle:"italic"}}>Most AI tools answer questions.<br />AURA removes the ones that don't matter.</div><button onClick={()=>{setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),100);}} style={{display:"block",margin:"20px auto 0",background:"none",border:"1px solid #3a3632",color:"#6a6660",fontFamily:"'DM Mono',monospace",fontSize:"10px",letterSpacing:".2em",textTransform:"uppercase",padding:"8px 24px",cursor:"pointer",borderRadius:"2px"}}>ENTER</button></div>)}
 
           {/* First-Why pause — AURA asks one question before entering conversation */}
           {firstWhyPending && (
@@ -1995,7 +1997,7 @@ export default function AURAv2() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKey}
-                placeholder="Τι σε απασχολεί αυτή τη στιγμή;"
+                placeholder="Τι συμβαίνει;"
                 rows={5}
                 disabled={loading}
                 enterKeyHint="send"
