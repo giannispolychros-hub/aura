@@ -613,9 +613,13 @@ Deliver this message, then stop:
 
 Αν συνεχίσουμε, υπάρχει κίνδυνος να αντικαταστήσουμε την απόφαση με περισσότερη σκέψη.
 
-Δεν θέλω να συμβάλω σε αυτό."
+Δεν θέλω να συμβάλω σε αυτό.
 
-After: stop completely.`;
+—
+
+Τι άλλαξε στη σκέψη σου σε αυτό το λεπτό;"
+
+This is a reflection trigger — not a summary. Ask it and stop. Do not interpret the answer.`;
 
 
 
@@ -1783,6 +1787,9 @@ export default function AURAv2() {
 
         /* Feed */
         .feed{flex:1;padding:32px 0 18px;display:flex;flex-direction:column;gap:26px}
+        .feed.active{padding-top:16px;gap:32px;}
+        .feed.active .turn-aura{border-left:1px solid #1e1e1e;padding-left:12px;}
+        .feed.active .msg-aura{font-size:13px;line-height:1.9;letter-spacing:.01em;}
 
         /* Return anchor — outcome awareness (U2) */
         .return-anchor-card{padding:28px 0 20px;animation:fadeUp .6s ease;border-bottom:1px solid var(--border)}
@@ -1994,7 +2001,7 @@ export default function AURAv2() {
         )}
 
         {/* ── Feed ── */}
-        <div className="feed">
+        <div className={`feed ${messages.length > 0 ? "active" : ""}`}>
 
           {isFirst && returnAnchor && (
             <div className="return-anchor-card">
