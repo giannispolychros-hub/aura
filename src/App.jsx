@@ -1767,8 +1767,7 @@ export default function AURAv2() {
 
         {/* ── Header ── */}
         <header className="header" style={{flexDirection:"column",alignItems:"flex-start",gap:"2px",paddingBottom:"6px"}}>
-          <span className="wordmark">aura</span>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:"8px",letterSpacing:".05em",color:"#2e2c2a",lineHeight:1.6,fontStyle:"italic"}}>Most AI tools answer questions. Aura removes the ones that don't matter.</span>
+          <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"18px",fontWeight:300,color:"#d8d4cc",letterSpacing:".04em",lineHeight:1.4}}>Most AI tools answer questions. <span style={{color:"#c9a84c"}}>Aura</span> removes the ones that don't matter.</span>
           <div className="header-right">
             {/* Lens is invisible — no indicator shown to user */}
             {safetyMode && (
