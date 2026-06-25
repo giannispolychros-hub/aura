@@ -1920,6 +1920,7 @@ export default function AURAv2() {
 
   const resetSession = () => {
     setSessionStarted(false);
+    setIntroShown(false);
     const updated = { ...memory, sessionCount: (memory.sessionCount || 0) + 1 };
     if (memory.storageEnabled) saveMemory(updated);
     setMemory(updated);
