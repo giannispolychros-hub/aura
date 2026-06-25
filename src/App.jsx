@@ -2041,7 +2041,7 @@ export default function AURAv2() {
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
         :root{
           --bg:#080808;--border:#141414;--border-mid:#1e1e1e;
-          --text-primary:#c4c0b8;--text-secondary:#565250;
+          --text-primary:#dedad2;--text-secondary:#565250;
           --text-dim:#252320;--text-user:#68645e;
           --gold:#c9a84c;--gold-dim:#6b5a28;
           --green:#4a7a4a;--red:#7a4a4a;--red-dim:#3a1a1a;
@@ -2096,7 +2096,7 @@ export default function AURAv2() {
           font-style:italic; color:#d8d3c8; line-height:1.6;
         }
 
-        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 16px 0 56px;display:flex;flex-direction:column;position:relative}
+        .root{min-height:100vh;min-height:100dvh;max-width:650px;margin:0 auto;padding:0 18px 20px 58px;display:flex;flex-direction:column;position:relative}
 
         /* Header */
         .header{padding:26px 0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
@@ -2213,11 +2213,12 @@ export default function AURAv2() {
         .new-btn:hover{color:var(--text-primary);border-color:#383530}
 
         /* Input */
-        .input-area{padding:12px 0 12px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:50;}
+        .input-area{padding:14px 0 14px;border-bottom:1px solid var(--border);background:#0a0907;position:sticky;top:0;z-index:100;}
         .input-row{display:flex;align-items:flex-end;gap:10px}
-        .textarea{flex:1;background:transparent;border:1px solid var(--border-mid);border-radius:4px;background:rgba(255,255,255,0.03);color:var(--text-primary);font-family:'DM Mono',monospace;font-size:13px;font-weight:300;line-height:1.8;padding:12px;resize:none;outline:none;min-height:120px;max-height:240px;transition:border-color .2s}
+        .textarea{flex:1;background:transparent;border:1px solid var(--border-mid);border-radius:4px;background:rgba(255,255,255,0.03);color:var(--text-primary);font-family:'DM Mono',monospace;font-size:16px;font-weight:400;line-height:1.9;padding:14px;resize:none;outline:none;min-height:120px;max-height:240px;transition:border-color .2s}
         .textarea::placeholder{color:var(--text-dim)}
-        .textarea:focus{border-color:#383530}
+        .textarea:focus{border-color:#c9a84c;outline:none}
+        .textarea::placeholder{color:#4a4845;font-size:15px}
         .textarea:disabled{opacity:.3;cursor:not-allowed}
         .send-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;transition:all .2s;flex-shrink:0;margin-bottom:2px}
         .send-btn.ready{color:var(--text-secondary);border-color:var(--border-mid)}
