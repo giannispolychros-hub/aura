@@ -2157,11 +2157,20 @@ export default function AURAv2() {
         /* State-driven background clarity shift. No gradients-as-decor, no time-based loops. */
         .light-field{
           position:fixed; inset:0; z-index:-1;
-          background:var(--field-base);
-          transition:background 1.4s ease;
+          background-image:url('/bg.png');
+          background-size:cover;
+          background-position:center top;
+          background-repeat:no-repeat;
+          transition:opacity 1.4s ease;
         }
-        .light-field.clear{ background:var(--field-clear); }
-        .light-field.surge{ background:#121211; transition:background .35s ease; }
+        .light-field::after{
+          content:''; position:absolute; inset:0;
+          background:var(--field-base);
+          opacity:0.45;
+          transition:opacity 1.4s ease;
+        }
+        .light-field.clear::after{ opacity:0.35; }
+        .light-field.surge::after{ opacity:0.6; transition:opacity .35s ease; }
 
         /* ── VERTICAL IDENTITY: AURA ERGO SUM ── */
         .vertical-identity{
