@@ -1748,7 +1748,7 @@ export default function AURAv2() {
         .light-field::after{
           content:''; position:absolute; inset:0;
           background:var(--field-base);
-          opacity:0.7;
+          opacity:0.25;
           transition:opacity 1.4s ease;
         }
         .light-field.clear::after{ opacity:0.55; }
