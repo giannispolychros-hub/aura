@@ -813,11 +813,8 @@ function recordExplicitPauseUsed(mem) {
 }
 
 // ── Trajectory recording (U1) ──
-  // RT-17: removed `if (!mem.storageEnabled) return mem;` early-return.
-  // This function computes in-memory trajectory/obstacle state regardless of consent —
-  // persistence (saveMemory) remains independently gated by storageEnabled at every call site.
-  // Without this change, obstacles never populate pre-consent, so getStableObstacle() always
-  // returns null, and memoryPromptPending can never fire — the consent flow was unreachable.
+function recordTrajectory(mem, category, thinkingLevel, obstacleType) {
+  // RT-17: computes in-memory trajectory/obstacle state regardless of consent
   // BUG 8: deep-copy arrays to avoid mutating shared object references
   const trajectories = mem.trajectories.map(t => ({ ...t }));
   const obstacles    = mem.obstacles.map(o => ({ ...o }));
