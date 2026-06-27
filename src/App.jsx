@@ -155,6 +155,42 @@ EH4 (4+ simultaneous domains): "Ποιο νιώθεις πιο επείγον �
 EH5 (Clarity Snapshot — sparingly): "Αυτό που φαίνεται πιο ξεκάθαρο: [X]. Αυτό που παραμένει ανοιχτό: [Y]."
 
 ────────────────────────────────────────
+SEMANTIC GAP DETECTION:
+
+Constantly track the gap between what the user says they want and what their behavior shows.
+
+STATED GOAL vs ACTUAL BEHAVIOR — detect when they diverge:
+- User says "θέλω να αποφασίσω" but keeps adding variables → analysis loop
+- User says "ξέρω τι πρέπει να κάνω" but returns to same question → avoidance
+- User says "δεν έχω χρόνο" but writes long messages → anxiety, not urgency
+
+HARD INTERRUPT — activate when gap is sustained across 3+ turns:
+Do NOT say "I notice a gap." That is clinical and breaks trust.
+Instead, name the behavior, not the person:
+"Αναζητάς απόφαση ή χρόνο πριν από αυτήν;"
+"Έχουμε εξετάσει αυτό από τρεις γωνίες. Τι εμποδίζει την κίνηση;"
+"Κάτι κρατάει αυτή την απόφαση ανοιχτή. Τι είναι;"
+
+After Hard Interrupt: one question only. Then wait.
+If user confirms they want to decide → drop analysis, go to Action Extraction.
+If user admits they're avoiding → treat as AVOIDANCE state, apply Perspective Swap.
+Rule: The gap between words and behavior is where the real problem lives.
+
+────────────────────────────────────────
+MEMORY SUMMARY TRIGGER (every 5th session):
+
+When memory.sessionCount is divisible by 5 AND a recurring theme exists:
+Open the session with one line — not a summary, a mirror:
+"Τις τελευταίες φορές που μίλησες με την AURA, το θέμα [X] εμφανίστηκε ξανά. Θες να ξεκινήσουμε από εκεί ή έχεις κάτι νέο;"
+
+RULES:
+- [X] must be in the user's own words from previous sessions — never a label.
+- If user says "κάτι νέο" → proceed normally, do not reference the pattern again.
+- If user says "ναι" → treat it as the first message of a new session on that theme.
+- Never present it as "I remember you" — present it as "this kept coming up."
+- Skip entirely if the user's first message already addresses a clear new topic.
+
+────────────────────────────────────────
 EXIT: only when genuine clarity reached.
 "τίποτα" after exit → "Εντάξει. Αυτό είναι επίσης πληροφορία." Then stop.
 <4 exchanges → Graceful Exit: "Δεν προέκυψε καθαρό μοτίβο ακόμα. Μπορούμε να συνεχίσουμε ή να το αφήσουμε εδώ."
@@ -1626,8 +1662,8 @@ export default function AURAv2() {
 
   const resetSession = () => {
     setSessionStarted(false);
-    setIntroShown(false);
-    const updated = { ...memory, sessionCount: (memory.sessionCount || 0) + 1 };
+    const newCount = (memory.sessionCount || 0) + 1;
+    const updated = { ...memory, sessionCount: newCount };
     if (memory.storageEnabled) saveMemory(updated);
     setMemory(updated);
     setMessages([]);
@@ -1647,21 +1683,33 @@ export default function AURAv2() {
     setFirstWhyMessage("");
     setActiveLens("SIMPLIFY");
     turnCount.current = 0;
-    currentSessionId.current = Date.now().toString(36); // new id for new session
-    sessionStartTime.current = Date.now(); // reset duration timer
+    currentSessionId.current = Date.now().toString(36);
+    sessionStartTime.current = Date.now();
     clarificationRound.current = 0;
     lastChallengeAt.current = -99;
     compressionCount.current = 0;
     warningIssued.current = false;
     setError(null);
-    // Reset visual & closing system
     setClaritySurge(false);
     setIllumLevel(0);
     setIsFirstDistillation(false);
     setFinalDistillation(null);
     recentSurges.current = [];
-    illuminAnimCancelled.current = true; // cancel any in-progress progressive illumination
+    illuminAnimCancelled.current = true;
   };
+
+  // ── Memory Summary Card ──
+  // Every 5th session: show recurring theme as mirror, not reminder.
+  const memorySummaryTheme = (() => {
+    if (!memory.storageEnabled) return null;
+    const count = memory.sessionCount || 0;
+    if (count === 0 || count % 5 !== 0) return null;
+    // Find most recurring trajectory in user's own words
+    const sorted = [...(memory.trajectories || [])]
+      .filter(t => t.sessions >= 2 && !t.resolved)
+      .sort((a, b) => b.sessions - a.sessions);
+    return sorted.length > 0 ? sorted[0].category : null;
+  })();
 
   const openAnchors = getOpenAnchors(memory);
   const isFirst = messages.length === 0 && !layerGatePending && !pivotPending && !firstWhyPending;
@@ -1893,17 +1941,12 @@ export default function AURAv2() {
           <div style={{width:"100%",maxWidth:"480px"}}>
             <div className="intro-tagline">Thinking with you. Not for you.</div>
             <div className="intro-text">
-              Υπάρχουν πράγματα που ξέρεις ότι πρέπει να σκεφτείς — αλλά δεν μπορείς μόνος σου.<br /><br />
-              Όχι γιατί δεν είσαι έξυπνος.<br />
-              Γιατί είμαστε όλοι τυφλοί στα δικά μας.<br /><br />
-              Η AURA το κάνει αυτό.<br />
-              Λίγες ερωτήσεις. Και ξαφνικά:<br /><br />
-              <span style={{color:"#c9a84c",fontStyle:"normal"}}>"Να το."</span><br /><br />
-              Όχι η έκπληξη.<br />
-              Η χαρά που το βρήκες.
+              Έχεις μιλήσει με πολλούς.<br /><br />
+              Πες στην AURA αυτό που δεν έχεις πει ακόμα σε κανέναν.<br /><br />
+              <span style={{color:"#c9a84c",fontStyle:"normal"}}>Ίσως ανακαλύψεις ότι το πρόβλημα δεν είναι αυτό που νομίζεις.</span>
             </div>
             <div className="intro-actions">
-              <button className="intro-continue" onClick={() => { setIntroShown(true); try { localStorage.setItem("aura_intro_seen","1"); } catch {} }}>Συνέχεια</button>
+              <button className="intro-continue" onClick={() => { setIntroShown(true); try { localStorage.setItem("aura_intro_seen","1"); } catch {} }}>Ξεκίνα</button>
               <button className="intro-skip" onClick={() => { setIntroShown(true); setSessionStarted(true); try { localStorage.setItem("aura_intro_seen","1"); } catch {} }}>skip</button>
             </div>
           </div>
@@ -1996,6 +2039,14 @@ export default function AURAv2() {
 
         {/* ── Feed ── */}
         <div className={`feed ${messages.length > 0 ? "active" : ""}`}>
+
+          {isFirst && memorySummaryTheme && !returnAnchor && (
+            <div className="return-anchor-card">
+              <div className="return-label">επαναλαμβανόμενο θέμα</div>
+              <div className="return-text">Τις τελευταίες φορές, το θέμα <span style={{color:"var(--text-secondary)"}}>{memorySummaryTheme}</span> εμφανίστηκε ξανά.</div>
+              <div className="return-question">Θες να ξεκινήσουμε από εκεί ή έχεις κάτι νέο;</div>
+            </div>
+          )}
 
           {isFirst && returnAnchor && (
             <div className="return-anchor-card">
