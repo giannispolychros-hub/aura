@@ -526,76 +526,48 @@ const MEMORY_KEY = "aura_v2_memory";
 // Remembers HOW thinking evolves, not just what exists
 // ─────────────────────────────────────────────
 
-const MEMORY_SCHEMA_VERSION = 1;
+const MEMORY_SCHEMA_VERSION = 2;
 
 const EMPTY_MEMORY = () => ({
   schemaVersion: MEMORY_SCHEMA_VERSION,
   storageEnabled: false,
 
   // TRAJECTORY MEMORY (U1) — how thinking evolves, not facts
-  // Each trajectory is a recurring decision theme with thinking quality over time
   trajectories: [],
-  /*
-    trajectory: {
-      id: string,
-      category: string,            // career | relation | financial | health | identity | founder | life_change | personal
-      firstSeen: number,
-      lastSeen: number,
-      sessions: number,            // how many sessions touched this
-      thinkingQuality: number,     // 1–5: 1=reactive, 3=structured, 5=clear trade-off analysis
-      obstacleType: string|null,   // what keeps appearing: fear_of_failure | certainty_seeking | avoidance | values_conflict | null
-      obstacleConfidence: number,  // 0–1, requires 3+ occurrences before > 0.6 (U7)
-      resolved: boolean,
-    }
-  */
-
-  // OUTCOME TRACKING (U2) — what happened after the conversation
-  // Anchors store decisions + outcomes when user reports back
   anchors: [],
-  /*
-    anchor: {
-      id: string,
-      text: string,                // decision in user's words
-      category: string,
-      createdAt: number,
-      status: "open"|"completed"|"revised"|"released"|"paused",
-      closedAt: number|null,
-      outcome: string|null,        // what user reported happened (optional, user-provided)
-      outcomeAt: number|null,
-    }
-  */
-
-  // THINKING QUALITY LOG (U5,U6) — tracks clarity and confidence over time
-  // Not per-conversation content, just quality signals
   qualityLog: [],
-  /*
-    entry: {
-      sessionId: string,
-      category: string,
-      thinkingLevel: number,       // 1=reactive ("tell me what to do"), 5=structured ("I see 3 options, stuck here")
-      clarityGain: boolean,        // did confusion reduce this session?
-      confusionReduced: boolean,   // user expressed more clarity at end than start
-    }
-  */
-
-  // PATTERN STABILITY (U7) — obstacles require 3+ confirmed appearances
   obstacles: [],
-  /*
-    obstacle: {
-      type: string,                // fear_of_failure | certainty_seeking | avoidance | values_conflict
-      category: string,
-      confirmedCount: number,      // 0–N, only stable when >= 3
-      stable: boolean,             // true only when confirmedCount >= 3
-      firstSeen: number,
-      lastSeen: number,
-      corrections: number,         // user-rejected observations reduce confidence
-    }
-  */
-
-  // MISFIRES — rejected observations (reduces future confidence)
   misfires: [],
-
   sessionCount: 0,
+
+  // ─── SILENT PROFILING SYSTEM ───
+  // Stores HOW the user thinks, not WHAT they think about.
+  // All values are moving averages (0–100). Decay toward 50 after 90 days of inactivity.
+  // Never shown to user. Never labeled. Only affects AURA's rhythm and question style.
+  profile: {
+    // PASSIVE signals (updated automatically every session)
+    impulsivity: 50,        // low=deliberate, high=quick-response, topic-switching
+    analyticalDepth: 50,    // low=feeling-based, high=structured/logical framing
+    riskAvoidance: 50,      // low=open to risk, high=seeks certainty before moving
+    autonomyNeed: 50,       // low=wants guidance, high=wants to find own answer
+    ruminationTendency: 50, // low=moves on, high=returns to same theme repeatedly
+    validationSeeking: 50,  // low=self-directed, high=seeks confirmation
+
+    // EMBEDDED signals (updated from embedded diagnostic questions)
+    preferredPace: 50,      // low=wants quick clarity, high=wants to unfold slowly
+    orientation: 50,        // low=problem-focused, high=goal/vision-focused
+    decisionConfidence: 50, // low=needs more info before deciding, high=acts on partial info
+
+    // METAPHOR signals (updated from choice questions)
+    // Stored as raw choices, interpreted as patterns
+    metaphorChoices: [],    // [{q: "obstacle|crossroads", a: "obstacle", at: timestamp}, ...]
+
+    // PROFILE METADATA
+    lastUpdated: null,
+    totalSignals: 0,        // total data points collected
+    profilingMaturity: 0,   // 0–100: how confident the profile is (requires 10+ signals)
+    explicitPauseUsed: 0,   // count of explicit pause interventions (max 1 per 5 sessions)
+  },
 });
 
 function loadMemory() {
@@ -603,15 +575,16 @@ function loadMemory() {
     const raw = localStorage.getItem(MEMORY_KEY);
     if (!raw) return EMPTY_MEMORY();
     const parsed = JSON.parse(raw);
-    // B1: schema version mismatch — start fresh rather than risk type errors on old data
     if (parsed.schemaVersion !== MEMORY_SCHEMA_VERSION) return EMPTY_MEMORY();
     const merged = { ...EMPTY_MEMORY(), ...parsed };
-    // RT-18: defensive array coercion — corrupted/null fields would crash later .map()/.find() calls
     merged.trajectories = Array.isArray(merged.trajectories) ? merged.trajectories : [];
     merged.obstacles    = Array.isArray(merged.obstacles)    ? merged.obstacles    : [];
     merged.anchors      = Array.isArray(merged.anchors)      ? merged.anchors      : [];
     merged.qualityLog   = Array.isArray(merged.qualityLog)   ? merged.qualityLog   : [];
-    return merged;
+    // Ensure profile exists with all keys
+    merged.profile = { ...EMPTY_MEMORY().profile, ...(merged.profile || {}) };
+    // Apply decay if user has been away 90+ days
+    return applyProfileDecay(merged);
   } catch { return EMPTY_MEMORY(); }
 }
 
@@ -632,9 +605,178 @@ function saveMemory(mem) {
   }, 400);
 }
 
+// ── Silent Profile Update ──
+// Updates moving averages. Weight: recent signal = 0.2, existing = 0.8
+// Shadow Trigger: if deviates >30%, skip update this call.
+// Resume: after 2+ consecutive non-shadow sessions, profiling resumes automatically.
+function updateProfile(mem, signals) {
+  const p = { ...mem.profile };
+  const WEIGHT = 0.2;
+
+  if (signals.messageLength !== undefined) {
+    const len = signals.messageLength;
+    const impulsiveSignal = len < 20 ? 75 : len > 150 ? 25 : 50;
+    const analyticalSignal = len > 100 ? 75 : len < 30 ? 25 : 50;
+    p.impulsivity = Math.round(p.impulsivity * (1 - WEIGHT) + impulsiveSignal * WEIGHT);
+    p.analyticalDepth = Math.round(p.analyticalDepth * (1 - WEIGHT) + analyticalSignal * WEIGHT);
+  }
+
+  if (signals.topicSwitched !== undefined) {
+    p.impulsivity = Math.round(p.impulsivity * (1 - WEIGHT) + (signals.topicSwitched ? 70 : 40) * WEIGHT);
+  }
+
+  if (signals.resistedSuggestion !== undefined) {
+    p.autonomyNeed = Math.round(p.autonomyNeed * (1 - WEIGHT) + (signals.resistedSuggestion ? 75 : 35) * WEIGHT);
+    p.validationSeeking = Math.round(p.validationSeeking * (1 - WEIGHT) + (signals.resistedSuggestion ? 25 : 65) * WEIGHT);
+  }
+
+  if (signals.returnedToSameTheme !== undefined) {
+    p.ruminationTendency = Math.round(p.ruminationTendency * (1 - WEIGHT) + (signals.returnedToSameTheme ? 75 : 35) * WEIGHT);
+  }
+
+  if (signals.soughtValidation !== undefined) {
+    p.validationSeeking = Math.round(p.validationSeeking * (1 - WEIGHT) + (signals.soughtValidation ? 75 : 30) * WEIGHT);
+  }
+
+  if (signals.usedFeelVsThink !== undefined) {
+    p.analyticalDepth = Math.round(p.analyticalDepth * (1 - WEIGHT) + (signals.usedFeelVsThink === 'think' ? 75 : 30) * WEIGHT);
+  }
+
+  if (signals.paceChoice !== undefined) {
+    p.preferredPace = Math.round(p.preferredPace * (1 - WEIGHT) + signals.paceChoice * WEIGHT);
+  }
+
+  if (signals.orientationChoice !== undefined) {
+    p.orientation = Math.round(p.orientation * (1 - WEIGHT) + signals.orientationChoice * WEIGHT);
+  }
+
+  if (signals.metaphorChoice !== undefined) {
+    p.metaphorChoices = [
+      ...(p.metaphorChoices || []).slice(-10),
+      { q: signals.metaphorChoice.question, a: signals.metaphorChoice.answer, at: Date.now() }
+    ];
+    if (signals.metaphorChoice.question === 'relief_vs_excitement') {
+      p.riskAvoidance = Math.round(p.riskAvoidance * (1 - WEIGHT) +
+        (signals.metaphorChoice.answer === 'relief' ? 75 : 30) * WEIGHT);
+    }
+  }
+
+  // #7 fix: track consecutive non-shadow sessions for auto-resume
+  p.consecutiveNormalSessions = (p.consecutiveNormalSessions || 0) + 1;
+
+  p.lastUpdated = Date.now();
+  p.totalSignals = (p.totalSignals || 0) + 1;
+  p.profilingMaturity = Math.min(100, Math.round((p.totalSignals / 30) * 100));
+
+  return { ...mem, profile: p };
+}
+
+// ── Profile Decay ──
+// After 90 days of inactivity, values drift toward 50 (neutral)
+function applyProfileDecay(mem) {
+  if (!mem.profile?.lastUpdated) return mem;
+  const daysSince = (Date.now() - mem.profile.lastUpdated) / (1000 * 60 * 60 * 24);
+  if (daysSince < 90) return mem;
+
+  const decayRate = Math.min(0.5, (daysSince - 90) / 180); // max 50% decay
+  const p = { ...mem.profile };
+  const keys = ['impulsivity','analyticalDepth','riskAvoidance','autonomyNeed',
+                 'ruminationTendency','validationSeeking','preferredPace',
+                 'orientation','decisionConfidence'];
+  keys.forEach(k => {
+    p[k] = Math.round(p[k] + (50 - p[k]) * decayRate);
+  });
+  return { ...mem, profile: p };
+}
+
+// ── Profile Summary for System Prompt ──
+// Returns a compact description to inject into the prompt
+// Only used when profilingMaturity > 30 (enough data to be useful)
+function getProfileSummary(mem) {
+  const p = mem.profile;
+  if (!p || p.profilingMaturity < 30) return '';
+
+  const traits = [];
+  if (p.impulsivity > 65) traits.push('responds quickly, low tolerance for slow unfolding');
+  if (p.impulsivity < 35) traits.push('deliberate, prefers to think before responding');
+  if (p.analyticalDepth > 65) traits.push('logical framing, responds well to structured questions');
+  if (p.analyticalDepth < 35) traits.push('feeling-based, responds better to open space than structure');
+  if (p.riskAvoidance > 65) traits.push('seeks certainty before moving, fear-driven decisions');
+  if (p.riskAvoidance < 35) traits.push('goal-driven, comfortable with uncertainty');
+  if (p.autonomyNeed > 65) traits.push('prefers to reach own conclusions, resists being led');
+  if (p.autonomyNeed < 35) traits.push('open to guidance, may seek direction');
+  if (p.ruminationTendency > 65) traits.push('tends to return to same themes, needs explicit closure');
+  if (p.validationSeeking > 65) traits.push('frequently seeks confirmation, handle refusals carefully');
+  if (p.preferredPace > 65) traits.push('prefers slow unfolding over quick answers');
+  if (p.preferredPace < 35) traits.push('prefers quick clarity over depth');
+  if (p.orientation > 65) traits.push('goal-oriented framing works better than problem-focused');
+
+  if (traits.length === 0) return '';
+  return `\n[SILENT PROFILE — internal only, never reference directly]\n${traits.join('. ')}.\nMaturity: ${p.profilingMaturity}%. Adjust rhythm and question style accordingly.\n`;
+}
+
+// ── Check if Explicit Pause is available ──
+// ── Shadow Trigger — Inconsistency Detection ──
+// If current behavior deviates >30% from profile, pause profiling silently.
+// Resets consecutiveNormalSessions counter.
+// Auto-resume: after 2+ consecutive normal sessions, profiling continues.
+function detectShadowTrigger(mem, signals) {
+  const p = mem.profile;
+  if (!p || p.profilingMaturity < 30) return false;
+  // Auto-resume: if 2+ consecutive normal sessions have passed since last shadow, don't fire
+  if ((p.consecutiveNormalSessions || 0) >= 2) return false;
+  const deviations = [];
+  if (signals.messageLength !== undefined) {
+    const currentImpulsive = signals.messageLength < 20 ? 75 : signals.messageLength > 150 ? 25 : 50;
+    if (Math.abs(currentImpulsive - p.impulsivity) > 30) deviations.push('impulsivity');
+  }
+  if (signals.usedFeelVsThink !== undefined) {
+    const currentAnalytical = signals.usedFeelVsThink === 'think' ? 75 : 30;
+    if (Math.abs(currentAnalytical - p.analyticalDepth) > 30) deviations.push('analytical');
+  }
+  return deviations.length >= 1;
+}
+
+// Reset consecutiveNormalSessions when shadow fires
+function recordShadowFired(mem) {
+  return { ...mem, profile: { ...mem.profile, consecutiveNormalSessions: 0 } };
+}
+
+// ── Crisis Mode Detection ──
+// Merged into detectSafetySignal below. This function is kept as alias for profile bypass only.
+// 2+ high-stress signals → bypass profiling (not safety — safety uses detectSafetySignal)
+function detectCrisisMode(text) {
+  const patterns = [
+    /δεν αντέχω/i, /τελείωσα/i, /χάθηκα/i, /δεν βλέπω νόημα/i,
+    /δεν μπορώ άλλο/i, /πανικός/i, /χάος/i, /collapse/i,
+  ];
+  return patterns.filter(p => p.test(text)).length >= 2;
+}
+
+// ── Honest Uncertainty Rule (injected into system prompt) ──
+const HONEST_UNCERTAINTY_RULE = `
+[SILENT PROFILE USAGE — internal only, never reference directly]
+SHADOW TRIGGER: If current behavior deviates significantly from stored profile → do NOT update profile this session. Work only with what is visible now. Never mention the deviation.
+CRISIS MODE: If 2+ high-stress signals ("δεν αντέχω", "χάθηκα", "πανικός") → bypass all profiling. One question, maximum space, zero pressure. Resume only after 2+ calm messages.
+HONEST UNCERTAINTY: If referencing a pattern externally (rare): "Παρατήρησα ότι [X]. Το βλέπεις κι εσύ;" — NEVER "Είσαι [X]" or "Το προφίλ σου δείχνει [X]". User is always authority on their own patterns.
+`;
+
+// ── Explicit Pause — wired and functional ──
+// Max 1 explicit pause per 5 sessions. Used in generateResponse to inject diagnostic question.
+function canUseExplicitPause(mem) {
+  const sessionsPerPause = 5;
+  const used = mem.profile?.explicitPauseUsed || 0;
+  return mem.sessionCount >= used * sessionsPerPause + sessionsPerPause;
+}
+
+function recordExplicitPauseUsed(mem) {
+  return {
+    ...mem,
+    profile: { ...mem.profile, explicitPauseUsed: (mem.profile?.explicitPauseUsed || 0) + 1 }
+  };
+}
+
 // ── Trajectory recording (U1) ──
-// Records how user's thinking on a category evolves across sessions
-function recordTrajectory(mem, category, thinkingLevel, obstacleType) {
   // RT-17: removed `if (!mem.storageEnabled) return mem;` early-return.
   // This function computes in-memory trajectory/obstacle state regardless of consent —
   // persistence (saveMemory) remains independently gated by storageEnabled at every call site.
@@ -953,9 +1095,6 @@ export default function AURAv2() {
   // Observation misfire — user rejected an observation
   const [misfirePending, setMisfirePending]   = useState(false);
   const [misfireType, setMisfireType]         = useState(null);
-  const [misfireInput, setMisfireInput]       = useState("");
-
-  // Pattern exploring state
 
   // ── Visual & Closing System (presentation layer only) ──
   const [claritySurge, setClaritySurge]   = useState(false); // brief pulse on clarity moment
@@ -1025,15 +1164,68 @@ export default function AURAv2() {
       }
       // U1/U3: Build memory context for current category (injected silently, never shown)
       const memCtx = buildMemoryContext(memory, currentDomain);
-      // B3: memory recall is itself a quiet signal — one illumination tick,
-      // distinct from clarity-surge (which marks insight, not recall).
       if (memCtx) setIllumLevel(prev => Math.min(11, prev + 1));
+
+      // ── Silent Profile injection ──
+      const profileSummary = getProfileSummary(memory);
+      const profileCtx = profileSummary ? profileSummary + HONEST_UNCERTAINTY_RULE : '';
+
+      // ── Explicit Pause injection (#5 fix) ──
+      // Max 1 per 5 sessions. Injected as system instruction — AURA decides when to use it naturally.
+      const explicitPauseCtx = canUseExplicitPause(memory) && currentMode === "ANSWER" &&
+        msgs.filter(m => m.role === "user").length >= 3 ?
+        `\n[EXPLICIT PAUSE AVAILABLE — optional, use at most once this session if conversation has reached a natural reflection point: briefly pause topic, ask one question about HOW the user prefers to search for clarity (e.g. "Έχω μια απορία για τον τρόπο που ψάχνεις — όχι για το θέμα σου. Προτιμάς να φτάσουμε σε μια απόφαση ή να καταλάβεις γιατί κολλάς;"), then return naturally to session. Never announce it as a special feature.]\n` : '';
+
       const basePrompt =
         currentMode === "COMPRESSION" ? SYSTEM_COMPRESSION :
         currentMode === "SUPPORTIVE"  ? SYSTEM_SUPPORTIVE :
         getLensPrompt(activeLens);
-      const system = memCtx ? basePrompt + memCtx : basePrompt;
+      const system = [basePrompt, memCtx, profileCtx, explicitPauseCtx].filter(Boolean).join('\n');
       const text = await callAura([...contextRefresh, ...msgs], system);
+
+      // If explicit pause was used, record it
+      if (explicitPauseCtx && /(τρόπο που ψάχνεις|προτιμάς να φτάσουμε|απόφαση ή να καταλάβεις)/i.test(text)) {
+        const updatedPause = recordExplicitPauseUsed({ ...memory });
+        setMemory(updatedPause);
+        if (memory.storageEnabled) saveMemory(updatedPause);
+      }
+
+      // ── Passive signal tracking ──
+      const lastUserMsg = [...msgs].reverse().find(m => m.role === "user")?.content || "";
+      const signals = {};
+      signals.messageLength = lastUserMsg.length;
+      signals.usedFeelVsThink =
+        /(νιώθω|αισθάνομαι|feel|felt)/i.test(lastUserMsg) ? 'feel' :
+        /(σκέφτομαι|αναλύω|think|analyze|consider)/i.test(lastUserMsg) ? 'think' : undefined;
+      signals.soughtValidation = /(έχω δίκιο|σωστά;|τι πιστεύεις;|πες μου αν)/i.test(lastUserMsg);
+      signals.returnedToSameTheme = msgs.filter(m => m.role === "user").length > 3 &&
+        /(ξανά|πάλι|again|still|ακόμα)/i.test(lastUserMsg);
+
+      // Embedded diagnostic: detect pace/orientation answers naturally
+      if (/(γρήγορα|σύντομα|quickly|fast)/i.test(lastUserMsg)) signals.paceChoice = 25;
+      else if (/(ξεδιπλώσουμε|αναλύσουμε|unfold|slowly|βαθύτερα)/i.test(lastUserMsg)) signals.paceChoice = 75;
+      if (/(πρόβλημα|εμπόδιο|problem|obstacle)/i.test(lastUserMsg)) signals.orientationChoice = 25;
+      else if (/(θέλω|στόχος|goal|vision|αποτέλεσμα)/i.test(lastUserMsg)) signals.orientationChoice = 75;
+
+      // Metaphor detection
+      if (/(ανακούφιση|relief)/i.test(lastUserMsg)) signals.metaphorChoice = { question: 'relief_vs_excitement', answer: 'relief' };
+      else if (/(ενθουσιασμός|excitement)/i.test(lastUserMsg)) signals.metaphorChoice = { question: 'relief_vs_excitement', answer: 'excitement' };
+
+      // Crisis mode: bypass profiling (separate from Safety which handles UI/flow)
+      const crisisFired = detectCrisisMode(lastUserMsg);
+      // Shadow Trigger: behavior deviates >30% from profile
+      const shadowFired = !crisisFired && detectShadowTrigger(memory, signals);
+
+      if (!shadowFired && !crisisFired) {
+        const updatedWithProfile = updateProfile({ ...memory }, signals);
+        setMemory(updatedWithProfile);
+        if (memory.storageEnabled) saveMemory(updatedWithProfile);
+      } else if (shadowFired) {
+        // Record shadow fired — resets auto-resume counter
+        const updatedWithShadow = recordShadowFired({ ...memory });
+        setMemory(updatedWithShadow);
+        if (memory.storageEnabled) saveMemory(updatedWithShadow);
+      }
 
       if (currentMode === "COMPRESSION") {
         compressionCount.current += 1;
@@ -1345,7 +1537,10 @@ export default function AURAv2() {
       try {
         // U1/U3: Inject memory context for this category
         const memCtx = buildMemoryContext(memory, currentDomain);
-        const prompt = getLensPrompt(inferred) + (memCtx || "");
+        // #10 fix: inject profile summary in firstWhy path too
+        const profileCtx = getProfileSummary(memory);
+        const profileWithRules = profileCtx ? profileCtx + HONEST_UNCERTAINTY_RULE : '';
+        const prompt = [getLensPrompt(inferred), memCtx, profileWithRules].filter(Boolean).join('\n');
         const text = await callAura(initMsgs, prompt);
         setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "ANSWER" }]);
         // U1: Start trajectory for this category
