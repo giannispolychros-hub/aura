@@ -317,8 +317,8 @@ CLOSURE LOOP when terminating:
 IMPORTANT: Safety Override is already defined in AURA_CORE_PERSONALITY and applies here.
 Do not terminate if the user is in distress.`;
 
-// Backward compatibility aliases
-const SYSTEM_AUDIT  = SYSTEM_LENS_SIMPLIFY;
+// Backward compatibility aliases — SYSTEM_AUDIT now uses active lens (set at call site)
+const SYSTEM_AUDIT  = SYSTEM_LENS_SIMPLIFY; // fallback only — overridden in misfire recovery
 
 const SYSTEM_SUPPORTIVE = `You are AURA in Supportive Mode.
 
@@ -1068,7 +1068,10 @@ export default function AURAv2() {
   const [error, setError]               = useState(null);
   const [mode, setMode]                 = useState("ANSWER");
   const [sessionStarted, setSessionStarted] = useState(false);
-  const [introShown, setIntroShown] = useState(false);
+  const [introShown, setIntroShown] = useState(() => {
+    // Returning users skip intro — only show once per install
+    try { return !!localStorage.getItem("aura_intro_seen"); } catch { return false; }
+  });
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
   // First-Why protocol
@@ -1121,10 +1124,8 @@ export default function AURAv2() {
   const compressionCount = useRef(0);
   const warningIssued    = useRef(false);
   const submittingRef    = useRef(false); // RT-15: synchronous double-submit guard
-  const currentSessionId   = useRef(Date.now().toString(36)); // unique id per session
-  const sessionStartTime   = useRef(Date.now()); // beta: session duration tracking
-  const betaFlags          = useRef({ firstWhyPassed: false, firstWhySkipped: false,
-    clarificationReached: false, terminationReached: false, snapshotShown: false }); // beta observability
+  const currentSessionId   = useRef(Date.now().toString(36));
+  const sessionStartTime   = useRef(Date.now());
 
   // First "To the point of mind" ever shown — slightly slower fade, no other change
   const [isFirstDistillation, setIsFirstDistillation] = useState(false);
@@ -1160,7 +1161,7 @@ export default function AURAv2() {
       // Track clarification rounds — force answer after 3 rounds
       if (currentMode !== "COMPRESSION" && currentMode !== "SUPPORTIVE") {
         clarificationRound.current += 1;
-      betaFlags.current.clarificationReached = true; // beta: clarification stage reached
+      // clarification reached
       }
       // U1/U3: Build memory context for current category (injected silently, never shown)
       const memCtx = buildMemoryContext(memory, currentDomain);
@@ -1264,9 +1265,8 @@ export default function AURAv2() {
         const thinkingLevel = isReactive ? 1 : hasStructure ? 4 : 2;
         // Clarity gain: did AURA compress or identify the core issue?
         const clarityGain  = /(the core|the real question|what remains|αυτό που μένει|η ουσία)/i.test(text);
-        if (clarityGain) betaFlags.current.snapshotShown = true; // beta: clarity snapshot signal
-        const sessionDuration = Math.round((Date.now() - sessionStartTime.current) / 1000); // seconds
-        const updatedMem = recordQualitySignal({ ...memory }, currentDomain, thinkingLevel, clarityGain, currentSessionId.current, sessionDuration, { ...betaFlags.current });
+        const sessionDuration = Math.round((Date.now() - sessionStartTime.current) / 1000);
+        const updatedMem = recordQualitySignal({ ...memory }, currentDomain, thinkingLevel, clarityGain, currentSessionId.current, sessionDuration, {});
         const updatedWithTraj = recordTrajectory(updatedMem, currentDomain, thinkingLevel, null);
         setMemory(updatedWithTraj);
         if (memory.storageEnabled) saveMemory(updatedWithTraj);
@@ -1275,8 +1275,30 @@ export default function AURAv2() {
       // Termination logic — only if not in safety mode and warning was already issued
       // FIX 3: broader termination signal detection — catches equivalent phrasings
       const modelSignalsEnd = /(action belongs to (you|the user)|we.ve reached the limit|the decision is yours|continuing.{0,30}(not|won.t) (help|serve)|η απόφαση (είναι|ανήκει) (δική σου|σε σένα)|έχουμε (φτάσει|αρκετή|αρκετό)|συνεχίζοντας.{0,30}δεν (βοηθ|εξυπηρετ))/i.test(text);
-      // C12: safetyMode can be exited if user explicitly requests decision help
-    if (!safetyMode && (compressionCount.current >= 2 || modelSignalsEnd)) {
+
+      // ── Natural Exit Detection ──
+      // If last 3 user messages are short/repetitive/agreement → user has reached their point.
+      // Exit Signature as reward, not punishment.
+      const userMsgsAll = msgs.filter(m => m.role === "user");
+      const naturalExitReady = !safetyMode &&
+        currentMode === "ANSWER" &&
+        userMsgsAll.length >= 4 &&
+        !warningIssued.current &&
+        compressionCount.current === 0 && // only before any compression
+        (() => {
+          const last3 = userMsgsAll.slice(-3).map(m => m.content);
+          const allShort = last3.every(m => m.trim().split(/\s+/).length <= 8);
+          const hasAgreement = last3.filter(m => /^(ναι|yes|σωστό|ακριβώς|κατάλαβα|εντάξει|οκ|ok|νομίζω ναι|πιστεύω ναι)[\.,!]?$/i.test(m.trim())).length >= 2;
+          const hasRepeat = last3.length === 3 && last3[1].trim() === last3[2].trim();
+          return (allShort && hasAgreement) || hasRepeat;
+        })();
+
+      if (naturalExitReady) {
+        await triggerTermination(msgs);
+        return;
+      }
+
+      if (!safetyMode && (compressionCount.current >= 2 || modelSignalsEnd)) {
         if (!warningIssued.current) {
           setWarningPending(true);
           warningIssued.current = true;
@@ -1324,25 +1346,19 @@ export default function AURAv2() {
     if (safetyMode) return;
     setLoading(true);
     try {
-      // Use graceful exit if no insight was confirmed during session
-      const hasConfirmedInsight = msgs.some(m => m.role === "assistant" && m.isInsight);
-      const activePrompt = hasConfirmedInsight ? SYSTEM_TERMINATION : SYSTEM_GRACEFUL_EXIT;
+      // Unified closing — natural exit, always warm, never punishment
       const termMsgs = [...msgs, {
         role: "user",
-        content: hasConfirmedInsight
-          ? "[Deliver the termination message now. Include the closure reflection task. Do not add anything else.]"
-          : "[Deliver the graceful exit message now. Verbatim only. Do not interpret.]"
+        content: "[Deliver the closing message now. Acknowledge what surfaced, even if incomplete. End with the exit question. Do not add anything else.]"
       }];
-      const text = await callAura(termMsgs, activePrompt);
+      const text = await callAura(termMsgs, SYSTEM_TERMINATION);
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
-      betaFlags.current.terminationReached = true; // beta: natural termination reached
-      // Visual: session end — full illumination + distilled closing line
       applyTerminationIllumination();
       const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
       if (lines.length > 0) setFinalDistillation(lines[0]);
     } catch {
-      const fallback = "Έχουμε αρκετή καθαρότητα για τώρα.\n\nΑν συνεχίσουμε, υπάρχει κίνδυνος να αντικαταστήσουμε την απόφαση με περισσότερη σκέψη.\n\nΔεν θέλω να συμβάλω σε αυτό.\n\n—\n\nΠριν επιστρέψεις, γράψε για τον εαυτό σου το πιο ισχυρό επιχείρημα υπέρ και εναντίον. Επίστρεψε μόνο αν κάτι αλλάξει.";
+      const fallback = "Έχουμε αρκετή καθαρότητα για τώρα.\n\nΔεν θέλω να συμβάλω σε περισσότερη σκέψη αντί για απόφαση.\n\n—\n\nΤι άλλαξε στη σκέψη σου σε αυτό το λεπτό;";
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: fallback, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
       applyTerminationIllumination();
@@ -1366,7 +1382,7 @@ export default function AURAv2() {
       ...messages,
       { role: "user", content: userCorrection || "[User indicated the observation was inaccurate. Apply misfire recovery protocol.]" }
     ];
-    const recoveryPrompt = SYSTEM_AUDIT + `\n\nMISFIRE RECOVERY: The user has indicated your previous observation was inaccurate or incomplete. Your response must begin with: "Understood. My interpretation appears incomplete." Then ask: "What am I missing that changes the picture?" Do not repeat the original observation.`;
+    const recoveryPrompt = getLensPrompt(activeLens) + `\n\nMISFIRE RECOVERY: The user has indicated your previous observation was inaccurate or incomplete. Your response must begin with: "Understood. My interpretation appears incomplete." Then ask: "What am I missing that changes the picture?" Do not repeat the original observation.`;
     setLoading(true);
     try {
       const text = await callAura(correctionMsgs, recoveryPrompt);
@@ -1522,8 +1538,8 @@ export default function AURAv2() {
       // Does not make First-WHY optional — only handles explicit refusals.
       // Refusal patterns: direct negation, skip requests, unrelated meta-responses.
       const firstWhyRefusal = /^(δεν θέλω|δεν ξέρω πώς|skip|παράλειψε|απλά απάντα|απλά απάντησε|προχώρα|συνέχισε|pass|no thanks|never mind)[\.!;,]?$/i.test(userText.trim());
-      if (firstWhyRefusal) betaFlags.current.firstWhySkipped = true;
-      else betaFlags.current.firstWhyPassed = true;
+      
+      
       const inferred = inferLensFallback(firstWhyMessage, firstWhyRefusal ? firstWhyMessage : userText);
       setActiveLens(inferred);
       const initMsgs = [
@@ -1633,8 +1649,6 @@ export default function AURAv2() {
     turnCount.current = 0;
     currentSessionId.current = Date.now().toString(36); // new id for new session
     sessionStartTime.current = Date.now(); // reset duration timer
-    betaFlags.current = { firstWhyPassed: false, firstWhySkipped: false,
-      clarificationReached: false, terminationReached: false, snapshotShown: false };
     clarificationRound.current = 0;
     lastChallengeAt.current = -99;
     compressionCount.current = 0;
@@ -1889,8 +1903,8 @@ export default function AURAv2() {
               Η χαρά που το βρήκες.
             </div>
             <div className="intro-actions">
-              <button className="intro-continue" onClick={() => setIntroShown(true)}>Συνέχεια</button>
-              <button className="intro-skip" onClick={() => { setIntroShown(true); setSessionStarted(true); }}>skip</button>
+              <button className="intro-continue" onClick={() => { setIntroShown(true); try { localStorage.setItem("aura_intro_seen","1"); } catch {} }}>Συνέχεια</button>
+              <button className="intro-skip" onClick={() => { setIntroShown(true); setSessionStarted(true); try { localStorage.setItem("aura_intro_seen","1"); } catch {} }}>skip</button>
             </div>
           </div>
         </div>
