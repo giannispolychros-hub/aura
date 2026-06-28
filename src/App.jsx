@@ -2071,14 +2071,12 @@ export default function AURAv2() {
         .new-btn:hover{color:var(--text-primary);border-color:#383530}
 
         /* Input */
-        .input-area{padding:14px 0 env(safe-area-inset-bottom,14px);border-top:1px solid transparent;border-bottom:none;background:transparent;position:sticky;bottom:0;z-index:100;transition:border-color .3s,background .3s;}
-        .input-area.active{border-top:1px solid var(--border);background:rgba(8,8,8,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+        .input-area{padding:14px 0 env(safe-area-inset-bottom,14px);border-top:none;border-bottom:none;background:transparent !important;position:sticky;bottom:0;z-index:100;}
+        .input-area.active{border-top:none;background:transparent !important;backdrop-filter:none;}
         .input-row{display:flex;align-items:flex-end;gap:10px}
-        .textarea{flex:1;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--text-primary);font-family:'DM Mono',monospace;font-size:16px;font-weight:400;line-height:1.9;padding:14px;resize:none;outline:none;min-height:80px;max-height:160px;transition:border-color .3s,background .3s;}
-        .textarea:focus,.textarea:not(:placeholder-shown){background:transparent;border-color:transparent;}
-        .textarea:focus{border-color:transparent;}
-        .textarea::placeholder{color:var(--text-dim)}
-        .textarea:focus{border-color:#c9a84c;outline:none}
+        .textarea{flex:1;background:transparent !important;border:none !important;border-radius:0;color:var(--text-primary);font-family:'DM Mono',monospace;font-size:16px;font-weight:400;line-height:1.9;padding:14px;resize:none;outline:none !important;min-height:80px;max-height:160px;box-shadow:none !important;}
+        .textarea:focus,.textarea:not(:placeholder-shown){background:transparent !important;border:none !important;box-shadow:none !important;}
+        .textarea:focus{border:none !important;outline:none !important;}
         .textarea::placeholder{color:#4a4845;font-size:15px}
         .textarea:disabled{opacity:.3;cursor:not-allowed}
         .send-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;transition:all .2s;flex-shrink:0;margin-bottom:2px}
@@ -2223,8 +2221,12 @@ export default function AURAv2() {
             </div>
           )}
 
-          {isFirst && !returnAnchor && (<div className="empty" style={{justifyContent:"space-between",paddingTop:"40px",paddingBottom:"40px"}}><div style={{textAlign:"right",fontSize:"10px",color:"#4a4845",lineHeight:1.8,fontStyle:"italic"}}></div><div style={{position:"fixed",top:"22%",left:"50%",transform:"translateX(-50%)",fontFamily:"'Cormorant Garamond',serif",fontSize:"52px",fontWeight:300,fontStyle:"italic",color:"rgba(196,192,184,0.85)",textAlign:"center",lineHeight:1,pointerEvents:"none",zIndex:0,letterSpacing:"0.08em"}}>Aura</div><div></div>
-<div style={{position:"fixed",bottom:"12%",left:"50%",transform:"translateX(-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:"10px",zIndex:10}}><div style={{fontFamily:"'DM Mono',monospace",fontSize:"9px",letterSpacing:".14em",textTransform:"uppercase",color:"#4a4845",textAlign:"center",opacity:.7}}>Thinking with you, not for you</div><button onClick={()=>{setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),100);}} style={{display:"block",background:"none",border:"1px solid #3a3632",color:"#6a6660",fontFamily:"'DM Mono',monospace",fontSize:"10px",letterSpacing:".2em",textTransform:"uppercase",padding:"8px 24px",cursor:"pointer",borderRadius:"2px"}}>ENTER</button></div></div>)}
+          {isFirst && !returnAnchor && (<div className="empty" style={{justifyContent:"center",paddingTop:"0",paddingBottom:"0"}}>
+          <div style={{position:"fixed",top:"32%",left:"50%",transform:"translate(-50%,-50%)",fontFamily:"'Cormorant Garamond',serif",fontSize:"48px",fontWeight:300,fontStyle:"italic",color:"rgba(196,192,184,0.9)",textAlign:"center",lineHeight:1,pointerEvents:"none",zIndex:2,letterSpacing:"0.08em"}}>Aura</div>
+          <div style={{position:"fixed",right:"18px",top:"50%",transform:"translateY(-50%)",writingMode:"vertical-rl",textOrientation:"mixed",fontFamily:"'DM Mono',monospace",fontSize:"9px",letterSpacing:".18em",color:"#c9a84c",opacity:.8,zIndex:2,userSelect:"none"}}>thinking with you, not for you</div>
+          <div style={{position:"fixed",bottom:"8%",left:"50%",transform:"translateX(-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:"8px",zIndex:10}}>
+            <button onClick={()=>{setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),100);}} style={{display:"block",background:"none",border:"1px solid rgba(58,54,50,0.6)",color:"rgba(106,102,96,0.7)",fontFamily:"'DM Mono',monospace",fontSize:"10px",letterSpacing:".2em",textTransform:"uppercase",padding:"8px 24px",cursor:"pointer",borderRadius:"2px"}}>ENTER</button>
+          </div></div>)}
 
           {/* First-Why pause — AURA asks one question before entering conversation */}
           {firstWhyPending && (
