@@ -2074,15 +2074,14 @@ export default function AURAv2() {
         .input-area{padding:14px 0 env(safe-area-inset-bottom,14px);border-top:none;border-bottom:none;background:transparent !important;position:sticky;bottom:0;z-index:100;}
         .input-area.active{border-top:none;background:transparent !important;backdrop-filter:none;}
         .input-row{display:flex;align-items:flex-end;gap:10px}
-        .textarea{flex:1;background:transparent !important;border:none !important;border-radius:0;color:var(--text-primary);font-family:'DM Mono',monospace;font-size:16px;font-weight:400;line-height:1.9;padding:14px;resize:none;outline:none !important;min-height:80px;max-height:160px;box-shadow:none !important;}
-        .textarea:focus,.textarea:not(:placeholder-shown){background:transparent !important;border:none !important;box-shadow:none !important;}
-        .textarea:focus{border:none !important;outline:none !important;}
+        .textarea{flex:1;background:rgba(10,9,8,0.35) !important;border:1px solid rgba(58,54,50,0.35) !important;border-radius:4px;color:var(--text-primary);font-family:'DM Mono',monospace;font-size:16px;font-weight:400;line-height:1.9;padding:14px;resize:none;outline:none !important;min-height:80px;max-height:160px;box-shadow:none !important;backdrop-filter:blur(4px);}
+        .textarea:focus{border:1px solid rgba(201,168,76,0.35) !important;outline:none !important;background:rgba(10,9,8,0.4) !important;}
         .textarea::placeholder{color:#4a4845;font-size:15px}
         .textarea:disabled{opacity:.3;cursor:not-allowed}
-        .send-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;transition:all .2s;flex-shrink:0;margin-bottom:2px}
-        .send-btn.ready{color:var(--text-secondary);border-color:var(--border-mid)}
-        .send-btn.ready:hover{color:var(--text-primary);border-color:#383530}
-        .send-btn:disabled{opacity:.18;cursor:not-allowed}
+        .send-btn{background:rgba(10,9,8,0.6);border:1px solid rgba(88,84,78,0.8);color:#8a8680;font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;transition:all .2s;flex-shrink:0;margin-bottom:2px}
+        .send-btn.ready{color:#c9a84c;border-color:rgba(201,168,76,0.6);background:rgba(10,9,8,0.7)}
+        .send-btn.ready:hover{color:#e8d890;border-color:#c9a84c}
+        .send-btn:disabled{opacity:.25;cursor:not-allowed}
         .intro-screen{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;flex-direction:column;align-items:center;padding:40px 32px 80px;overflow-y:auto;}
         .intro-text{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:300;color:#c4c0b8;line-height:1.9;max-width:480px;}
         .intro-tagline{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#c9a84c;opacity:.7;margin-bottom:32px;}
@@ -2091,7 +2090,7 @@ export default function AURAv2() {
         .intro-continue:hover{border-color:#c9a84c;color:#c9a84c;}
         .intro-skip{background:none;border:none;color:#3a3632;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;cursor:pointer;transition:color .2s;}
         .intro-skip:hover{color:#6a6660;}
-        .mic-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;}
+        .mic-btn{background:rgba(10,9,8,0.6);border:1px solid rgba(88,84,78,0.8);color:#8a8680;font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;}
         .mic-btn.active{border-color:#7a4a4a;color:#7a4a4a;}
         .turn-counter{font-size:8px;letter-spacing:.1em;color:var(--text-dim);text-align:right;margin-top:5px}
         .err{font-size:10px;color:#4a1a1a;margin-top:7px;padding:6px 10px;border:1px solid #180000;border-radius:2px}
@@ -2128,7 +2127,7 @@ export default function AURAv2() {
 
         {/* ── Header ── */}
         <header className="header" style={{flexDirection:"column",alignItems:"flex-start",gap:"2px",paddingBottom:"6px"}}>
-          <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"18px",fontWeight:300,color:"#d8d4cc",letterSpacing:".04em",lineHeight:1.4}}>Most AI tools answer questions. <span style={{color:"#c9a84c"}}>Aura</span> removes the ones that don't matter.</span>
+          <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"18px",fontWeight:300,color:"#d8d4cc",letterSpacing:".04em",lineHeight:1.4}}>We find the question that matters.<br /><span style={{fontSize:"14px",color:"#8a8680"}}>Nothing else.</span></span>
           <div className="header-right">
             {/* Lens is invisible — no indicator shown to user */}
             {safetyMode && (
