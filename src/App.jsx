@@ -2133,9 +2133,10 @@ export default function AURAv2() {
           <div style={{width:"100%",maxWidth:"480px"}}>
             <div className="intro-tagline">Thinking with you. Not for you.</div>
             <div className="intro-text" style={{textAlign:"center",maxWidth:"320px"}}>
-              <div style={{marginBottom:"16px"}}>Ψάχνουμε τη μια ερώτηση.</div>
-              <div style={{marginBottom:"16px"}}>Τη σωστή.</div>
-              <div style={{color:"#c9a84c",fontStyle:"normal"}}>Αυτή είναι η Aura.</div>
+              <div style={{marginBottom:"8px",fontSize:"12px",letterSpacing:".12em",color:"#6a6660",textTransform:"uppercase",fontFamily:"'DM Mono',monospace"}}>After AI.</div>
+              <div style={{marginBottom:"16px"}}>Μια ερώτηση. Τη σωστή.</div>
+              <div style={{marginBottom:"16px",color:"#9a9690"}}>Αλλάζουμε τον τρόπο που βλέπεις το πρόβλημα.</div>
+              <div style={{color:"#c9a84c",fontStyle:"normal"}}>Αυτό είναι η AURA.</div>
             </div>
             <div className="intro-actions">
               <button className="intro-continue" onClick={() => { setIntroShown(true); try { localStorage.setItem("aura_intro_seen","1"); } catch {} }}>Ξεκίνα</button>
@@ -2150,8 +2151,8 @@ export default function AURAv2() {
         {/* ── AURA Light Field (background, state-driven) ── */}
         <div className={`light-field ${illumLevel > 0 ? "clear" : ""} ${claritySurge ? "surge" : ""}`} />
 
-        {/* ── Vertical Identity: AURA ERGO SUM (progressive illumination) ── */}
-        <div className="vertical-identity">{["A","U","R","A","·","E","R","G","O","·","S","U","M"].map((ch,i)=>{const isDot=ch==="·";return(<span key={i} style={isDot?{height:"14px",display:"block"}:{}}>{isDot?"":ch}</span>);})}</div>
+        {/* ── Vertical Identity: ONE. QUESTION. (progressive illumination) ── */}
+        <div className="vertical-identity">{["O","N","E","·","Q","U","E","S","T","I","O","N","·"].map((ch,i)=>{const isDot=ch==="·";return(<span key={i} style={isDot?{height:"14px",display:"block"}:{}}>{isDot?"":ch}</span>);})}</div>
 
         {/* ── Header ── */}
         <header className="header" style={{flexDirection:"column",alignItems:"flex-start",gap:"2px",paddingBottom:"6px"}}>
