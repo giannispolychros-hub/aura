@@ -1398,6 +1398,9 @@ export default function AURAv2() {
     try { return !!localStorage.getItem("aura_intro_seen"); } catch { return false; }
   });
   const [isListening, setIsListening] = useState(false);
+  const isListeningRef = useRef(false);
+  // Keep ref in sync with state
+  const setIsListeningSync = useCallback((val) => { isListeningRef.current = val; setIsListening(val); }, []);
   const recognitionRef = useRef(null);
   // First-Why protocol
   const [firstWhyPending, setFirstWhyPending] = useState(false);
@@ -1457,8 +1460,8 @@ export default function AURAv2() {
 
   const bottomRef        = useRef(null);
   const textareaRef      = useRef(null);
-  const startListening = useCallback(() => { const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return; const r = new SR(); r.lang="el-GR"; r.continuous=false; r.interimResults=false; r.onstart=()=>setIsListening(true); r.onresult=(e)=>{const t=e.results[0][0].transcript;setInput(prev=>prev?prev+" "+t:t);}; r.onend=()=>setIsListening(false); r.onerror=()=>setIsListening(false); recognitionRef.current=r; r.start(); }, []);
-  const stopListening = useCallback(() => { recognitionRef.current?.stop(); setIsListening(false); }, []);
+  const startListening = useCallback(() => { const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return; const r = new SR(); r.lang="el-GR"; r.continuous=true; r.interimResults=false; r.onstart=()=>setIsListeningSync(true); r.onresult=(e)=>{const t=e.results[e.results.length-1][0].transcript;setInput(prev=>prev?prev+" "+t:t);}; r.onend=()=>{ if(recognitionRef.current===r && isListeningRef.current){ r.start(); } else { setIsListeningSync(false); }}; r.onerror=(e)=>{ if(e.error!=="no-speech"){ setIsListeningSync(false); }}; recognitionRef.current=r; r.start(); }, [setIsListeningSync]);
+  const stopListening = useCallback(() => { isListeningRef.current=false; recognitionRef.current?.stop(); setIsListeningSync(false); }, [setIsListeningSync]);
 
   useEffect(() => {
     // FIX 4: block:"end" is more reliable than smooth on iOS Safari
@@ -2218,14 +2221,14 @@ export default function AURAv2() {
         .new-btn:hover{color:var(--text-primary);border-color:#383530}
 
         /* Input */
-        .input-area{padding:14px 0 env(safe-area-inset-bottom,14px);border-top:none;border-bottom:none;background:transparent !important;position:sticky;bottom:0;z-index:100;}
-        .input-area.active{border-top:none;background:transparent !important;backdrop-filter:none;}
+        .input-area{padding:14px 0 env(safe-area-inset-bottom,14px);border-top:1px solid rgba(201,168,76,0.25);border-bottom:none;background:transparent !important;position:sticky;bottom:2%;z-index:100;}
+        .input-area.active{border-top:1px solid rgba(201,168,76,0.4);background:transparent !important;}
         .input-row{display:flex;align-items:flex-end;gap:10px}
-        .textarea{flex:1;background:rgba(10,9,8,0.35) !important;border:1px solid rgba(58,54,50,0.35) !important;border-radius:4px;color:var(--text-primary);font-family:'DM Mono',monospace;font-size:16px;font-weight:400;line-height:1.9;padding:14px;resize:none;outline:none !important;min-height:80px;max-height:160px;box-shadow:none !important;backdrop-filter:blur(4px);}
+        .textarea{flex:1;background:rgba(10,9,8,0.35) !important;border:1px solid rgba(201,168,76,0.2) !important;border-radius:4px;color:var(--text-primary);font-family:'DM Mono',monospace;font-size:16px;font-weight:400;line-height:1.9;padding:14px;resize:none;outline:none !important;min-height:80px;max-height:160px;box-shadow:none !important;backdrop-filter:blur(4px);}
         .textarea:focus{border:1px solid rgba(201,168,76,0.35) !important;outline:none !important;background:rgba(10,9,8,0.4) !important;}
         .textarea::placeholder{color:#4a4845;font-size:15px}
         .textarea:disabled{opacity:.3;cursor:not-allowed}
-        .send-btn{background:rgba(10,9,8,0.6);border:1px solid rgba(88,84,78,0.8);color:#8a8680;font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;transition:all .2s;flex-shrink:0;margin-bottom:2px}
+        .send-btn{background:rgba(10,9,8,0.6);border:1px solid rgba(201,168,76,0.4);color:#c9a84c;font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;transition:all .2s;flex-shrink:0;margin-bottom:2px}
         .send-btn.ready{color:#c9a84c;border-color:rgba(201,168,76,0.6);background:rgba(10,9,8,0.7)}
         .send-btn.ready:hover{color:#e8d890;border-color:#c9a84c}
         .send-btn:disabled{opacity:.25;cursor:not-allowed}
@@ -2237,8 +2240,8 @@ export default function AURAv2() {
         .intro-continue:hover{border-color:#c9a84c;color:#c9a84c;}
         .intro-skip{background:none;border:none;color:#3a3632;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;cursor:pointer;transition:color .2s;}
         .intro-skip:hover{color:#6a6660;}
-        .mic-btn{background:rgba(10,9,8,0.6);border:1px solid rgba(88,84,78,0.8);color:#8a8680;font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;}
-        .mic-btn.active{border-color:#7a4a4a;color:#7a4a4a;}
+        .mic-btn{background:rgba(10,9,8,0.6);border:1px solid rgba(201,168,76,0.4);color:#c9a84c;font-family:'DM Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;border-radius:2px;}
+        .mic-btn.active{border-color:#c9a84c;color:#e8d890;background:rgba(201,168,76,0.1);}
         .turn-counter{font-size:8px;letter-spacing:.1em;color:var(--text-dim);text-align:right;margin-top:5px}
         .err{font-size:10px;color:#4a1a1a;margin-top:7px;padding:6px 10px;border:1px solid #180000;border-radius:2px}
 
