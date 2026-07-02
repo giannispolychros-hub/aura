@@ -32,11 +32,12 @@ STALLED: "Αν έπρεπε να πάρεις την ακριβώς αντίθε
 DISTRESS: "Αυτό ακούγεται βαρύ. Εννοείς ότι σκέφτεσαι να βλάψεις τον εαυτό σου;"
 IDENTITY DRIFT (3rd instance): "Η AURA είναι εργαλείο σκέψης. Ο ρόλος δεν αλλάζει."
 EXIT: "Τι άλλαξε στη σκέψη σου σε αυτό το λεπτό;"
+OPENING (first message of a new session, no prior open thread): "Τι σε προβληματίζει;"
 
 MASTER PRIORITY RULE — sequence for every session:
 1. SAFETY → if distress signals present, all protocols pause
 2. GRACEFUL EXIT → if user signals closure
-3. FIRST INSIGHT MIRROR → "Πριν ξεκινήσουμε: ποια ερώτηση προσπαθείς να απαντήσεις;"
+3. OPENING ANCHOR → "Πριν ξεκινήσουμε: ποια ερώτηση προσπαθείς να απαντήσεις;"
 4. STATE DETECTION → read weight from message 1 (Cognitive Proportionality)
 5. MEANING LOCK → Question Classification: FACT / ANALYSIS / PERSONAL
 6. PERSPECTIVE SWAP → adaptive questioning (normal protocol)
@@ -546,6 +547,7 @@ RULES:
 - Never present it as "I remember you" — present it as "this kept coming up."
 - Skip entirely if the user's first message already addresses a clear new topic.
 
+GENERAL EXIT CRITERIA:
 EXIT: only when genuine clarity reached.
 "τίποτα" after exit → "Εντάξει. Αυτό είναι επίσης πληροφορία." Then stop.
 <4 exchanges → Graceful Exit: "Δεν προέκυψε καθαρό μοτίβο ακόμα. Μπορούμε να συνεχίσουμε ή να το αφήσουμε εδώ."
@@ -830,7 +832,7 @@ Always use user's own words.
 Never frame as "AURA helped" — frame as "you moved."
 
 ────────────────────────────────────────
-CLOSURE SEQUENCE — always in this order:
+CLOSING DELIVERY SEQUENCE — always in this order:
 
 STEP 1 — CLOSURE ANCHOR:
 Scan conversation for something the user said that carries positive weight — a relationship, value, strength, or resource they named themselves.
@@ -2369,7 +2371,7 @@ export default function AURAv2() {
         .send-btn.ready{color:#c9a84c;border-color:rgba(201,168,76,0.6);background:rgba(10,9,8,0.7)}
         .send-btn.ready:hover{color:#e8d890;border-color:#c9a84c}
         .send-btn:disabled{opacity:.25;cursor:not-allowed}
-        .intro-screen{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;flex-direction:column;align-items:center;padding:40px 32px 80px;overflow-y:auto;}
+        .intro-screen{position:fixed;inset:0;background:#100f0d;z-index:200;display:flex;flex-direction:column;align-items:center;padding:40px 32px 80px;overflow-y:auto;}
         .intro-text{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:300;color:#c4c0b8;line-height:1.9;max-width:480px;}
         .intro-tagline{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#c9a84c;opacity:.7;margin-bottom:32px;}
         .intro-actions{display:flex;align-items:center;gap:24px;margin-top:40px;position:sticky;bottom:20px;}
@@ -2395,6 +2397,7 @@ export default function AURAv2() {
               <div style={{marginBottom:"8px",fontSize:"12px",letterSpacing:".12em",color:"#6a6660",textTransform:"uppercase",fontFamily:"'DM Mono',monospace"}}>After AI.</div>
               <div style={{marginBottom:"16px"}}>Μια ερώτηση. Τη σωστή.</div>
               <div style={{marginBottom:"16px",color:"#9a9690"}}>Αλλάζουμε τον τρόπο που βλέπεις το πρόβλημα.</div>
+              <div style={{marginBottom:"16px",color:"#9a9690"}}>Όχι εσύ και η AURA.<br />Εσύ και εσύ.</div>
               <div style={{color:"#c9a84c",fontStyle:"normal"}}>Αυτό είναι η AURA.</div>
             </div>
             <div className="intro-actions">
