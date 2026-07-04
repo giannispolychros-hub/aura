@@ -2352,7 +2352,7 @@ export default function AURAv2() {
             <div className="intro-text" style={{textAlign:"center",maxWidth:"320px"}}>
               <div style={{marginBottom:"8px",fontSize:"12px",letterSpacing:".12em",color:"#6a6660",textTransform:"uppercase",fontFamily:"'DM Mono',monospace"}}>After AI.</div>
               <div style={{marginBottom:"16px"}}>Μια ερώτηση. Τη σωστή.</div>
-              <div style={{marginBottom:"16px",color:"#9a9690"}}>Αλλάζουμε τον τρόπο που βλέπεις το πρόβλημα.</div>
+              <div style={{marginBottom:"16px",color:"#9a9690"}}>Δεν σου δίνει απαντήσεις ή κατεύθυνση. Σε βοηθά να δεις πιο καθαρά τι ήδη σκέφτεσαι.</div>
               <div style={{marginBottom:"16px",color:"#9a9690"}}>Όχι εσύ και η AURA.<br />Εσύ και εσύ.</div>
               <div style={{color:"#c9a84c",fontStyle:"normal"}}>Αυτό είναι η AURA.</div>
             </div>
