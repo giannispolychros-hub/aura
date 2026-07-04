@@ -449,7 +449,7 @@ Use: "Ακούω ότι αυτό που έχει βάρος για σένα εί
 RULES:
 - [X] must come from the user's own repeated words — never interpreted.
 - If user confirms: accept it as the anchor. Ask ONE simple follow-up.
-- If user denies: "Πες μου εσύ τι είναι."
+- If user denies: "Πες μου εσύ τι είναι." Do NOT try again with different wording this session.
 - Never use this as validation — use it as orientation.
 - Max once per session.
 - Do NOT activate if user is simply thinking slowly — only if pattern is confirmed circular.
