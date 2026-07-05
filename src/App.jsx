@@ -163,7 +163,7 @@ If user's correction differs significantly: "Πες μου τι το κάνει 
 
 OUTCOME EXPECTATION SCALE (closing verification):
 When a concrete next step has emerged AND the conversation is reaching closure, before final exit, ask once:
-"Αν το κάνεις, τι περιμένεις να αλλάξει μέσα σου, από το 1 έως το 10;"
+"Αν πούμε ότι αυτό σε βάραινε στο 10 όταν ήρθες — πόσο πιστεύεις ότι θα σε ανακουφίσει αυτό;"
 This is diagnostic, not motivational — a low number (1-4) signals the identified step may not address the real issue; a high number (7-10) confirms genuine resolution.
 Do NOT interpret or comment on the number. Simply receive it.
 If number is low: "Αυτό ίσως δεν είναι αρκετό." Then ask what would change it — do not solve it yourself.
@@ -1540,6 +1540,8 @@ export default function AURAv2() {
 
   // Pre-termination warning
   const [warningPending, setWarningPending] = useState(false);
+  const [closureConfirmPending, setClosureConfirmPending] = useState(false);
+  const pendingClosureMsgs = useRef(null);
 
   // Memory
   const [memory, setMemory]                       = useState(() => loadMemory());
@@ -1590,7 +1592,7 @@ export default function AURAv2() {
   useEffect(() => {
     // FIX 4: block:"end" is more reliable than smooth on iOS Safari
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, loading, pivotPending, layerGatePending, memoryPromptPending, warningPending, misfirePending, firstWhyPending]);
+  }, [messages, loading, pivotPending, layerGatePending, memoryPromptPending, warningPending, closureConfirmPending, misfirePending, firstWhyPending]);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -1745,13 +1747,14 @@ export default function AURAv2() {
         (() => {
           const last3 = userMsgsAll.slice(-3).map(m => m.content);
           const allShort = last3.every(m => m.trim().split(/\s+/).length <= 8);
-          const hasAgreement = last3.filter(m => /^(ναι|yes|σωστό|ακριβώς|κατάλαβα|εντάξει|οκ|ok|νομίζω ναι|πιστεύω ναι)[\.,!]?$/i.test(m.trim())).length >= 1;
+          const hasAgreement = last3.filter(m => /^(ναι|yes|σωστό|ακριβώς|κατάλαβα|εντάξει|οκ|ok|νομίζω ναι|πιστεύω ναι|τέλος|τελειώσαμε|αυτό ήταν|πάω|φεύγω)[\.,!?;]?$/i.test(m.trim())).length >= 1;
           const hasRepeat = last3.length === 3 && last3[1].trim() === last3[2].trim();
           return (allShort && hasAgreement) || hasRepeat;
         })();
 
       if (naturalExitReady) {
-        await triggerTermination(msgs);
+        pendingClosureMsgs.current = msgs;
+        setClosureConfirmPending(true);
         return;
       }
 
@@ -1944,6 +1947,16 @@ export default function AURAv2() {
       await triggerTermination(messages);
     }
   }, [messages, generateResponse, triggerTermination]);
+
+  const handleClosureConfirm = useCallback(async (proceed) => {
+    setClosureConfirmPending(false);
+    const msgs = pendingClosureMsgs.current;
+    pendingClosureMsgs.current = null;
+    if (proceed) {
+      await triggerTermination(msgs || messages);
+    }
+    // If not proceeding, simply dismiss — the user continues typing normally, no forced response.
+  }, [messages, triggerTermination]);
 
   // ── Main submit ──
   const handleSubmit = useCallback(async () => {
@@ -2609,6 +2622,21 @@ export default function AURAv2() {
             </div>
           )}
 
+          {/* Pre-closure confirmation — gives the user a heads-up before the real closing summary */}
+          {closureConfirmPending && (
+            <div className="warning-card">
+              <div className="warning-label">πριν κλείσουμε</div>
+              <div className="warning-text">
+                Αν είσαι σίγουρος ότι δεν έχεις κάτι να προσθέσεις, θα ήθελα να σου δείξω την πορεία της σκέψης σου.<br />
+                Αυτή αποτελεί κτήμα σου πλέον.
+              </div>
+              <div className="choice-btns">
+                <button className="choice-btn" onClick={() => handleClosureConfirm(false)}>Έχω κι άλλο να πω</button>
+                <button className="choice-btn prim" onClick={() => handleClosureConfirm(true)}>Δείξε μου</button>
+              </div>
+            </div>
+          )}
+
           {/* Pre-termination warning */}
           {warningPending && (
             <div className="warning-card">
@@ -2671,7 +2699,7 @@ export default function AURAv2() {
         </div>
 
         {/* ── Input ── */}
-        {!sessionEnded && !layerGatePending && !pivotPending && !memoryPromptPending && !warningPending && !misfirePending && sessionStarted && (
+        {!sessionEnded && !layerGatePending && !pivotPending && !memoryPromptPending && !warningPending && !closureConfirmPending && !misfirePending && sessionStarted && (
           <div className={`input-area${input.trim() || loading ? " active" : ""}`}>
             <div className="input-row" style={{flexDirection:"column",gap:"4px",alignItems:"stretch"}}>
               <textarea
