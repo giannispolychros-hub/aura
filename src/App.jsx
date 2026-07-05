@@ -14,7 +14,7 @@ function nextMsgId() { return `m${Date.now().toString(36)}_${(_msgIdCounter++).t
 // AURA CORE PERSONALITY (all lenses share this)
 // ─────────────────────────────────────────────
 const AURA_CORE_PERSONALITY = `
-FOUNDATIONAL PRODUCT PRINCIPLE: AURA is not a conversation engine. AURA is a continuity mirror for human understanding. Every session should feel like a continuation of the user's developing understanding, never an isolated conversation. The user should gradually experience that understanding accumulates across time — but this is shown, never asserted: continuity is only ever displayed as a return to the user's own recorded words, never claimed as fact by AURA. AURA preserves context. The user owns the insight. Never create dependency. Never create artificial continuity. Continuity exists only when genuine understanding has emerged, and is expressed strictly at the opening of a returning session, never at closure.
+FOUNDATIONAL PRODUCT PRINCIPLE: AURA does not preserve conversations. It preserves only what the user actually discovered. AURA is not a conversation engine. AURA is a continuity mirror for human understanding. Every session should feel like a continuation of the user's developing understanding, never an isolated conversation. The user should gradually experience that understanding accumulates across time — but this is shown, never asserted: continuity is only ever displayed as a return to the user's own recorded words, never claimed as fact by AURA. AURA preserves context. The user owns the insight. Never create dependency. Never create artificial continuity. Continuity exists only when genuine understanding has emerged, and is expressed strictly at the opening of a returning session, never at closure.
 
 IDENTITY: You are AURA. A clarity tool. Not a coach, therapist, or mentor. Calm. Direct. Concise. The user's autonomy is absolute.
 
@@ -1538,6 +1538,7 @@ export default function AURAv2() {
   const [memory, setMemory]                       = useState(() => loadMemory());
   const [memoryPromptPending, setMemoryPromptPending] = useState(false);
   const [showMemoryPanel, setShowMemoryPanel]     = useState(false);
+  const [showArchivePanel, setShowArchivePanel]   = useState(false);
 
   // Observation misfire — user rejected an observation
   const [misfirePending, setMisfirePending]   = useState(false);
@@ -2412,7 +2413,8 @@ export default function AURAv2() {
                 <span style={{color:"var(--red)"}}>υποστήριξη</span>
               </div>
             )}
-            <button className="icon-btn" onClick={() => setShowMemoryPanel(v => !v)} title="Ρυθμίσεις μνήμης">μνήμη</button>
+            <button className="icon-btn" onClick={() => { setShowMemoryPanel(v => !v); setShowArchivePanel(false); }} title="Ρυθμίσεις μνήμης">μνήμη</button>
+            <button className="icon-btn" onClick={() => { setShowArchivePanel(v => !v); setShowMemoryPanel(false); }} title="Αρχείο">αρχείο</button>
           </div>
         </header>
 
@@ -2457,6 +2459,25 @@ export default function AURAv2() {
                 try { localStorage.removeItem(MEMORY_KEY); } catch {}
               }}>διαγραφή όλων</button>
             </div>
+          </div>
+        )}
+
+        {/* ── Αρχείο: passive, deterministic ownership archive — no AI logic, no ranking ── */}
+        {showArchivePanel && (
+          <div className="mem-panel">
+            <div className="mem-panel-title">αρχείο</div>
+            <div style={{fontSize:9,color:"var(--text-dim)",marginBottom:10,lineHeight:1.7}}>
+              Ό,τι έγραψες, με τη σειρά που το έγραψες. Καμία επεξεργασία, καμία σειρά σημασίας.
+            </div>
+            {(memory.anchors||[]).length === 0 && (
+              <div style={{fontSize:11,color:"var(--text-dim)"}}>Δεν υπάρχει ακόμα τίποτα αποθηκευμένο.</div>
+            )}
+            {[...(memory.anchors||[])].sort((a,b) => (b.createdAt||0) - (a.createdAt||0)).map(a => (
+              <div key={a.id} className="mem-panel-row" style={{flexDirection:"column",alignItems:"flex-start",gap:4,paddingTop:10,paddingBottom:10,borderTop:"1px solid var(--border)"}}>
+                <span style={{fontSize:9,color:"var(--text-dim)"}}>{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : ""}</span>
+                <span style={{fontSize:12,color:"var(--text-secondary)"}}>{a.text}</span>
+              </div>
+            ))}
           </div>
         )}
 
