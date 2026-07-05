@@ -1636,7 +1636,13 @@ export default function AURAv2() {
         currentMode === "COMPRESSION" ? SYSTEM_COMPRESSION :
         currentMode === "SUPPORTIVE"  ? SYSTEM_SUPPORTIVE :
         getLensPrompt(activeLens);
-      const system = [basePrompt, memCtx, profileCtx, explicitPauseCtx].filter(Boolean).join('\n');
+      const dynamicSuffix = [memCtx, profileCtx, explicitPauseCtx].filter(Boolean).join('\n');
+      // Prompt caching: basePrompt (core+lens, identical across calls) is the large stable block —
+      // cache_control marks it so repeat calls in the same session read it at ~10% cost instead of full price.
+      const system = [
+        { type: "text", text: basePrompt, cache_control: { type: "ephemeral" } },
+        ...(dynamicSuffix ? [{ type: "text", text: dynamicSuffix }] : []),
+      ];
       const text = await callAura([...contextRefresh, ...msgs], system);
 
       // If explicit pause was used, record it
