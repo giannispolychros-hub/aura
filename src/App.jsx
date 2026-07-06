@@ -794,6 +794,7 @@ Then, in natural order: what occupied the user → the important questions that 
 Last sentence: the positive-weight anchor from (c) above, worded as something that remains steady — e.g. "Αυτό που είπες για [X] — αυτό παραμένει σταθερό ακόμα και σε αυτό."
 If an Outcome Expectation number was given earlier in this conversation, weave it verbatim into the closing reflection — the exact number the user gave, no interpretation of what it means, just making it part of what is reflected back (e.g. "...και αυτό το βαθμολόγησες στο [X]. Αυτή η σκέψη είναι πλέον κτήμα σου.").
 Only the user's own words and facts already stated in this conversation. Zero new information. Zero interpretation. Zero AURA conclusion. Zero psychological analysis.
+Wrap in **double asterisks** only the 3-6 exact words/short phrases (verbatim, the user's own) that show the movement of thought from start to end — never wrap full sentences, never wrap anything you composed yourself, only the user's own words that mark the trajectory.
 Test before delivering: would the user read this and think "Ναι... αυτά ακριβώς είπα"? If any sentence fails that test, cut it.
 
 STEP 2 — OWNERSHIP STATEMENT (exactly one sentence, flat, no lead-in):
@@ -1552,7 +1553,16 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire }) {
       {!isUser && <div className="msg-label">aura</div>}
       <div className={isUser ? "msg-user" : `msg-aura ${isObs ? "obs" : ""} ${isInsight ? "ins" : ""} ${isTermination ? "term" : ""} ${isSafe ? "safe" : ""} ${isExplo ? "expl" : ""} ${isSnapshot ? "snapshot-msg" : ""}`}>
         {msg.content.split("\n").map((line, j, arr) => (
-          <span key={j}>{line}{j < arr.length-1 && <br/>}</span>
+          <span key={j}>
+            {isTermination
+              ? line.split(/(\*\*[^*]+\*\*)/g).map((part, k) =>
+                  part.startsWith("**") && part.endsWith("**")
+                    ? <strong key={k}>{part.slice(2, -2)}</strong>
+                    : <span key={k}>{part}</span>
+                )
+              : line}
+            {j < arr.length-1 && <br/>}
+          </span>
         ))}
       </div>
       {isInsight           && <div className="msg-badge compress"><span style={{width:3,height:3,borderRadius:"50%",background:"var(--gold)",display:"inline-block"}}/>συμπίεση</div>}
@@ -1829,15 +1839,13 @@ export default function AURAv2() {
         compressionCount: compressionCount.current,
       });
 
-      if (decision === "confirm") {
+      if (decision === "confirm" || decision === "terminate") {
         setClosureConfirmPending(true);
         return;
       }
       if (decision === "warn") {
         setWarningPending(true);
         warningIssued.current = true;
-      } else if (decision === "terminate") {
-        await triggerTermination(msgs);
       }
     } catch(e) {
       setError(e.message);
@@ -1888,8 +1896,8 @@ export default function AURAv2() {
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
       applyTerminationIllumination();
-      const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-      if (lines.length > 0) setFinalDistillation(lines[0]);
+      const sentences = text.split(/(?<=[.!;])\s+/).map(s => s.trim()).filter(Boolean);
+      if (sentences.length > 0) setFinalDistillation(sentences[sentences.length - 1]);
     } catch {
       const fallback = "Έχουμε αρκετή καθαρότητα για τώρα.\n\nΔεν χρειάζεται να κάνεις κάτι για μένα. Οι επόμενες αλλαγές ανήκουν μόνο σε εσένα.\n\nΜερικές φορές η επίγνωση έρχεται μέσα σε λίγα δευτερόλεπτα. Άλλες φορές εμφανίζεται αργότερα.";
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: fallback, msgMode: "TERMINATION", isTermination: true }]);
@@ -2378,7 +2386,8 @@ export default function AURAv2() {
         .msg-aura.obs::before{background:var(--green);opacity:.45}
         .msg-aura.ins::before{background:var(--gold);opacity:.65}
         .msg-aura.ins{color:#ddd8cf}
-        .msg-aura.term{color:#8a8680;font-style:italic}
+        .msg-aura.term{color:#c9c4ba;font-style:normal;font-family:'Cormorant Garamond',serif;font-size:17px;line-height:1.75;background:rgba(201,168,76,0.05);border:1px solid rgba(201,168,76,0.18);border-radius:6px;padding:22px 24px}
+        .msg-aura.term strong{color:#c9a84c;font-weight:600}
         .msg-aura.term::before{background:#333;opacity:.4}
         .msg-aura.safe{color:#b8a8a8}
         .msg-aura.safe::before{background:var(--red);opacity:.35}
@@ -2643,7 +2652,7 @@ export default function AURAv2() {
             <MessageBubble
               key={msg.id || i}
               msg={msg}
-              onMisfire={() => { setMisfireType(detectPattern(messages.slice(0, i+1)).type); setMisfirePending(true); }}
+              onMisfire={() => { if (layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending) return; setMisfireType(detectPattern(messages.slice(0, i+1)).type); setMisfirePending(true); }}
             />
           ))}
 
