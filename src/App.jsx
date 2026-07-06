@@ -1384,6 +1384,40 @@ function detectDomain(text) {
 // CLIENT-SIDE PATTERN DETECTION
 // ─────────────────────────────────────────────
 
+// ── Termination decision — extracted from generateResponse for isolated testability ──
+// Pure function: no state mutation, no API calls. Returns "confirm" | "warn" | "terminate" | "none".
+// Same exact logic that used to live inline inside generateResponse — behavior unchanged.
+function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued, compressionCount }) {
+  if (safetyMode) return "none";
+
+  // FIX 3: broader termination signal detection — catches equivalent phrasings
+  const modelSignalsEnd = /(action belongs to (you|the user)|we.ve reached the limit|the decision is yours|continuing.{0,30}(not|won.t) (help|serve)|η απόφαση (είναι|ανήκει) (δική σου|σε σένα)|έχουμε (φτάσει|αρκετή|αρκετό)|συνεχίζοντας.{0,30}δεν (βοηθ|εξυπηρετ))/i.test(text);
+
+  // ── Natural Exit Detection ──
+  // If last 3 user messages are short/repetitive/agreement → user has reached their point.
+  const userMsgsAll = msgs.filter(m => m.role === "user");
+  const naturalExitReady =
+    currentMode === "ANSWER" &&
+    userMsgsAll.length >= 4 &&
+    !warningIssued &&
+    compressionCount === 0 && // only before any compression
+    (() => {
+      const last3 = userMsgsAll.slice(-3).map(m => m.content);
+      const allShort = last3.every(m => m.trim().split(/\s+/).length <= 8);
+      const hasAgreement = last3.filter(m => /^(ναι|yes|σωστό|ακριβώς|κατάλαβα|εντάξει|οκ|ok|νομίζω ναι|πιστεύω ναι|τέλος|τελειώσαμε|αυτό ήταν|πάω|φεύγω)[\.,!?;]?$/i.test(m.trim())).length >= 1;
+      const hasRepeat = last3.length === 3 && last3[1].trim() === last3[2].trim();
+      return (allShort && hasAgreement) || hasRepeat;
+    })();
+
+  if (naturalExitReady) return "confirm";
+
+  if (compressionCount >= 2 || modelSignalsEnd) {
+    return warningIssued ? "terminate" : "warn";
+  }
+
+  return "none";
+}
+
 function detectPattern(messages) {
   const userMsgs = messages.filter(m => m.role === "user");
   if (userMsgs.length < 3) return { type: "NEW", confidence: 0 };
@@ -1764,39 +1798,23 @@ export default function AURAv2() {
         if (memory.storageEnabled) saveMemory(updatedWithTraj);
       }
 
-      // Termination logic — only if not in safety mode and warning was already issued
-      // FIX 3: broader termination signal detection — catches equivalent phrasings
-      const modelSignalsEnd = /(action belongs to (you|the user)|we.ve reached the limit|the decision is yours|continuing.{0,30}(not|won.t) (help|serve)|η απόφαση (είναι|ανήκει) (δική σου|σε σένα)|έχουμε (φτάσει|αρκετή|αρκετό)|συνεχίζοντας.{0,30}δεν (βοηθ|εξυπηρετ))/i.test(text);
+      // Termination decision — extracted to decideTermination() for testability, same logic as before.
+      const decision = decideTermination(msgs, text, {
+        safetyMode,
+        currentMode,
+        warningIssued: warningIssued.current,
+        compressionCount: compressionCount.current,
+      });
 
-      // ── Natural Exit Detection ──
-      // If last 3 user messages are short/repetitive/agreement → user has reached their point.
-      // Exit Signature as reward, not punishment.
-      const userMsgsAll = msgs.filter(m => m.role === "user");
-      const naturalExitReady = !safetyMode &&
-        currentMode === "ANSWER" &&
-        userMsgsAll.length >= 4 &&
-        !warningIssued.current &&
-        compressionCount.current === 0 && // only before any compression
-        (() => {
-          const last3 = userMsgsAll.slice(-3).map(m => m.content);
-          const allShort = last3.every(m => m.trim().split(/\s+/).length <= 8);
-          const hasAgreement = last3.filter(m => /^(ναι|yes|σωστό|ακριβώς|κατάλαβα|εντάξει|οκ|ok|νομίζω ναι|πιστεύω ναι|τέλος|τελειώσαμε|αυτό ήταν|πάω|φεύγω)[\.,!?;]?$/i.test(m.trim())).length >= 1;
-          const hasRepeat = last3.length === 3 && last3[1].trim() === last3[2].trim();
-          return (allShort && hasAgreement) || hasRepeat;
-        })();
-
-      if (naturalExitReady) {
+      if (decision === "confirm") {
         setClosureConfirmPending(true);
         return;
       }
-
-      if (!safetyMode && (compressionCount.current >= 2 || modelSignalsEnd)) {
-        if (!warningIssued.current) {
-          setWarningPending(true);
-          warningIssued.current = true;
-        } else {
-          await triggerTermination(msgs);
-        }
+      if (decision === "warn") {
+        setWarningPending(true);
+        warningIssued.current = true;
+      } else if (decision === "terminate") {
+        await triggerTermination(msgs);
       }
     } catch(e) {
       setError(e.message);
