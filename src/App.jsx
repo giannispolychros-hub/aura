@@ -1025,6 +1025,14 @@ function loadMemory() {
     merged.qualityLog   = Array.isArray(merged.qualityLog)   ? merged.qualityLog   : [];
     // Ensure profile exists with all keys
     merged.profile = { ...EMPTY_MEMORY().profile, ...(merged.profile || {}) };
+    // RT-fix: sanitize numeric profile fields — a single non-finite value (NaN, string, corrupted
+    // localStorage) would otherwise silently poison every future moving-average update forever.
+    const _numericProfileKeys = ["impulsivity","analyticalDepth","riskAvoidance","autonomyNeed",
+      "ruminationTendency","validationSeeking","preferredPace","orientation","decisionConfidence",
+      "totalSignals","profilingMaturity","explicitPauseUsed","consecutiveNormalSessions"];
+    _numericProfileKeys.forEach(k => {
+      if (!Number.isFinite(merged.profile[k])) merged.profile[k] = k === "totalSignals" || k === "profilingMaturity" || k === "explicitPauseUsed" || k === "consecutiveNormalSessions" ? 0 : 50;
+    });
     // Apply decay if user has been away 90+ days
     return applyProfileDecay(merged);
   } catch { return EMPTY_MEMORY(); }
