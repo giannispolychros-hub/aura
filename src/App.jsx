@@ -1031,20 +1031,33 @@ function loadMemory() {
 }
 
 let _saveMemoryTimer = null;
-function saveMemory(mem) {
+let _quotaWarned = false;
+function _writeMemoryNow(mem) {
+  try {
+    // A2: cap unbounded arrays — keep most recently active entries
+    const capped = {
+      ...mem,
+      trajectories: (mem.trajectories || []).slice(-50),
+      obstacles: (mem.obstacles || []).slice(-50),
+      anchors: (mem.anchors || []).slice(-100), // RT-fix: anchors previously had no cap at all
+    };
+    localStorage.setItem(MEMORY_KEY, JSON.stringify(capped));
+  } catch (e) {
+    // No longer silently swallowed — warn once so a storage-quota failure is at least visible in devtools.
+    if (!_quotaWarned) { _quotaWarned = true; console.warn("AURA memory save failed (storage quota or unavailable):", e); }
+  }
+}
+function saveMemory(mem, immediate = false) {
+  if (immediate) {
+    // RT-fix: critical, user-initiated writes (e.g. closing an anchor) flush immediately —
+    // no debounce window where a tab-close could silently lose the action the user just saw happen.
+    if (_saveMemoryTimer) { clearTimeout(_saveMemoryTimer); _saveMemoryTimer = null; }
+    _writeMemoryNow(mem);
+    return;
+  }
   // A2: debounce writes — multiple rapid updates collapse into one disk write
   if (_saveMemoryTimer) clearTimeout(_saveMemoryTimer);
-  _saveMemoryTimer = setTimeout(() => {
-    try {
-      // A2: cap unbounded arrays — keep most recently active entries
-      const capped = {
-        ...mem,
-        trajectories: (mem.trajectories || []).slice(-50),
-        obstacles: (mem.obstacles || []).slice(-50),
-      };
-      localStorage.setItem(MEMORY_KEY, JSON.stringify(capped));
-    } catch {}
-  }, 400);
+  _saveMemoryTimer = setTimeout(() => _writeMemoryNow(mem), 400);
 }
 
 // ── Silent Profile Update ──
@@ -1427,7 +1440,12 @@ let _activeCall = false;
 
 async function callAura(messages, systemPrompt, retries = 1) {
   if (_activeCall && retries === 1) {
-    throw new Error("Κάτι δεν λειτούργησε. Δοκίμασε ξανά.");
+    // RT-fix: brief grace window instead of immediate hard fail — two legitimate
+    // actions can overlap by a few hundred ms without either being a real error.
+    await new Promise(r => setTimeout(r, 300));
+    if (_activeCall) {
+      throw new Error("Κάτι δεν λειτούργησε. Δοκίμασε ξανά.");
+    }
   }
   // FIX 1: AbortController — 30s timeout for mobile network stalls
   const controller = new AbortController();
@@ -1542,7 +1560,6 @@ export default function AURAv2() {
   // Pre-termination warning
   const [warningPending, setWarningPending] = useState(false);
   const [closureConfirmPending, setClosureConfirmPending] = useState(false);
-  const pendingClosureMsgs = useRef(null);
 
   // Memory
   const [memory, setMemory]                       = useState(() => loadMemory());
@@ -1588,6 +1605,15 @@ export default function AURAv2() {
   const bottomRef        = useRef(null);
   const textareaRef      = useRef(null);
   const startListening = useCallback(() => { const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return; const r = new SR(); r.lang="el-GR"; r.continuous=true; r.interimResults=false; r.onstart=()=>setIsListeningSync(true); r.onresult=(e)=>{const t=e.results[e.results.length-1][0].transcript;setInput(prev=>prev?prev+" "+t:t);}; r.onend=()=>{ if(recognitionRef.current===r && isListeningRef.current){ r.start(); } else { setIsListeningSync(false); }}; r.onerror=(e)=>{ if(e.error!=="no-speech"){ setIsListeningSync(false); }}; recognitionRef.current=r; r.start(); }, [setIsListeningSync]);
+
+  // RT-fix: stop any active recognition on unmount — previously nothing did this,
+  // so a listening session could keep restarting itself (r.onend -> r.start()) in the background.
+  useEffect(() => {
+    return () => {
+      isListeningRef.current = false;
+      recognitionRef.current?.stop();
+    };
+  }, []);
   const stopListening = useCallback(() => { isListeningRef.current=false; recognitionRef.current?.stop(); setIsListeningSync(false); }, [setIsListeningSync]);
 
   useEffect(() => {
@@ -1760,7 +1786,6 @@ export default function AURAv2() {
         })();
 
       if (naturalExitReady) {
-        pendingClosureMsgs.current = msgs;
         setClosureConfirmPending(true);
         return;
       }
@@ -1935,7 +1960,7 @@ export default function AURAv2() {
   const closeAnchorHandler = useCallback((id, status) => {
     const updated = closeAnchor({ ...memory }, id, status);
     setMemory(updated);
-    if (memory.storageEnabled) saveMemory(updated);
+    if (memory.storageEnabled) saveMemory(updated, true);
   }, [memory]);
 
   // ── Warning: pre-termination ──
@@ -1957,10 +1982,8 @@ export default function AURAv2() {
 
   const handleClosureConfirm = useCallback(async (proceed) => {
     setClosureConfirmPending(false);
-    const msgs = pendingClosureMsgs.current;
-    pendingClosureMsgs.current = null;
     if (proceed) {
-      await triggerTermination(msgs || messages);
+      await triggerTermination(messages); // live state — includes the latest reply by the time the user clicks
     }
     // If not proceeding, simply dismiss — the user continues typing normally, no forced response.
   }, [messages, triggerTermination]);
