@@ -1032,6 +1032,7 @@ function loadMemory() {
 
 let _saveMemoryTimer = null;
 let _quotaWarned = false;
+let _onStorageFailure = null; // set by the component — lets a plain module function reach React UI without importing it
 function _writeMemoryNow(mem) {
   try {
     // A2: cap unbounded arrays — keep most recently active entries
@@ -1043,8 +1044,13 @@ function _writeMemoryNow(mem) {
     };
     localStorage.setItem(MEMORY_KEY, JSON.stringify(capped));
   } catch (e) {
-    // No longer silently swallowed — warn once so a storage-quota failure is at least visible in devtools.
-    if (!_quotaWarned) { _quotaWarned = true; console.warn("AURA memory save failed (storage quota or unavailable):", e); }
+    // RT-fix (Scenario 2): no longer silent — warn in console AND tell the user once, so they don't
+    // believe something was saved when it wasn't.
+    if (!_quotaWarned) {
+      _quotaWarned = true;
+      console.warn("AURA memory save failed (storage quota or unavailable):", e);
+      _onStorageFailure?.();
+    }
   }
 }
 function saveMemory(mem, immediate = false) {
@@ -1638,6 +1644,15 @@ export default function AURAv2() {
 
   const bottomRef        = useRef(null);
   const textareaRef      = useRef(null);
+
+  // RT-fix (Scenario 2): surface storage failures to the user, not just devtools —
+  // uses the existing error banner, phrased calmly, non-alarming.
+  useEffect(() => {
+    _onStorageFailure = () => {
+      setError("Η συσκευή σου δεν έχει άλλο χώρο να θυμηθεί — η συνομιλία συνεχίζεται κανονικά, απλά δεν θα αποθηκευτεί.");
+    };
+    return () => { _onStorageFailure = null; };
+  }, []);
   const startListening = useCallback(() => { const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return; const r = new SR(); r.lang="el-GR"; r.continuous=true; r.interimResults=false; r.onstart=()=>setIsListeningSync(true); r.onresult=(e)=>{const t=e.results[e.results.length-1][0].transcript;setInput(prev=>prev?prev+" "+t:t);}; r.onend=()=>{ if(recognitionRef.current===r && isListeningRef.current){ r.start(); } else { setIsListeningSync(false); }}; r.onerror=(e)=>{ if(e.error!=="no-speech"){ setIsListeningSync(false); }}; recognitionRef.current=r; r.start(); }, [setIsListeningSync]);
 
   // RT-fix: stop any active recognition on unmount — previously nothing did this,
@@ -1942,6 +1957,12 @@ export default function AURAv2() {
           : pivotType === "AVOIDANCE" ? "certainty_seeking"
           : pivotType === "DECISION_PRESENT" ? "fear_of_commitment"
           : null;
+        // INTENTIONAL: recordTrajectory runs here regardless of storageEnabled, in-memory only for this
+        // session — never persisted (saveMemory below stays consent-gated). This is required so the
+        // consent-offering mechanism itself can detect a stable pattern worth asking about; without this,
+        // the app could never know a pattern exists in order to offer consent for it in the first place.
+        // Documented decision, not an oversight — do not "fix" by gating this line without redesigning
+        // how stable-obstacle detection triggers the consent prompt.
         let updatedMem = recordTrajectory({ ...memory }, currentDomain, 2, obstacleType);
 
         // Check if stable obstacle exists (3+ confirmations) — offer memory consent
@@ -2020,24 +2041,24 @@ export default function AURAv2() {
     if (safetySignal === "CRISIS") {
       // Level 3: full safety mode, supportive only
       setSafetyMode(true);
-      setFirstWhyPending(false);  // BUG 6: clear pending state on safety override
+      setFirstWhyPending(false); setFirstWhyMessage("");  // RT-fix #2: also clear stale message content, not just the flag
       setCurrentDomain(detectDomain(userText));  // RT-02: symmetric with DISTRESS branch
       const safeMsgs = [...messages, { id: nextMsgId(), role: "user", content: userText }];
       setMessages(safeMsgs);
-      turnCount.current += 1;
       await generateResponse(safeMsgs, "SUPPORTIVE");
+      turnCount.current += 1; // RT-fix #5: moved after the call — a failed call no longer inflates the count
       return;
     }
     if (safetySignal === "DISTRESS") {
       // Level 2: gentle clarity — skip First-WHY, softer tone, user still gets help
-      setFirstWhyPending(false);  // BUG 6: clear pending state on safety override
+      setFirstWhyPending(false); setFirstWhyMessage("");  // RT-fix #2: also clear stale message content, not just the flag
       const distressMsgs = [...messages, { id: nextMsgId(), role: "user", content: userText }];
       setMessages(distressMsgs);
-      turnCount.current += 1;
       setCurrentDomain(detectDomain(userText));  // BUG 9: set domain in distress path
       // Inject distress context into normal flow — lens defaults to SIMPLIFY/PERSPECTIVE
       setActiveLens("PERSPECTIVE");
       await generateResponse(distressMsgs, mode);
+      turnCount.current += 1; // RT-fix #5: moved after the call
       return;
     }
 
@@ -2095,6 +2116,7 @@ export default function AURAv2() {
     if (domain !== currentDomain && currentDomain !== "\u03ac\u03bb\u03bb\u03bf") {
       compressionCount.current = 0;
       warningIssued.current = false;
+      clarificationRound.current = 0; // RT-fix #6: previously only reset on full resetSession, not domain change
     }
     setCurrentDomain(domain);
     const turn     = turnCount.current + 1;
@@ -2143,6 +2165,7 @@ export default function AURAv2() {
   };
 
   const resetSession = () => {
+    _activeCall = false; // RT-fix #1: previously not reset — a stalled call could lock out the next session
     setSessionStarted(false);
     const newCount = (memory.sessionCount || 0) + 1;
     const updated = { ...memory, sessionCount: newCount };
