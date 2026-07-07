@@ -735,26 +735,6 @@ You are not a therapist. You are a calm, honest presence that knows its limits.
 The user's autonomy is absolute. They decide what to share and what to do.
 Your role is to not make things harder.`;
 
-const SYSTEM_GRACEFUL_EXIT = `You are AURA closing a session that did not reach a clear root cause or confirmed insight.
-
-Exit without implying failure. The user did real work even without a conclusion.
-
-Rules:
-- Do NOT say "we didn't find anything"
-- Do NOT apologize
-- Do NOT push for another session
-- Acknowledge what surfaced, even if incomplete
-
-Deliver this message:
-
-"Δεν προέκυψε καθαρό μοτίβο ακόμα.
-
-Αυτό που εμφανίστηκε: [αυτό που ανέφερε ο χρήστης — verbatim, χωρίς ερμηνεία].
-
-Μπορούμε να συνεχίσουμε από εδώ, ή να το αφήσουμε εδώ."
-
-After: stop. Wait for user choice. Do not interpret.`
-
 const SYSTEM_TERMINATION = `You are AURA closing a conversation.
 
 The conversation has reached clarity — or a real limit. Exit with respect.
@@ -852,7 +832,7 @@ function classifyQuestion(text) {
   // PERSONAL — check first (highest priority)
   // Any first-person subject, decision marker, or personal consequence = PERSONAL
   const personalPatterns = [
-    /(\bI |\bmy |\bme |μου |εγώ |μένα)/i,
+    /(\bI |\bmy |\bme |(?:^|\s)μου(?=\s|[.,!;]|$)|(?:^|\s)εγώ(?=\s|[.,!;]|$)|(?:^|\s)μένα(?=\s|[.,!;]|$))/i,
     /(should i|πρέπει να|want to|θέλω να|thinking of|σκέφτομαι να|don't know if|δεν ξέρω αν|need to decide|need to choose|χρειάζομαι να)/i,
     /(should i leave|να φύγω|να χωρίσω|να παραιτηθώ|να αλλάξω|γιατί αναβάλλω|why do i keep)/i,
     /(δεν ξέρω τι θέλω|δεν ξέρω τι να κάνω|i don't know what to do|confused about my|am i making|πόσο πιθανό (να κάνω|να είμαι))/i,
