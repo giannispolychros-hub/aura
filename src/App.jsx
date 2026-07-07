@@ -852,7 +852,7 @@ function classifyQuestion(text) {
   // PERSONAL — check first (highest priority)
   // Any first-person subject, decision marker, or personal consequence = PERSONAL
   const personalPatterns = [
-    /(\bI |\bmy |\bme |\bμου\b|\bεγώ\b|\bμένα\b)/i,
+    /(\bI |\bmy |\bme |μου |εγώ |μένα)/i,
     /(should i|πρέπει να|want to|θέλω να|thinking of|σκέφτομαι να|don't know if|δεν ξέρω αν|need to decide|need to choose|χρειάζομαι να)/i,
     /(should i leave|να φύγω|να χωρίσω|να παραιτηθώ|να αλλάξω|γιατί αναβάλλω|why do i keep)/i,
     /(δεν ξέρω τι θέλω|δεν ξέρω τι να κάνω|i don't know what to do|confused about my|am i making|πόσο πιθανό (να κάνω|να είμαι))/i,
@@ -947,11 +947,14 @@ function getLensPrompt(lens) {
 function detectSafetySignal(text) {
   const crisis = [
     /\b(suicide|suicidal|self.harm|self.hurt|kill myself|end my life|don't want to (live|be here)|want to die|want to disappear|can't go on)\b/i,
-    /\b(αυτοκτον|αυτοτραυματ|δεν θέλω να ζω|θέλω να πεθάν|να τελειώσω|δεν αντέχω άλλο|δεν βλέπω νόημα|δεν υπάρχει λόγος να συνεχίσω|δεν βλέπω λόγο να συνεχίσω|ίσως (ούτε) η ζωή μου|δεν αξίζει (πια|πλέον)|τι νόημα έχει πια|κουράστηκα να (προσπαθώ|υπάρχω|αγωνίζομαι|συνεχίζω))\b/i,
+    // RT-CRITICAL-fix: \b does not recognize Greek letters as word characters in JS regex —
+    // every Greek pattern here previously NEVER matched, in any real sentence, ever. Removed \b.
+    /(αυτοκτον|αυτοτραυματ|δεν θέλω να ζω|θέλω να πεθάν|να τελειώσω|δεν αντέχω άλλο|δεν βλέπω νόημα|δεν υπάρχει λόγος να συνεχίσω|δεν βλέπω λόγο να συνεχίσω|ίσως (ούτε )?η ζωή μου|δεν αξίζει (πια|πλέον)|τι νόημα έχει πια|κουράστηκα να (προσπαθώ|υπάρχω|αγωνίζομαι|συνεχίζω))/i,
   ];
   const distress = [
     /\b(grief|bereaved|bereavement|trauma|traumatic|abuse|abused|assault|crisis|breakdown|panic attack)\b/i,
-    /\b(πένθος|τραύμα|κατάρρευση|κρίση|κακοποίηση|απώλεια αγαπημένου)\b/i,
+    // Same fix applied here — no \b on Greek patterns.
+    /(πένθος|τραύμα|κατάρρευση|κρίση|κακοποίηση|απώλεια αγαπημένου)/i,
   ];
   // FIX 2: model-level safety fallback already in A6 prompt — client catches obvious misses only
   if (crisis.some(p => p.test(text))) return "CRISIS";
@@ -1330,9 +1333,12 @@ function createAnchor(mem, text, category, status = "open") {
   return { ...mem, anchors: [...(mem.anchors || []), anchor] };
 }
 function closeAnchor(mem, id, status) {
-  const a = mem.anchors.find(a => a.id === id);
-  if (a) { a.status = status; a.closedAt = Date.now(); }
-  return mem;
+  return {
+    ...mem,
+    anchors: (mem.anchors || []).map(a =>
+      a.id === id ? { ...a, status, closedAt: Date.now() } : a
+    ),
+  };
 }
 
 // ── Stable obstacle check (U7) ──
