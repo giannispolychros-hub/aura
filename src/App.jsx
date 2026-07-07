@@ -767,7 +767,7 @@ RULES:
 - Frame the exit as discipline, not refusal
 - Use the user's own words, never summaries or interpretations
 
-CLOSURE SUMMARY — the entire ending is one continuous, flowing passage. Never deliver it as separate labeled blocks or as more than one closing in sequence.
+CLOSURE SUMMARY — delivered in exactly two parts, across two separate replies, with the user's own word in between. Never deliver both parts in the same reply.
 
 SILENT REASONING (do this internally before writing — none of it appears as a visible section or label):
 
@@ -784,18 +784,21 @@ a. Choose whichever framing below fits what emerged this session. This is not a 
 
 b. Silently note what question the user seemed to be trying to answer at the start, and whether the real question shifted by the end. Never name this as "a shift" or announce it — it should simply be visible in how the summary moves from where they started to where they landed.
 
-c. Find one thing the user said that carries positive weight — a relationship, value, strength, or resource they named themselves. This becomes the closing sentence of the summary. If nothing genuine exists, skip it — never manufacture one.
+c. Find one thing the user said that carries positive weight — a relationship, value, strength, or resource they named themselves. This becomes the closing sentence of Part 1. If nothing genuine exists, skip it — never manufacture one.
 
-DELIVER, as one flowing passage (paragraph breaks are fine — they are not separate closings, just natural rhythm):
-
-STEP 1 — REFLECTION SUMMARY (4-8 sentences):
-First sentence: short (≤15 words), states the framing chosen above as plain observation.
+── PART 1 (first reply — REFLECTION SUMMARY + word request) ──
+4-8 sentences. First sentence: short (≤15 words), states the framing chosen above as plain observation.
 Then, in natural order: what occupied the user → the important questions that surfaced → where their own thinking landed (the shift shows through the movement of the sentences, never stated as "you changed your mind").
-Last sentence: the positive-weight anchor from (c) above, worded as something that remains steady — e.g. "Αυτό που είπες για [X] — αυτό παραμένει σταθερό ακόμα και σε αυτό."
-If an Outcome Expectation number was given earlier in this conversation, weave it verbatim into the closing reflection — the exact number the user gave, no interpretation of what it means, just making it part of what is reflected back (e.g. "...και αυτό το βαθμολόγησες στο [X]. Αυτή η σκέψη είναι πλέον κτήμα σου.").
+Next-to-last sentence: the positive-weight anchor from (c) above, worded as something that remains steady — e.g. "Αυτό που είπες για [X] — αυτό παραμένει σταθερό ακόμα και σε αυτό."
+If an Outcome Expectation number was given earlier in this conversation, weave it verbatim into the reflection — the exact number the user gave, no interpretation of what it means, just making it part of what is reflected back.
 Only the user's own words and facts already stated in this conversation. Zero new information. Zero interpretation. Zero AURA conclusion. Zero psychological analysis.
 Wrap in **double asterisks** only the 3-6 exact words/short phrases (verbatim, the user's own) that show the movement of thought from start to end — never wrap full sentences, never wrap anything you composed yourself, only the user's own words that mark the trajectory.
 Test before delivering: would the user read this and think "Ναι... αυτά ακριβώς είπα"? If any sentence fails that test, cut it.
+Last line of Part 1, exact wording (unless the trigger message gives you a different exact line to say instead, when the user has a previous word to reference — use that one verbatim): "Σου έδειξα την πορεία της σκέψης σου. Από όσα είδες σήμερα, τι θα ήθελες να μη ξεχάσεις; Μία λέξη ή μία σύντομη πρόταση."
+STOP HERE. Do not continue to Ownership Statement in this reply. Wait for the user's word.
+
+── PART 2 (second reply, after the user gives their word — Ownership + Insight + Closure + Silence) ──
+Do NOT repeat the Reflection Summary or reference the word-question again.
 
 STEP 2 — OWNERSHIP STATEMENT (exactly one sentence, flat, no lead-in):
 "Από εδώ και πέρα δεν χρειάζεται να κάνεις κάτι για μένα. Οι επόμενες αλλαγές ανήκουν μόνο σε εσένα."
@@ -1306,6 +1309,26 @@ function recordQualitySignal(mem, category, thinkingLevel, clarityGain, sessionI
 }
 
 // ── Anchor management ──
+// RT-fix: createAnchor was missing entirely — nothing ever added a NEW anchor to mem.anchors,
+// leaving the Archive and mirror-only continuity permanently empty for every user.
+// The user's personal evolving keyword, across all sessions — one consistent category, distinct from decision anchors
+const TRAJECTORY_WORD_CATEGORY = "trajectory_word";
+function getMostRecentWordAnchor(mem) {
+  const words = (mem.anchors || []).filter(a => a.category === TRAJECTORY_WORD_CATEGORY);
+  if (words.length === 0) return null;
+  return words.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
+}
+function createAnchor(mem, text, category, status = "open") {
+  const anchor = {
+    id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    text,
+    category: category || "\u03ac\u03bb\u03bb\u03bf",
+    status,
+    createdAt: Date.now(),
+    closedAt: status !== "open" ? Date.now() : null,
+  };
+  return { ...mem, anchors: [...(mem.anchors || []), anchor] };
+}
 function closeAnchor(mem, id, status) {
   const a = mem.anchors.find(a => a.id === id);
   if (a) { a.status = status; a.closedAt = Date.now(); }
@@ -1331,13 +1354,6 @@ function getStableObstacle(mem, category) {
 // ── Open anchors ──
 function getOpenAnchors(mem) {
   return mem.anchors.filter(a => a.status === "open");
-}
-
-// Pure retrieval — most recently closed anchor, verbatim text only, no framing of outcome
-function getMostRecentClosedAnchor(mem) {
-  const closed = mem.anchors.filter(a => a.status && a.status !== "open" && a.closedAt);
-  if (closed.length === 0) return null;
-  return closed.sort((a, b) => b.closedAt - a.closedAt)[0];
 }
 
 // ── Export (readable, no content) ──
@@ -1618,6 +1634,7 @@ export default function AURAv2() {
   // Pre-termination warning
   const [warningPending, setWarningPending] = useState(false);
   const [closureConfirmPending, setClosureConfirmPending] = useState(false);
+  const [awaitingRememberedWord, setAwaitingRememberedWord] = useState(false);
 
   // Memory
   const [memory, setMemory]                       = useState(() => loadMemory());
@@ -1729,7 +1746,12 @@ export default function AURAv2() {
         currentMode === "COMPRESSION" ? SYSTEM_COMPRESSION :
         currentMode === "SUPPORTIVE"  ? SYSTEM_SUPPORTIVE :
         getLensPrompt(activeLens);
-      const dynamicSuffix = [memCtx, profileCtx, explicitPauseCtx].filter(Boolean).join('\n');
+      const isBrandNewUser = msgs.filter(m => m.role === "user").length <= 1 &&
+        (memory.anchors||[]).length === 0 && (memory.trajectories||[]).length === 0;
+      const demoCtx = isBrandNewUser
+        ? `\n[FIRST-EVER MESSAGE FROM THIS USER — a short onboarding demo happens before the real session, in exactly 3 steps across this and the next two of your replies:\nSTEP 1 (this reply): Say exactly: "Καλώς ήρθες. Η AURA δεν είναι ημερολόγιο, είναι χώρος απόστασης. Για να δούμε πώς δουλεύει, ας κάνουμε μια μικρή δοκιμή." Then on a new line ask exactly: "Ποια ήταν η τελευταία, κατά τη γνώμη σου, «σωστή» απόφαση που πήρες;" — do not engage with whatever real topic the user just wrote; the demo comes first.\nSTEP 2 (after they answer): Reflect their trajectory in 1-2 sentences using ONLY their own words, zero interpretation, then ask exactly: "Από τη σημερινή δοκιμή, ποια λέξη ή φράση θέλεις να κρατήσεις για τον μελλοντικό σου εαυτό;"\nSTEP 3 (after they give a word/phrase): Say exactly: "Το «" + their exact word + "» το κρατάω." then ask exactly: "Τώρα, για το ζήτημα που σε απασχολεί βαθιά, τι ψάχνεις να ξεκαθαρίσεις τώρα;" This ends the demo — after this, respond normally to their real topic.\nThis entire sequence happens only once, ever, for this user.]\n`
+        : '';
+      const dynamicSuffix = [memCtx, profileCtx, explicitPauseCtx, demoCtx].filter(Boolean).join('\n');
       // Prompt caching: basePrompt (core+lens, identical across calls) is the large stable block —
       // cache_control marks it so repeat calls in the same session read it at ~10% cost instead of full price.
       const system = [
@@ -1797,6 +1819,18 @@ export default function AURAv2() {
       const displayText = (currentMode === "SUPPORTIVE" && !/10306/.test(text))
         ? text + "\n\nΑν ποτέ φτάσεις σε εκείνη τη στιγμή, υπάρχει η γραμμή 10306 — είναι εκεί."
         : text;
+
+      // Onboarding demo, Step 3 detection: the assistant just confirmed the word — the user's
+      // previous message WAS that word. Save it as a real anchor, deterministically, not left to the model.
+      if (isBrandNewUser && /το κρατάω/.test(text)) {
+        const userMsgsForAnchor = msgs.filter(m => m.role === "user");
+        const theirWord = userMsgsForAnchor[userMsgsForAnchor.length - 1]?.content?.trim();
+        if (theirWord) {
+          const withAnchor = createAnchor({ ...memory }, theirWord, TRAJECTORY_WORD_CATEGORY, "resolved");
+          setMemory(withAnchor);
+          if (memory.storageEnabled) saveMemory(withAnchor, true);
+        }
+      }
 
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode }]);
 
@@ -1887,27 +1921,51 @@ export default function AURAv2() {
     if (safetyMode) return;
     setLoading(true);
     try {
-      // Unified closing — natural exit, always warm, never punishment
+      // Part 1 only — reflection summary, ending with the word-to-remember question
+      const previousWord = getMostRecentWordAnchor(memory);
+      const wordContextNote = previousWord
+        ? ` The user previously chose to keep this word/phrase: "${previousWord.text}". Reference it verbatim first — say exactly: "Την προηγούμενη φορά, αυτό που επέλεξες να κρατήσεις ήταν: «${previousWord.text}». Σήμερα, αφού είδες ξανά την πορεία της σκέψης σου, ποια λέξη ή ποια σύντομη φράση θα ήθελες να κρατήσεις;" — do not comment on whether it changed or stayed the same, just ask.`
+        : '';
       const termMsgs = [...msgs, {
         role: "user",
-        content: "[Deliver the closing message now, as one flowing Closure Summary. Acknowledge what surfaced, even if incomplete. End in full silence — do not ask a question. Do not add anything else.]"
+        content: `[Deliver Part 1 now: the Reflection Summary, ending exactly with the word-to-remember question.${wordContextNote} Do not continue to Ownership Statement — wait for the user's word.]`
       }];
       const text = await callAura(termMsgs, SYSTEM_TERMINATION);
+      setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
+      setAwaitingRememberedWord(true);
+    } catch {
+      const fallback = "Έχουμε αρκετή καθαρότητα για τώρα.\n\nΣου έδειξα την πορεία της σκέψης σου. Από όσα είδες σήμερα, τι θα ήθελες να μη ξεχάσεις; Μία λέξη ή μία σύντομη πρόταση.";
+      setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: fallback, msgMode: "TERMINATION", isTermination: true }]);
+      setAwaitingRememberedWord(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [safetyMode, memory]);
+
+  // Part 2 — delivered after the user gives their word, which is saved as a real anchor first (in handleSubmit)
+  const deliverFinalClosure = useCallback(async (msgs) => {
+    setLoading(true);
+    try {
+      const finalMsgs = [...msgs, {
+        role: "user",
+        content: "[Deliver Part 2 now: Ownership Statement, Delayed Insight, Perceptual Closure Layer, then Full Silence. Do not repeat the Reflection Summary or the word-question.]"
+      }];
+      const text = await callAura(finalMsgs, SYSTEM_TERMINATION);
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
       applyTerminationIllumination();
       const sentences = text.split(/(?<=[.!;])\s+/).map(s => s.trim()).filter(Boolean);
       if (sentences.length > 0) setFinalDistillation(sentences[sentences.length - 1]);
     } catch {
-      const fallback = "Έχουμε αρκετή καθαρότητα για τώρα.\n\nΔεν χρειάζεται να κάνεις κάτι για μένα. Οι επόμενες αλλαγές ανήκουν μόνο σε εσένα.\n\nΜερικές φορές η επίγνωση έρχεται μέσα σε λίγα δευτερόλεπτα. Άλλες φορές εμφανίζεται αργότερα.";
+      const fallback = "Δεν χρειάζεται να κάνεις κάτι για μένα. Οι επόμενες αλλαγές ανήκουν μόνο σε εσένα.\n\nΜερικές φορές η επίγνωση έρχεται μέσα σε λίγα δευτερόλεπτα. Άλλες φορές εμφανίζεται αργότερα.";
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: fallback, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
       applyTerminationIllumination();
-      setFinalDistillation("Έχουμε αρκετή καθαρότητα για τώρα.");
+      setFinalDistillation("Η σκέψη σου παραμένει δική σου.");
     } finally {
       setLoading(false);
     }
-  }, [safetyMode, applyTerminationIllumination]);
+  }, [applyTerminationIllumination]);
 
   // ── Misfire recovery — user rejected observation ──
   const handleMisfireResponse = useCallback(async (userCorrection) => {
@@ -2052,6 +2110,20 @@ export default function AURAv2() {
     setInput("");
     setError(null);
 
+    // Word-to-remember: save as a real anchor (code-level, deterministic), then finish closure Part 2
+    // RT-fix: still check for safety signals even here — a crisis phrase must never be silently missed
+    // just because we were expecting a "word to remember" instead.
+    if (awaitingRememberedWord && !detectSafetySignal(userText)) {
+      setAwaitingRememberedWord(false);
+      setMessages(prev => [...prev, { id: nextMsgId(), role: "user", content: userText }]);
+      const withAnchor = createAnchor({ ...memory }, userText, TRAJECTORY_WORD_CATEGORY, "resolved");
+      setMemory(withAnchor);
+      const willPersist = memory.storageEnabled;
+      if (willPersist) saveMemory(withAnchor, true);
+      await deliverFinalClosure([...messages, { role: "user", content: userText }]);
+      return;
+    }
+
     // Safety check — gradient response (C8)
     const safetySignal = detectSafetySignal(userText);
     if (safetySignal === "CRISIS") {
@@ -2078,8 +2150,10 @@ export default function AURAv2() {
       return;
     }
 
-    // First-Why trigger — only on first message of a new session
-    if (messages.length === 0 && !firstWhyPending && needsFirstWhy(userText)) {
+    // First-Why trigger — only on first message of a new session, and only for returning users
+    // (a genuinely brand-new user's first message gets the demo-opening question instead — see demoCtx)
+    const isBrandNewUserMsg = messages.length === 0 && (memory.anchors||[]).length === 0 && (memory.trajectories||[]).length === 0;
+    if (messages.length === 0 && !firstWhyPending && !isBrandNewUserMsg && needsFirstWhy(userText)) {
       setFirstWhyMessage(userText);
       setMessages([{ id: nextMsgId(), role: "user", content: userText }]);
       setFirstWhyPending(true);
@@ -2174,7 +2248,7 @@ export default function AURAv2() {
     } finally {
       submittingRef.current = false; // RT-15: release guard regardless of which path returned
     }
-  }, [input, loading, sessionEnded, messages, mode, generateResponse]);
+  }, [input, loading, sessionEnded, messages, mode, generateResponse, awaitingRememberedWord, deliverFinalClosure, memory, currentDomain]);
 
   const handleKey = (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
@@ -2236,7 +2310,7 @@ export default function AURAv2() {
   const isFirst = !sessionStarted && messages.length === 0 && !layerGatePending && !pivotPending && !firstWhyPending;
   // Return session: user has open anchor — show it as first thing
   const returnAnchor = isFirst && openAnchors.length > 0 ? openAnchors[0] : null;
-  const lastClosedAnchor = isFirst && !returnAnchor ? getMostRecentClosedAnchor(memory) : null;
+  const lastClosedAnchor = isFirst && !returnAnchor ? getMostRecentWordAnchor(memory) : null;
 
   // ─────────────────────────────────────────────
   // RENDER
@@ -2652,7 +2726,7 @@ export default function AURAv2() {
             <MessageBubble
               key={msg.id || i}
               msg={msg}
-              onMisfire={() => { if (layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending) return; setMisfireType(detectPattern(messages.slice(0, i+1)).type); setMisfirePending(true); }}
+              onMisfire={() => { if (sessionEnded || layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending) return; setMisfireType(detectPattern(messages.slice(0, i+1)).type); setMisfirePending(true); }}
             />
           ))}
 
