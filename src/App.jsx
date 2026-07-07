@@ -1675,6 +1675,10 @@ export default function AURAv2() {
   const clarificationRound = useRef(0); // tracks clarification depth — max 3
   const lastChallengeAt  = useRef(-99);
   const compressionCount = useRef(0);
+  // RT-hardening: replaces text-based detection ("does the model's reply say 'το κρατάω'?")
+  // with a plain count of how many replies have happened during the brand-new-user window —
+  // works regardless of the model's exact phrasing.
+  const onboardingStepRef = useRef(0);
   const warningIssued    = useRef(false);
   const submittingRef    = useRef(false); // RT-15: synchronous double-submit guard
   const currentSessionId   = useRef(Date.now().toString(36));
@@ -1826,9 +1830,10 @@ export default function AURAv2() {
         ? text + "\n\nΑν ποτέ φτάσεις σε εκείνη τη στιγμή, υπάρχει η γραμμή 10306 — είναι εκεί."
         : text;
 
-      // Onboarding demo, Step 3 detection: the assistant just confirmed the word — the user's
-      // previous message WAS that word. Save it as a real anchor, deterministically, not left to the model.
-      if (isBrandNewUser && /το κρατάω/.test(text)) {
+      // Onboarding demo, Step 3: this is the 3rd reply in the brand-new-user window, so the user's
+      // previous message (already in msgs) WAS their word. Save it as a real anchor — counted
+      // structurally, never by sniffing the model's exact wording.
+      if (isBrandNewUser && onboardingStepRef.current === 2) {
         const userMsgsForAnchor = msgs.filter(m => m.role === "user");
         const theirWord = userMsgsForAnchor[userMsgsForAnchor.length - 1]?.content?.trim();
         if (theirWord) {
@@ -1836,6 +1841,9 @@ export default function AURAv2() {
           setMemory(withAnchor);
           if (memory.storageEnabled) saveMemory(withAnchor, true);
         }
+        onboardingStepRef.current = 0; // demo complete — isBrandNewUser will be false from here on anyway
+      } else if (isBrandNewUser) {
+        onboardingStepRef.current += 1;
       }
 
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode }]);
