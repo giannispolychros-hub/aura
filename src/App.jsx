@@ -1420,7 +1420,7 @@ function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued,
   // αυτό;") appear, immediately followed by the closure dialog on the exact same turn,
   // interrupting the user mid-question. If the reply itself is a real open question, no
   // closing decision should ever be allowed to fire on that same turn.
-  const textAsksRealQuestion = /[;?]\s*$/.test((text || "").trim()) && (text || "").trim().split(/\s+/).length > 6;
+  const textAsksRealQuestion = /[;?]\s*$/.test((text || "").trim());
 
   // FIX 3: broader termination signal detection — catches equivalent phrasings
   const modelSignalsEnd = /(action belongs to (you|the user)|we.ve reached the limit|the decision is yours|continuing.{0,30}(not|won.t) (help|serve)|η απόφαση (είναι|ανήκει) (δική σου|σε σένα)|έχουμε (φτάσει|αρκετή|αρκετό)|συνεχίζοντας.{0,30}δεν (βοηθ|εξυπηρετ))/i.test(text);
@@ -1548,7 +1548,12 @@ function detectPattern(messages) {
   if (decisionPhrases.some(p => p.test(last)))
     return { type: "DECISION_PRESENT", confidence: 0.9 };
 
-  const words = s => new Set(s.toLowerCase().match(/\b\w{5,}\b/g) || []);
+  // Εύρημα 8 fix: \w in JS regex only matches [A-Za-z0-9_] — Greek letters were never
+  // included, so this returned an empty word-set for every Greek message, meaning
+  // REPETITION-via-similarity has never fired for a single Greek-speaking user. Same root
+  // cause as the detectSafetySignal fix earlier (\b/\w don't recognize Greek letters) —
+  // explicit Greek+Latin letter class instead, no \b needed since the regex is unanchored.
+  const words = s => new Set(s.toLowerCase().match(/[a-zα-ωάέήίόύώϊϋΐΰ]{5,}/g) || []);
   const a = words(last), b = words(prev), c = words(older);
   const sim1 = [...a].filter(w => b.has(w)).length / Math.max(a.size, b.size, 1);
   const sim2 = [...a].filter(w => c.has(w)).length / Math.max(a.size, c.size, 1);
