@@ -834,7 +834,11 @@ function classifyQuestion(text) {
     /^(what is |what are |who is |who are |how (many|much|does|do|did) |when (did|was|is) |where (is|are|was) |define |τι είναι |τι σημαίνει |πόσο |πότε |ποιος |πού )/i,
   ];
   if (factPatterns.some(p => p.test(t))) return "FACT";
-  if (t.split(" ").length <= 4) return "FACT";
+  // Real-bug (stress-test evidence): a short STATEMENT like "βαριέμαι" or "κουράστηκα" was
+  // falling into this fallback and being classified FACT purely for being ≤4 words — which
+  // silently skipped First-WHY for exactly the terse emotional openers it exists to catch.
+  // Restrict the fallback to things actually phrased as a question.
+  if (t.split(" ").length <= 4 && /[;?]\s*$/.test(t)) return "FACT";
 
   // Default: PERSONAL — never assume impersonal, never route to ANALYSIS without clear signal
   return "PERSONAL";
@@ -912,7 +916,7 @@ function detectSafetySignal(text) {
     /\b(suicide|suicidal|self.harm|self.hurt|kill myself|end my life|don't want to (live|be here)|want to die|want to disappear|can't go on)\b/i,
     // RT-CRITICAL-fix: \b does not recognize Greek letters as word characters in JS regex —
     // every Greek pattern here previously NEVER matched, in any real sentence, ever. Removed \b.
-    /(αυτοκτον|αυτοτραυματ|δεν θέλω να ζω|θέλω να πεθάν|να τελειώσω|δεν αντέχω άλλο|δεν βλέπω νόημα|δεν υπάρχει λόγος να συνεχίσω|δεν βλέπω λόγο να συνεχίσω|ίσως (ούτε )?η ζωή μου|δεν αξίζει (πια|πλέον)|τι νόημα έχει πια|κουράστηκα να (προσπαθώ|υπάρχω|αγωνίζομαι|συνεχίζω))/i,
+    /(αυτοκτον|αυτοτραυματ|δεν θέλω να ζω|θέλω να πεθάν|θέλω να χαθώ|να χαθώ|να τελειώσω|δεν αντέχω άλλο|δεν βλέπω νόημα|δεν υπάρχει λόγος να συνεχίσω|δεν βλέπω λόγο να συνεχίσω|ίσως (ούτε )?η ζωή μου|δεν αξίζει (πια|πλέον)|τι νόημα έχει πια|κουράστηκα να (προσπαθώ|υπάρχω|αγωνίζομαι|συνεχίζω))/i,
   ];
   const distress = [
     /\b(grief|bereaved|bereavement|trauma|traumatic|abuse|abused|assault|crisis|breakdown|panic attack)\b/i,
@@ -1398,12 +1402,25 @@ function isModelPreClosing(text) {
   return stripped.length === 0;
 }
 
-function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued, compressionCount, modelJudgesEnd, concreteStepStated = false, outcomeScaleAsked = false, outcomeScaleBlockUsed = false, duringOnboarding = false }) {
+function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued, compressionCount, modelJudgesEnd, concreteStepStated = false, outcomeScaleAsked = false, outcomeScaleBlockUsed = false, duringOnboarding = false, duringDeclineCooldown = false }) {
   if (safetyMode) return "none";
   // Real-user evidence (2026-07): a plain "οκ" mid-onboarding satisfied the natural-exit
   // agreement heuristic and triggered the closure dialog after only 4 messages, before the
   // 3-step demo had even finished. The demo must never compete with closing logic.
   if (duringOnboarding) return "none";
+  // Real-user evidence (2026-07): after the user declined a closure prompt ("Έχω κι άλλο να
+  // πω"), short replies like "ναι" kept re-triggering the SAME confirm dialog on the very next
+  // turn, forcing the user to repeatedly dismiss it. A brief cooldown after a decline prevents
+  // the same heuristics from immediately re-firing.
+  if (duringDeclineCooldown) return "none";
+
+  // Same-turn consistency guard: whichever heuristic below fires, the app already displays
+  // AURA's reply (including a real open question) before this decision is even computed —
+  // real-user evidence showed a genuine, substantive question ("Τι είναι το πιο ακίνητο σε
+  // αυτό;") appear, immediately followed by the closure dialog on the exact same turn,
+  // interrupting the user mid-question. If the reply itself is a real open question, no
+  // closing decision should ever be allowed to fire on that same turn.
+  const textAsksRealQuestion = /[;?]\s*$/.test((text || "").trim()) && (text || "").trim().split(/\s+/).length > 6;
 
   // FIX 3: broader termination signal detection — catches equivalent phrasings
   const modelSignalsEnd = /(action belongs to (you|the user)|we.ve reached the limit|the decision is yours|continuing.{0,30}(not|won.t) (help|serve)|η απόφαση (είναι|ανήκει) (δική σου|σε σένα)|έχουμε (φτάσει|αρκετή|αρκετό)|συνεχίζοντας.{0,30}δεν (βοηθ|εξυπηρετ))/i.test(text);
@@ -1442,6 +1459,12 @@ function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued,
     decision = "confirm";
   } else if (compressionCount >= 2 || modelSignalsEnd) {
     decision = warningIssued ? "terminate" : "warn";
+  }
+
+  // Same-turn override: never close on a turn whose own displayed reply is a real open
+  // question — see textAsksRealQuestion above. Applies regardless of which heuristic fired.
+  if ((decision === "confirm" || decision === "terminate") && textAsksRealQuestion) {
+    decision = "none";
   }
 
   // ── Outcome Expectation Scale gate ──
@@ -1487,8 +1510,18 @@ function decideOnboardingStep(msgs, lastUserMsg, stepCount, safetyCap = 6) {
 // Concrete next-step detection (user's own words) — bilingual, deliberately narrow:
 // only future-tense self-committal phrasing ("θα κάνω / I will / going to"), not
 // hypotheticals or questions. Used only to gate closing, never shown to the user.
+// Stress-test evidence: the base pattern alone false-positives on negated commitments
+// ("δεν θα πάρω τίποτα") and conditional/hypothetical ones ("αν έχω χρόνο θα ξεκινήσω") —
+// both guarded out below rather than loosening the base pattern.
 function detectsConcreteStep(text) {
-  return /(θα (πάρω|κάνω|ξεκινήσω|μιλήσω|πω|δοκιμάσω|αλλάξω|σταματήσω|φύγω|μείνω|γράψω|στείλω)|θα το (κάνω|πω|δοκιμάσω)|i('| a)?ll |i will |i'm going to |i am going to |going to (start|try|talk|do|stop|leave|change))/i.test(text || "");
+  const t = text || "";
+  const base = /(θα (πάρω|κάνω|ξεκινήσω|μιλήσω|πω|δοκιμάσω|αλλάξω|σταματήσω|φύγω|μείνω|γράψω|στείλω)|θα το (κάνω|πω|δοκιμάσω)|i('| a)?ll |i will |i'm going to |i am going to |going to (start|try|talk|do|stop|leave|change))/i;
+  const match = base.exec(t);
+  if (!match) return false;
+  const before = t.slice(0, match.index);
+  const isNegated = /(δεν|όχι|won'?t|will not|not going to)\s*$/i.test(before.trim());
+  const isConditional = /(?:^|\s)(αν|εάν)(?:\s|$)|\bif\b/i.test(before);
+  return !isNegated && !isConditional;
 }
 
 // Detect whether AURA's own reply already asked the Outcome Expectation Scale
@@ -1726,6 +1759,9 @@ export default function AURAv2() {
   const concreteStepStated   = useRef(false);
   const outcomeScaleAsked    = useRef(false);
   const outcomeScaleBlockUsed = useRef(false);
+  // Post-decline cooldown: counts down after the user dismisses a closure prompt, so the
+  // same short-reply heuristics can't immediately re-trigger it turn after turn.
+  const closureDeclineCooldown = useRef(0);
   const submittingRef    = useRef(false); // RT-15: synchronous double-submit guard
   const currentSessionId   = useRef(Date.now().toString(36));
   const sessionStartTime   = useRef(Date.now());
@@ -1945,7 +1981,9 @@ export default function AURAv2() {
         outcomeScaleAsked: outcomeScaleAsked.current,
         outcomeScaleBlockUsed: outcomeScaleBlockUsed.current,
         duringOnboarding: isBrandNewUser,
+        duringDeclineCooldown: closureDeclineCooldown.current > 0,
       });
+      if (closureDeclineCooldown.current > 0) closureDeclineCooldown.current -= 1;
 
       if (decision === "await_outcome_scale") {
         // Give AURA one more natural turn to ask the mandatory relief-scale question
@@ -2179,6 +2217,10 @@ export default function AURAv2() {
     setClosureConfirmPending(false);
     if (proceed) {
       await triggerTermination(messages); // live state — includes the latest reply by the time the user clicks
+    } else {
+      // Real-user evidence (2026-07): without this, short replies like "ναι" kept re-triggering
+      // the same confirm dialog turn after turn, forcing repeated dismissal.
+      closureDeclineCooldown.current = 3;
     }
     // If not proceeding, simply dismiss — the user continues typing normally, no forced response.
   }, [messages, triggerTermination]);
@@ -2369,6 +2411,7 @@ export default function AURAv2() {
     concreteStepStated.current = false;
     outcomeScaleAsked.current = false;
     outcomeScaleBlockUsed.current = false;
+    closureDeclineCooldown.current = 0;
     setError(null);
     setClaritySurge(false);
     setIllumLevel(0);
