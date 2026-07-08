@@ -1385,6 +1385,17 @@ function detectDomain(text) {
 // ── Termination decision — extracted from generateResponse for isolated testability ──
 // Pure function: no state mutation, no API calls. Returns "confirm" | "warn" | "terminate" | "none".
 // Same exact logic that used to live inline inside generateResponse — behavior unchanged.
+// Structural pre-closing detector (Schegloff & Sacks, 1973 "Opening Up Closings"): a short, flat,
+// question-free reply consisting only of known closing-type phrases is a pre-closing move —
+// detected on the model's ACTUAL output, never by asking the model to self-report.
+function isModelPreClosing(text) {
+  const t = (text || "").trim();
+  if (!t || /\?/.test(t)) return false;
+  if (t.split(/\s+/).length > 6) return false;
+  const stripped = t.replace(/εντάξει|καλή\s+συνέχεια|τα\s+λέμε|[.,!\s]/gi, "");
+  return stripped.length === 0;
+}
+
 function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued, compressionCount, modelJudgesEnd }) {
   if (safetyMode) return "none";
 
@@ -1408,6 +1419,12 @@ function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued,
     })();
 
   if (naturalExitReady) return "confirm";
+
+  // Structural pre-closing move detected in the model's own output — do not let it keep
+  // improvising more "Εντάξει." turns. Route straight to the real confirmation.
+  if (currentMode === "ANSWER" && userMsgsAll.length >= 2 && !warningIssued && isModelPreClosing(text)) {
+    return "confirm";
+  }
 
   // Semantic exit signal (structured tag, model's own judgment of meaning — not exact wording).
   // Deliberately independent of compressionCount: this is exactly the gap found in real testing,
@@ -1916,7 +1933,8 @@ export default function AURAv2() {
         role: "user",
         content: `[Deliver Part 1 now: the Reflection Summary, ending exactly with the word-to-remember question.${wordContextNote} Do not continue to Ownership Statement — wait for the user's word.]`
       }];
-      const text = await callAura(termMsgs, SYSTEM_TERMINATION);
+      const rawText = await callAura(termMsgs, SYSTEM_TERMINATION);
+      const text = rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, "");
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
       setAwaitingRememberedWord(true);
     } catch {
@@ -1936,7 +1954,8 @@ export default function AURAv2() {
         role: "user",
         content: "[Deliver Part 2 now: Ownership Statement, Delayed Insight, Perceptual Closure Layer, then Full Silence. Do not repeat the Reflection Summary or the word-question.]"
       }];
-      const text = await callAura(finalMsgs, SYSTEM_TERMINATION);
+      const rawText = await callAura(finalMsgs, SYSTEM_TERMINATION);
+      const text = rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, "");
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
       applyTerminationIllumination();
