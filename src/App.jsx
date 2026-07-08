@@ -1398,8 +1398,12 @@ function isModelPreClosing(text) {
   return stripped.length === 0;
 }
 
-function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued, compressionCount, modelJudgesEnd, concreteStepStated = false, outcomeScaleAsked = false, outcomeScaleBlockUsed = false }) {
+function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued, compressionCount, modelJudgesEnd, concreteStepStated = false, outcomeScaleAsked = false, outcomeScaleBlockUsed = false, duringOnboarding = false }) {
   if (safetyMode) return "none";
+  // Real-user evidence (2026-07): a plain "οκ" mid-onboarding satisfied the natural-exit
+  // agreement heuristic and triggered the closure dialog after only 4 messages, before the
+  // 3-step demo had even finished. The demo must never compete with closing logic.
+  if (duringOnboarding) return "none";
 
   // FIX 3: broader termination signal detection — catches equivalent phrasings
   const modelSignalsEnd = /(action belongs to (you|the user)|we.ve reached the limit|the decision is yours|continuing.{0,30}(not|won.t) (help|serve)|η απόφαση (είναι|ανήκει) (δική σου|σε σένα)|έχουμε (φτάσει|αρκετή|αρκετό)|συνεχίζοντας.{0,30}δεν (βοηθ|εξυπηρετ))/i.test(text);
@@ -1777,7 +1781,7 @@ export default function AURAv2() {
         currentMode === "COMPRESSION" ? SYSTEM_COMPRESSION :
         currentMode === "SUPPORTIVE"  ? SYSTEM_SUPPORTIVE :
         getLensPrompt(activeLens);
-      const isBrandNewUser = msgs.filter(m => m.role === "user").length <= 1 &&
+      const isBrandNewUser = onboardingStepRef.current < 3 &&
         (memory.anchors||[]).length === 0 && (memory.trajectories||[]).length === 0;
       const demoCtx = isBrandNewUser
         ? `\n[FIRST-EVER MESSAGE FROM THIS USER — a short onboarding demo happens before the real session, in exactly 3 steps across this and the next two of your replies:\nSTEP 1 (this reply): Say exactly: "Καλώς ήρθες. Η AURA δεν είναι ημερολόγιο, είναι χώρος απόστασης. Για να δούμε πώς δουλεύει, ας κάνουμε μια μικρή δοκιμή." Then on a new line ask exactly: "Ποια ήταν η τελευταία, κατά τη γνώμη σου, «σωστή» απόφαση που πήρες;" — do not engage with whatever real topic the user just wrote; the demo comes first.\nSTEP 2 (after they answer): Reflect their trajectory in 1-2 sentences using ONLY their own words, zero interpretation, then ask exactly: "Από τη σημερινή δοκιμή, ποια λέξη ή φράση θέλεις να κρατήσεις για τον μελλοντικό σου εαυτό;"\nSTEP 3 (after they give a word/phrase): Say exactly: "Το «" + their exact word + "» το κρατάω." then ask exactly: "Τώρα, για το ζήτημα που σε απασχολεί βαθιά, τι ψάχνεις να ξεκαθαρίσεις τώρα;" This ends the demo — after this, respond normally to their real topic.\nThis entire sequence happens only once, ever, for this user.]\n`
@@ -1865,7 +1869,7 @@ export default function AURAv2() {
           setMemory(withAnchor);
           if (memory.storageEnabled) saveMemory(withAnchor, true);
         }
-        onboardingStepRef.current = 0; // demo complete — isBrandNewUser will be false from here on anyway
+        onboardingStepRef.current = 3; // demo complete — isBrandNewUser now permanently false via the <3 check
       } else if (isBrandNewUser) {
         onboardingStepRef.current += 1;
       }
@@ -1922,6 +1926,7 @@ export default function AURAv2() {
         concreteStepStated: concreteStepStated.current,
         outcomeScaleAsked: outcomeScaleAsked.current,
         outcomeScaleBlockUsed: outcomeScaleBlockUsed.current,
+        duringOnboarding: isBrandNewUser,
       });
 
       if (decision === "await_outcome_scale") {
