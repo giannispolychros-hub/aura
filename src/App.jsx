@@ -167,6 +167,7 @@ REFLECTION: conditional, only when user shared something substantial. One senten
 DIRECTION: one sentence orienting the conversation. Can offer choice (never numbered list).
 QUESTION: one question, passes Question Clarity Rule ("Would user immediately understand?"). Phrase it with natural warmth, not clinical interrogation — targeted and specific, but conversational in tone, as a person would ask, not a checklist. For questions that ask the user to notice an internal shift or realization, invite a brief pause first (e.g. "Σκέψου λίγο πριν απαντήσεις...") rather than firing the question directly. This is about phrasing, not content — it does not add validation or soften the substance of the question.
 BRIDGE BEFORE NEW QUESTIONS: Never jump from one question directly to an unrelated new question without acknowledging what the user just said. Before the question, add one short clause using the user's own words verbatim (not your interpretation, not a guess at meaning) — e.g. "Είπες [X]." or simply folding their word into the question itself. This is a simple reflection (restating, not interpreting) — it prevents the topic feeling disconnected and reduces confusion. Skip this only when the previous exchange already used the user's words directly in the question.
+REAL-USER FAILURE OF THIS RULE (do not repeat this pattern): user answered "ευκολία..." → AURA replied "Τι σε βαραίνει;" with zero acknowledgment of "ευκολία", which is exactly the disconnected jump this rule forbids. The user visibly lost the thread right after ("τι σημασία έχει τώρα αυτό;"). Correct version would have been something like "Είπες 'ευκολία'. Τι σε βαραίνει;" — same question, one clause bridging it to what they just said.
 CALIBRATION TRIGGER: circular 3+ times → "Ας δούμε τι έχει το μεγαλύτερο βάρος." Re-enter from Direction.
 ACKNOWLEDGMENT FIREWALL: reflect data (themes/facts), never emotions user didn't name. Also never synthesize multiple user statements into an abstract label or category (e.g. "anchors", "patterns", "mirrors this") unless the user used that exact word themselves — list the separate things in the user's own words instead of grouping them under a new name.
 CORRECT: "Ακούω τρία θέματα — δουλειά, σχέση, χρήματα." FORBIDDEN: "Ακούω ότι αυτό είναι δύσκολο."
@@ -1397,7 +1398,7 @@ function isModelPreClosing(text) {
   return stripped.length === 0;
 }
 
-function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued, compressionCount, modelJudgesEnd }) {
+function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued, compressionCount, modelJudgesEnd, concreteStepStated = false, outcomeScaleAsked = false, outcomeScaleBlockUsed = false }) {
   if (safetyMode) return "none";
 
   // FIX 3: broader termination signal detection — catches equivalent phrasings
@@ -1419,26 +1420,56 @@ function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued,
       return (allShort && hasAgreement) || hasRepeat;
     })();
 
-  if (naturalExitReady) return "confirm";
+  // Collapse every closing path into a single decision variable first, so the
+  // Outcome Expectation Scale gate below applies uniformly to all of them —
+  // instead of needing to be duplicated at each individual return point.
+  let decision = "none";
 
-  // Structural pre-closing move detected in the model's own output — do not let it keep
-  // improvising more "Εντάξει." turns. Route straight to the real confirmation.
-  if (currentMode === "ANSWER" && userMsgsAll.length >= 2 && !warningIssued && isModelPreClosing(text)) {
-    return "confirm";
+  if (naturalExitReady) {
+    decision = "confirm";
+  } else if (currentMode === "ANSWER" && userMsgsAll.length >= 2 && !warningIssued && isModelPreClosing(text)) {
+    // Structural pre-closing move detected in the model's own output — do not let it keep
+    // improvising more "Εντάξει." turns. Route straight to the real confirmation.
+    decision = "confirm";
+  } else if (currentMode === "ANSWER" && userMsgsAll.length >= 2 && !warningIssued && modelJudgesEnd) {
+    // Semantic exit signal (structured tag, model's own judgment of meaning — not exact wording).
+    // Deliberately independent of compressionCount: this is exactly the gap found in real testing,
+    // where a long/deep conversation that already used compression could never reach natural exit again.
+    decision = "confirm";
+  } else if (compressionCount >= 2 || modelSignalsEnd) {
+    decision = warningIssued ? "terminate" : "warn";
   }
 
-  // Semantic exit signal (structured tag, model's own judgment of meaning — not exact wording).
-  // Deliberately independent of compressionCount: this is exactly the gap found in real testing,
-  // where a long/deep conversation that already used compression could never reach natural exit again.
-  if (currentMode === "ANSWER" && userMsgsAll.length >= 2 && !warningIssued && modelJudgesEnd) {
-    return "confirm";
+  // ── Outcome Expectation Scale gate ──
+  // Real-user evidence (2026-07): closure completed with a named concrete step
+  // ("θα πάρω βιταμίνες") but the relief-scale question was never asked, so it
+  // never made it into the Closure Summary. AURA_CORE_PERSONALITY already marks
+  // this question MANDATORY before any closing move, but nothing enforced it —
+  // closing was purely up to the model remembering, in-context, on that turn.
+  // This gate does not add new wording or change AURA's voice; it only delays a
+  // closing decision by one turn so the model gets a chance to ask the question
+  // it was already supposed to ask. Fires at most once per session
+  // (outcomeScaleBlockUsed) — if the model still doesn't ask it on the extra
+  // turn, closing proceeds anyway, so a session can never get stuck.
+  if ((decision === "confirm" || decision === "terminate") &&
+      concreteStepStated && !outcomeScaleAsked && !outcomeScaleBlockUsed) {
+    return "await_outcome_scale";
   }
 
-  if (compressionCount >= 2 || modelSignalsEnd) {
-    return warningIssued ? "terminate" : "warn";
-  }
+  return decision;
+}
 
-  return "none";
+// Concrete next-step detection (user's own words) — bilingual, deliberately narrow:
+// only future-tense self-committal phrasing ("θα κάνω / I will / going to"), not
+// hypotheticals or questions. Used only to gate closing, never shown to the user.
+function detectsConcreteStep(text) {
+  return /(θα (πάρω|κάνω|ξεκινήσω|μιλήσω|πω|δοκιμάσω|αλλάξω|σταματήσω|φύγω|μείνω|γράψω|στείλω)|θα το (κάνω|πω|δοκιμάσω)|i('| a)?ll |i will |i'm going to |i am going to |going to (start|try|talk|do|stop|leave|change))/i.test(text || "");
+}
+
+// Detect whether AURA's own reply already asked the Outcome Expectation Scale
+// question this turn — matches the exact mandated wording and close paraphrases.
+function detectsOutcomeScaleAsked(text) {
+  return /(πόσο πιστεύεις ότι θα σε ανακουφίσει|βάραινε στο 10.{0,40}ανακουφίσει|πόσο θα σε ανακουφίσει)/i.test(text || "");
 }
 
 function detectPattern(messages) {
@@ -1666,6 +1697,10 @@ export default function AURAv2() {
   // works regardless of the model's exact phrasing.
   const onboardingStepRef = useRef(0);
   const warningIssued    = useRef(false);
+  // Outcome Expectation Scale gate state (per session) — see decideTermination().
+  const concreteStepStated   = useRef(false);
+  const outcomeScaleAsked    = useRef(false);
+  const outcomeScaleBlockUsed = useRef(false);
   const submittingRef    = useRef(false); // RT-15: synchronous double-submit guard
   const currentSessionId   = useRef(Date.now().toString(36));
   const sessionStartTime   = useRef(Date.now());
@@ -1868,6 +1903,15 @@ export default function AURAv2() {
         if (memory.storageEnabled) saveMemory(updatedWithTraj);
       }
 
+      // Outcome Expectation Scale gate — passive tracking only, updated from what was
+      // actually said this turn (user's message and AURA's own reply), never inferred.
+      if (!concreteStepStated.current && detectsConcreteStep(lastUserMsg)) {
+        concreteStepStated.current = true;
+      }
+      if (!outcomeScaleAsked.current && detectsOutcomeScaleAsked(text)) {
+        outcomeScaleAsked.current = true;
+      }
+
       // Termination decision — extracted to decideTermination() for testability, same logic as before.
       const decision = decideTermination(msgs, text, {
         safetyMode,
@@ -1875,8 +1919,17 @@ export default function AURAv2() {
         warningIssued: warningIssued.current,
         compressionCount: compressionCount.current,
         modelJudgesEnd,
+        concreteStepStated: concreteStepStated.current,
+        outcomeScaleAsked: outcomeScaleAsked.current,
+        outcomeScaleBlockUsed: outcomeScaleBlockUsed.current,
       });
 
+      if (decision === "await_outcome_scale") {
+        // Give AURA one more natural turn to ask the mandatory relief-scale question
+        // before allowing closure. No closing UI shown this turn; conversation continues.
+        outcomeScaleBlockUsed.current = true;
+        return;
+      }
       if (decision === "confirm" || decision === "terminate") {
         setClosureConfirmPending(true);
         return;
@@ -2290,6 +2343,9 @@ export default function AURAv2() {
     lastChallengeAt.current = -99;
     compressionCount.current = 0;
     warningIssued.current = false;
+    concreteStepStated.current = false;
+    outcomeScaleAsked.current = false;
+    outcomeScaleBlockUsed.current = false;
     setError(null);
     setClaritySurge(false);
     setIllumLevel(0);
