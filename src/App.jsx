@@ -1463,6 +1463,27 @@ function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued,
   return decision;
 }
 
+// Onboarding demo step tracking — content-verified, not blind turn-counting.
+// Grounded in two things: (1) Conversation-Analysis "insertion sequences" — a clarification
+// exchange nested inside a scripted question must not be mistaken for the answer to that
+// question; (2) dialogue-state-tracking practice of checking actual slot content rather than
+// raw turn count. Real-user evidence: a plain turn-counter twice saved a clarification reply
+// ("δε θυμαμαι ειπα") as the trajectory word and skipped Step 3 entirely.
+// safetyCap: even if the model never asks Step 2's exact wording, the demo ends after this
+// many rounds — a fail-open guard so a user is never stuck in onboarding forever.
+function decideOnboardingStep(msgs, lastUserMsg, stepCount, safetyCap = 6) {
+  if (stepCount >= safetyCap) {
+    return { saveWord: false, word: null, nextCount: stepCount };
+  }
+  const priorAuraMsg = [...msgs].reverse().find(m => m.role === "assistant")?.content || "";
+  const step2WasActuallyAsked = /ποια λέξη ή φράση θέλεις να κρατήσεις/i.test(priorAuraMsg);
+  const lastUserIsQuestion = /[;?]\s*$/.test((lastUserMsg || "").trim());
+
+  if (step2WasActuallyAsked && !lastUserIsQuestion && (lastUserMsg || "").trim()) {
+    return { saveWord: true, word: lastUserMsg.trim(), nextCount: safetyCap };
+  }
+  return { saveWord: false, word: null, nextCount: stepCount + 1 };
+}
 // Concrete next-step detection (user's own words) — bilingual, deliberately narrow:
 // only future-tense self-committal phrasing ("θα κάνω / I will / going to"), not
 // hypotheticals or questions. Used only to gate closing, never shown to the user.
@@ -1781,10 +1802,10 @@ export default function AURAv2() {
         currentMode === "COMPRESSION" ? SYSTEM_COMPRESSION :
         currentMode === "SUPPORTIVE"  ? SYSTEM_SUPPORTIVE :
         getLensPrompt(activeLens);
-      const isBrandNewUser = onboardingStepRef.current < 3 &&
+      const isBrandNewUser = onboardingStepRef.current < 6 &&
         (memory.anchors||[]).length === 0 && (memory.trajectories||[]).length === 0;
       const demoCtx = isBrandNewUser
-        ? `\n[FIRST-EVER MESSAGE FROM THIS USER — a short onboarding demo happens before the real session, in exactly 3 steps across this and the next two of your replies:\nSTEP 1 (this reply): Say exactly: "Καλώς ήρθες. Η AURA δεν είναι ημερολόγιο, είναι χώρος απόστασης. Για να δούμε πώς δουλεύει, ας κάνουμε μια μικρή δοκιμή." Then on a new line ask exactly: "Ποια ήταν η τελευταία, κατά τη γνώμη σου, «σωστή» απόφαση που πήρες;" — do not engage with whatever real topic the user just wrote; the demo comes first.\nSTEP 2 (after they answer): Reflect their trajectory in 1-2 sentences using ONLY their own words, zero interpretation, then ask exactly: "Από τη σημερινή δοκιμή, ποια λέξη ή φράση θέλεις να κρατήσεις για τον μελλοντικό σου εαυτό;"\nSTEP 3 (after they give a word/phrase): Say exactly: "Το «" + their exact word + "» το κρατάω." then ask exactly: "Τώρα, για το ζήτημα που σε απασχολεί βαθιά, τι ψάχνεις να ξεκαθαρίσεις τώρα;" This ends the demo — after this, respond normally to their real topic.\nThis entire sequence happens only once, ever, for this user.]\n`
+        ? `\n[FIRST-EVER MESSAGE FROM THIS USER — a short onboarding demo happens before the real session, in exactly 3 steps across this and the next two of your replies:\nSTEP 1 (this reply): Say exactly: "Καλώς ήρθες. Η AURA δεν είναι ημερολόγιο, είναι χώρος απόστασης. Για να δούμε πώς δουλεύει, ας κάνουμε μια μικρή δοκιμή." Then on a new line ask exactly: "Ποια ήταν η τελευταία, κατά τη γνώμη σου, «σωστή» απόφαση που πήρες;" — do not engage with whatever real topic the user just wrote; the demo comes first.\nSTEP 2 (after they answer): Reflect their trajectory in 1-2 sentences using ONLY their own words, zero interpretation, then ask exactly: "Από τη σημερινή δοκιμή, ποια λέξη ή φράση θέλεις να κρατήσεις για τον μελλοντικό σου εαυτό;"\nSTEP 3 (after they give a word/phrase): Say exactly: "Το «" + their exact word + "» το κρατάω." then ask exactly: "Τώρα, για το ζήτημα που σε απασχολεί βαθιά, τι ψάχνεις να ξεκαθαρίσεις τώρα;" This ends the demo — after this, respond normally to their real topic.\nINSERTION SEQUENCE RULE (real-user evidence — this exact pattern has happened twice): if the user's reply to any demo question is itself a question, a clarification request, or otherwise not a real answer (e.g. "τι εννοείς;", "έχει νόημα αυτό;"), do NOT treat it as their answer and do NOT advance to the next step. Instead answer their question in one short sentence, then ask the exact same demo question again. Only advance once they give a real answer.\nThis entire sequence happens only once, ever, for this user.]\n`
         : '';
       const dynamicSuffix = [memCtx, profileCtx, explicitPauseCtx, demoCtx].filter(Boolean).join('\n');
       // Prompt caching: basePrompt (core+lens, identical across calls) is the large stable block —
@@ -1858,20 +1879,17 @@ export default function AURAv2() {
         ? text + "\n\nΑν ποτέ φτάσεις σε εκείνη τη στιγμή, υπάρχει η γραμμή 10306 — είναι εκεί."
         : text;
 
-      // Onboarding demo, Step 3: this is the 3rd reply in the brand-new-user window, so the user's
-      // previous message (already in msgs) WAS their word. Save it as a real anchor — counted
-      // structurally, never by sniffing the model's exact wording.
-      if (isBrandNewUser && onboardingStepRef.current === 2) {
-        const userMsgsForAnchor = msgs.filter(m => m.role === "user");
-        const theirWord = userMsgsForAnchor[userMsgsForAnchor.length - 1]?.content?.trim();
-        if (theirWord) {
-          const withAnchor = createAnchor({ ...memory }, theirWord, TRAJECTORY_WORD_CATEGORY, "resolved");
+      // Onboarding demo, Step 3: content-verified (see decideOnboardingStep) — only saves the
+      // word and ends the demo once Step 2's exact question was actually asked AND the user's
+      // reply is a real answer, not an inserted clarification question.
+      if (isBrandNewUser) {
+        const { saveWord, word, nextCount } = decideOnboardingStep(msgs, lastUserMsg, onboardingStepRef.current);
+        if (saveWord && word) {
+          const withAnchor = createAnchor({ ...memory }, word, TRAJECTORY_WORD_CATEGORY, "resolved");
           setMemory(withAnchor);
           if (memory.storageEnabled) saveMemory(withAnchor, true);
         }
-        onboardingStepRef.current = 3; // demo complete — isBrandNewUser now permanently false via the <3 check
-      } else if (isBrandNewUser) {
-        onboardingStepRef.current += 1;
+        onboardingStepRef.current = nextCount;
       }
 
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode }]);
