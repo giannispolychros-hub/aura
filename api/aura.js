@@ -15,9 +15,15 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Server configuration error" });
   }
 
-  // Body size guard — reject payloads over 64KB to prevent abuse
+  // Body size guard — real production evidence (2026-07-12): the system prompt alone is
+  // now ~54KB after today's additions, leaving almost no room under the old 64KB limit for
+  // any real conversation history — a 29-exchange session hit this and failed with 413.
+  // Raised to 300KB: generous headroom over current system-prompt size plus room for long
+  // conversations, while still rejecting genuinely abusive (multi-MB) payloads. The client
+  // also caps conversation history by character budget (capMessageHistory in App.jsx) as a
+  // second, independent layer of defense — this guard and that cap are not the same fix.
   const contentLength = parseInt(req.headers["content-length"] || "0", 10);
-  if (contentLength > 65536) {
+  if (contentLength > 300000) {
     return res.status(413).json({ error: "Payload too large" });
   }
 
