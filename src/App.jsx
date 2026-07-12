@@ -179,7 +179,7 @@ INVERSION — shift attention from fear of change to the cost of staying the sam
 
 EXECUTION DISCIPLINE: these operations are not coaching techniques — they are logical probes. Do not announce the operation being used. Do not label the process. Execute the reasoning naturally inside AURA's cold, precise, brief reflection style. Do not force an operation if it does not fit. Before asking any question, silently determine: "What cognitive change should this question create?" If no meaningful change is expected, do not ask it.
 
-COGNITIVE MOVEMENT STOP CONDITION (this replaces any previous shorter version of the same rule — there is one unified stopping logic, not multiple): if several different reasoning operations have already been attempted and none produces meaningful cognitive movement, treat that itself as information. Do not continue searching indefinitely for another question. Acknowledge briefly that no further clarity is emerging at this moment and allow the conversation to conclude naturally. Never manufacture progress. Never prolong the conversation simply to create another insight. Ending naturally is always preferable to forcing cognitive movement that is no longer occurring. A session may end without resolution if the user's reasoning has reached its current limit for that moment. Adapt any closing expression naturally to the user's language and the conversational context.
+COGNITIVE MOVEMENT STOP CONDITION (this replaces any previous shorter version of the same rule — there is one unified stopping logic, not multiple): if several different reasoning operations have already been attempted and none produces meaningful cognitive movement, treat that itself as information — signs of this include the same ideas repeating, no new contradictions surfacing, answers becoming variations of previous ones. Do not continue searching indefinitely for another question. State only what you observe about the conversation itself, never a claim about the user's internal state (e.g. NOT "έχεις αρκετή σαφήνεια" — that presumes to know how they feel): "Δεν βλέπω πλέον γνωστική μεταβολή." Then ask, don't decide for them: "Το νιώθεις κι εσύ, ή θέλεις να συνεχίσουμε;" Never manufacture progress. Never prolong the conversation simply to create another insight. Ending naturally is always preferable to forcing cognitive movement that is no longer occurring. A session may end without resolution if the user's reasoning has reached its current limit for that moment. Adapt the exact wording naturally to the conversational context, but keep the two-part shape: observation, then permission.
 Every question must justify its existence — never ask one simply to continue the dialogue. Before asking any question, silently ask: "What cognitive change do I expect this question to produce?" A question earns its place only if it can reveal a hidden assumption, separate variables, test evidence, clarify a definition, or expose a trade-off. If none of these outcomes is expected, do not ask that question. The goal is not more words — it is to help the user see their own reasoning more clearly, adding no interpretation that does not already exist in the user's own thinking.
 Do not optimize for a longer conversation. Do not optimize for engagement. Optimize only for increased clarity.
 A session is successful only if the user's mental model has changed, become more precise, or a hidden assumption has become visible.
@@ -2761,10 +2761,10 @@ export default function AURAv2() {
         .intro-continue:hover{border-color:#c9a84c;color:#c9a84c;}
         .intro-skip{background:none;border:none;color:#3a3632;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;cursor:pointer;transition:color .2s;}
         .intro-skip:hover{color:#6a6660;}
-        .mic-btn{background:rgba(10,9,8,0.7);border:1px solid rgba(201,168,76,0.5);color:#c9a84c;font-family:'DM Mono',monospace;font-size:16px;padding:12px 18px;cursor:pointer;border-radius:4px;min-width:48px;min-height:44px}
+        .mic-btn{background:rgba(10,9,8,0.7);border:1px solid rgba(201,168,76,0.25);color:#8a7a52;font-family:'DM Mono',monospace;font-size:16px;padding:12px 18px;cursor:pointer;border-radius:4px;min-width:48px;min-height:44px}
         .mic-btn.active{border-color:#c9a84c;color:#e8d890;background:rgba(201,168,76,0.1);}
         .turn-counter{font-size:8px;letter-spacing:.1em;color:var(--text-dim);text-align:right;margin-top:5px}
-        .err{font-size:10px;color:#4a1a1a;margin-top:7px;padding:6px 10px;border:1px solid #180000;border-radius:2px}
+        .err{font-size:10px;color:#e8a0a0;margin-top:7px;padding:6px 10px;border:1px solid #6b2c2c;border-radius:2px;background:rgba(74,26,26,0.25)}
 
         ::-webkit-scrollbar{width:2px}
         ::-webkit-scrollbar-track{background:transparent}
@@ -3023,8 +3023,8 @@ export default function AURAv2() {
                 Αυτή αποτελεί κτήμα σου πλέον.
               </div>
               <div className="choice-btns">
-                <button className="choice-btn" onClick={() => handleClosureConfirm(false)}>Έχω κι άλλο να πω</button>
-                <button className="choice-btn prim" onClick={() => handleClosureConfirm(true)}>Δείξε μου</button>
+                <button className="choice-btn prim" onClick={() => handleClosureConfirm(false)}>Έχω κι άλλο να πω</button>
+                <button className="choice-btn" onClick={() => handleClosureConfirm(true)}>Δείξε μου</button>
               </div>
             </div>
           )}
