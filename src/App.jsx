@@ -1640,7 +1640,44 @@ function friendlyApiError(status) {
 // Concurrent-call guard — prevents two callAura calls in-flight simultaneously
 let _activeCall = false;
 
+// Fix: real production evidence (HTTP 413 "Payload Too Large") — the request body was sending
+// the ENTIRE, unbounded conversation history on every call, with no cap. The system prompt
+// already promises "CONTEXT REFRESH every 10 messages" but the code never implemented any
+// windowing. Size-aware (character budget), not count-based: a naive count cap could easily
+// miss real failures — message COUNT isn't what blows the payload limit, total SIZE is (and
+// Greek text runs ~2 bytes/char in UTF-8, so the byte cost is roughly double the JS .length).
+// Walks backward from the most recent message, keeping messages until the budget is spent —
+// always keeps at least minKeep messages regardless of size, so short-term coherence never breaks.
+function capMessageHistory(messages, maxChars = 20000, minKeep = 10) {
+  if (!Array.isArray(messages)) return messages;
+  if (messages.length <= minKeep) return messages;
+  let totalChars = 0;
+  let cutIndex = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const len = (messages[i].content || "").length;
+    if (totalChars + len > maxChars && (messages.length - i) > minKeep) {
+      cutIndex = i + 1;
+      break;
+    }
+    totalChars += len;
+  }
+  return messages.slice(cutIndex);
+}
+
 async function callAura(messages, systemPrompt, retries = 1) {
+  // Prompt caching (Anthropic docs, confirmed 2026-07): AURA_CORE_PERSONALITY (~54KB) is the
+  // exact same prefix shared by every lens/compression system prompt, every turn, within a
+  // session — and across sessions too. Splitting it into its own cache_control block means
+  // repeated calls hit the cache (0.1x price) instead of full-price reprocessing every turn.
+  // No beta header needed for the standard 5-minute ephemeral cache. SYSTEM_TERMINATION doesn't
+  // share this prefix, so it's sent as a single block — harmless no-op if under the 1,024-token
+  // minimum cacheable length for Sonnet models.
+  const systemBlocks = systemPrompt.startsWith(AURA_CORE_PERSONALITY)
+    ? [
+        { type: "text", text: AURA_CORE_PERSONALITY, cache_control: { type: "ephemeral" } },
+        { type: "text", text: systemPrompt.slice(AURA_CORE_PERSONALITY.length) },
+      ]
+    : [{ type: "text", text: systemPrompt }];
   if (_activeCall && retries === 1) {
     // RT-fix: brief grace window instead of immediate hard fail — two legitimate
     // actions can overlap by a few hundred ms without either being a real error.
@@ -1661,8 +1698,8 @@ async function callAura(messages, systemPrompt, retries = 1) {
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 1000,
-        system: systemPrompt,
-        messages: messages.map(m => ({ role: m.role, content: m.content })),
+        system: systemBlocks,
+        messages: capMessageHistory(messages).map(m => ({ role: m.role, content: m.content })),
       }),
     });
     if (!res.ok) {
