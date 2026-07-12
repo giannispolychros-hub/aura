@@ -1672,12 +1672,17 @@ async function callAura(messages, systemPrompt, retries = 1) {
   // No beta header needed for the standard 5-minute ephemeral cache. SYSTEM_TERMINATION doesn't
   // share this prefix, so it's sent as a single block — harmless no-op if under the 1,024-token
   // minimum cacheable length for Sonnet models.
-  const systemBlocks = systemPrompt.startsWith(AURA_CORE_PERSONALITY)
-    ? [
-        { type: "text", text: AURA_CORE_PERSONALITY, cache_control: { type: "ephemeral" } },
-        { type: "text", text: systemPrompt.slice(AURA_CORE_PERSONALITY.length) },
-      ]
-    : [{ type: "text", text: systemPrompt }];
+  // RT-fix (real production crash — "t.startsWith is not a function"): one call site already
+  // builds systemPrompt as an array with its own cache_control (the main conversation turn).
+  // Handle both shapes defensively instead of assuming every caller passes a plain string.
+  const systemBlocks = Array.isArray(systemPrompt)
+    ? systemPrompt
+    : (typeof systemPrompt === "string" && systemPrompt.startsWith(AURA_CORE_PERSONALITY))
+      ? [
+          { type: "text", text: AURA_CORE_PERSONALITY, cache_control: { type: "ephemeral" } },
+          { type: "text", text: systemPrompt.slice(AURA_CORE_PERSONALITY.length) },
+        ]
+      : [{ type: "text", text: systemPrompt }];
   if (_activeCall && retries === 1) {
     // RT-fix: brief grace window instead of immediate hard fail — two legitimate
     // actions can overlap by a few hundred ms without either being a real error.
