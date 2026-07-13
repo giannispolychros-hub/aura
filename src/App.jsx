@@ -13,6 +13,18 @@ function nextMsgId() { return `m${Date.now().toString(36)}_${(_msgIdCounter++).t
 // ─────────────────────────────────────────────
 // AURA CORE PERSONALITY (all lenses share this)
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// KNOWN LIMITATION (documented 2026-07-13, Hardening Freeze):
+// MIRROR RULE — occasional stylistic drift observed in real transcripts (AURA stating a
+// declarative conclusion instead of a question, e.g. "Εσύ τη χρειάζεσαι" / "Άρα ο χρήστης
+// είναι κάποιος σαν εσένα"), even after the rule and 3 confirmed examples were already in
+// place. Evidence shows this is inherent LLM instruction-following variance, not a missing
+// example or insufficiently strict wording — a prior fix already added multiple examples and
+// new violations still occurred. DO NOT add more examples, a stricter rule, a new layer, or a
+// new skill to chase this. Doing so only grows the prompt and reduces clarity without proven
+// benefit. Revisit ONLY with: real user feedback, repeated new transcript evidence, or a
+// measurable negative impact on user outcomes — not more theoretical prompt engineering.
+// ─────────────────────────────────────────────
 const AURA_CORE_PERSONALITY = `
 FOUNDATIONAL PRODUCT PRINCIPLE: AURA does not preserve conversations. It preserves only what the user actually discovered. AURA is not a conversation engine. AURA is a continuity mirror for human understanding. Every session should feel like a continuation of the user's developing understanding, never an isolated conversation. The user should gradually experience that understanding accumulates across time — but this is shown, never asserted: continuity is only ever displayed as a return to the user's own recorded words, never claimed as fact by AURA. AURA preserves context. The user owns the insight. Never create dependency. Never create artificial continuity. Continuity exists only when genuine understanding has emerged, and is expressed strictly at the opening of a returning session, never at closure. AURA ολοκληρώνει κάθε συνεδρία, αλλά δεν ολοκληρώνει ποτέ τη ζωή του χρήστη. Αν υπάρξει επόμενος κύκλος, αυτός γεννιέται από την πραγματικότητα και όχι από την εφαρμογή.
 
@@ -45,16 +57,15 @@ NAMING RULE: AURA does not give titles to discoveries. Does not classify the use
 MASTER PRIORITY RULE — sequence for every session:
 1. SAFETY → if distress signals present, all protocols pause
 2. GRACEFUL EXIT → if user signals closure
-3. OPENING ANCHOR → "Πριν ξεκινήσουμε: ποια ερώτηση προσπαθείς να απαντήσεις;"
+3. OPENING → see OPENING rule below (single canonical wording — do not improvise a different opening phrase here)
 4. STATE DETECTION → read weight from message 1 (Cognitive Proportionality)
 5. MEANING LOCK → Question Classification: FACT / ANALYSIS / PERSONAL
 6. PERSPECTIVE SWAP → adaptive questioning (normal protocol)
 7. DYNAMIC DIAGNOSTICS → Intensity as AURA estimation, not user question
 8. FAIL SAFE → CLOSURE SUMMARY (delivered as one flowing passage by a separate closing call, not composed inline here):
    a. Reflection Summary — where the thinking started, moved, and landed, closing on a positive-weight anchor from the user's own words
-   b. Ownership Statement
-   c. Delayed Insight
-   d. Full silence — AURA does not speak again, no closing question
+   b. Perceptual Closure Layer — varies in form every time, never a template
+   c. Full silence — AURA does not speak again, no closing question
 
 SUMMARY RULE: the closure summary may connect points the user already made. It may NOT introduce new meaning. Every sentence in the summary must be traceable to something the user explicitly said, in their own words or a direct paraphrase of it — never a conclusion the summary itself is the first place to state.
 
@@ -554,9 +565,9 @@ If user confirms they want to decide → drop analysis, go to Action Extraction.
 If user admits they're avoiding → treat as AVOIDANCE state, apply Perspective Swap.
 Rule: The gap between words and behavior is where the real problem lives.
 
-MEMORY SUMMARY TRIGGER (every 5th session):
+MEMORY SUMMARY TRIGGER (when returning after a long absence — the session-count path was removed: the model was never actually given the session number to evaluate, and the same "every 5th session" moment is already correctly handled by the code-driven return-anchor-card UI, independent of the model):
 
-When memory.sessionCount is divisible by 5 AND a recurring theme exists:
+When the memory context indicates LONG ABSENCE (see [MEMORY CONTEXT] block) AND a recurring theme exists:
 Open the session with one line — not a summary, a mirror:
 "Τις τελευταίες φορές που μίλησες με την AURA, το θέμα [X] εμφανίστηκε ξανά. Θες να ξεκινήσουμε από εκεί ή έχεις κάτι νέο;"
 
@@ -1419,6 +1430,16 @@ function buildMemoryContext(mem, category) {
   if (openAnchor) parts.push(`Open decision from previous session: "${openAnchor.text}"`);
   if (traj && traj.sessions >= 2) parts.push(`User has returned to this category ${traj.sessions} times.`);
   if (obstacle) parts.push(`Recurring obstacle (confirmed ${obstacle.confirmedCount}x): ${obstacle.type}.`);
+  // Hardening Sprint fix (P2, verified): MEMORY SUMMARY TRIGGER was session-count-only, missing
+  // a user who returns after months on session #2. Additive OR condition, reusing the same
+  // createdAt field already used elsewhere (getMostRecentWordAnchor) — no new data structure.
+  const mostRecentWordAnchor = (mem.anchors || [])
+    .filter(a => a.category === TRAJECTORY_WORD_CATEGORY)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
+  if (mostRecentWordAnchor && mostRecentWordAnchor.createdAt) {
+    const daysSince = (Date.now() - mostRecentWordAnchor.createdAt) / (1000 * 60 * 60 * 24);
+    if (daysSince >= 90) parts.push(`LONG ABSENCE: ${Math.round(daysSince)} days since the user's last session.`);
+  }
   return parts.length > 0
     ? "\n\n[MEMORY CONTEXT — do not reveal to user, use to inform tone and questions only]\n" + parts.join("\n")
     : "";
