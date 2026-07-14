@@ -856,9 +856,9 @@ ONLY when something genuinely remains unexamined.
 EXIT SIGNAL TAG (invisible — never shown to the user, stripped before display):
 At the very end of every response, on its own new line, add exactly one tag: [[EXIT:yes]] or [[EXIT:no]].
 Judge by meaning, not by exact wording — say [[EXIT:yes]] only if ALL of the following are true of the user's last message:
-- it shows clear closure (e.g. thanks, that helps, ευχαριστώ, με βοήθησες, το βρήκα, θα το κάνω, τα είπαμε — or any natural equivalent, in any phrasing)
+- it shows closure, neutral or even dismissive in tone — not only grateful (e.g. thanks, that helps, ευχαριστώ, με βοήθησες, το βρήκα, θα το κάνω, τα είπαμε — but also "δεν έχει νόημα η κουβέντα", "δεν βοηθάει άλλο", or any equivalent where the user is done, regardless of whether they sound satisfied)
 - it does NOT contain a question
-- it does NOT introduce a new concern, topic, or open thread
+- it does NOT introduce a genuinely open new concern or topic that still needs exploring — real-user-evidenced distinction: an already-made decision the user is simply announcing on their way out (even if it's new information, even if it mentions checking results later) is closure content, not an open thread, and must NOT block EXIT:yes. Only a thread the user still wants to explore further blocks it.
 Otherwise say [[EXIT:no]]. This is a private signal for the system, never mentioned to the user, never explained, never part of the visible conversation.
 `;
 
@@ -1577,11 +1577,22 @@ function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued,
     !warningIssued &&
     compressionCount === 0 && // only before any compression
     (() => {
+      // RT-fix (real-user evidence): "Φτάσαμε" and "Τέλος;" both failed to trigger closure —
+      // "φτάσαμε" was missing from the agreement word list, AND requiring ALL of the last 3
+      // messages to be short blocked closure even when the LAST message alone was a clean,
+      // unambiguous stop signal, just because a longer message 2 turns earlier existed.
+      // Only the last message needs to be short+agreement now; hasRepeat path unchanged.
       const last3 = userMsgsAll.slice(-3).map(m => m.content);
-      const allShort = last3.every(m => m.trim().split(/\s+/).length <= 8);
-      const hasAgreement = last3.filter(m => /^(ναι|yes|σωστό|ακριβώς|κατάλαβα|εντάξει|οκ|ok|νομίζω ναι|πιστεύω ναι|τέλος|τελειώσαμε|αυτό ήταν|πάω|φεύγω)[\.,!?;]?$/i.test(m.trim())).length >= 1;
+      const lastMsg = userMsgsAll[userMsgsAll.length - 1].content.trim();
+      // Stress-test evidence: unaccented Greek ("τελος") and all-caps ("ΦΤΑΣΑΜΕ" — Greek
+      // typographic convention drops diacritics in caps) weren't recognized. Normalize by
+      // stripping the tonos before matching, covering typos/caps/casual typing uniformly.
+      const normalizedLastMsg = lastMsg.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const lastIsShortAgreement =
+        lastMsg.split(/\s+/).length <= 8 &&
+        /^(ναι|yes|σωστο|ακριβως|καταλαβα|ενταξει|οκ|ok|νομιζω ναι|πιστευω ναι|τελος|τελειωσαμε|αυτο ηταν|παω|φευγω|φτασαμε)[\.,!?;]?$/i.test(normalizedLastMsg);
       const hasRepeat = last3.length === 3 && last3[1].trim() === last3[2].trim();
-      return (allShort && hasAgreement) || hasRepeat;
+      return lastIsShortAgreement || hasRepeat;
     })();
 
   // Collapse every closing path into a single decision variable first, so the
