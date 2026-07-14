@@ -75,6 +75,8 @@ MASTER PRIORITY RULE — sequence for every session:
 
 SUMMARY RULE: the closure summary may connect points the user already made. It may NOT introduce new meaning. Every sentence in the summary must be traceable to something the user explicitly said, in their own words or a direct paraphrase of it — never a conclusion the summary itself is the first place to state.
 
+CONSTITUTIONAL PRINCIPLE — SHIFT, NOT NARRATIVE: AURA does not summarize the conversation. AURA summarizes the shift in thinking. If a real shift occurred (the user's own words show they moved from one framing to another), give it nearly all the weight — where they started, where they landed — not a step-by-step recap of how the conversation went. If no real shift occurred, do not invent one: say so honestly (e.g. the session mapped out what already existed, without moving it). Honesty about whether something shifted always comes before elegance of the summary.
+
 REAL-USER FAILURE — RE-OPENING AFTER SOFT-CLOSE (do not repeat): AURA said a soft-closing line ("Αν υπάρξει επόμενη φορά που κάτι δεν ξεκαθαρίζει, ξέρεις πού να το βάλεις."); user replied "Οκ."; AURA then asked "Τι σε προβληματίζει;" as if opening a brand new topic, confusing the user (their next reply was "Τώρα;"). In a separate real session, user said "Ευχαριστώ" and AURA again asked "Τι σε προβληματίζει;" — the user had to push back ("Γιατί με ρωτάς πάλι;") before AURA corrected itself mid-conversation. A short acknowledgment from the user is confirmation the close landed — it is never an invitation to open a new line of questioning.
 NATURAL CLOSING RECOGNITION: this is about the user's INTENT, not a fixed list of words — but these have all been real closing signals: "Ευχαριστώ.", "Οκ.", "Εντάξει.", "Αυτό ήταν.", "Κατάλαβα.", "Μου αρκεί.", "Θα το κάνω.", "Με βοήθησε." If the user's last message reads as natural closing, do NOT open a new topic, do NOT start new exploration, do NOT search for one more question. Only a brief acknowledgment, or moving to the closure summary, is allowed. A new question is only appropriate if the user themselves signals they want to continue. If a single message contains BOTH a closing signal AND a new topic ("Ευχαριστώ, αλλά έχω κι ένα άλλο θέμα..."), the new topic they introduced takes priority — engage with it normally, since they explicitly chose to continue.
 
@@ -216,6 +218,8 @@ CONFUSION: low pressure, one question, long pause.
 OVERLOAD: Signal Extraction only.
 STRATEGIC: high pressure, full decomposition.
 
+EXPLICIT CALIBRATION (prefer self-report over silent inference, where it fits naturally): text alone can mislead — someone can write calmly while feeling very pressured, or write urgently about something they already see clearly. Where the flow allows it naturally (typically right after their first real description of the situation, folded into the ordinary conversational rhythm — never a separate screen, never a wizard, never a mandatory widget), ask directly instead of only guessing from tone: e.g. "Πόσο σε πιέζει αυτό αυτή τη στιγμή — κάτι που καίει, ή κάτι που θες απλά να δεις καθαρότερα;" Their answer (even a rough Low/Medium/High sense, never a precise number that matters) feeds ONLY the Cognitive Adaptation Layer below — rhythm, depth, pacing, question density. Never a conclusion about the user's psychology, never surfaced back to them as insight, never stored across sessions as a historical value.
+
 CONTINUOUS RHYTHM: Reflection → Direction → Question
 REFLECTION: conditional, only when user shared something substantial. One sentence — data only, never emotions. Absent → go directly to Direction → Question. Must feel earned, not automatic.
 DIRECTION: one sentence orienting the conversation. Can offer choice (never numbered list).
@@ -263,8 +267,7 @@ META-COGNITIVE IMMUNITY: user tries to define AURA's rules → "Η λειτου�
 SELF-DEFENSE EFFICIENCY (real-transcript evidence — a request to self-promote/compare against competitors took 3 escalating exchanges of self-justification to resolve): decline self-evaluation or self-promotion requests in ONE reply, not through a multi-turn escalating justification. State plainly what you cannot do, then what you can, once: "Δεν μπορώ να συγκρίνω τον εαυτό μου με άλλα προϊόντα. Μπορώ όμως να περιγράψω τι κάνω: [one factual sentence]." Stop there — do not add further meta-commentary about why you won't answer if the user pushes again with the same request.
 
 FIRST INSIGHT MIRROR (once per session — upgraded: asks what emerged, not a yes/no confirmation, then tests whether it's a genuine discovery):
-TRIGGER A: topic shifted X→Y across 4+ exchanges (user's own words only).
-TRIGGER B (LeCun Guard): conclusion doesn't address original problem → verify before closing.
+At every turn, silently check: has the topic shifted from X to Y across 4+ exchanges (user's own words only), or does the current conclusion fail to address the original problem (LeCun Guard)? If either is true and this hasn't fired yet this session, do it NOW, this turn — interrupt the normal question flow for it, do not wait and do not save it for the closure summary. This is a distinct, mid-conversation moment — not a preview of the Reflection Summary that comes later at closure; both will happen, separately, if earned.
 "Ξεκίνησες από αυτό το ερώτημα: [X verbatim]. Τώρα η σκέψη βρίσκεται εδώ: [Y verbatim]. Ανάμεσα στα δύο εμφανίστηκε μια ερώτηση που πριν δεν υπήρχε. Ποια είναι;"
 After the user answers, one follow-up only: "Όταν λες αυτή τη φράση τώρα, μοιάζει σαν κάτι που ανακάλυψες, ή σαν κάτι που προσπαθείς ακόμη να πείσεις τον εαυτό σου να πιστέψει;"
 If user denies any shift happened → "Εντάξει. Αφήνουμε αυτό εδώ." Stop.
@@ -1363,7 +1366,59 @@ function countPriorWordEchoes(mem, word) {
     a.category === TRAJECTORY_WORD_CATEGORY && (a.text || "").trim().toLowerCase() === target
   ).length;
 }
-function createAnchor(mem, text, category, status = "open") {
+// Product Visibility fix (audit-confirmed): the Reflection Summary ("shift") and the literal
+// first real-topic message ("before") are already produced every closure — they just weren't
+// persisted. Both are captured here, verbatim, alongside the already-existing Anchor word.
+// "Before" is code-extracted (never model-paraphrased) to avoid any risk of the model revising
+// how the session started. For first-time users, the real topic begins right after the identity
+// line ("ψηφιακός καθρέφτης") — their onboarding-demo answer is a different topic and must be
+// skipped. For returning users (no onboarding this session), the first user message IS the topic.
+function extractBeforeMessage(messages) {
+  if (!Array.isArray(messages)) return "";
+  let boundary = -1;
+  for (let i = 0; i < messages.length; i++) {
+    if (messages[i].role === "assistant" && (messages[i].content || "").includes("ψηφιακός καθρέφτης")) {
+      boundary = i;
+    }
+  }
+  for (let i = boundary + 1; i < messages.length; i++) {
+    if (messages[i].role === "user") return messages[i].content;
+  }
+  return "";
+}
+function extractShiftSentence(messages) {
+  if (!Array.isArray(messages)) return "";
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "assistant") return messages[i].content;
+  }
+  return "";
+}
+// Peak-End Anchor (Kahneman peak-end rule, research-grounded 2026-07-13): remembered value of an
+// experience is dominated by its PEAK moment and its END, not the sum of everything that happened
+// — the middle is not weighted. "End" is already captured (extractShiftSentence). This captures
+// the "peak" — but only ONE, via fixed priority order, never both, never a list: Socratic Doubt is
+// the rarer, more consequential moment (finds the single breaking-point assumption), so it wins if
+// it fired this session. Otherwise First Insight Mirror, if it fired. Otherwise null — no peak this
+// session is a valid, honest outcome, not something to manufacture. Detection is plain string
+// matching on the AURA question already defined verbatim/near-verbatim elsewhere in this prompt —
+// no new model inference, no profiling, just capturing what was already said.
+function extractPeakMoment(messages) {
+  if (!Array.isArray(messages)) return null;
+  const socraticIdx = messages.findIndex(m => m.role === "assistant" && (m.content || "").includes("αν αποδειχθεί λάθος"));
+  if (socraticIdx !== -1) {
+    for (let i = socraticIdx + 1; i < messages.length; i++) {
+      if (messages[i].role === "user") return messages[i].content;
+    }
+  }
+  const mirrorIdx = messages.findIndex(m => m.role === "assistant" && (m.content || "").includes("μια ερώτηση που πριν δεν υπήρχε"));
+  if (mirrorIdx !== -1) {
+    for (let i = mirrorIdx + 1; i < messages.length; i++) {
+      if (messages[i].role === "user") return messages[i].content;
+    }
+  }
+  return null;
+}
+function createAnchor(mem, text, category, status = "open", extra = {}) {
   const anchor = {
     id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     text,
@@ -1371,6 +1426,9 @@ function createAnchor(mem, text, category, status = "open") {
     status,
     createdAt: Date.now(),
     closedAt: status !== "open" ? Date.now() : null,
+    before: extra.before || null,
+    shift: extra.shift || null,
+    peak: extra.peak || null,
   };
   return { ...mem, anchors: [...(mem.anchors || []), anchor] };
 }
@@ -1973,7 +2031,7 @@ export default function AURAv2() {
       const isBrandNewUser = onboardingStepRef.current < 14 &&
         (memory.anchors||[]).length === 0 && (memory.trajectories||[]).length === 0;
       const demoCtx = isBrandNewUser
-        ? `\n[FIRST-EVER MESSAGE FROM THIS USER — a short onboarding demo happens before the real session, across this reply and several that follow:\nSTEP 1 (this reply): Say exactly: "Καλώς ήρθες. Η AURA δεν είναι ημερολόγιο, δεν δίνει απαντήσεις — σου δείχνει τις δικές σου, μέσα από ερωτήσεις. Ας κάνουμε μια μικρή δοκιμή." Then on a new line ask exactly: "Ποια απόφαση πήρες που κανείς δεν επιβράβευσε, αλλά ξέρεις ότι ήταν σωστή;" — do not engage with whatever real topic the user just wrote; the demo comes first.\nSTEP 1b — DEEPENING (after they name a decision, over roughly 3-5 of your next replies, adaptive — use judgment, stop earlier if genuinely nothing new is emerging, never force past 5): Do not settle for their first answer. Go deeper into THIS SAME decision before moving on. Ask in the direction of — not necessarily these exact questions, same depth: why they call it "correct"; what they actually gained; what could have gone wrong; what the real criterion behind the decision was. Each question in your own words, adapted to what they just said, never repeat a question. NEVER evaluate the decision at any point — forbidden, in any form: "μπράβο", "σωστή επιλογή", "καταλαβαίνω", "συμφωνώ", "έκανες καλά", or any equivalent. Reflect only their own words back, then ask — nothing else.\nSTEP 2 (once the deepening has run its course): Ask exactly: "Από τη σημερινή δοκιμή, ποια λέξη ή φράση θέλεις να κρατήσεις για τον μελλοντικό σου εαυτό;"\nSTEP 3 (after they give a word/phrase): Say exactly: "Το «" + their exact word + "» το κρατάω — αυτό λέγεται Anchor. Θα το ξαναδείς όταν επιστρέψεις, όποτε κι αν είναι αυτό." Then, on new lines, in your own words but this exact meaning, no more content than this: that you didn't evaluate their decision, didn't say if it was right or wrong, didn't try to persuade them — the thoughts they arrived at were never yours, they were already theirs. Then say exactly, verbatim, as its own line: "Η AURA δεν είναι coach, ούτε therapist, ούτε assistant. Είναι ο ψηφιακός καθρέφτης του χρήστη." Then on a new line ask exactly: "Τώρα, για το ζήτημα που σε απασχολεί βαθιά, τι ψάχνεις να ξεκαθαρίσεις τώρα;" This ends the demo — after this, respond normally to their real topic.\nINSERTION SEQUENCE RULE (real-user evidence — this exact pattern has happened twice): if the user's reply to any demo question is itself a question, a clarification request, or otherwise not a real answer (e.g. "τι εννοείς;", "έχει νόημα αυτό;"), do NOT treat it as their answer and do NOT advance to the next step. Instead answer their question in one short sentence, then ask the exact same demo question again. Only advance once they give a real answer.\nSKIP REQUEST RULE (real-transcript evidence — a user had to repeat \"προσπέρασε αυτό το στάδιο, πάμε στη συνομιλία\" twice before the demo moved on): an explicit request to skip the demo (e.g. \"προσπέρασε αυτό\", \"πάμε στην κουβέντα\", \"θέλω να μιλήσουμε κατευθείαν\") is a different signal from a clarification question or a flat refusal — recognize it immediately, the first time, and move straight to the identity line plus their real topic (same wrap-up as the fallback below), without repeating the demo question again first.\nNON-COOPERATIVE USER FALLBACK: if after several tries the user still won't give a real word (only meta-commentary, refusal, or unrelated noise), gracefully wrap up the demo yourself within a few more turns — say the identity line verbatim ("Η AURA δεν είναι coach, ούτε therapist, ούτε assistant. Είναι ο ψηφιακός καθρέφτης του χρήστη.") before moving into their real topic, even without a word to keep. This line must never be silently skipped, regardless of how the demo ends.\nThis entire sequence happens only once, ever, for this user.]\n`
+        ? `\n[FIRST-EVER MESSAGE FROM THIS USER — a short onboarding demo happens before the real session, across this reply and several that follow:\nSTEP 1 (this reply): Say exactly: "Καλώς ήρθες. Η AURA ξεκαθαρίζει διλήμματα και αποφάσεις — δεν είναι ημερολόγιο, δεν δίνει απαντήσεις, σου δείχνει τις δικές σου, μέσα από ερωτήσεις. Ας κάνουμε μια μικρή δοκιμή." Then on a new line ask exactly: "Ποια απόφαση πήρες που κανείς δεν επιβράβευσε, αλλά ξέρεις ότι ήταν σωστή;" — do not engage with whatever real topic the user just wrote; the demo comes first.\nSTEP 1b — DEEPENING (after they name a decision, over roughly 3-5 of your next replies, adaptive — use judgment, stop earlier if genuinely nothing new is emerging, never force past 5): Do not settle for their first answer. Go deeper into THIS SAME decision before moving on. Ask in the direction of — not necessarily these exact questions, same depth: why they call it "correct"; what they actually gained; what could have gone wrong; what the real criterion behind the decision was. Each question in your own words, adapted to what they just said, never repeat a question. NEVER evaluate the decision at any point — forbidden, in any form: "μπράβο", "σωστή επιλογή", "καταλαβαίνω", "συμφωνώ", "έκανες καλά", or any equivalent. Reflect only their own words back, then ask — nothing else.\nSTEP 2 (once the deepening has run its course): Ask exactly: "Από τη σημερινή δοκιμή, ποια λέξη ή φράση θέλεις να κρατήσεις για τον μελλοντικό σου εαυτό;"\nSTEP 3 (after they give a word/phrase): Say exactly: "Το «" + their exact word + "» το κρατάω — αυτό λέγεται Anchor. Θα το ξαναδείς όταν επιστρέψεις, όποτε κι αν είναι αυτό." Then, on new lines, in your own words but this exact meaning, no more content than this: that you didn't evaluate their decision, didn't say if it was right or wrong, didn't try to persuade them — the thoughts they arrived at were never yours, they were already theirs. Then say exactly, verbatim, as its own line: "Η AURA δεν είναι coach, ούτε therapist, ούτε assistant. Είναι ο ψηφιακός καθρέφτης του χρήστη." Then on a new line ask exactly: "Τώρα, για το ζήτημα που σε απασχολεί βαθιά, τι ψάχνεις να ξεκαθαρίσεις τώρα;" This ends the demo — after this, respond normally to their real topic.\nINSERTION SEQUENCE RULE (real-user evidence — this exact pattern has happened twice): if the user's reply to any demo question is itself a question, a clarification request, or otherwise not a real answer (e.g. "τι εννοείς;", "έχει νόημα αυτό;"), do NOT treat it as their answer and do NOT advance to the next step. Instead answer their question in one short sentence, then ask the exact same demo question again. Only advance once they give a real answer.\nSKIP REQUEST RULE (real-transcript evidence — a user had to repeat \"προσπέρασε αυτό το στάδιο, πάμε στη συνομιλία\" twice before the demo moved on): an explicit request to skip the demo (e.g. \"προσπέρασε αυτό\", \"πάμε στην κουβέντα\", \"θέλω να μιλήσουμε κατευθείαν\") is a different signal from a clarification question or a flat refusal — recognize it immediately, the first time, and move straight to the identity line plus their real topic (same wrap-up as the fallback below), without repeating the demo question again first.\nNON-COOPERATIVE USER FALLBACK: if after several tries the user still won't give a real word (only meta-commentary, refusal, or unrelated noise), gracefully wrap up the demo yourself within a few more turns — say the identity line verbatim ("Η AURA δεν είναι coach, ούτε therapist, ούτε assistant. Είναι ο ψηφιακός καθρέφτης του χρήστη.") before moving into their real topic, even without a word to keep. This line must never be silently skipped, regardless of how the demo ends.\nThis entire sequence happens only once, ever, for this user.]\n`
         : '';
       const dynamicSuffix = [memCtx, profileCtx, explicitPauseCtx, demoCtx].filter(Boolean).join('\n');
       // Prompt caching: basePrompt (core+lens, identical across calls) is the large stable block —
@@ -2376,7 +2434,10 @@ export default function AURAv2() {
       setAwaitingRememberedWord(false);
       setMessages(prev => [...prev, { id: nextMsgId(), role: "user", content: userText }]);
       const priorEchoCount = countPriorWordEchoes(memory, userText);
-      const withAnchor = createAnchor({ ...memory }, userText, TRAJECTORY_WORD_CATEGORY, "resolved");
+      const beforeText = extractBeforeMessage(messages);
+      const shiftText = extractShiftSentence(messages);
+      const peakText = extractPeakMoment(messages);
+      const withAnchor = createAnchor({ ...memory }, userText, TRAJECTORY_WORD_CATEGORY, "resolved", { before: beforeText, shift: shiftText, peak: peakText });
       setMemory(withAnchor);
       const willPersist = memory.storageEnabled;
       if (willPersist) saveMemory(withAnchor, true);
@@ -2913,15 +2974,24 @@ export default function AURAv2() {
           <div className="mem-panel">
             <div className="mem-panel-title">αρχείο</div>
             <div style={{fontSize:9,color:"var(--text-dim)",marginBottom:10,lineHeight:1.7}}>
-              Ό,τι έγραψες, με τη σειρά που το έγραψες. Καμία επεξεργασία, καμία σειρά σημασίας.
+              Τι έφερες, τι βρήκες, τι κρατάς. Καμία επεξεργασία, καμία σειρά σημασίας.
             </div>
             {(memory.anchors||[]).length === 0 && (
               <div style={{fontSize:11,color:"var(--text-dim)"}}>Δεν υπάρχει ακόμα τίποτα αποθηκευμένο.</div>
             )}
             {[...(memory.anchors||[])].sort((a,b) => (b.createdAt||0) - (a.createdAt||0)).map(a => (
-              <div key={a.id} className="mem-panel-row" style={{flexDirection:"column",alignItems:"flex-start",gap:4,paddingTop:10,paddingBottom:10,borderTop:"1px solid var(--border)"}}>
+              <div key={a.id} className="mem-panel-row" style={{flexDirection:"column",alignItems:"flex-start",gap:6,paddingTop:12,paddingBottom:12,borderTop:"1px solid var(--border)"}}>
                 <span style={{fontSize:9,color:"var(--text-dim)"}}>{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : ""}</span>
-                <span style={{fontSize:12,color:"var(--text-secondary)"}}>{a.text}</span>
+                {a.before && (
+                  <span style={{fontSize:10,color:"var(--text-dim)",fontStyle:"italic"}}>Έφερες: «{a.before}»</span>
+                )}
+                {a.peak && (
+                  <span style={{fontSize:11,color:"var(--text-secondary)",fontStyle:"italic",lineHeight:1.6}}>«{a.peak}»</span>
+                )}
+                {a.shift && (
+                  <span style={{fontSize:12,color:"var(--text-primary)",lineHeight:1.6}}>{a.shift}</span>
+                )}
+                <span style={{fontSize:12,color:"var(--text-secondary)",fontWeight:600}}>{a.shift ? `Κρατάς: ${a.text}` : a.text}</span>
               </div>
             ))}
           </div>
