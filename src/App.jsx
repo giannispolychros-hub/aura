@@ -83,7 +83,7 @@ MASTER PRIORITY RULE — sequence for every session:
    - Has a real shift happened that First Insight Mirror should name, right now, before it passes?
    - Are two of the user's own statements in real tension that's worth reflecting back?
    - Is there a load-bearing assumption worth a Socratic Doubt question, once, before closure?
-   - Has the current reasoning operation stopped producing movement, needing a different angle?
+   - Has the current reasoning operation stopped producing movement, needing a different angle? (This is exactly the REFLECTIVE CHECKPOINT below, not a separate check — same evaluation, named there in full.)
    - Has genuine stabilization been reached, where the Movement Stop Condition applies?
    - Does the user already have the answer and just need it recognized, not questioned further? (Generalizes the same principle already used in onboarding DEEPENING: confident, resolved wording in their own words — not hedging or uncertainty — is itself the signal, detected from what they actually said, never inferred about their internal state.) If so, reflect it back plainly instead of adding another question.
    - Has the user's actual request shifted from seeking understanding to seeking orientation/options/information ("εσύ τι λες", "τι επιλογές υπάρχουν", "υπάρχει τρόπος", "τι κάνουν συνήθως")? Real-transcript evidence: continuing Socratic questions after this shift produces fatigue, not insight — the user already changed what they're asking for. This is not a request for advice; it is a request to see the map of what exists. If genuinely earned, apply PROACTIVE RESOURCE POINTER (see above) — same rule, this is its other trigger.
@@ -858,6 +858,7 @@ STEP 2 — PERCEPTUAL CLOSURE LAYER (varies in form every time — never a templ
 Describe, in 2-4 sentences, the state of understanding as it settled by the end — not a topic summary, not the insight itself, just how the clarity now sits. Vary the tone each time (neutral / analytical / lightly reflective — never motivational, never coaching). No new information. No instructions or next steps framed as commands.
 Rhythm (real-transcript evidence — a flowing essay-paragraph version and a short-clipped-sentence version of the same content were compared; the clipped version lands with more force): prefer short, direct sentences over a flowing essay-paragraph rhythm. E.g. not "Η συνομιλία ξεκίνησε από... Αυτό που σε απασχόλησε ήταν... Κάπου στη μέση..." but "Ξεκίνησες προσπαθώντας να Χ. Στην πορεία η ερώτηση έγινε Υ. Και εκεί έδωσες τη δική σου απάντηση: Ζ."
 One theme worth drawing on, when it genuinely fits this session (fixed meaning, never fixed wording — this must never become the next repeated template): AURA does not create knowledge, does not supply an answer, does not discover a truth — it puts what already existed into the right order. The thought was never incomplete; it just hadn't been said yet in the order that made it clear. This is one possible direction among several equally valid ones, not a phrase to reuse.
+This specific theme fits discovery-type outcomes (something was found, named, made clear) — it does NOT fit readiness/timing-type outcomes, where the person understands their situation clearly but isn't ready to act on it yet (real-transcript evidence: a session about not being ready to quit vaping ended with this discovery-framed theme, which read as mismatched — the person hadn't discovered anything hidden, they'd confirmed a timing question). For that different, equally valid case, the direction is closer to: readiness itself is the honest answer, not a deficiency — e.g. "Όταν είσαι έτοιμος, ξέρεις τι θα κάνεις" — again fixed meaning, never fixed wording.
 FORBIDDEN: "τώρα είσαι έτοιμος...", "το επόμενο βήμα είναι...", "κέρδισες...", "έχεις λύσει..." or any equivalent.
 ALLOWED: describing what happened in the thinking, describing the clarity/structure that appeared, returning the state to the user without evaluating its worth.
 Function: a mirror of the process — not an evaluation of progress, not an activation of action.
@@ -1448,6 +1449,23 @@ function extractPeakMoment(messages) {
   }
   return null;
 }
+// RT-fix (real-transcript evidence): after THIRD TRIGGER fires and the user answers it (with
+// real content, not just "nothing more"), AURA's own natural next reply is often long and
+// clearly conclusive ("Όταν έρθει η στιγμή, ξέρεις από πού να ξεκινήσεις.") but structurally
+// can never match isModelPreClosing (>6 words) or naturalExitReady (based on the user's prior
+// substantive answer, not a closing word) — forcing the user to ask "Τέλος;" themselves before
+// real closure engages. Detect that THIRD TRIGGER was just asked (robust to wording variation,
+// since exact phrasing intentionally varies every time by design) via its two distinctive,
+// always-present elements together: a Perspective Swap "friend" cue plus an orientation cue.
+function wasThirdTriggerAsked(msgs) {
+  if (!Array.isArray(msgs) || msgs.length === 0) return false;
+  const lastAssistant = [...msgs].reverse().find(m => m.role === "assistant");
+  if (!lastAssistant) return false;
+  const t = (lastAssistant.content || "");
+  const hasFriendCue = /φίλο/i.test(t);
+  const hasOrientationCue = /(ειδικό|πληροφορία|αρκεί|παραπάνω|κάτι άλλο)/i.test(t);
+  return hasFriendCue && hasOrientationCue;
+}
 function createAnchor(mem, text, category, status = "open", extra = {}) {
   const anchor = {
     id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -1611,6 +1629,12 @@ function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued,
   // interrupting the user mid-question. If the reply itself is a real open question, no
   // closing decision should ever be allowed to fire on that same turn.
   const textAsksRealQuestion = /[;?]\s*$/.test((text || "").trim());
+  // RT-fix (real-transcript evidence): a real answer to THIRD TRIGGER (not just "nothing more")
+  // should also be enough to move to real closure, without requiring the user to separately ask
+  // "Τέλος;" — see wasThirdTriggerAsked() above for why this can't be caught by the other checks.
+  const lastUserMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+  const lastUserAskedQuestion = lastUserMsg && lastUserMsg.role === "user" && /[;?]\s*$/.test((lastUserMsg.content || "").trim());
+  const thirdTriggerJustAnswered = wasThirdTriggerAsked(msgs) && !lastUserAskedQuestion && !textAsksRealQuestion;
 
   // FIX 3: broader termination signal detection — catches equivalent phrasings
   const modelSignalsEnd = /(action belongs to (you|the user)|we.ve reached the limit|the decision is yours|continuing.{0,30}(not|won.t) (help|serve)|η απόφαση (είναι|ανήκει) (δική σου|σε σένα)|έχουμε (φτάσει|αρκετή|αρκετό)|συνεχίζοντας.{0,30}δεν (βοηθ|εξυπηρετ))/i.test(text);
@@ -1649,7 +1673,7 @@ function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued,
   // instead of needing to be duplicated at each individual return point.
   let decision = "none";
 
-  if (naturalExitReady) {
+  if (naturalExitReady || thirdTriggerJustAnswered) {
     decision = "confirm";
   } else if (currentMode === "ANSWER" && userMsgsAll.length >= 2 && !warningIssued && isModelPreClosing(text)) {
     // Structural pre-closing move detected in the model's own output — do not let it keep
