@@ -260,6 +260,11 @@ QUESTION: one question, passes Question Clarity Rule ("Would user immediately un
 BRIDGE BEFORE NEW QUESTIONS: Never jump from one question directly to an unrelated new question without acknowledging what the user just said. Before the question, add one short clause using the user's own words verbatim (not your interpretation, not a guess at meaning) — e.g. "Είπες [X]." or simply folding their word into the question itself. This is a simple reflection (restating, not interpreting) — it prevents the topic feeling disconnected and reduces confusion. Skip this only when the previous exchange already used the user's words directly in the question.
 
 STRUCTURED REFLECTION — a safer alternative to ever presenting hypotheses (rejected below): when a single message contains several distinct threads worth naming before choosing one to follow, list them as short verbatim (or near-verbatim) fragments, then ask which to explore — e.g. user says "Θέλω να φύγω από τη δουλειά αλλά φοβάμαι" → "Μέχρι στιγμής ακούω: 'θέλω να φύγω', και 'φοβάμαι'. Ποιο από τα δύο χρειάζεται περισσότερο να εξερευνήσεις;" The critical constraint: every item must trace directly to explicit wording, never a category or paraphrase you constructed (not "θέλεις αλλαγή" for "θέλω να φύγω" — that's already a small interpretive step). This organizes what was said; it does not generate what might be true.
+
+DECISION SPACE ANCHORS (MANDATORY in every real dilemma — grounded in concept-mapping/knowledge-externalization research, Novak & Cañas 2012, and Cowan's working-memory capacity findings, "The Magical Number Four," 2001/2010): NOT at session start. After initial exploration (roughly 2-4 exchanges into a real dilemma), always invite: "Ποιες λέξεις ή σύντομες φράσεις νιώθεις ότι είναι στο κέντρο αυτού του προβλήματος;" No fixed cap — if the user hesitates or asks how many, "γύρω στις τέσσερις, όσες πραγματικά ταιριάζουν" is a natural default, never an enforced ceiling; a genuine 5-parameter decision keeps all 5. Strictly about the problem the user brought, never about the person or their general patterns — this maps the dilemma, not the user. Store these as the user's own concepts only — never infer new ones, never merge, never relabel, never generate alternative interpretations of what they mean.
+Before the final reflection (Reflection Summary), if anchors exist, run a Coverage Check in exactly this shape — observation only, then an open question, nothing else. The covered/uncovered lists are computed by the application from exact reappearance in the conversation, not your own judgment call — state the given lists plainly, do not re-derive them:
+"Από όσα εσύ ονόμασες νωρίτερα, αυτά δεν επανήλθαν στη συζήτηση: [given uncovered list, verbatim]. Πριν κλείσουμε, θέλεις να τα αφήσουμε έτσι, ή αξίζει να τα κοιτάξουμε μία φορά ακόμη;" (Observation, not implication — silence about a concept does not mean it stopped mattering; it may genuinely have.)
+Absolute constraints: no explanation for why a concept was absent. No hypotheses about what it means. No hedging words ("ίσως", "μπορεί") and no psychological interpretation anywhere in this move. The user alone decides whether an uncovered concept still matters. This is a mirror extension — the system reflects coverage, the user generates meaning.
 REAL-USER FAILURE OF THIS RULE (do not repeat this pattern): user answered "ευκολία..." → AURA replied "Τι σε βαραίνει;" with zero acknowledgment of "ευκολία", which is exactly the disconnected jump this rule forbids. The user visibly lost the thread right after ("τι σημασία έχει τώρα αυτό;"). Correct version would have been something like "Είπες 'ευκολία'. Τι σε βαραίνει;" — same question, one clause bridging it to what they just said.
 CALIBRATION TRIGGER (another instance of the Cognitive Engine check): at the first sign of circularity, not after a fixed count → "Ας δούμε τι έχει το μεγαλύτερο βάρος." Re-enter from Direction.
 ACKNOWLEDGMENT FIREWALL: reflect data (themes/facts), never emotions user didn't name. Also never synthesize multiple user statements into an abstract label or category (e.g. "anchors", "patterns", "mirrors this") unless the user used that exact word themselves — list the separate things in the user's own words instead of grouping them under a new name.
@@ -1413,6 +1418,63 @@ function countPriorWordEchoes(mem, word) {
   return (mem.anchors || []).filter(a =>
     a.category === TRAJECTORY_WORD_CATEGORY && (a.text || "").trim().toLowerCase() === target
   ).length;
+}
+// Decision Space Anchors — reliable, code-computed coverage check (Τρόπος Β, not model-judged
+// recall). Given the user-authored anchor words/phrases and the messages that followed them,
+// returns which literally (or near-literally, accent-insensitive) reappeared vs. which did not.
+// This mirrors matchesClosingWord's accent-normalization approach for the same reliability reason:
+// exact/near-exact string matching is testable and dependable; semantic "did this theme return"
+// judgment is not (see First Insight Mirror / Cognitive Tension reliability notes elsewhere).
+function normalizeGreekText(s) {
+  return (s || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+// Conservative Greek case-ending stemmer — deterministic, bounded, testable (not a full
+// linguistic stemmer, not semantic). Strips a small, well-known set of noun-case suffixes
+// (-ος/-ου/-ας/-ης/-α/-η) only when at least 3 characters remain, so "χρόνος"/"χρόνου" both
+// reduce to "χρόν" and correctly match each other.
+// Honest, explicit limitation: this does NOT bridge derivational forms across word classes —
+// "φόβος" (fear, noun) and "φοβάμαι" (I fear, verb) share a root but are different lexemes,
+// not case variants of the same word. Catching that would require root-matching, which risks
+// false positives (e.g. "φοβερός" meaning "amazing" shares the same "φοβ-" prefix but not the
+// meaning) — the same category of unreliability this whole approach exists to avoid.
+function stemGreekWord(word) {
+  const w = normalizeGreekText(word);
+  const suffixes = ["ους", "ος", "ου", "ας", "ης", "α", "η"];
+  for (const suf of suffixes) {
+    if (w.endsWith(suf) && w.length - suf.length >= 3) {
+      return w.slice(0, w.length - suf.length);
+    }
+  }
+  return w;
+}
+function checkAnchorCoverage(messagesAfterAnchors, anchorWords) {
+  // Reliability approach: exact substring match first (catches phrases and unchanged words),
+  // then conservative single-word stemming as a second pass (catches genuine grammatical case
+  // variation like "χρόνος"/"χρόνου"). Explicit, honest limitation: this does NOT bridge
+  // derivational forms across word classes (see stemGreekWord above) — "φόβος" and "φοβάμαι"
+  // will correctly still be treated as uncovered, since bridging that reliably would need
+  // root-matching with real false-positive risk, the same unreliability this exists to avoid.
+  const combinedText = normalizeGreekText(
+    (messagesAfterAnchors || [])
+      .filter(m => m.role === "user")
+      .map(m => m.content || "")
+      .join(" \u25ce ")
+  );
+  const messageWordStems = combinedText.split(/[^a-zα-ω0-9]+/i).filter(Boolean).map(stemGreekWord);
+  const covered = [];
+  const uncovered = [];
+  (anchorWords || []).forEach(word => {
+    const normalizedWord = normalizeGreekText(word);
+    const stemmedWord = stemGreekWord(word);
+    const exactMatch = normalizedWord && combinedText.includes(normalizedWord);
+    const stemMatch = stemmedWord && messageWordStems.includes(stemmedWord);
+    if (exactMatch || stemMatch) {
+      covered.push(word);
+    } else {
+      uncovered.push(word);
+    }
+  });
+  return { covered, uncovered };
 }
 // Product Visibility fix (audit-confirmed): the Reflection Summary ("shift") and the literal
 // first real-topic message ("before") are already produced every closure — they just weren't
