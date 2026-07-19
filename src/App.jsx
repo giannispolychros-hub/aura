@@ -3229,11 +3229,10 @@ export default function AURAv2() {
         {/* ── AURA Light Field (background, state-driven) ── */}
         <div className={`light-field ${illumLevel > 0 ? "clear" : ""} ${claritySurge ? "surge" : ""}`} />
 
-
-        {/* ── Header ── */}
-        <header className="header" style={{flexDirection:"column",alignItems:"flex-end",gap:"2px",paddingBottom:"6px"}}>
-          {messages.length === 0 ? (
-            <div style={{maxWidth:"420px",textAlign:"right"}}>
+        {/* ── Intro overlay — full-screen, fully independent of chat layout, closes instantly on CTA click ── */}
+        {messages.length === 0 && !sessionStarted && (
+          <div style={{position:"fixed",inset:0,zIndex:60,background:"#0d0c0a",overflowY:"auto",padding:"36px 20px 60px"}}>
+            <div style={{maxWidth:"420px",margin:"0 auto",textAlign:"right"}}>
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:300,color:"#d8d4cc",letterSpacing:".02em",lineHeight:1.3,marginBottom:"4px"}}>
                 AURA — Ο καθρέφτης της σκέψης σου
               </div>
@@ -3264,9 +3263,13 @@ export default function AURAv2() {
                 Ξεκίνα να σβήνεις τη φασαρία
               </button>
             </div>
-          ) : (
-            <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"18px",fontWeight:300,color:"#d8d4cc",letterSpacing:".04em",lineHeight:1.4,textAlign:"right"}}>We find the question that matters.<br /><span style={{fontSize:"14px",color:"#8a8680"}}>Nothing else.</span></span>
-          )}
+          </div>
+        )}
+
+
+        {/* ── Header ── */}
+        <header className="header" style={{flexDirection:"column",alignItems:"flex-end",gap:"2px",paddingBottom:"6px"}}>
+          <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"18px",fontWeight:300,color:"#d8d4cc",letterSpacing:".04em",lineHeight:1.4,textAlign:"right"}}>We find the question that matters.<br /><span style={{fontSize:"14px",color:"#8a8680"}}>Nothing else.</span></span>
           <div className="header-right">
             {/* Lens is invisible — no indicator shown to user */}
             {safetyMode && (
