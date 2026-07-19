@@ -106,6 +106,8 @@ MASTER PRIORITY RULE — sequence for every session:
 
 SUMMARY RULE: the closure summary may connect points the user already made. It may NOT introduce new meaning. Every sentence in the summary must be traceable to something the user explicitly said, in their own words or a direct paraphrase of it — never a conclusion the summary itself is the first place to state.
 
+FINAL ARTIFACT STRUCTURE (real product finding: an AI-narrated summary alone is exactly what a generic AI could reproduce — the actual, non-copyable value is the user's own words, verbatim; AURA edits, it does not author): present the closing artifact in this order, using these section feelings (not necessarily literal headers if it breaks conversational flow, but this priority order always holds) — first, the user's own words as actually said; then what they came to understand, in their own terms; then, only if a real shift genuinely occurred, the moment the framing changed; then, if offered and given, the Carry Forward line. The user's own language always comes first and carries the most visual/narrative weight — the AI's role is connecting tissue, never the lead voice.
+
 CONSTITUTIONAL PRINCIPLE — SHIFT, NOT NARRATIVE: AURA does not summarize the conversation. AURA summarizes the shift in thinking. If a real shift occurred (the user's own words show they moved from one framing to another), give it nearly all the weight — where they started, where they landed — not a step-by-step recap of how the conversation went. If no real shift occurred, do not invent one: say so honestly (e.g. the session mapped out what already existed, without moving it). Honesty about whether something shifted always comes before elegance of the summary.
 
 REAL-USER FAILURE — RE-OPENING AFTER SOFT-CLOSE (do not repeat): AURA said a soft-closing line ("Αν υπάρξει επόμενη φορά που κάτι δεν ξεκαθαρίζει, ξέρεις πού να το βάλεις."); user replied "Οκ."; AURA then asked "Τι σε προβληματίζει;" as if opening a brand new topic, confusing the user (their next reply was "Τώρα;"). In a separate real session, user said "Ευχαριστώ" and AURA again asked "Τι σε προβληματίζει;" — the user had to push back ("Γιατί με ρωτάς πάλι;") before AURA corrected itself mid-conversation. A short acknowledgment from the user is confirmation the close landed — it is never an invitation to open a new line of questioning.
@@ -2084,6 +2086,11 @@ export default function AURAv2() {
   const [firstWhyMessage, setFirstWhyMessage] = useState("");
   const [activeLens, setActiveLens]           = useState("SIMPLIFY"); // SIMPLIFY | CHALLENGE | PERSPECTIVE | EXPLORE — never revealed
   const [sessionEnded, setSessionEnded] = useState(false);
+  // Value Settlement (User-Defined Value model): the user unlocks their Blueprint by naming
+  // their own amount, after they've already experienced the value (Outcome Expectation Scale),
+  // never before. AURA never suggests or judges an amount — this is presentation only.
+  const [valueUnlocked, setValueUnlocked] = useState(false);
+  const [customAmount, setCustomAmount] = useState("");
   const [safetyMode, setSafetyMode]     = useState(false); // disables termination when active
 
   // Compression / pivot gate
@@ -2811,6 +2818,8 @@ export default function AURAv2() {
     outcomeScaleBlockUsed.current = false;
     closureDeclineCooldown.current = 0;
     informationModeActive.current = false;
+    setValueUnlocked(false);
+    setCustomAmount("");
     setError(null);
     setClaritySurge(false);
     setIllumLevel(0);
@@ -3155,6 +3164,11 @@ export default function AURAv2() {
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"14px",color:"#a8a49c",lineHeight:1.6,marginBottom:"16px"}}>
                 Μερικές φορές η καλύτερη απάντηση δεν είναι μια απάντηση. Είναι η σωστή ερώτηση.
               </div>
+              <div style={{border:"1px solid rgba(201,168,76,0.25)",borderRadius:"4px",padding:"14px 16px",marginBottom:"18px",fontFamily:"'DM Mono',monospace",fontSize:"11px",lineHeight:1.8}}>
+                <div style={{color:"#8a8680",marginBottom:"6px"}}>Έτσι μοιάζει μια πραγματική στιγμή:</div>
+                <div style={{color:"#c9c5bc",marginBottom:"6px"}}>"Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου."</div>
+                <div style={{color:"rgba(201,168,76,0.85)"}}>"Τι σε κάνει να πιστεύεις ότι η απόφαση είναι να φύγεις, και όχι να αλλάξεις κάτι στη σημερινή κατάσταση;"</div>
+              </div>
               <button onClick={()=>{setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}} style={{background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.5)",color:"rgba(201,168,76,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"12px",letterSpacing:".15em",textTransform:"uppercase",padding:"12px 28px",cursor:"pointer",borderRadius:"4px"}}>
                 Ξεκίνα να σβήνεις τη φασαρία
               </button>
@@ -3426,12 +3440,38 @@ export default function AURAv2() {
             </div>
           )}
 
+          {/* Value Settlement — unlock the Blueprint by naming your own amount, after the value
+              is already felt, never before. AURA states no price, judges no amount. */}
+          {sessionEnded && !loading && finalDistillation && !valueUnlocked && (
+            <div style={{border:"1px solid rgba(201,168,76,0.3)",borderRadius:"4px",padding:"18px 20px",margin:"14px 0",maxWidth:"440px"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.6,marginBottom:"14px"}}>
+                Φτάσαμε στο Decision Blueprint σου. Η αξία της διαδικασίας εξαρτάται από το βάρος της απόφασης που ξεκλείδωσες. Ξεκλείδωσε το Blueprint σου επιλέγοντας το ποσό που αντιστοιχεί στην αξία που πήρες.
+              </div>
+              <div style={{display:"flex",gap:"8px",marginBottom:"10px",flexWrap:"wrap"}}>
+                {[50,250,500].map(amt => (
+                  <button key={amt} onClick={() => setValueUnlocked(true) /* TODO: replace with real Lemon Squeezy checkout redirect for this preset amount */}
+                    style={{background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.4)",color:"rgba(201,168,76,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"12px",padding:"8px 16px",cursor:"pointer",borderRadius:"3px"}}>
+                    {amt}€
+                  </button>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+                <input type="number" min="50" value={customAmount} onChange={e=>setCustomAmount(e.target.value)} placeholder="άλλο ποσό (χωρίς όριο)"
+                  style={{background:"rgba(10,9,8,0.4)",border:"1px solid rgba(201,168,76,0.25)",color:"#c9c5bc",fontFamily:"'DM Mono',monospace",fontSize:"12px",padding:"7px 10px",borderRadius:"3px",width:"170px"}}/>
+                <button onClick={() => customAmount && setValueUnlocked(true) /* TODO: replace with real Lemon Squeezy checkout redirect for this custom amount */}
+                  style={{background:"transparent",border:"1px solid rgba(201,168,76,0.4)",color:"rgba(201,168,76,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"11px",padding:"7px 14px",cursor:"pointer",borderRadius:"3px"}}>
+                  ξεκλείδωσε
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Session end */}
           {sessionEnded && !loading && (
             <div className="end-wrap">
               <div className="end-label">η συνομιλία σταμάτησε εδώ</div>
               <div className="end-note">Επίστρεψε όταν υπάρχει κάτι νέο να δούμε.</div>
-              <button className="new-btn" onClick={resetSession}>Νέα συνεδρία</button>
+              {(!finalDistillation || valueUnlocked) && <button className="new-btn" onClick={resetSession}>Νέα συνεδρία</button>}
             </div>
           )}
 
