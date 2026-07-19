@@ -3040,7 +3040,7 @@ export default function AURAv2() {
         .shift-beat-final .shift-beat-label{ color:var(--gold); }
         .shift-beat-final .shift-beat-text{ color:#e8e4da; font-size:21px; }
 
-        .root{height:100vh;height:100dvh;max-width:650px;margin:0 auto;padding:0 18px 0 128px;display:flex;flex-direction:column;position:relative;overflow:hidden}
+        .root{height:100vh;height:100dvh;max-width:650px;margin:0 auto;padding:0 18px 0 90px;display:flex;flex-direction:column;position:relative;overflow:hidden}
 
         /* Header */
         .header{padding:26px 0 18px;display:flex;align-items:center;justify-content:space-between}
@@ -3224,7 +3224,7 @@ export default function AURAv2() {
         </div>
       )}
 
-      <div className="root" style={{backgroundImage:`url("/you.png")`,backgroundSize:"contain",backgroundPosition:"left center",backgroundRepeat:"no-repeat",backgroundAttachment:"fixed",backgroundColor:"#0d0c0a"}}>
+      <div className="root" style={{backgroundImage:`url("/you.png")`,backgroundSize:"90px auto",backgroundPosition:"left center",backgroundRepeat:"no-repeat",backgroundAttachment:"fixed",backgroundColor:"#0d0c0a"}}>
 
         {/* ── AURA Light Field (background, state-driven) ── */}
         <div className={`light-field ${illumLevel > 0 ? "clear" : ""} ${claritySurge ? "surge" : ""}`} />
@@ -3240,16 +3240,16 @@ export default function AURAv2() {
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#a8a49c",lineHeight:1.5,marginBottom:"14px"}}>
                 Δύσκολο δεν είναι οι δύσκολες αποφάσεις.<br/>Δύσκολο είναι να δεις καθαρά.
               </div>
-              <div style={{fontSize:"12px",color:"#8a8680",lineHeight:1.7,marginBottom:"10px"}}>
+              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
                 Οι περισσότεροι, όταν νιώθουν μπλοκαρισμένοι, ψάχνουν περισσότερες πληροφορίες, γνώμες, συμβουλές. Συνήθως όμως δεν τους λείπει τίποτα από αυτά — τους λείπει η διαύγεια.
               </div>
-              <div style={{fontSize:"12px",color:"#8a8680",lineHeight:1.7,marginBottom:"10px"}}>
+              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
                 Η AURA δεν γεννήθηκε σε εργαστήριο, αλλά στην παρατήρηση της αξίας της σωστής ερώτησης — χρόνια πραγματικών αποφάσεων σε συνθήκες πίεσης, όπου πριν από κάθε σωστή απόφαση προηγείται πάντα μια σωστή διαλογή: το ουσιαστικό από τον θόρυβο, το επείγον από το σημαντικό, τη σύγχυση από το πραγματικό πρόβλημα.
               </div>
-              <div style={{fontSize:"12px",color:"#8a8680",lineHeight:1.7,marginBottom:"10px"}}>
+              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
                 Αυτή η εμπειρία δεν έγινε βιβλίο. Έγινε ένας τρόπος σκέψης. Και αυτός ο τρόπος σκέψης έγινε η AURA.
               </div>
-              <div style={{fontSize:"12px",color:"#8a8680",lineHeight:1.7,marginBottom:"10px"}}>
+              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
                 Η AURA δεν αποφασίζει για σένα. Δεν δίνει έτοιμες συμβουλές. Δεν προσπαθεί να σε πείσει. Σου κάνει τις ερωτήσεις που βάζουν τάξη στη σκέψη σου — όχι επειδή σ' την είπε κάποιος, αλλά επειδή την είδες μόνος σου.
               </div>
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"14px",color:"#a8a49c",lineHeight:1.6,marginBottom:"16px"}}>
