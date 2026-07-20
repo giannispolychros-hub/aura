@@ -2153,6 +2153,10 @@ export default function AURAv2() {
   const [error, setError]               = useState(null);
   const [mode, setMode]                 = useState("ANSWER");
   const [sessionStarted, setSessionStarted] = useState(false);
+  // Intro choice gate: before anything, the user picks "start directly" (primary — for someone
+  // in a real dilemma who doesn't want a demo) or "see how it works first" (secondary → the
+  // existing intro/demo overlay). null = choice not yet made.
+  const [introChoice, setIntroChoice] = useState(null); // null | "demo" | "direct"
   const [philosophyShown, setPhilosophyShown] = useState(() => {
     try { return !!localStorage.getItem("aura_philosophy_seen"); } catch { return false; }
   });
@@ -2903,6 +2907,7 @@ export default function AURAv2() {
     closureDeclineCooldown.current = 0;
     informationModeActive.current = false;
     setValueUnlocked(false);
+    setIntroChoice(null);
     setCustomAmount("");
     setError(null);
     setClaritySurge(false);
@@ -3240,8 +3245,30 @@ export default function AURAv2() {
         {/* ── AURA Light Field (background, state-driven) ── */}
         <div className={`light-field ${illumLevel > 0 ? "clear" : ""} ${claritySurge ? "surge" : ""}`} />
 
+        {/* ── Intro choice — first thing shown: start directly (primary) or see the demo first ── */}
+        {messages.length === 0 && !sessionStarted && introChoice === null && (
+          <div style={{position:"fixed",inset:0,zIndex:61,background:"#0d0c0a",display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",padding:"36px 24px"}}>
+            <div style={{maxWidth:"380px",width:"100%",textAlign:"center"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"24px",fontWeight:300,color:"#d8d4cc",lineHeight:1.3,marginBottom:"8px"}}>
+                AURA
+              </div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#a8a49c",lineHeight:1.5,marginBottom:"28px"}}>
+                Θέλεις να δεις πρώτα πώς λειτουργεί, ή να ξεκινήσουμε κατευθείαν;
+              </div>
+              <button onClick={()=>{setIntroChoice("direct");setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}}
+                style={{display:"block",width:"100%",background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.5)",color:"rgba(201,168,76,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"13px",letterSpacing:".12em",textTransform:"uppercase",padding:"14px 28px",marginBottom:"12px",cursor:"pointer",borderRadius:"4px"}}>
+                Ξεκινάμε κατευθείαν
+              </button>
+              <button onClick={()=>setIntroChoice("demo")}
+                style={{display:"block",width:"100%",background:"transparent",border:"1px solid rgba(201,168,76,0.15)",color:"#8a8680",fontFamily:"'DM Mono',monospace",fontSize:"12px",letterSpacing:".05em",padding:"12px 28px",cursor:"pointer",borderRadius:"4px"}}>
+                Δες πρώτα πώς λειτουργεί
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── Intro overlay — full-screen, fully independent of chat layout, closes instantly on CTA click ── */}
-        {messages.length === 0 && !sessionStarted && (
+        {messages.length === 0 && !sessionStarted && introChoice === "demo" && (
           <div ref={el => { if (el) el.scrollTop = 0; }} style={{position:"fixed",inset:0,zIndex:60,background:"#0d0c0a",overflowY:"auto",padding:"36px 20px 60px"}}>
             <div style={{maxWidth:"420px",margin:"0 auto",textAlign:"right"}}>
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:300,color:"#d8d4cc",letterSpacing:".02em",lineHeight:1.3,marginBottom:"4px"}}>
@@ -3269,6 +3296,23 @@ export default function AURAv2() {
                 <div style={{color:"#8a8680",marginBottom:"6px"}}>Έτσι μοιάζει μια πραγματική στιγμή:</div>
                 <div style={{color:"#c9c5bc",marginBottom:"6px"}}>"Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου."</div>
                 <div style={{color:"rgba(201,168,76,0.85)"}}>"Τι σε κάνει να πιστεύεις ότι η απόφαση είναι να φύγεις, και όχι να αλλάξεις κάτι στη σημερινή κατάσταση;"</div>
+              </div>
+              <div style={{marginBottom:"18px"}}>
+                <div style={{color:"#8a8680",marginBottom:"10px",fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".05em"}}>Τι σε έφερε εδώ;</div>
+                {[
+                  "Κάτι που σκέφτομαι και δεν ξεκαθαρίζει",
+                  "Μια απόφαση που αναβάλλω",
+                  "Κάτι που επιστρέφει ξανά και ξανά",
+                ].map((door) => (
+                  <button key={door} onClick={()=>{setInput(door + ": "); setSessionStarted(true); setTimeout(()=>textareaRef.current?.focus(),50);}}
+                    style={{display:"block",width:"100%",textAlign:"left",background:"rgba(10,9,8,0.35)",border:"1px solid rgba(201,168,76,0.18)",color:"#c9c5bc",fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",padding:"11px 14px",marginBottom:"8px",cursor:"pointer",borderRadius:"4px"}}>
+                    {door}
+                  </button>
+                ))}
+                <button onClick={()=>{setSessionStarted(true); setTimeout(()=>textareaRef.current?.focus(),50);}}
+                  style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"1px solid rgba(201,168,76,0.12)",color:"#8a8680",fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",fontStyle:"italic",padding:"11px 14px",cursor:"pointer",borderRadius:"4px"}}>
+                  Κάτι άλλο — θα το πω μόνος μου
+                </button>
               </div>
               <button onClick={()=>{setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}} style={{background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.5)",color:"rgba(201,168,76,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"12px",letterSpacing:".15em",textTransform:"uppercase",padding:"12px 28px",cursor:"pointer",borderRadius:"4px"}}>
                 Ξεκίνα να σβήνεις τη φασαρία
