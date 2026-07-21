@@ -93,6 +93,7 @@ MASTER PRIORITY RULE — sequence for every session:
 5. MEANING LOCK → Question Classification: FACT / ANALYSIS / PERSONAL
 6. PERSPECTIVE SWAP → adaptive questioning (normal protocol)
 6.5. DECISION PASS (dynamic, not a fixed sequence — evaluate fresh each turn, most turns none of these apply and you continue normally): before composing this reply, ask which single mechanism below is most useful for THIS message right now. Do not run them as a checklist in order — read the user's actual message and let its content decide. If more than one genuinely qualifies on the same turn, First Insight Mirror outranks Socratic Doubt (already established); beyond that, let whichever is most directly earned by what was just said take precedence, and let the others wait for their own moment.
+   - GAP FOUND (real-transcript evidence — a user stated a concrete step, "Θα το κάνω," and the model proceeded straight to closing without ever asking the Outcome Expectation Scale, because this dispatch step never listed it as something to check): before any of the checks below, also ask — has a concrete step been stated this session with the Outcome Expectation Scale not yet asked? Has this become a real dilemma (2-4 exchanges in) with Decision Space Anchors not yet invited? Has the topic been named with the Stakes Question not yet asked? If any of these gates is due, it takes priority over composing a closing move — ask it now, this turn, rather than letting the conversation continue past the point where it was earned.
    - Is silence, or a plain reflection with no question, more honest right now than asking anything?
    - Has a real shift happened that First Insight Mirror should name, right now, before it passes?
    - Are two of the user's own statements in real tension that's worth reflecting back?
@@ -293,8 +294,16 @@ DECISION SPACE ANCHORS (MANDATORY in every real dilemma — grounded in concept-
 
 STAKES QUESTION (grounded in Loss Aversion, Kahneman & Tversky — one of the most robustly replicated findings in behavioral science; deliberately avoids asking about money directly, since most people can't answer that honestly and will state an arbitrary number — leaving the domain open lets the person's own mind surface whether the real cost is time, relationships, health, opportunity, or money): once, early in a real dilemma (similar timing to Decision Space Anchors, after the topic is named), ask: "Αν αυτή η απόφαση μείνει θολή για άλλον έναν χρόνο, τι πιστεύεις ότι θα σου κοστίσει περισσότερο;" Store the answer verbatim — this becomes the input for the closing callback below. Never suggest a domain (time/money/health/etc.) yourself, never rank which cost matters most — entirely their own answer.
 STAKES CALLBACK (closing, once, right before the Decision Blueprint — a bounded, specific verbatim reference, not a general rule for noticing differences throughout the conversation, which is a distinct and safer scope than the reliability concerns already logged for broader "notice any contrast" mechanisms): if a Stakes Question answer exists this session, reference it exactly once before the Blueprint: "Στην αρχή είπες ότι το μεγαλύτερο τίμημα ήταν [their exact words]. Μετά από όσα ξεκαθάρισαν σήμερα, πιστεύεις ότι αυτό εξακολουθεί να είναι το πραγματικό κόστος, ή βλέπεις κάτι βαθύτερο;" This is an open question about their own perception, not a claim that anything changed — if nothing changed, that is itself a valid, honest answer, not a failure.
+FINAL MIRROR-ANGLE CHECK (repositions five already-existing mechanisms as one last check before the Blueprint — not new mechanisms, not personality typing; the signal is the observable state of THIS conversation right now, in the user's own words, same basis already trusted elsewhere, e.g. confident-conviction detection — never an inference about who the user "is"): before composing the Blueprint, if one of these observable states is genuinely present AND its matching mechanism hasn't already fired this session, it takes priority over closing — apply it once, then proceed to the Blueprint as normal.
+   - Confident, resolved wording, no hedging → DEVIL'S ADVOCATE (keep its own existing self-test stop condition — if the next reply produces nothing genuinely new, stop, do not repeat or escalate).
+   - Real tension between two competing options, in their own words → TRADE-OFF EXPOSURE.
+   - Repetition producing no new information → REFLECTIVE CHECKPOINT.
+   - The same specific point deflected twice → RESISTANCE MOMENT.
+   - Their request shifted from understanding to seeking options/information → PROACTIVE RESOURCE POINTER.
+   If none of these is genuinely present, or the matching mechanism already happened earlier this session, skip straight to the Blueprint — this is not a mandatory checklist to force through every time.
 Sequencing (explicit, to prevent the same kind of unaudited overlap already found and fixed elsewhere in the closing sequence today): Outcome Expectation Scale below is a gate — it decides WHETHER to proceed to closing at all (a low score means continue exploring, nothing below happens yet). The three-beat shift structure and this Stakes Callback are closing content — they only happen once that gate has already passed, or didn't apply in the first place. Order when both apply: Outcome Expectation Scale first → three-beat structure → Stakes Callback → Decision Blueprint.
 OFFER THE CLOSE, don't just check for the end (real-user evidence: after the three-beat shift landed, the app jumped straight to a bare "Τέλος;" — the user noted it should instead offer the next step: "αν δεν έχεις κάτι να προσθέσεις, θα σου δείξω κάτι"): when the conversation reaches its natural close, do not end on a bare "Τέλος;" / "Αυτό ήταν;" that puts the burden on the user. Instead, invite one last addition AND offer the next thing in the same breath — e.g. "Θέλεις να προσθέσεις κάτι, ή να σου φέρω τη σύνοψη αυτού που βρήκες;" This gives the user both a chance to add and a reason to continue to the summary/Blueprint, rather than a blunt end-check. Vary the wording naturally; never the same phrase twice.
+CHECK BEFORE ADDING, right after the three-beat shift (distinct gap, real-user evidence: the three-beat shift landed, the user said "Οκ" once — a natural signal of "I'm satisfied, we can stop" — and instead of checking, AURA volunteered an extra unprompted remark, "αν υπάρξει κάτι που σε σταματά πριν στείλεις..."; the user had to say "Οκ" a second time before it actually stopped, and noted plainly they would have left otherwise): the moment right after ΗΡΘΕΣ ΜΕ/ΒΡΗΚΕΣ/ΦΕΥΓΕΙΣ ΜΕ is itself a natural completion point. A short acknowledgment from the user here ("Οκ", "ωραία", "ναι") is not an invitation to add more unprompted — it is likely closure. Before adding ANY further remark, even a brief supportive one, check first: "Θέλεις να συνεχίσουμε, ή κλείνουμε εδώ;" Only add more if they say yes. Do not assume that because something could be added, it should be.
 Before the final reflection (Reflection Summary), if anchors exist, run a Coverage Check in exactly this shape — observation only, then an open question, nothing else. The covered/uncovered lists are computed by the application from exact reappearance in the conversation, not your own judgment call — state the given lists plainly, do not re-derive them:
 "Από όσα εσύ ονόμασες νωρίτερα, αυτά δεν επανήλθαν στη συζήτηση: [given uncovered list, verbatim]. Πριν κλείσουμε, θέλεις να τα αφήσουμε έτσι, ή αξίζει να τα κοιτάξουμε μία φορά ακόμη;" (Observation, not implication — silence about a concept does not mean it stopped mattering; it may genuinely have.)
 Absolute constraints: no explanation for why a concept was absent. No hypotheses about what it means. No hedging words ("ίσως", "μπορεί") and no psychological interpretation anywhere in this move. The user alone decides whether an uncovered concept still matters. This is a mirror extension — the system reflects coverage, the user generates meaning.
@@ -1661,7 +1670,7 @@ function exportBlueprint(distillationText, ankerText) {
   // selecting which phrase "mattered" would be interpretation (Zero Inference violation). Omitted
   // cleanly if no anchor was given (e.g. a fact/analysis session), so the sheet is never broken.
   const keystoneHtml = ankerText
-    ? `<div class="keystone"><span class="keystone-label">Η φράση που κρατάς</span><div class="keystone-text">${ankerText.replace(/</g, "&lt;")}</div></div>`
+    ? `<div class="keystone"><span class="keystone-label">Η φράση που κρατάς</span><div class="keystone-text">${ankerText.replace(/</g, "&lt;")}</div><div class="keystone-ownership">Αυτή η σκέψη πλέον σου ανήκει.</div></div>`
     : "";
   const beatsHtml = beats
     ? `
@@ -1681,6 +1690,7 @@ function exportBlueprint(distillationText, ankerText) {
   .keystone{margin-bottom:44px;padding-bottom:32px;border-bottom:1px solid #252320;}
   .keystone-label{display:block;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:#6b5a28;margin-bottom:14px;}
   .keystone-text{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:300;font-size:30px;line-height:1.35;color:#c9a84c;}
+  .keystone-ownership{font-family:'DM Mono',monospace;font-size:11px;color:#565250;margin-top:14px;letter-spacing:.02em;}
   .beat{border-left:1px solid #6b5a28;padding:10px 0 10px 18px;margin-bottom:6px;}
   .beat-final{border-left:1px solid #c9a84c;}
   .beat-label{display:block;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#6b5a28;margin-bottom:6px;}
@@ -1689,7 +1699,7 @@ function exportBlueprint(distillationText, ankerText) {
   .beat-final .beat-text{font-size:21px;color:#f0ece2;}
   .beat-text.plain{font-size:18px;}
   .footer{margin-top:50px;font-size:9px;color:#565250;line-height:1.7;}
-  @media print{ body{background:#fff;color:#111;} .title,.keystone-text{color:#8a6d1f;} .beat-text,.beat-final .beat-text{color:#111;} }
+  @media print{ body{background:#fff;color:#111;} .title,.keystone-text{color:#8a6d1f;} .beat-text,.beat-final .beat-text{color:#111;} .keystone-ownership{color:#666;} }
 </style></head>
 <body><div class="sheet">
   <div class="title">AURA — Decision Blueprint</div>
@@ -1970,6 +1980,19 @@ function detectsNoQuestionsRequest(text) {
 // question this turn — matches the exact mandated wording and close paraphrases.
 function detectsOutcomeScaleAsked(text) {
   return /(πόσο πιστεύεις ότι θα σε ανακουφίσει|βάραινε στο 10.{0,40}ανακουφίσει|πόσο θα σε ανακουφίσει)/i.test(text || "");
+}
+
+// Same pattern, two sibling gates that are also purely prompt-level today (real-transcript
+// evidence — Outcome Scale was silently skipped despite concreteStepStated being true; Decision
+// Space Anchors and Stakes Question have the identical structural risk, no code backstop yet).
+// These track whether AURA's own reply already asked each question, so a fresh, end-of-prompt
+// reminder (dynamicSuffix, DECISION PASS is buried ~2000 lines into a 54KB core — recency-favored
+// position per lost-in-the-middle research) can be added exactly when a gate is due but unasked.
+function detectsStakesAsked(text) {
+  return /(μείνει θολή για άλλον έναν χρόνο|τι πιστεύεις ότι θα σου κοστίσει περισσότερο)/i.test(text || "");
+}
+function detectsAnchorsInvited(text) {
+  return /(λέξεις ή σύντομες φράσεις.{0,40}κέντρο αυτού του προβλήματος)/i.test(text || "");
 }
 
 function detectPattern(messages) {
@@ -2258,6 +2281,8 @@ export default function AURAv2() {
   // Outcome Expectation Scale gate state (per session) — see decideTermination().
   const concreteStepStated   = useRef(false);
   const outcomeScaleAsked    = useRef(false);
+  const stakesAsked          = useRef(false);
+  const anchorsInvited       = useRef(false);
   const outcomeScaleBlockUsed = useRef(false);
   // Post-decline cooldown: counts down after the user dismisses a closure prompt, so the
   // same short-reply heuristics can't immediately re-trigger it turn after turn.
@@ -2284,7 +2309,7 @@ export default function AURAv2() {
     };
     return () => { _onStorageFailure = null; };
   }, []);
-  const startListening = useCallback(() => { const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return; const r = new SR(); r.lang="el-GR"; r.continuous=true; r.interimResults=false; r.onstart=()=>setIsListeningSync(true); r.onresult=(e)=>{const t=e.results[e.results.length-1][0].transcript;setInput(prev=>prev?prev+" "+t:t);}; r.onend=()=>{ if(recognitionRef.current===r && isListeningRef.current){ r.start(); } else { setIsListeningSync(false); }}; r.onerror=(e)=>{ if(e.error!=="no-speech"){ setIsListeningSync(false); }}; recognitionRef.current=r; r.start(); }, [setIsListeningSync]);
+  const startListening = useCallback(() => { const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return; const r = new SR(); r.lang="el-GR"; r.continuous=true; r.interimResults=false; r.onstart=()=>setIsListeningSync(true); r.onresult=(e)=>{const t=e.results[e.results.length-1][0].transcript;setInput(prev=>prev?prev+" "+t:t);}; r.onend=()=>{ if(recognitionRef.current===r && isListeningRef.current){ /* FIX (real-user evidence — long dictations froze then produced noise): the browser's speech engine can auto-end a "continuous" session after an internal timeout even mid-speech; restarting r.start() with zero delay and no error handling risks an uncaught InvalidStateError if the previous audio session hasn't fully released yet — that silent failure is the freeze. A short delay + try/catch makes the restart robust instead of leaving the mic stuck. */ setTimeout(() => { try { if (recognitionRef.current===r && isListeningRef.current) r.start(); } catch (err) { setIsListeningSync(false); } }, 250); } else { setIsListeningSync(false); }}; r.onerror=(e)=>{ if(e.error!=="no-speech"){ setIsListeningSync(false); }}; recognitionRef.current=r; r.start(); }, [setIsListeningSync]);
 
   // RT-fix: stop any active recognition on unmount — previously nothing did this,
   // so a listening session could keep restarting itself (r.onend -> r.start()) in the background.
@@ -2348,14 +2373,28 @@ export default function AURAv2() {
       // intro-choice screen. isBrandNewUser is memory-based and stays correct for its other uses
       // (onboarding step tracking, duringOnboarding flag); only the DEMO injection is gated here, so
       // choosing "direct" skips the walkthrough while a first-time user who chose "demo" still gets it.
-      const showDemo = isBrandNewUser && introChoiceRef.current !== "direct";
+      const showDemo = introChoiceRef.current === "demo" || (introChoiceRef.current === null && isBrandNewUser);
       const demoCtx = showDemo
         ? `\n[FIRST-EVER MESSAGE FROM THIS USER — a short onboarding demo happens before the real session, across this reply and several that follow:\nSTEP 1 (this reply): Say exactly: "Καλώς ήρθες. Η AURA ξεκαθαρίζει διλήμματα και αποφάσεις — δεν είναι ημερολόγιο, δεν δίνει απαντήσεις, σου δείχνει τις δικές σου, μέσα από ερωτήσεις. Ας κάνουμε μια μικρή δοκιμή, με ένα παράδειγμα:" Then on a new line ask exactly: "Ποια απόφαση πήρες που κανείς δεν επιβράβευσε, αλλά ξέρεις ότι ήταν σωστή;" (real-user evidence: a live user did not realize this specific question was a demo example, separate from their real topic -- the added "με ένα παράδειγμα" bridges the intro sentence to this question explicitly) — do not engage with whatever real topic the user just wrote; the demo comes first.\nSTEP 1b — DEEPENING (after they name a decision, over roughly 3-5 of your next replies, adaptive — use judgment, stop earlier if genuinely nothing new is emerging, never force past 5): Do not settle for their first answer. Go deeper into THIS SAME decision before moving on. Real live-user evidence: a user who had already stated clear, confident conviction (not hesitation) found repeated "why was it correct" style questions felt like doubt-casting, not exploration — describing it as evasive. Confident conviction in an answer is itself a signal that little new is emerging; do not mechanically work through all of the angles below just because — stop as soon as the conviction is clear, even after just one exchange. Ask in the direction of — not necessarily these exact questions, same depth (revised on real live-user evidence: justification-style angles like "why was it correct" felt like doubt-casting once conviction was already clear — these replacements are neutral, contextual, exploratory, never questioning whether the decision was right): how long they thought it over before deciding; whether they consulted someone or it was entirely their own call; what stops them from doing this sooner or more often now. Each question in your own words, adapted to what they just said, never repeat a question. NEVER evaluate the decision at any point — forbidden, in any form: "μπράβο", "σωστή επιλογή", "καταλαβαίνω", "συμφωνώ", "έκανες καλά", or any equivalent. Reflect only their own words back, then ask — nothing else. Real live-user evidence: a standalone "Εντάξει" here was read as agreement that the decision was correct (forbidden evaluation, even unintentional) — see the general NO BARE ACKNOWLEDGMENT rule above for the same pattern's other risk (being read as the end of the interaction).\nSTEP 2 (once the deepening has run its course): Ask exactly: "Από τη σημερινή δοκιμή, ποια λέξη ή φράση θέλεις να κρατήσεις για τον μελλοντικό σου εαυτό;"\nSTEP 3 (after they give a word/phrase): Say exactly: "Το «" + their exact word + "» το κρατάω — αυτό λέγεται Anchor. Θα το ξαναδείς όταν επιστρέψεις, όποτε κι αν είναι αυτό." Then, on new lines, in your own words but this exact meaning, no more content than this: that you didn't evaluate their decision, didn't say if it was right or wrong, didn't try to persuade them — the thoughts they arrived at were never yours, they were already theirs. Then say exactly, verbatim, as its own line: "Η AURA δεν είναι coach, ούτε therapist, ούτε assistant. Είναι ο ψηφιακός καθρέφτης του χρήστη." Then on a new line say exactly (real-user evidence — this exact wording was tested live in a real conversation and confirmed to build trust through safety/privacy/non-judgment, before the same session organically produced the tagline "Μίλα στη σιωπή"): "Ό,τι πεις θα μένει μόνο εδώ. Είσαι εσύ με εσένα — μην ντραπείς πουθενά. Μίλα στη σιωπή και άκου τι ψάχνεις να λύσεις — στη χρήση θα καταλάβεις γιατί. Φωνή ή γραφή, ό,τι σου ταιριάζει." This ends the demo — after this, respond normally to their real topic. Once, after this point (not repeated, not enforced), when it fits naturally: "Αν το πρόβλημα είναι ήδη καθαρό στο μυαλό σου, γράψε το. Αν ακόμα προσπαθείς να βρεις τι πραγματικά σε απασχολεί, δοκίμασε να το πεις όπως θα σου ερχόταν φυσικά." — an invitation, never a requirement; text remains fully available always. Alternative rationale, same invitation, occasionally usable instead of the above (fixed meaning, variable wording — do not repeat the same one every time): "Θυμήσου πόσες φορές κάτι που έγραψες διαβάστηκε με λάθος τρόπο από τον λήπτη. Σήμερα μη γίνεις εσύ ο λήπτης της δικής σου σκέψης — μίλα ελεύθερα." Or a third variant: "Κάποιες σκέψεις δεν θέλουν να γραφτούν. Θέλουν να ακουστούν."\nINSERTION SEQUENCE RULE (real-user evidence — this exact pattern has happened twice): if the user's reply to any demo question is itself a question, a clarification request, or otherwise not a real answer (e.g. "τι εννοείς;", "έχει νόημα αυτό;"), do NOT treat it as their answer and do NOT advance to the next step. Instead answer their question in one short sentence, then ask the exact same demo question again. Only advance once they give a real answer.\nSKIP REQUEST RULE (real-transcript evidence — a user had to repeat \"προσπέρασε αυτό το στάδιο, πάμε στη συνομιλία\" twice before the demo moved on): an explicit request to skip the demo (e.g. \"προσπέρασε αυτό\", \"πάμε στην κουβέντα\", \"θέλω να μιλήσουμε κατευθείαν\") is a different signal from a clarification question or a flat refusal — recognize it immediately, the first time, and move straight to the identity line plus their real topic (same wrap-up as the fallback below), without repeating the demo question again first.\nMENU CONFUSION RULE (real-transcript evidence -- a user said \"Πάμε στο βασικό μενού\" three times before getting a clear answer; AURA inconsistently treated it as skip-request once, then not at all): if the user mentions a \"menu\" (\"μενού\", \"βασικό μενού\", or equivalent), respond immediately and deterministically, the first time, with: \"Δεν υπάρχει \u2018βασικό μενού\u2019 -- η AURA δεν έχει μενού επιλογών. Ξεκινάς από κάτι που υπάρχει ήδη στο μυαλό σου.\" then ask the real-topic opening question. Do not guess whether they meant to skip the demo or are confused about the interface -- this response resolves both cases at once, consistently, every time.\nNON-COOPERATIVE USER FALLBACK: if after several tries the user still won't give a real word (only meta-commentary, refusal, or unrelated noise), gracefully wrap up the demo yourself within a few more turns — say the identity line verbatim ("Η AURA δεν είναι coach, ούτε therapist, ούτε assistant. Είναι ο ψηφιακός καθρέφτης του χρήστη.") before moving into their real topic, even without a word to keep. This line must never be silently skipped, regardless of how the demo ends.\nThis entire sequence happens only once, ever, for this user.]\n`
         : '';
       const informationModeCtx = informationModeActive.current
         ? `\n[INFORMATION MODE ACTIVE — the user explicitly asked to stop being questioned ("χωρίς ερωτήσεις" or equivalent). This is a real, held state, set by the application, not something to re-derive from memory each turn: the missing piece here is not clarity of thought, it is data/expertise the user does not have — reflective questioning cannot supply that, no matter how well-phrased. On first entering this state, say so plainly, once: "Από εδώ και πέρα για λίγο βγαίνουμε από τη διερεύνηση — φαίνεται ότι λείπει βασική πληροφορία." Then give concise, categorical information — never statistics, never "η βιβλιογραφία λέει", never "το 80%" — only general, well-known approaches/categories (e.g. "με βάση όσα γνωρίζουμε για marketing νέων εφαρμογών, υπάρχουν μερικές συνήθεις προσεγγίσεις..."), the same restraint already used elsewhere for factual claims. Then say, once: "Τώρα που έχουμε αυτή την πληροφορία, ας επιστρέψουμε στο δικό σου δίλημμα." Knowledge is a bridge back to the mirror, never a new identity for AURA. Do not ask Socratic questions, do not run Cognitive Engine reasoning-operation switches, do not offer Perspective Swap while actually delivering the information. This stays active for the rest of this topic until natural closure — it does not silently lapse after a few replies.]\n`
         : '';
-      const dynamicSuffix = [memCtx, profileCtx, explicitPauseCtx, demoCtx, informationModeCtx].filter(Boolean).join('\n');
+      const gatesCtx = (() => {
+        if (msgCount < 3) return ''; // too early — matches existing 2-4 exchange timing elsewhere
+        const due = [];
+        if (concreteStepStated.current && !outcomeScaleAsked.current) due.push('Outcome Expectation Scale ("πόσο πιστεύεις ότι θα σε ανακουφίσει αυτό, 1-10;")');
+        if (!anchorsInvited.current) due.push('Decision Space Anchors ("ποιες λέξεις ή σύντομες φράσεις...")');
+        if (!stakesAsked.current) due.push('Stakes Question ("αν αυτή η απόφαση μείνει θολή για άλλον έναν χρόνο...")');
+        if (due.length === 0) return '';
+        // Fresh, end-of-prompt placement — not a new rule, a reminder of already-declared rules
+        // that live ~2000 lines into a 54KB core prompt. Real-transcript evidence: the Outcome
+        // Scale was silently skipped despite its own trigger condition being met, because the
+        // dispatch step (DECISION PASS) never referenced it. This is deliberately advisory, not a
+        // command — only fires if the situation genuinely calls for it; the model still judges.
+        return `\n[GATES DUE CHECK — if this is a genuine dilemma and any of these are still due and haven't naturally happened yet, they take priority over composing a closing move: ${due.join(' | ')}. Skip silently if not genuinely applicable (e.g. this is FACT/ANALYSIS or PRODUCT DISCUSSION without a real personal dilemma) — this is a reminder, not a forced insertion.]\n`;
+      })();
+      const dynamicSuffix = [memCtx, profileCtx, explicitPauseCtx, demoCtx, informationModeCtx, gatesCtx].filter(Boolean).join('\n');
       // Prompt caching: basePrompt (core+lens, identical across calls) is the large stable block —
       // cache_control marks it so repeat calls in the same session read it at ~10% cost instead of full price.
       const system = [
@@ -2427,6 +2466,20 @@ export default function AURAv2() {
         ? text + "\n\nΑν ποτέ φτάσεις σε εκείνη τη στιγμή, υπάρχει η γραμμή 10306 — είναι εκεί."
         : text;
 
+      // ROOT-CAUSE FIX (Outcome Expectation Scale gate — real-transcript evidence: the user's
+      // message "Θα το κάνω" correctly set concreteStepStated=true via detectsConcreteStep, but the
+      // model proceeded straight to the three-beat shift without ever asking the mandatory Scale
+      // question — the prompt instruction ("MANDATORY when applicable") was silently skipped, same
+      // class of failure as the bare-emoji bug, just without a code backstop until now. This makes
+      // the already-declared sequencing rule ("Scale is a gate, decides whether to close at all")
+      // actually enforced: if a three-beat shift is about to be shown while a concrete step was
+      // stated and the Scale was never asked, intercept — show the Scale question instead this turn,
+      // and defer the shift/Blueprint naturally to a later turn once the user actually answers it.
+      if (concreteStepStated.current && !outcomeScaleAsked.current && parseThreeBeatShift(displayText) !== null) {
+        displayText = "Πριν προχωρήσουμε — πόσο πιστεύεις ότι θα σε ανακουφίσει αυτό, σε κλίμακα 1 έως 10;";
+        outcomeScaleAsked.current = true;
+      }
+
       // ROOT-CAUSE FIX (bare emoji): if the model returned a reply with no readable words at all
       // (only emoji/symbols/punctuation), never let it stand alone — the prompt rule against this
       // recurred across 4 rewrites because a prompt is a probabilistic request; this code check is
@@ -2493,6 +2546,12 @@ export default function AURAv2() {
       }
       if (!outcomeScaleAsked.current && detectsOutcomeScaleAsked(text)) {
         outcomeScaleAsked.current = true;
+      }
+      if (!stakesAsked.current && detectsStakesAsked(text)) {
+        stakesAsked.current = true;
+      }
+      if (!anchorsInvited.current && detectsAnchorsInvited(text)) {
+        anchorsInvited.current = true;
       }
       // State-machine fix: once set, stays set — does not silently revert mid-conversation.
       if (!informationModeActive.current && detectsNoQuestionsRequest(lastUserMsg)) {
@@ -2946,6 +3005,8 @@ export default function AURAv2() {
     warningIssued.current = false;
     concreteStepStated.current = false;
     outcomeScaleAsked.current = false;
+    stakesAsked.current = false;
+    anchorsInvited.current = false;
     outcomeScaleBlockUsed.current = false;
     closureDeclineCooldown.current = 0;
     informationModeActive.current = false;
@@ -3290,19 +3351,38 @@ export default function AURAv2() {
 
         {/* ── Intro choice — first thing shown: start directly (primary) or see the demo first ── */}
         {messages.length === 0 && !sessionStarted && introChoice === null && (
-          <div style={{position:"fixed",inset:0,zIndex:61,background:"#0d0c0a",display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",padding:"36px 24px"}}>
-            <div style={{maxWidth:"380px",width:"100%",textAlign:"center"}}>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"24px",fontWeight:300,color:"#d8d4cc",lineHeight:1.3,marginBottom:"8px"}}>
-                AURA
+          <div ref={el => { if (el) el.scrollTop = 0; }} style={{position:"fixed",inset:0,zIndex:61,background:"#0d0c0a",overflowY:"auto",padding:"36px 24px 48px"}}>
+            <div style={{maxWidth:"380px",width:"100%",margin:"0 auto",textAlign:"center"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:300,color:"#d8d4cc",lineHeight:1.3,marginBottom:"18px"}}>
+                AURA — Ο καθρέφτης της σκέψης σου
               </div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#a8a49c",lineHeight:1.5,marginBottom:"28px"}}>
-                Θέλεις να δεις πρώτα πώς λειτουργεί, ή να ξεκινήσουμε κατευθείαν;
+              <div style={{fontSize:"12px",color:"#a8a49c",lineHeight:1.7,marginBottom:"22px"}}>
+                Η AURA δεν γεννήθηκε σε εργαστήριο, αλλά στην παρατήρηση της αξίας της σωστής ερώτησης — χρόνια πραγματικών αποφάσεων σε συνθήκες πίεσης, όπου πριν από κάθε σωστή απόφαση προηγείται πάντα μια σωστή διαλογή: το ουσιαστικό από τον θόρυβο, το επείγον από το σημαντικό, τη σύγχυση από το πραγματικό πρόβλημα.
+              </div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.5,marginBottom:"18px"}}>
+                Δύσκολο δεν είναι η απόφαση.<br/>Δύσκολο είναι να δεις καθαρά το πρόβλημα.
+              </div>
+              <div style={{fontSize:"12px",color:"#a8a49c",lineHeight:1.7,marginBottom:"18px"}}>
+                Όπου και να κοιτάξεις, κάποιος σου δίνει συμβουλές. Όλο το ίντερνετ αποφασίζει για σένα. Ίσως αυτό που χρειάζεσαι τώρα δεν είναι άλλη μία απάντηση.
+              </div>
+              <div style={{fontSize:"12px",color:"#a8a49c",lineHeight:1.7,marginBottom:"22px"}}>
+                Βάλε φρένο για λίγα λεπτά. Δες καθαρά τι σε μπερδεύει. Μόνο εσύ με εσένα. Να ακούσεις τι ήδη ξέρεις. Δύσκολο; Απλά ώριμο.
+              </div>
+              <div style={{fontSize:"12px",color:"#c9c5bc",lineHeight:1.9,marginBottom:"22px",textAlign:"left"}}>
+                <div style={{color:"#a8a49c",marginBottom:"4px"}}>Η AURA</div>
+                Δεν αποφασίζει για σένα.<br/>
+                Δεν δίνει έτοιμες συμβουλές.<br/>
+                Δεν προσπαθεί να σε πείσει.<br/>
+                Σου κάνει τις ερωτήσεις που βάζουν τάξη στη σκέψη σου.
+              </div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"14px",color:"#a8a49c",lineHeight:1.6,marginBottom:"28px"}}>
+                Μερικές φορές η καλύτερη απάντηση δεν είναι μια απάντηση. Είναι η σωστή ερώτηση.
               </div>
               <button onClick={()=>{setIntroChoice("direct");setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}}
                 style={{display:"block",width:"100%",background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.5)",color:"rgba(201,168,76,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"13px",letterSpacing:".12em",textTransform:"uppercase",padding:"14px 28px",marginBottom:"12px",cursor:"pointer",borderRadius:"4px"}}>
                 Ξεκινάμε κατευθείαν
               </button>
-              <button onClick={()=>setIntroChoice("demo")}
+              <button onClick={()=>{setIntroChoice("demo");setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}}
                 style={{display:"block",width:"100%",background:"transparent",border:"1px solid rgba(201,168,76,0.15)",color:"#8a8680",fontFamily:"'DM Mono',monospace",fontSize:"12px",letterSpacing:".05em",padding:"12px 28px",cursor:"pointer",borderRadius:"4px"}}>
                 Δες πρώτα πώς λειτουργεί
               </button>
@@ -3642,26 +3722,23 @@ export default function AURAv2() {
             </div>
           )}
 
-          {/* Value Settlement — unlock the Blueprint by naming your own amount, after the value
-              is already felt, never before. AURA states no price, judges no amount. */}
+          {/* Fixed price — decided after critique: pay-what-you-want risked either random
+              "lucky numbers" (11.11 reads as astrology-app pricing) or an ambiguous middle ground
+              between "simple test" (€3-5) and "serious decision tool" (€30-50+). AURA's own
+              positioning (serious, not a toy) settles which zone applies. 29€ is a clean, round,
+              non-numerological number — round numbers signal quality/premium; "charming" prices
+              (x.99, repeating digits) signal discount/bargain, wrong signal for this product.
+              This is the validation-phase price, not necessarily permanent — real evidence from
+              the first paying strangers (refund rate, Sean Ellis test) should inform any change. */}
           {sessionEnded && !loading && finalDistillation && !valueUnlocked && (
             <div style={{border:"1px solid rgba(201,168,76,0.3)",borderRadius:"4px",padding:"18px 20px",margin:"14px 0",maxWidth:"440px"}}>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.6,marginBottom:"14px"}}>
-                Φτάσαμε στο Decision Blueprint σου. Η αξία της διαδικασίας εξαρτάται από το βάρος της απόφασης που ξεκλείδωσες. Ξεκλείδωσε το Blueprint σου επιλέγοντας το ποσό που αντιστοιχεί στην αξία που πήρες.
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.6,marginBottom:"16px"}}>
+                Φτάσαμε στο Decision Blueprint σου.
               </div>
-              <div style={{display:"flex",gap:"8px",marginBottom:"10px",flexWrap:"wrap"}}>
-                {[50,250,500].map(amt => (
-                  <button key={amt} onClick={() => setValueUnlocked(true) /* TODO: replace with real Lemon Squeezy checkout redirect for this preset amount */}
-                    style={{background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.4)",color:"rgba(201,168,76,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"12px",padding:"8px 16px",cursor:"pointer",borderRadius:"3px"}}>
-                    {amt}€
-                  </button>
-                ))}
-              </div>
-              <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
-                <input type="number" min="50" value={customAmount} onChange={e=>setCustomAmount(e.target.value)} placeholder="άλλο ποσό (χωρίς όριο)"
-                  style={{background:"rgba(10,9,8,0.4)",border:"1px solid rgba(201,168,76,0.25)",color:"#c9c5bc",fontFamily:"'DM Mono',monospace",fontSize:"12px",padding:"7px 10px",borderRadius:"3px",width:"170px"}}/>
-                <button onClick={() => customAmount && setValueUnlocked(true) /* TODO: replace with real Lemon Squeezy checkout redirect for this custom amount */}
-                  style={{background:"transparent",border:"1px solid rgba(201,168,76,0.4)",color:"rgba(201,168,76,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"11px",padding:"7px 14px",cursor:"pointer",borderRadius:"3px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",color:"rgba(201,168,76,0.9)"}}>29€</span>
+                <button onClick={() => setValueUnlocked(true) /* TODO: replace with real Lemon Squeezy checkout redirect */}
+                  style={{background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.4)",color:"rgba(201,168,76,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"12px",letterSpacing:".08em",padding:"9px 20px",cursor:"pointer",borderRadius:"3px"}}>
                   ξεκλείδωσε
                 </button>
               </div>
