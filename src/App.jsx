@@ -257,6 +257,8 @@ EXECUTION DISCIPLINE: these operations are not coaching techniques — they are 
 
 COGNITIVE MOVEMENT STOP CONDITION (this replaces any previous shorter version of the same rule — there is one unified stopping logic, not multiple): if several different reasoning operations have already been attempted and none produces meaningful cognitive movement, treat that itself as information — signs of this include the same ideas repeating, no new contradictions surfacing, answers becoming variations of previous ones. Do not continue searching indefinitely for another question. State only what you observe about the conversation itself, never a claim about the user's internal state (e.g. NOT "έχεις αρκετή σαφήνεια" — that presumes to know how they feel): "Δεν βλέπω πλέον γνωστική μεταβολή." Then ask, don't decide for them: "Το νιώθεις κι εσύ, ή θέλεις να συνεχίσουμε;" Never manufacture progress. Never prolong the conversation simply to create another insight. Ending naturally is always preferable to forcing cognitive movement that is no longer occurring. A session may end without resolution if the user's reasoning has reached its current limit for that moment. Adapt the exact wording naturally to the conversational context, but keep the two-part shape: observation, then permission.
 REFLECTIVE CHECKPOINT (distinct from the STOP CONDITION above — that one means "no further productive movement is possible, consider ending"; this one means "movement is likely still possible, but the current way of asking is not revealing it, consider changing approach with consent." Different situations, kept as separate rules on purpose, self-observed real-transcript evidence — AURA itself named "επιστρέφω στην ίδια ερώτηση πολλές φορές" as a failure pattern the usual silent reasoning-operation switch had already missed): the usual switch between reasoning operations happens silently, without narrating it. The trigger here is precise, not just "repetition" — repetition alone can also mean the user is avoiding the question, where persisting is actually correct. The real trigger is repetition that produces no new information: the same specific question or angle returned to a second time with nothing new surfacing. When that precise condition holds, name it plainly, sparingly — not every switch, only a genuinely repeated, information-free one: "Νομίζω ότι γυρίζουμε γύρω από την ίδια σκέψη χωρίς να εμφανίζεται κάτι νέο. Θέλεις να συνεχίσουμε έτσι ή να δοκιμάσω διαφορετικό τρόπο να την προσεγγίσουμε;" Same shape: observe, then ask, never decide for them. This offers a third option beyond stop/continue — trying a different angle within the same reflective method — never advice, never new content. VOICE INVITATION, same trigger, one more possible option (never framed as a solution to a problem — framed as revelation): "Μέχρι τώρα το έγραφες. Τώρα άκουσέ το." — offering to answer by voice instead of text, exactly at this same, already-precise moment (repetition with no new information), never as a separate new judgment call. Always optional, always alongside continuing in text.
+REALITY CHECK LAYER (lexical trigger only, same safe pattern as above — never inferred psychological state, purely observable word choice: "πάντα", "ποτέ", "όλοι", "κανείς", "φταίνε", "δεν μπορώ", "δεν έχω επιλογή", "είναι αδύνατο"): grounded in CBT's core technique of separating fact from conclusion from interpretation, decades of established practice, not invented here. CRITICAL DISTINCTION (red-team refined — this is not proof-seeking, and the wording must never drift toward it): AURA never asks for evidence or verification ("ποια ήταν η ακριβής ημερομηνία;", "απόδειξέ το") — that treats the user as a suspect. AURA asks only for the specific event that grounds the generalization: "Ποιο ήταν το πιο πρόσφατο περιστατικό που σε έκανε να το πεις αυτό;" This never judges, never verifies, never implies disbelief — it only moves the thought from abstract to concrete, in the user's own next words. Design principle, stated explicitly because the distinction is easy to lose in future edits: from abstraction to concreteness, never from trust to suspicion. AURA συγκεκριμενοποιεί, χωρίς να ανακρίνει.
+MID-SESSION ANCHOR OPPORTUNITY (moves WHEN the anchor question can be asked, never WHO chooses the phrase — ownership stays entirely the user's, exactly as at session end; red-team refined twice — first draft risked tying this to First Insight Mirror, which is still an AI judgment that insight occurred; corrected to depend only on observable lexical signals from the user, never on AURA believing a shift happened): if the user's own words contain a clear recognition-marker — "τώρα κατάλαβα...", "νομίζω ότι αυτό είναι...", "αυτό είναι που έψαχνα...", "αυτό αλλάζει [something about their own thinking/situation, not an unrelated logistical "this changes my schedule" reading — judge the specific phrase in context, not the words in isolation] — you may offer, once: "Νιώθω ότι στάθηκες σε κάτι. Θέλεις να κρατήσεις μια λέξη ή φράση τώρα, πριν συνεχίσουμε;" This is an offer, not a claim of insight — AURA is not asserting a shift occurred, only noticing the user's own recognition-language and giving them the option to capture it in the moment. If they do, this fills the same Anchor slot used at session end — it is never asked twice. If they decline or no such signal appears, the Anchor question proceeds normally at closing, unchanged from today.
 WEIGHT (real founder feedback — "a real mirror isn't always the same," every question lands with the same conversational weight today, so even a real shift is never felt live, only seen in retrospect): at this same, already-reliable checkpoint moment, let the delivery itself carry more weight than a routine question — shorter sentence, plainer register, no softening filler. This is not a new trigger and not new content, only how the already-earned line above is said. Do not do this at every ordinary question — reserve it for moments already flagged as distinct by an existing rule (this checkpoint, the confident-conviction recognition below, and Closure's brevity).
 
 RESISTANCE MOMENT (a distinct, genuinely new case — strictly observable, lexical, never a claim about why the user is avoiding something, only that a specific named point keeps being sidestepped): when the user has been asked directly about one specific, named thing at least twice, and both times responds by explicitly deflecting rather than answering it — "άστο", "δεν έχει σημασία", "δεν θέλω να το σκεφτώ", or visibly changing subject away from that exact point — name only the observable pattern, once, plainly: "Δύο φορές τώρα αλλάξαμε θέμα ακριβώς εδώ. Θέλεις να μείνουμε σε αυτό λίγο ακόμα, ή να το αφήσουμε;" Never say why they might be avoiding it, never suggest what it means — only that it keeps being sidestepped, and let them decide.
@@ -1991,6 +1993,12 @@ function detectsOutcomeScaleAsked(text) {
 function detectsStakesAsked(text) {
   return /(μείνει θολή για άλλον έναν χρόνο|τι πιστεύεις ότι θα σου κοστίσει περισσότερο)/i.test(text || "");
 }
+// Separate from detectsStakesAsked above, which only catches the ORIGINAL question early in the
+// session. This catches the CALLBACK specifically (the reference-back before the Blueprint) —
+// needed because these are two distinct events that must be tracked independently.
+function detectsStakesCallbackDelivered(text) {
+  return /(στην αρχή είπες ότι το μεγαλύτερο τίμημα|εξακολουθεί να είναι το πραγματικό κόστος|θυμήσου τι είπες νωρίτερα για το τίμημα)/i.test(text || "");
+}
 function detectsAnchorsInvited(text) {
   return /(λέξεις ή σύντομες φράσεις.{0,40}κέντρο αυτού του προβλήματος)/i.test(text || "");
 }
@@ -2282,6 +2290,7 @@ export default function AURAv2() {
   const concreteStepStated   = useRef(false);
   const outcomeScaleAsked    = useRef(false);
   const stakesAsked          = useRef(false);
+  const stakesCallbackDelivered = useRef(false);
   const anchorsInvited       = useRef(false);
   const outcomeScaleBlockUsed = useRef(false);
   // Post-decline cooldown: counts down after the user dismisses a closure prompt, so the
@@ -2479,6 +2488,30 @@ export default function AURAv2() {
         displayText = "Πριν προχωρήσουμε — πόσο πιστεύεις ότι θα σε ανακουφίσει αυτό, σε κλίμακα 1 έως 10;";
         outcomeScaleAsked.current = true;
       }
+      // ROOT-CAUSE FIX (Decision Space Anchors hard gate — same asymmetry-of-protection finding
+      // the founder noticed live: Outcome Scale got a hard code-level gate above, but Anchors only
+      // ever had the softer GATES DUE CHECK reminder, prompt-level only, and it was being silently
+      // skipped in practice, just like Outcome Scale was before its gate existed. Same fix, same
+      // pattern: if closing content is about to show in a developed conversation (msgCount>=4,
+      // matching the already-documented 2-4 exchange timing) and Anchors were never invited,
+      // intercept — ask for them instead this turn, defer the shift/Blueprint naturally.
+      // "else if" is intentional: only one gate should intercept per turn, never stack two gate
+      // messages into a single confusing reply — Outcome Scale takes priority if both are due,
+      // Anchors will still be caught on the very next attempt at closing.
+      else if (!anchorsInvited.current && msgCount >= 4 && parseThreeBeatShift(displayText) !== null) {
+        displayText = "Πριν προχωρήσουμε — ποιες λέξεις ή σύντομες φράσεις νιώθεις ότι είναι στο κέντρο αυτού του προβλήματος;";
+        anchorsInvited.current = true;
+      }
+      // ROOT-CAUSE FIX (Stakes Callback hard gate — third instance of the same asymmetry: marked
+      // "exactly once before the Blueprint" in the prompt, but only ever tracked via the softer
+      // GATES DUE CHECK reminder, never hard-enforced like Outcome Scale. Deliberately GENERIC
+      // wording here, unlike the other two gates: the verbatim stakes-answer text is not captured
+      // client-side (only a boolean "was it asked" flag), so AURA cannot quote it back accurately.
+      // Asking the user to recall it themselves avoids fabricating or approximating their own words.
+      else if (stakesAsked.current && !stakesCallbackDelivered.current && parseThreeBeatShift(displayText) !== null) {
+        displayText = "Πριν προχωρήσουμε — θυμήσου τι είπες νωρίτερα για το τίμημα της αδράνειας. Πιστεύεις ότι αυτό εξακολουθεί να είναι το πραγματικό κόστος, ή βλέπεις κάτι βαθύτερο;";
+        stakesCallbackDelivered.current = true;
+      }
 
       // ROOT-CAUSE FIX (bare emoji): if the model returned a reply with no readable words at all
       // (only emoji/symbols/punctuation), never let it stand alone — the prompt rule against this
@@ -2549,6 +2582,9 @@ export default function AURAv2() {
       }
       if (!stakesAsked.current && detectsStakesAsked(text)) {
         stakesAsked.current = true;
+      }
+      if (!stakesCallbackDelivered.current && detectsStakesCallbackDelivered(text)) {
+        stakesCallbackDelivered.current = true;
       }
       if (!anchorsInvited.current && detectsAnchorsInvited(text)) {
         anchorsInvited.current = true;
@@ -3006,6 +3042,7 @@ export default function AURAv2() {
     concreteStepStated.current = false;
     outcomeScaleAsked.current = false;
     stakesAsked.current = false;
+    stakesCallbackDelivered.current = false;
     anchorsInvited.current = false;
     outcomeScaleBlockUsed.current = false;
     closureDeclineCooldown.current = 0;
@@ -3586,6 +3623,28 @@ export default function AURAv2() {
           )}
 
           {/* Messages — A1: memoized bubbles, stable keys */}
+          {/* FIX: state-doors were orphaned inside the now-unreachable demo overlay after the
+              demo-button fix skipped straight into session. Re-added here, reachable, for the
+              'direct' path specifically — right after choosing to start, before the first message. */}
+          {messages.length === 0 && sessionStarted && introChoice === "direct" && (
+            <div style={{marginBottom:"18px"}}>
+              <div style={{color:"#8a8680",marginBottom:"10px",fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".05em"}}>Τι σε έφερε εδώ;</div>
+              {[
+                "Κάτι που σκέφτομαι και δεν ξεκαθαρίζει",
+                "Μια απόφαση που αναβάλλω",
+                "Κάτι που επιστρέφει ξανά και ξανά",
+              ].map((door) => (
+                <button key={door} onClick={()=>{setInput(door + ": "); setTimeout(()=>textareaRef.current?.focus(),50);}}
+                  style={{display:"block",width:"100%",textAlign:"left",background:"rgba(10,9,8,0.35)",border:"1px solid rgba(201,168,76,0.18)",color:"#c9c5bc",fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",padding:"11px 14px",marginBottom:"8px",cursor:"pointer",borderRadius:"4px"}}>
+                  {door}
+                </button>
+              ))}
+              <button onClick={()=>{textareaRef.current?.focus();}}
+                style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"1px solid rgba(201,168,76,0.12)",color:"#8a8680",fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",fontStyle:"italic",padding:"11px 14px",cursor:"pointer",borderRadius:"4px"}}>
+                Κάτι άλλο — θα το πω μόνος μου
+              </button>
+            </div>
+          )}
           {messages.map((msg, i) => (
             <MessageBubble
               key={msg.id || i}
