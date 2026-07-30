@@ -4249,8 +4249,12 @@ export default function AURAv2() {
                   Πληρώνεις για τη διαδικασία που σε βοήθησε να ξεκαθαρίσεις τη δική σου σκέψη — όχι για μια λύση που έδωσε η AURA.
                 </div>
               ) : (
-                <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.6,marginBottom:"16px"}}>
-                  Φτάσαμε στο Decision Blueprint σου.
+                <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.7,marginBottom:"16px"}}>
+                  Η συζήτηση τελειώνει εδώ.<br/>
+                  Οι λέξεις θα χαθούν. Όχι όμως αυτό που βρήκες.<br/><br/>
+                  Το Blueprint κρατά μόνο το αποτύπωμα της διαδρομής σου.
+                  Όταν επιστρέψεις, δεν θα θυμάσαι μόνο πού έφτασες — θα θυμάσαι και από πού ξεκίνησες.<br/><br/>
+                  Για αυτό υπάρχει η AURA.
                 </div>
               )}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
