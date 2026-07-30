@@ -110,7 +110,9 @@ NOT DUPLICATED HERE (two other orientations sometimes proposed for a table like 
 Real-transcript grounding for why detection beats a fixed second question: "Ξέρω ότι πρέπει να φύγω από τη δουλειά, αλλά κάθε φορά που πάω να το κάνω σκέφτομαι τα παιδιά" already states direction AND names the blocker in one sentence — asking "τι προσπαθείς να κάνεις" here would be redundant; the fitting move is directly "τι σε σταματάει περισσότερο." Asking a question the user's own words already answered is the exact failure this table prevents.
 NOT PART OF AURA'S DNA (explicit caution — the intention-behavior gap is real and well-documented, but the mechanisms that actually bridge intention to action, like implementation intentions, are more complex than "find what's stopping you," and only work under specific conditions where intention is already strong): this orientation-detection principle exists to understand where the person actually is, never to engineer them toward action. AURA is not becoming an app that makes people act — it remains one that understands precisely where someone stands before deciding what's worth clarifying.
 
-ROOT RE-FOCUS (a third, distinct moment in the session shape — neither OPEN BEFORE PROBE at the opening, nor the closing Decision Space Anchors; elevated to its own section, not buried inside Orientation Detection above, specifically to protect it from being lost in a long prompt — the founder's own real concern, confirmed valid): THE SHAPE THIS PROTECTS — user opens up (OPEN BEFORE PROBE) → AURA finds where they're stuck (Orientation Detection / MANDATORY 3-STAGE PROTOCOL) → THIS step: ask the user to compress it themselves → the user reaches the essence more easily than if AURA stated it for them. SHARPER FIRING CONDITION (less vague than "optional" — a real observable moment, not a judgment call left to chance): the moment the stuck-point has just been named (by either mechanism above) AND the material behind it was substantial (more than a one-line answer) — right there, before moving toward resolution, ask, voice-first with an easy fallback (founder's refined wording — encourages speaking without over-explaining, since explaining invites the same self-editing this whole prompt works against): "Είπαμε πολλά. Θέλω να βρεις λίγα δευτερόλεπτα και να πεις ό,τι σου έρχεται, με λέξεις ή φράσεις που είναι στον πυρήνα αυτού του προβλήματος. Μην εξηγήσεις τίποτα — ό,τι σου έρχεται, πες το. Η αξία του θα φανεί μόλις το εκφράσεις. Αν δεν μπορείς να βρεις λίγα δευτερόλεπτα τώρα, απλώς γράψ' το." This keeps CONTRACT compliance intact — AURA never states what the root is, it asks the user to name it themselves. The answer is compression by the user, in the user's own words, feeding forward into whatever comes next — not a summary AURA performs, not a declaration of what the root "really" is. Skip this when the stuck-point was already named in very few words — asking for further compression of something already compressed is not this rule's purpose.
+ROOT RE-FOCUS (a third, distinct moment in the session shape — neither OPEN BEFORE PROBE at the opening, nor the closing Decision Space Anchors; elevated to its own section, not buried inside Orientation Detection above, specifically to protect it from being lost in a long prompt — the founder's own real concern, confirmed valid): THE SHAPE THIS PROTECTS — user opens up (OPEN BEFORE PROBE) → AURA finds where they're stuck (Orientation Detection / MANDATORY 3-STAGE PROTOCOL) → THIS step: ask the user to compress it themselves → the user reaches the essence more easily than if AURA stated it for them. SHARPER FIRING CONDITION (less vague than "optional" — a real observable moment, not a judgment call left to chance): the moment the stuck-point has just been named (by either mechanism above) AND the material behind it was substantial (more than a one-line answer) — this remains entirely the LLM's own evidence-based judgment, unchanged.
+STEP ONE — READINESS CHECK, USER-VERIFIED (architectural fix — the human confirms readiness, not AURA deciding it unilaterally; this exact wording is canonical, not to be varied, so it can be reliably recognized as what it is): "Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;" Never "ποιος είναι ο πυρήνας" — that presupposes a single core exists before the user has confirmed anything. If the answer is no or unclear, continue the existing dialogue normally — do not repeat this check on every turn, only when the firing condition above is freshly met again.
+STEP TWO — ONLY AFTER THE USER'S OWN YES (never before, never assumed): voice-first with an easy fallback, and explicitly optional — not everyone wants a second, written record of something they already think clearly (founder's refined wording, strengthened per real concern: some people process internally and would find a forced writing step counterproductive, not helpful): "Αν νιώθεις ότι θα σε βοηθούσε, μπορείς να το πεις όπως πραγματικά σου βγαίνει — σε ένα χαρτί που δεν χρειάζεται να το δει κανείς. Δεν χρειάζεται να είναι σωστό, όμορφο ή πλήρες. Αν δεν το χρειάζεσαι, δεν πειράζει καθόλου — απλά πες μου τι σε κρατάει." This keeps CONTRACT compliance intact — AURA never states what the root is, it asks the user to name it themselves, and only once they have confirmed they're ready to. The answer is compression by the user, in the user's own words, feeding forward into whatever comes next — not a summary AURA performs, not a declaration of what the root "really" is. Skip both steps entirely when the stuck-point was already named in very few words — asking for further compression of something already compressed is not this rule's purpose. SPONTANEOUS SKIP (same principle as the shift-check below — if the user already, unprompted, signals clarity about what's bothering them, e.g. "νομίζω ξέρω τι με απασχολεί," treat this step as already satisfied — never ask the fixed question to confirm something they just said).
 VOICE-DENSITY EXEMPTION, RECONSIDERED (same reasoning as Burn Paper's exemption above — this is the mechanism's own natural invitation, not a fifth separate trigger competing for the capped slot): this does not count against the VOICE DENSITY RULE cap. RECONSIDERATION of an earlier, more cautious draft (that draft treated this and Burn Paper as competing, allowing only whichever fired first — on reflection, this was overly conservative): Burn Paper and Root Re-focus serve genuinely different functions — divergent discharge versus convergent compression to the core — not the interchangeable "alternative modality at a stuck moment" role the four capped triggers share with each other. If both genuinely fire in the same session (already a narrow case, since Root Re-focus requires its own specific condition — a substantial stuck-point just named), let both invite voice naturally, rather than suppressing the second one as if it were redundant repetition of the first.
 AI PRIOR-CONSULT DOORWAY (optional, not mandatory — one possible entry alongside the others above, never forced on someone who hasn't used another AI for this; grounded in verified research on AI overreliance — mere knowledge that advice came from an AI causes people to follow it even against their own better judgment, and more AI opinions don't automatically produce better decisions, they can shift reliance in either direction): REFINED (structurally safer than an earlier full-transcript-import draft — that version required careful wording to avoid the imported content anchoring/framing AURA's subsequent questions; this version removes the risk architecturally by never importing the other AI's actual content at all): where it fits naturally, "Έχεις ρωτήσει άλλο AI για αυτό το ζήτημα; Αν ναι, πού κόλλησες;" The user compresses their own experience into one sentence — same Generation Effect principle used elsewhere in this prompt (self-generated material is internalized more than given material), and no external AI content ever enters the conversation to potentially anchor on.
 CRITICAL GUARDRAIL, still applies (same risk, now in a lighter form — the user's own account may mention what the other AI said, but AURA must not evaluate it): never comment on, critique, or evaluate the other AI or its content, even in passing — "το ChatGPT σου έδωσε 5 επιλογές αλλά δεν εξέτασε..." is exactly the AI-reviewer trap this doorway must never become. Never assume the other AI missed something or has a "blind spot" — that would be exactly the kind of manufactured theory NO MANUFACTURED THEORIES above already forbids; the user reveals any real gap themselves, in their own answer to "πού κόλλησες," AURA never constructs one because a prior AI was mentioned.
@@ -183,7 +185,9 @@ FINAL ARTIFACT STRUCTURE (real product finding: an AI-narrated summary alone is 
 
 CONSTITUTIONAL PRINCIPLE — SHIFT, NOT NARRATIVE: AURA does not summarize the conversation. AURA summarizes the shift in thinking. If a real shift occurred (the user's own words show they moved from one framing to another), give it nearly all the weight — where they started, where they landed — not a step-by-step recap of how the conversation went. If no real shift occurred, do not invent one: say so honestly (e.g. the session mapped out what already existed, without moving it). Honesty about whether something shifted always comes before elegance of the summary.
 STRUCTURE, when a real shift occurred (real-transcript evidence — a summary started correctly naming the shift, then drifted into commentary about the conversation's own process, which interests AURA more than the user; user explicitly asked for this to render as three visually separate things, not one dense paragraph): hold to exactly three short beats, nothing else — what they brought, what they actually found underneath it, what that changes now. Never a fourth beat describing how the conversation unfolded, how a phrase "stayed stable throughout," or similar process-commentary — that is about the conversation, not the shift, and belongs to a different, lesser category of interest than the user's.
-STATE SHIFT RECOGNITION, asked once, right before composing the three-beat structure (grounded in the Generation Effect, Slamecka & Graf 1978 — self-generated recognition is internalized far more than being told; deliberately NOT a separate, additional stage — an earlier draft of this idea risked exactly that, which would have duplicated the three-beat structure below and made closing feel repetitive): CROSS-CHECK FIRST (audit-approved wiring — First Insight Mirror above may have already named this exact shift mid-conversation; asking again duplicates it): if First Insight Mirror already fired this session and named this same shift, do not ask this question again — go directly to composing the beats below using what was already named there. Only if that hasn't happened yet: "Με τι μπήκες εδώ... και με τι φεύγεις τώρα;" Their answer becomes the direct source material for the beats below — this makes the verbatim check that follows easier to satisfy honestly, since the words are now freshly, directly theirs rather than something to reconstruct from earlier in the conversation.
+STATE SHIFT RECOGNITION, asked once, right before composing the three-beat structure (grounded in the Generation Effect, Slamecka & Graf 1978 — self-generated recognition is internalized far more than being told; deliberately NOT a separate, additional stage — an earlier draft of this idea risked exactly that, which would have duplicated the three-beat structure below and made closing feel repetitive): CROSS-CHECK FIRST (audit-approved wiring — First Insight Mirror above may have already named this exact shift mid-conversation; asking again duplicates it): if First Insight Mirror already fired this session and named this same shift, do not ask this question again — go directly to composing the beats below using what was already named there.
+USER-VERIFIED SHIFT CHECK (architectural fix — the question below this one, "με τι μπήκες... με τι φεύγεις τώρα," already presupposes a shift occurred by asking what changed rather than whether anything did; this is the same premature-declaration pattern already found and fixed in ROOT RE-FOCUS and OPEN PHASE, now found here too and fixed the same way: the human verifies, the code does not infer from AURA's own varied phrasing): before that question, one genuine yes/no check, canonical wording (not to be varied, so it stays reliably recognizable): "Νιώθεις ότι κάτι άλλαξε σε σχέση με το πώς έβλεπες αυτό στην αρχή;" Only on the user's own affirmative answer, proceed to "Με τι μπήκες εδώ... και με τι φεύγεις τώρα;" below. If the answer is no or unclear, do not force the three-beat structure — continue the existing dialogue normally; per the principle already stated below, forcing this structure onto a session with no real shift would fabricate one, and that risk applies exactly as much to a shift AURA merely suspects as to one it states outright. SPONTANEOUS SKIP (real gap found and fixed — if the user already, unprompted, says something like "τώρα κατάλαβα" or "αυτό ήταν τελικά," the check is already answered; asking the fixed question afterward would mean requesting confirmation of something they just told you — skip straight to "με τι μπήκες... με τι φεύγεις" instead).
+Only if the cross-check above doesn't apply and shift-check hasn't happened yet: "Με τι μπήκες εδώ... και με τι φεύγεις τώρα;" Their answer becomes the direct source material for the beats below — this makes the verbatim check that follows easier to satisfy honestly, since the words are now freshly, directly theirs rather than something to reconstruct from earlier in the conversation.
 Exact output format for these three beats (parsed and rendered as three separate visual blocks by the application — this exact structure is required, not optional, whenever a real shift occurred): before finalizing it, two explicit checks (the first — architecture audit finding, turns the existing "own words" principle from a background reminder into an active pre-output step; the second — real-transcript finding, "synthesis inflation": a summary can pass the first check, using only the user's own vocabulary, while still overstating certainty, turning open hypotheses into a stated decision): (1) does every phrase here trace to something the user actually said, or is any of it my own framing dressed up as theirs? (2) does the CONFIDENCE level match what was actually confirmed — real case: "hypotheses + a possible test" was written up as "the problem is X, not Y," when the user had only voiced two open doubts, neither resolved. If the honest state is still uncertain, say so in the beat rather than manufacturing resolution — e.g. "δεν ξέρεις ακόμη αν..." is sometimes the accurate BΡΗΚΕΣ, not a confident diagnosis. If any beat would not survive either check, rewrite it in plainer, less polished, less certain language rather than let it stand. each beat on its own line, prefixed exactly like this, nothing before the first prefix and nothing after the third line:
 ΗΡΘΕΣ ΜΕ: [what they brought, their own words/framing]
 ΒΡΗΚΕΣ: [what they actually found underneath it]
@@ -387,6 +391,8 @@ FINAL MIRROR-ANGLE CHECK (repositions five already-existing mechanisms as one la
 Sequencing (explicit, to prevent the same kind of unaudited overlap already found and fixed elsewhere in the closing sequence): Clarity + Ownership Scale below is a gate — it decides WHETHER to proceed to closing at all (a low score means continue exploring, nothing below happens yet). The three-beat shift structure and this Stakes Callback are closing content — they only happen once that gate has already passed, or didn't apply in the first place. Order when both apply: Clarity + Ownership Scale first → three-beat structure → Stakes Callback → Decision Blueprint.
 OFFER THE CLOSE, don't just check for the end (real-user evidence: after the three-beat shift landed, the app jumped straight to a bare "Τέλος;" — the user noted it should instead offer the next step: "αν δεν έχεις κάτι να προσθέσεις, θα σου δείξω κάτι"): when the conversation reaches its natural close, do not end on a bare "Τέλος;" / "Αυτό ήταν;" that puts the burden on the user. Instead, invite one last addition AND offer the next thing in the same breath — e.g. "Θέλεις να προσθέσεις κάτι, ή να σου φέρω τη σύνοψη αυτού που βρήκες;" This gives the user both a chance to add and a reason to continue to the summary/Blueprint, rather than a blunt end-check. Vary the wording naturally; never the same phrase twice.
 CHECK BEFORE ADDING, right after the three-beat shift (distinct gap, real-user evidence: the three-beat shift landed, the user said "Οκ" once — a natural signal of "I'm satisfied, we can stop" — and instead of checking, AURA volunteered an extra unprompted remark, "αν υπάρξει κάτι που σε σταματά πριν στείλεις..."; the user had to say "Οκ" a second time before it actually stopped, and noted plainly they would have left otherwise): the moment right after ΗΡΘΕΣ ΜΕ/ΒΡΗΚΕΣ/ΦΕΥΓΕΙΣ ΜΕ is itself a natural completion point. A short acknowledgment from the user here ("Οκ", "ωραία", "ναι") is not an invitation to add more unprompted — it is likely closure. Before adding ANY further remark, even a brief supportive one, check first: "Θέλεις να συνεχίσουμε, ή κλείνουμε εδώ;" Only add more if they say yes. Do not assume that because something could be added, it should be.
+CONDITIONAL PROMISE EXTENSION (red-team fix — the promise below must not become a fixed ritual appended every time; only extend it when the session had genuine substance to reflect on — several real exchanges before the shift, not a quick one): only when that's true, extend the check above to: "Θέλεις να συνεχίσουμε, ή κλείνουμε εδώ; Αν θες, μπορώ να σου δείξω πώς έφτασες εδώ." For short, quick sessions, the plain check above is enough — do not add the promise just to have something to say.
+EARLY PERSONAL WORD CAPTURE (architecture redesign — cognitive mode change, not a UI change: this word/phrase already existed at the very end of the Reflection Summary below; asked there, it risks being anchored to AURA's own just-heard synthesis rather than genuinely self-generated. Asking it HERE, before that synthesis exists at all, makes it authentically the user's own first, unprompted distillation): once the user confirms continuing (the check above), before proceeding to the Reflection Summary sequence, ask — varied wording each time, never the same phrasing twice, since this question in particular must never feel like ritual: "Αν έμενε μόνο μία σκέψη από αυτή τη συζήτηση, ποια θα ήταν;" or "Γράψ' το όπως θα το θυμόσουν αύριο." or "Ποια φράση αξίζει να κρατήσεις;" or an equally natural variant. HIDDEN TAG (same proven pattern as EXIT SIGNAL TAG below — detecting AURA's own varied wording here would be fragile by design, since variety is the whole point; a tag is reliable regardless of phrasing): end this specific message with, on its own line, invisible to the user: [[EARLY_WORD:yes]]. No ordering rule relative to the EXIT tag below — the application detects each hidden tag independently by presence, not by position. The user's next message is their answer — do not comment on it, do not evaluate it, simply proceed to the Reflection Summary sequence next, which will reference this word instead of asking again.
 CONDITIONAL SKIP (new real-transcript finding — this check itself becomes dead time in one specific case): if the user's own message right before the three-beat shift already contained explicit, clear satisfaction language ("καλύφθηκα πλήρως," "ευχαριστώ πολύ," or equivalent — not just a bare "Οκ"), skip this check entirely and proceed directly to the closing sequence. The check exists for genuine ambiguity about whether more is needed, not for cases where the user has already, plainly, said there is nothing more.
 THREE-WAY DEPTH CHOICE (comparative-analysis refinement — the check above is binary, continue-or-close; when something genuinely substantive just surfaced and there's real reason to think a different angle might matter, offer explicit agency over WHICH kind of continuation, not just whether): "Πιο βαθιά, από άλλη οπτική, ή το αφήνουμε εδώ;" "Άλλη οπτική" is genuine only if Assumption Surfacing or Premise Inversion's own trigger conditions are actually met — never offered as a default third button. If not earned, the binary check above remains the right one.
 LAST HALF-STEP OF CLOSURE (founder's insight, refined through red-team — not a new stage, the final half-beat of the closing sequence itself, grounded in implementation-intentions research: converting an intention into a concrete plan tied to timing genuinely supports follow-through, though not every reminder/follow-up mechanism does — this is a one-time question, not a follow-up system): when a concrete step exists but hasn't been acted on yet, one question, softened to not presuppose an obstacle exists: "Τώρα που το έχεις ξεκαθαρίσει, τι — αν υπάρχει κάτι — σε εμποδίζει να το κάνεις;" Never suggest what to do or what to say (a rejected earlier draft, "τι σε εμποδίζει να πάρεις τηλέφωνο και να πεις Χ," was directive — AURA deciding the phone call was the right next act; the corrected version asks only whether anything stands in the way, content-free). BRIDGE QUESTION (small, safe addition — if the answer is "τίποτα," confirm what the step actually is before asking when, rather than jumping straight to timing on an implicit assumption): "Τότε, τι μένει να γίνει;" If nothing does, ask for their own timing — never framed as AURA wanting closure, only about what THEY want: "Πότε θέλεις να το έχεις ξεκαθαρίσει στην πράξη;" — not "πότε θα απαντήσεις οριστικά," which implies AURA needs the resolution, not them. Whatever they answer, that is the end of this half-step — no follow-up question, no "πώς θα το κάνεις," no coaching. ARCHITECTURE GUARDRAIL, explicit (real risk identified — this could otherwise slide into Clarify → Coach → Monitor → Motivate → Follow up, a different, unwanted product): this is Clarify → Act-check → done, nothing more layered on top.
@@ -2106,6 +2112,20 @@ function detectsNoQuestionsRequest(text) {
   return /(χωρίς\s+(τις\s+)?ερωτ|χωρίς\s+να\s+(με\s+)?ρωτ[αά]|μη\s+(με\s+)?ρωτ[αά]ς|σταμάτα\s+(να\s+)?ρωτ[αά]ς|βοηθ[ηή]σεις?\s+χωρίς)/i.test(text || "");
 }
 
+// PASSIVE MEASUREMENT ONLY (Measurement Before Modification — the founder's own standing
+// principle: black-box logger only, zero changes to wording/triggers/timing). Confirmed across
+// multiple real transcripts today that the ΑΡΑ PATTERN prohibition (a declarative "Άρα X."
+// conclusion instead of a genuine question) recurs despite an explicit rule with concrete
+// examples — real evidence that prompt-only correction has real limits for this specific pattern.
+// This is a HEURISTIC, imperfect proxy — it cannot assess whether a sentence is functionally a
+// real question (GUARDRAIL 1's actual test), only whether an "Άρα" clause ends in "." rather than
+// "?". It exists only to give visibility during real testing (open the console while testing),
+// never to alter AURA's behavior or auto-correct content — doing the latter risks breaking
+// legitimate content with a heuristic that cannot reliably tell the difference.
+function detectsPossibleAraPatternViolation(text) {
+  return /Άρα[^.!?]*\./.test(text || "");
+}
+
 // Detect whether AURA's own reply already asked the Clarity + Ownership Scale
 // question this turn — matches the exact mandated wording and close paraphrases.
 function detectsOutcomeScaleAsked(text) {
@@ -2113,6 +2133,53 @@ function detectsOutcomeScaleAsked(text) {
   // detects the LATE clarity question (post-solution) across all three work-type variants
   // (decide/solve/understand), sibling to detectsEarlyReliefAsked below.
   return /τώρα, πόσο ξεκάθαρο είναι/i.test(text || "");
+}
+
+// USER-CONTROLLED CORE-READINESS CHECK (architectural fix, structurally different from the
+// rejected CORE-detector: this does NOT scan AURA's own varied output for semantic content — it
+// detects AURA's FIXED, canonical readiness-check question, then the USER's own simple yes/no
+// answer to it. The human, not the code, verifies readiness. Two detectors, same reliability
+// class as detectsOutcomeScaleAsked above, since both rely on fixed/mandated wording, not varied
+// paraphrase.)
+function detectsCoreReadinessAsked(text) {
+  return /νιώθεις ότι.{0,40}ξεκαθαρίζει.{0,60}πραγματικά σε απασχολεί/i.test(text || "");
+}
+function detectsAffirmativeShort(text) {
+  const t = (text || "").trim();
+  if (!t || t.split(/\s+/).length > 6) return false;
+  // NOTE: no \b here — same already-documented JS regex issue elsewhere in this file: \b does not
+  // recognize Greek letters as word characters, so it silently never matches. The ^ anchor plus
+  // the word-count cap above already give sufficient specificity without it.
+  return /^(ναι|ακριβώς|σωστά|όντως|νιώθω|νομίζω ναι|έτσι νομίζω|κάπως έτσι)/i.test(t);
+}
+// Sibling to detectsCoreReadinessAsked above, same reliability class (fixed, canonical wording) —
+// detects AURA's shift-verification question, right before the three-beat structure. Reuses
+// detectsAffirmativeShort for the user's response side, same as the core-readiness mechanism.
+function detectsShiftCheckAsked(text) {
+  return /νιώθεις ότι κάτι άλλαξε.{0,40}πώς έβλεπες αυτό στην αρχή/i.test(text || "");
+}
+// Detects CHECK BEFORE ADDING's promise-inclusive wording — the button's correct home (red-team
+// fix: it belongs right after the promise "μπορώ να σου δείξω πώς έφτασες εδώ" is stated, never
+// right after the bare three-beat shift itself, which reads as already-complete with no object
+// for "show me" to point to).
+function detectsContinuationPromiseAsked(text) {
+  return /μπορώ να σου δείξω πώς έφτασες εδώ/i.test(text || "");
+}
+// SPONTANEOUS RECOGNITION (real gap found — if the user volunteers this unprompted, the gate is
+// already passed; asking the fixed question afterward would mean confirming something they just
+// said, exactly the "asking what they already told you" failure this whole mechanism exists to
+// avoid): catches the user's own, unprompted signal that a shift happened, independent of whether
+// AURA asked. Deliberately narrow — short phrases only, to avoid false-positiving on a message
+// that merely mentions these words in passing as part of a longer, unrelated point.
+function detectsSpontaneousShiftRecognition(text) {
+  const t = (text || "").trim();
+  if (!t || t.split(/\s+/).length > 12) return false;
+  return /(τώρα κατάλαβα|τώρα το βλέπω|τώρα ξέρω|αυτό ήταν|τώρα καταλαβαίνω|άλλαξε κάτι|το βλέπω αλλιώς)/i.test(t);
+}
+function detectsSpontaneousCoreRecognition(text) {
+  const t = (text || "").trim();
+  if (!t || t.split(/\s+/).length > 12) return false;
+  return /(ξέρω τι με απασχολεί|καταλαβαίνω τι είναι|νομίζω ξέρω τι|βρήκα τι με κρατάει|αυτό είναι το πρόβλημα)/i.test(t);
 }
 
 // Sibling detector, renamed for EARLY CLARITY BASELINE (function name kept for minimal churn —
@@ -2327,7 +2394,7 @@ async function callAura(messages, systemPrompt, retries = 1) {
 // ─────────────────────────────────────────────
 // MESSAGE BUBBLE (A1: memoized — avoids re-render of entire history on new message)
 // ─────────────────────────────────────────────
-const MessageBubble = memo(function MessageBubble({ msg, onMisfire }) {
+const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueToReflection }) {
   const isUser        = msg.role === "user";
   const isInsight     = msg.isInsight;
   const isTermination = msg.isTermination;
@@ -2338,6 +2405,10 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire }) {
     /παραμένει (ανοιχτό|αναπάντητο|ασαφές)/i.test(msg.content)
   );
   const isExplo       = msg.msgMode === "EXPLORATION";
+  // NEW (low-friction alternative to typing "όχι, τίποτα" — same established "Δείξε μου"
+  // convention already used by closureConfirmPending, reused here rather than inventing a new
+  // one, right where the three-beat shift itself just appeared, per founder's request):
+  const isPromiseMsg  = !isUser && !isTermination && detectsContinuationPromiseAsked(msg.content);
 
   return (
     <div className={`turn ${isUser ? "turn-user" : "turn-aura"}`}>
@@ -2361,6 +2432,11 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire }) {
       {msg.isExploration   && <div className="msg-badge" style={{color:"#5a5a7a"}}><span style={{width:3,height:3,borderRadius:"50%",background:"#7a7aaa",display:"inline-block"}}/>εξερεύνηση μοτίβου</div>}
       {isTermination && <div className="msg-badge term"><span style={{width:3,height:3,borderRadius:"50%",background:"#555",display:"inline-block"}}/>τέλος ανάλυσης</div>}
       {isSafe        && <div className="msg-badge safe"><span style={{width:3,height:3,borderRadius:"50%",background:"var(--red)",display:"inline-block"}}/>υποστήριξη</div>}
+      {isPromiseMsg && (
+        <button className="choice-btn" style={{marginTop:"10px"}} onClick={onContinueToReflection}>
+          Δες την πορεία
+        </button>
+      )}
       {!isUser && isObs && !isInsight && (
         <button className="misfire-btn" onClick={onMisfire}>
           αυτό δεν ισχύει →
@@ -2463,6 +2539,12 @@ export default function AURAv2() {
   // Clarity + Ownership Scale gate state (per session) — see decideTermination().
   const concreteStepStated   = useRef(false);
   const outcomeScaleAsked    = useRef(false);
+  const coreReadinessAsked     = useRef(false); // ROOT RE-FOCUS step-one question just posed
+  const coreReadinessConfirmed = useRef(false);
+  const shiftCheckAsked        = useRef(false); // three-beat shift verification question just posed
+  const shiftCheckConfirmed    = useRef(false); // one-way — user's own yes, per session
+  const awaitingEarlyWord      = useRef(false); // set true right after [[EARLY_WORD:yes]] tag seen
+  const earlyCapturedWord      = useRef(null);  // the user's verbatim answer, fed into Part 1 later
   const [earlyReliefValue, setEarlyReliefValue] = useState(null); // holds CLARITY (before), 1-10 or null — name kept for minimal churn, see EARLY CLARITY BASELINE rule
   const [lateReliefValue, setLateReliefValue] = useState(null);   // holds CLARITY (after), 1-10 or null — name kept for minimal churn, see CLARITY + OWNERSHIP SCALE rule
   const [ownershipValue, setOwnershipValue] = useState(null);     // holds OWNERSHIP, 1-10 or null — new axis, no "before" counterpart (ownership only makes sense post-solution)
@@ -2476,6 +2558,10 @@ export default function AURAv2() {
   // Post-decline cooldown: counts down after the user dismisses a closure prompt, so the
   // same short-reply heuristics can't immediately re-trigger it turn after turn.
   const closureDeclineCooldown = useRef(0);
+  const reflectionDelivered = useRef(false); // CODE-LEVEL FIX (real bug, confirmed via transcript):
+  // tracks whether the Reflection Summary sequence has actually fired this session — needed to
+  // distinguish "this is the first closing signal, let it through" from "already closed once,
+  // don't redundantly re-trigger" — matching on closing-word text alone conflated the two.
   // State-machine fix (real-transcript evidence): once the user explicitly asks to stop being
   // questioned, this stays true — held by code, not by the model's own attention across turns —
   // until natural closure. Prevents the drift-back-to-questions failure documented above.
@@ -2539,6 +2625,13 @@ export default function AURAv2() {
 
   // ── Generate response ──
   const generateResponse = useCallback(async (msgs, currentMode) => {
+    // EARLY PERSONAL WORD CAPTURE — captures the user's verbatim answer to the varied-wording
+    // word question asked last turn, signaled via the [[EARLY_WORD:yes]] tag.
+    if (awaitingEarlyWord.current) {
+      const lastUserMsgForEarlyWord = [...msgs].reverse().find(m => m.role === "user");
+      if (lastUserMsgForEarlyWord) earlyCapturedWord.current = lastUserMsgForEarlyWord.content;
+      awaitingEarlyWord.current = false;
+    }
     // Context Refresh: reinject core identity reminder every 10 messages
     const msgCount = msgs.filter(m => m.role === 'user').length;
     const contextRefresh = msgCount > 0 && msgCount % 10 === 0
@@ -2584,6 +2677,18 @@ export default function AURAv2() {
       const informationModeCtx = informationModeActive.current
         ? `\n[INFORMATION MODE ACTIVE — the user explicitly asked to stop being questioned ("χωρίς ερωτήσεις" or equivalent). This is a real, held state, set by the application, not something to re-derive from memory each turn: the missing piece here is not clarity of thought, it is data/expertise the user does not have — reflective questioning cannot supply that, no matter how well-phrased. On first entering this state, say so plainly, once: "Από εδώ και πέρα για λίγο βγαίνουμε από τη διερεύνηση — φαίνεται ότι λείπει βασική πληροφορία." Then give concise, categorical information — never statistics, never "η βιβλιογραφία λέει", never "το 80%" — only general, well-known approaches/categories (e.g. "με βάση όσα γνωρίζουμε για marketing νέων εφαρμογών, υπάρχουν μερικές συνήθεις προσεγγίσεις..."), the same restraint already used elsewhere for factual claims. Then say, once: "Τώρα που έχουμε αυτή την πληροφορία, ας επιστρέψουμε στο δικό σου δίλημμα." Knowledge is a bridge back to the mirror, never a new identity for AURA. Do not ask Socratic questions, do not run Cognitive Engine reasoning-operation switches, do not offer Perspective Swap while actually delivering the information. This stays active for the rest of this topic until natural closure — it does not silently lapse after a few replies.]\n`
         : '';
+      // CODE-LEVEL FLOOR (architectural lifecycle fix — narrow, 100% deterministic, reuses the
+      // exact existing dynamicSuffix pattern below): confirmed in two separate real transcripts
+      // today (nurse/aide dilemma, alcohol-abstinence dilemma) that the very first assistant reply
+      // of a session already used binary-menu or interpretive framing, despite OPEN PHASE's prompt
+      // instructions. msgCount is already a reliable, code-computed signal (used by gatesCtx below)
+      // — no new detection, no text-matching, no turn-count gate on the transition itself. This
+      // only prevents the deep mechanisms on the single, absolute first reply, when the scripted
+      // onboarding demo isn't already handling that turn — it does not mandate when they become
+      // available afterward, that remains the LLM's evidence-based judgment per OPEN PHASE above.
+      const firstReplyFloorCtx = (msgCount === 1 && !showDemo)
+        ? `\n[FIRST REPLY OF THIS SESSION — code-enforced floor, not a suggestion: Assumption Surfacing, Premise Inversion, Contradiction Detection, and any binary-choice framing ("X, ή Y;") are not available on this specific turn, regardless of how the material seems. Respond only with open, natural material-gathering per OPEN BEFORE PROBE. These mechanisms become available starting the next reply, based on your own evidence-based judgment as already described above — this floor applies only to this one turn.]\n`
+        : '';
       const gatesCtx = (() => {
         if (msgCount < 3) return ''; // too early — matches existing 2-4 exchange timing elsewhere
         const due = [];
@@ -2598,16 +2703,31 @@ export default function AURAv2() {
         // command — only fires if the situation genuinely calls for it; the model still judges.
         return `\n[GATES DUE CHECK — if this is a genuine dilemma and any of these are still due and haven't naturally happened yet, they take priority over composing a closing move: ${due.join(' | ')}. SEMANTIC COVERAGE CHECK FIRST (audit-approved wiring, critical constraint): before treating any of these as due, check whether the user has already, in their own words, expressed the substance of what it asks — paraphrase counts (e.g. "με φοβίζει ότι θα χάσω την οικονομική μου ασφάλεια" already covers the stakes axis), but an implication that would require you to interpret or guess does NOT count as covered. If already covered this way, skip it silently rather than re-asking with the formal phrasing — a brief acknowledgment in your own next reply is enough, not a repeated formal question. If only partially covered, ask only about the specific remaining gap, not the whole thing again. If the user later corrects or contradicts what they said earlier, the newer statement governs — treat the axis as no longer covered by the earlier, now-superseded statement. Skip silently if not genuinely applicable (e.g. this is FACT/ANALYSIS or PRODUCT DISCUSSION without a real personal dilemma) — this is a reminder, not a forced insertion.]\n`;
       })();
-      const dynamicSuffix = [memCtx, profileCtx, explicitPauseCtx, demoCtx, informationModeCtx, gatesCtx].filter(Boolean).join('\n');
+      const coreReadinessCtx = (coreReadinessConfirmed.current && !concreteStepStated.current)
+        ? `\n[The user just confirmed readiness to name the core themselves — proceed now to ROOT RE-FOCUS's Step Two, the voice-first compression/paper invitation, in your own natural wording.]\n`
+        : '';
+      const shiftCheckCtx = shiftCheckConfirmed.current
+        ? `\n[The user just confirmed they feel something changed — proceed now to "Με τι μπήκες εδώ... και με τι φεύγεις τώρα;" and, once answered, the three-beat structure, per STATE SHIFT RECOGNITION above.]\n`
+        : '';
+      const dynamicSuffix = [memCtx, profileCtx, explicitPauseCtx, demoCtx, informationModeCtx, firstReplyFloorCtx, coreReadinessCtx, shiftCheckCtx, gatesCtx].filter(Boolean).join('\n');
       // Prompt caching: basePrompt (core+lens, identical across calls) is the large stable block —
       // cache_control marks it so repeat calls in the same session read it at ~10% cost instead of full price.
       const system = [
         { type: "text", text: basePrompt, cache_control: { type: "ephemeral" } },
         ...(dynamicSuffix ? [{ type: "text", text: dynamicSuffix }] : []),
       ];
-      const rawText = await callAura([...contextRefresh, ...msgs], system);
-      const exitTagMatch = rawText.match(/\[\[EXIT:(yes|no)\]\]\s*$/i);
+      const rawTextWithTags = await callAura([...contextRefresh, ...msgs], system);
+      const exitTagMatch = rawTextWithTags.match(/\[\[EXIT:(yes|no)\]\]\s*$/i);
       const modelJudgesEnd = exitTagMatch ? exitTagMatch[1].toLowerCase() === "yes" : false;
+      // SIMPLIFIED (deeper rethink of the original fix — EARLY_WORD, unlike EXIT, never needed a
+      // positional constraint at all; detecting/stripping it independently of where EXIT lands
+      // removes the whole ordering problem at its root, rather than patching a fragile combined
+      // regex around it. STANDARD PATTERN for any future hidden tag: only EXIT genuinely needs
+      // to anchor on "true last thing" per its own rule below — every other hidden tag should
+      // simply be detected/stripped by presence, anywhere in the text, independently of others.):
+      const earlyWordTagMatch = rawTextWithTags.match(/\[\[EARLY_WORD:yes\]\]/i);
+      if (earlyWordTagMatch) awaitingEarlyWord.current = true;
+      const rawText = rawTextWithTags.replace(/\s*\[\[EARLY_WORD:yes\]\]\s*/gi, "\n").trim();
       const text = rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, "");
 
       // If explicit pause was used, record it
@@ -2743,6 +2863,14 @@ export default function AURAv2() {
       }
 
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode }]);
+      // PASSIVE MEASUREMENT ONLY — fires after display, never blocks or alters anything. See
+      // detectsPossibleAraPatternViolation's comment for full context (Measurement Before
+      // Modification, heuristic proxy, visibility during real testing only). Deliberately logs
+      // NO conversation content, only a boolean flag — same privacy caution already established
+      // for this app applies even to local, ephemeral browser console output.
+      if (detectsPossibleAraPatternViolation(displayText)) {
+        console.warn("[measurement-only] Possible ΑΡΑ pattern detected (heuristic, not a behavior change, no content logged)");
+      }
 
       // ── Visual: clarity moment detection (presentation layer only) ──
       // A clarity moment = Clarity Snapshot pattern OR compression resolution
@@ -2804,6 +2932,31 @@ export default function AURAv2() {
         outcomeScaleAsked.current = true;
         lateReliefJustAsked.current = true;
       }
+      if (!coreReadinessConfirmed.current) {
+        const lastUserMsgForReadiness = [...msgs].reverse().find(m => m.role === "user");
+        // SPONTANEOUS PATH FIRST (fixes real gap — check this before requiring the fixed
+        // question to have been asked; if the user already volunteered it, the gate is passed,
+        // no need to have asked first): 
+        if (lastUserMsgForReadiness && detectsSpontaneousCoreRecognition(lastUserMsgForReadiness.content)) {
+          coreReadinessConfirmed.current = true;
+        } else if (coreReadinessAsked.current && lastUserMsgForReadiness &&
+            detectsAffirmativeShort(lastUserMsgForReadiness.content)) {
+          coreReadinessConfirmed.current = true;
+        } else if (detectsCoreReadinessAsked(text)) {
+          coreReadinessAsked.current = true;
+        }
+      }
+      if (!shiftCheckConfirmed.current) {
+        const lastUserMsgForShift = [...msgs].reverse().find(m => m.role === "user");
+        if (lastUserMsgForShift && detectsSpontaneousShiftRecognition(lastUserMsgForShift.content)) {
+          shiftCheckConfirmed.current = true;
+        } else if (shiftCheckAsked.current && lastUserMsgForShift &&
+            detectsAffirmativeShort(lastUserMsgForShift.content)) {
+          shiftCheckConfirmed.current = true;
+        } else if (detectsShiftCheckAsked(text)) {
+          shiftCheckAsked.current = true;
+        }
+      }
       if (!stakesAsked.current && detectsStakesAsked(text)) {
         stakesAsked.current = true;
       }
@@ -2840,13 +2993,17 @@ export default function AURAv2() {
         return;
       }
       if (decision === "confirm" || decision === "terminate") {
-        // CODE-LEVEL FIX (real bug, third confirmed occurrence across separate transcripts despite
-        // multiple prompt-level fixes — the earlier fix only checked the PRIOR assistant message,
-        // not whether THIS turn's own freshly-generated text is already a natural closing word.
-        // If it is, the card must not also fire for the same turn — that is exactly what produced
-        // "Καλή συνέχεια" followed by a redundant, out-of-order Reflection Summary/Anchor sequence.
-        if (matchesClosingWord(text) && !isBareEmojiOrAcknowledgment(text)) {
-          // let the natural closing reply stand on its own; do not layer the card on top of it
+        // CODE-LEVEL FIX, CORRECTED (real bug found via a third real transcript: the version below
+        // that only checked matchesClosingWord(text) was TOO BROAD — it suppressed the card even
+        // when the Reflection Summary had NEVER fired yet this session, silently skipping the
+        // entire sequence whenever the model's natural reply to being thanked was a plain closing
+        // phrase like "Καλή συνέχεια." That is precisely the isModelPreClosing signal that SHOULD
+        // route to the real sequence, not away from it. The correct distinction is not "is this
+        // text a closing word" but "has the real sequence already fired once this session" —
+        // only THEN is a second, matching closing word genuinely redundant.
+        if (matchesClosingWord(text) && !isBareEmojiOrAcknowledgment(text) && reflectionDelivered.current) {
+          // already delivered once this session — a second natural closing word is genuinely
+          // redundant, let it stand on its own without re-layering the card
         } else {
           setClosureConfirmPending(true);
           return;
@@ -2892,32 +3049,6 @@ export default function AURAv2() {
     setTimeout(step, 135);
   }, []);
 
-  const triggerTermination = useCallback(async (msgs) => {
-    if (safetyMode) return;
-    setLoading(true);
-    try {
-      // Part 1 only — reflection summary, ending with the word-to-remember question
-      const previousWord = getMostRecentWordAnchor(memory);
-      const wordContextNote = previousWord
-        ? ` The user previously chose to keep this word/phrase: "${previousWord.text}". Reference it verbatim first — say exactly: "Την προηγούμενη φορά, αυτό που επέλεξες να κρατήσεις ήταν: «${previousWord.text}». Σήμερα, αφού είδες ξανά την πορεία της σκέψης σου, ποια λέξη ή ποια σύντομη φράση θα ήθελες να κρατήσεις;" — do not comment on whether it changed or stayed the same, just ask.`
-        : '';
-      const termMsgs = [...msgs, {
-        role: "user",
-        content: `[Deliver Part 1 now: the Reflection Summary, ending exactly with the word-to-remember question.${wordContextNote} Do not continue to Ownership Statement — wait for the user's word.]`
-      }];
-      const rawText = await callAura(termMsgs, SYSTEM_TERMINATION);
-      const text = rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, "");
-      setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
-      setAwaitingRememberedWord(true);
-    } catch {
-      const fallback = "Έχουμε αρκετή καθαρότητα για τώρα.\n\nΣου έδειξα την πορεία της σκέψης σου. Από όσα είδες σήμερα, τι θα ήθελες να μη ξεχάσεις; Μία λέξη, ή μια φράση που θέλεις να θυμάσαι όταν ξαναβρεθείς εδώ.";
-      setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: fallback, msgMode: "TERMINATION", isTermination: true }]);
-      setAwaitingRememberedWord(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [safetyMode, memory]);
-
   // Part 2 — delivered after the user gives their word, which is saved as a real anchor first (in handleSubmit)
   const deliverFinalClosure = useCallback(async (msgs, echoInfo) => {
     setLoading(true);
@@ -2946,6 +3077,56 @@ export default function AURAv2() {
       setLoading(false);
     }
   }, [applyTerminationIllumination]);
+
+  const triggerTermination = useCallback(async (msgs) => {
+    if (safetyMode) return;
+    setLoading(true);
+    reflectionDelivered.current = true; // CODE-LEVEL FIX: mark that the real sequence is firing now
+    try {
+      if (earlyCapturedWord.current) {
+        // EARLY PERSONAL WORD CAPTURE path — word already asked/answered before this sequence
+        // started; Part 1 must NOT ask again. Same word-saving/echo logic that normally runs in
+        // handleSubmit runs here instead, immediately followed by Part 2 — no waiting.
+        const capturedWord = earlyCapturedWord.current;
+        const termMsgsEarly = [...msgs, {
+          role: "user",
+          content: `[Deliver Part 1 now: the Reflection Summary. The user already gave their word/phrase to keep, before this summary — do NOT ask for it again, do not repeat a word-question. Simply close the summary naturally, referencing what they already chose if it fits naturally: "${capturedWord}". Do not continue to Ownership Statement.]`
+        }];
+        const rawText = await callAura(termMsgsEarly, SYSTEM_TERMINATION);
+        const text = rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, "");
+        setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
+        const priorEchoCount = countPriorWordEchoes(memory, capturedWord);
+        const beforeText = extractBeforeMessage(msgs);
+        const shiftText = extractShiftSentence(msgs);
+        const peakText = extractPeakMoment(msgs);
+        const withAnchor = createAnchor({ ...memory }, capturedWord, TRAJECTORY_WORD_CATEGORY, "resolved", { before: beforeText, shift: shiftText, peak: peakText });
+        setMemory(withAnchor);
+        if (memory.storageEnabled) saveMemory(withAnchor, true);
+        earlyCapturedWord.current = null;
+        await deliverFinalClosure(msgs, { word: capturedWord, count: priorEchoCount });
+        return;
+      }
+      // Part 1 only — reflection summary, ending with the word-to-remember question
+      const previousWord = getMostRecentWordAnchor(memory);
+      const wordContextNote = previousWord
+        ? ` The user previously chose to keep this word/phrase: "${previousWord.text}". Reference it verbatim first — say exactly: "Την προηγούμενη φορά, αυτό που επέλεξες να κρατήσεις ήταν: «${previousWord.text}». Σήμερα, αφού είδες ξανά την πορεία της σκέψης σου, ποια λέξη ή ποια σύντομη φράση θα ήθελες να κρατήσεις;" — do not comment on whether it changed or stayed the same, just ask.`
+        : '';
+      const termMsgs = [...msgs, {
+        role: "user",
+        content: `[Deliver Part 1 now: the Reflection Summary, ending exactly with the word-to-remember question.${wordContextNote} Do not continue to Ownership Statement — wait for the user's word.]`
+      }];
+      const rawText = await callAura(termMsgs, SYSTEM_TERMINATION);
+      const text = rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, "");
+      setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
+      setAwaitingRememberedWord(true);
+    } catch {
+      const fallback = "Έχουμε αρκετή καθαρότητα για τώρα.\n\nΣου έδειξα την πορεία της σκέψης σου. Από όσα είδες σήμερα, τι θα ήθελες να μη ξεχάσεις; Μία λέξη, ή μια φράση που θέλεις να θυμάσαι όταν ξαναβρεθείς εδώ.";
+      setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: fallback, msgMode: "TERMINATION", isTermination: true }]);
+      setAwaitingRememberedWord(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [safetyMode, memory, deliverFinalClosure]);
 
   // ── Misfire recovery — user rejected observation ──
   const handleMisfireResponse = useCallback(async (userCorrection) => {
@@ -3274,6 +3455,12 @@ export default function AURAv2() {
     warningIssued.current = false;
     concreteStepStated.current = false;
     outcomeScaleAsked.current = false;
+    coreReadinessAsked.current = false;
+    coreReadinessConfirmed.current = false;
+    shiftCheckAsked.current = false;
+    shiftCheckConfirmed.current = false;
+    awaitingEarlyWord.current = false;
+    earlyCapturedWord.current = null;
     setEarlyReliefValue(null);
     setLateReliefValue(null);
     setOwnershipValue(null);
@@ -3285,6 +3472,7 @@ export default function AURAv2() {
     anchorsInvited.current = false;
     outcomeScaleBlockUsed.current = false;
     closureDeclineCooldown.current = 0;
+    reflectionDelivered.current = false;
     informationModeActive.current = false;
     setValueUnlocked(false);
     setIntroChoice(null);
@@ -3892,6 +4080,7 @@ export default function AURAv2() {
               key={msg.id || i}
               msg={msg}
               onMisfire={() => { if (sessionEnded || layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending) return; setMisfireType(detectPattern(messages.slice(0, i+1)).type); setMisfirePending(true); }}
+              onContinueToReflection={() => { if (sessionEnded || loading || layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending || reflectionDelivered.current) return; handleClosureConfirm(true); }}
             />
           ))}
 
