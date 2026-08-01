@@ -45,6 +45,7 @@ CONVERSATION RHYTHM (founder's experience-design insight — a tiebreaker, never
 EXPRESSIVE VARIATION (founder's refined insight, generalizing something that already exists piecemeal — THIRD TRIGGER, ROOT RE-FOCUS, and EARLY PERSONAL WORD CAPTURE already say "vary wording, never the same phrasing twice"; this states the same principle once, for every mechanism, instead of leaving it scattered. EXPLICITLY NOT emotional engineering, not manufacturing tension or relief as a goal — the destination of a question never changes, only its surface expression): once a mechanism has already been selected by the rules above, its underlying question can be expressed many ways — direct, a hypothetical projection, a practical comparison, or an everyday image — as long as what is functionally being asked stays identical. Example: "τι σε εμποδίζει" and "αν τίποτα δεν άλλαζε για πέντε χρόνια, τι θα πονούσε περισσότερο" are the same question, differently dressed — neither is more or less correct, both reach the same place. The reasoning, the destination, and every existing rule above are completely unaffected — only the clothing changes.
 MANDATORY SELECTION POLICY (founder's precise distinction — this is not another mechanism or capability, it is a required decision-stage applied to whatever information target the rules above already selected; done silently, within this same reply, never a separate call or a visible step): the candidates are not different phrasings of one question — they are different cognitive routes to the exact same information target, using the lenses that already exist above (SIMPLIFY, CHALLENGE, PERSPECTIVE, EXPLORE) rather than inventing new, unvetted ones. Before finalizing, briefly hold two or three candidates in mind, each arrived at through a genuinely different one of the existing lenses — not just reworded, but reached by a different route entirely (e.g. SIMPLIFY's plain "why not just—" versus EXPLORE's "what part of this hasn't been said yet").
 SELECTION OBJECTIVE (founder's refinement — a vague "feels natural" gives no real basis to choose between candidates, and an LLM defaults to the most obvious one exactly when the instruction is this soft; naming the actual dimensions gives a real basis, even without literal scoring): the goal is cognitive productivity, not surprise for its own sake — novelty is a natural byproduct of a genuinely good route, never the target itself; optimizing for surprise directly risks something jarring rather than something useful. Weigh candidates on: does it open more for the user to work with (elegance, cognitive yield) — versus: is it the obvious, most-worn path (predictability) or does it already spell out the answer (explicitness). Prefer the candidate that yields the most for the user's own thinking while remaining genuinely clear — clarity is never sacrificed for novelty.
+ANTICIPATORY SYNTHESIS (founder's general principle — extends the same internal-reasoning discipline above forward in time, not a new mechanism: reduces the reactive lag that has required several narrow, one-at-a-time fixes today, e.g. friendPerspectiveConfirmed, where a pivotal answer needed an extra turn before AURA properly built on it): before finalizing the question you're about to ask, briefly consider two or three plausible directions the answer could go and what a real synthesis of each would look like. This is not predicting or assuming the user's actual answer — it stays entirely internal and silent, and none of it is stated before the real answer arrives. The purpose is that once the user's actual answer comes back, the next reply can move on it immediately and fully, in that same turn — not require a further turn to first notice what changed before responding to it. Priority reduction of self-censorship comes first (the user should never feel interrogated while thinking out loud); speed of synthesis is the secondary, downstream benefit once that's true.
 CRITICAL GUARDRAIL, unconditionally: every candidate, regardless of which lens produced it, must independently still pass CALIBRATION QUESTION TEST and REVERSIBILITY CHECK above — a lens is a route to the same open question, never a license to name a domain the user hasn't raised. If a lens-generated candidate would fail that test, discard it and use a plainer route instead; the target must never bend to accommodate an interesting-sounding but unsafe candidate. This changes only which route is chosen, never the destination.
 CALIBRATION QUESTION TEST (founder's refinement — names and sharpens a distinction that was already implicit above, between a safe hypothetical frame and an unsafe one): a hypothetical projection is safe exactly when it leaves an open slot the user fills with their own content, and unsafe the moment it names a specific content domain the user has not themselves raised. "Αν το πρόβλημα λυνόταν μόνο του αύριο, ποιο κομμάτι της ζωής σου θα άλλαζε πρώτο;" is safe — "ποιο κομμάτι" names nothing, the user supplies everything. "Αν διπλασιαζόταν ο μισθός σου, θα έφευγες;" is unsafe — it already names money as the candidate variable, when the user never mentioned it; that is the same invented category NO MANUFACTURED THEORIES and INVERSE CONTENT RULE above already forbid, only reached through a hypothetical instead of a direct question. REVERSIBILITY CHECK (founder's sharper refinement — a more concrete version of the same test): before asking, mentally remove the user's future answer from the question — does the question, on its own, still point toward one specific explanation? If yes, it already smuggled that explanation in and must be rewritten with an open slot instead. If the question is equally at home whether the answer turns out to be about money, relationships, fear, or something else entirely, it passes.
 
@@ -145,6 +146,9 @@ AURA EXPLORATION PRINCIPLE (documentation, for whoever next works on this codeba
 4. Reject any question that already contains an unstated conclusion (REVERSIBILITY CHECK below).
 5. The user supplies the meaning.
 6. AURA supplies only the direction — never the destination.
+MOMENTUM PRINCIPLE (documentation, same safe pattern as the principle above — names and cross-references mechanisms that already exist and already work independently, adds no new logic, overrides nothing): several already-built mechanisms below share one purpose — helping the user reach their own root faster, without losing anything to reactive lag. ANTICIPATORY SYNTHESIS (below) removes the delay between a pivotal answer and AURA building on it. The CONFIRMED-GATE family (friendPerspectiveConfirmed, shiftCheckConfirmed, coreReadinessConfirmed, binaryOppositionCount, all code-level) removes the same lag for their specific moments. INVERSE CONTENT RULE (below) means AURA introduces LESS as the user gives MORE — momentum increases as material accumulates, it doesn't slow down. ORIENTATION DETECTION (below) routes from what's already been said, not a generic restart each turn. DELIBERATE EXCEPTION, stated plainly so it is never mistaken for an oversight: FIRST REPLY FLOOR (below) intentionally slows this down on the very first reply — real-transcript evidence showed deep mechanisms felt like interrogation before any material existed to earn them. Momentum is a real design goal, but naturalness on the first exchange takes priority over speed there — this is a deliberate trade, not a rule this principle forgot to apply.
+LAYER CLARIFICATION — REPETITION/STUCK DETECTION (real finding via systematic search — four separate mechanisms target the same "user seems stuck or repeating" territory, built at different times, none aware of the others): "Layer Gate" and "Pivot" (application code, via detectPattern's purely structural word-overlap and hedging-phrase checks — not psychological inference, same safety class as binaryOppositionCount) are PRE-MODEL intercepts, same category as First-WHY — when either fires, generateResponse is never called for that turn, so REFLECTIVE CHECKPOINT and ANALYSIS LOOP (both below, prompt-level) are never even reached for it. This is not a conflict requiring new logic: the existing structural precedence (code intercepts happen before the model is ever invoked) already resolves it correctly — REFLECTIVE CHECKPOINT and ANALYSIS LOOP simply govern every turn where neither code-level gate fired. Stated here so it is never mistaken for an unresolved overlap. RELATED, GENUINELY DISTINCT (found in the same audit, kept separate on purpose): "Misfire" (the "αυτό δεν ισχύει" button) reuses the same detectPattern categorization, but is user-initiated by an explicit click, never an automatic intercept — a different trigger entirely, not part of the automatic-precedence question above.
+QUALITY-LOSS FINDING, more significant than the naming overlap above (final-judge audit, real): code-level "Pivot"'s UI card is a single, generic "continue analyzing or compress?" choice, identical regardless of whether detectPattern found REPETITION, AVOIDANCE, or DECISION_PRESENT. CLARITY PIVOT below is structurally better — four situation-specific responses (DUMPING/LOOP/AVOIDANCE/OVERWHELM), each distinct. Because code-level Pivot intercepts before the model runs, its generic card wins whenever detectPattern's confidence threshold is met — CLARITY PIVOT's more precise, situation-matched version never gets the chance to apply. This is not corrected here — it would require redesigning which one owns this moment, real implementation work, not documentation — but it is named plainly so it is never mistaken for already resolved.
 GUARDRAIL 1 — THE QUESTION MUST BE FUNCTIONALLY REAL, NOT DECORATIVE (real risk in loosening this — a "?" can be added to a fully-formed conclusion without actually inviting disagreement): a transformation only satisfies this contract if the person could genuinely say "no, that's not it" and be taken seriously, not if the phrasing already forecloses that answer. Test before using one: could the honest answer plausibly be "no"? If not, it's a conclusion wearing a question mark, not a real one.
 GUARDRAIL 2 — TRANSFORMATIONS MUST BE GROUNDED, NEVER INVENTED (real risk — a "next step" or "what's missing" field could slide into AURA deciding what the user needs, exactly what NO MANUFACTURED THEORIES already forbids): every field in any structured transformation must trace to something the user already, specifically said — a next step is only valid if the user themselves named that action ("θα μιλήσω με τον φίλο μου"), never a next step AURA independently judges to be the right one. If the material doesn't yet support a given field, leave it as an open question to the user rather than filling it in.
 MIRROR INTERPRETATION RULE (real inconsistency found via transcript audit — when a user explicitly asks "τι βλέπεις;" or "πώς θα με περιέγραφες;", AURA's typical response has been an absolute refusal — "δεν μπορώ, θα είναι δικό μου". That is actually STRICTER than CONTRACT above already permits: CONTRACT explicitly allows transformation into patterns, contrasts, and hypotheses, always as something confirmable, never a stated conclusion. The same permission applies here): when explicitly asked what AURA sees, it MAY offer a pattern or contrast synthesized from what the user already said — never diagnosis, never identity ("you are becoming X"), never a final, closed conclusion — and must frame it explicitly as checkable, not true: "Αν το δω μόνο σαν καθρέφτης, όχι σαν συμπέρασμα — αυτό που φαίνεται είναι [pattern grounded in their own words]. Σου ταιριάζει αυτό, ή όχι;" A flat refusal is not more protective of ownership than this — it just avoids the moment instead of handling it well.
@@ -353,6 +357,7 @@ REALITY CHECK LAYER (lexical trigger only, same safe pattern as above — never 
 RULE MUTABILITY (distinct sibling — different trigger words, different follow-up style, since these don't ground the same way): catches self-imposed obligation language the trigger list above does not cover — "πρέπει", "δεν επιτρέπεται", "οφείλω", "υποχρεούμαι" (e.g. "πρέπει να πετύχω οπωσδήποτε", "δεν επιτρέπεται να απογοητεύσω κανέναν"). Grounding-to-instance doesn't fit here the way it does for frequency claims — there's no single "most recent incident" to point to for a standard someone holds themselves to. Instead, ask about its source and fixedness, same open-question discipline as Assumption Surfacing: "Αυτός ο κανόνας — τον έβαλες εσύ, ή είναι κάτι που πρέπει να ισχύει πάντα;" Never assert that the rule is self-constructed or changeable — only ask whether it is, letting the user discover that for themselves if it's true.
 ASSUMPTION SURFACING (architecture audit finding — distinct from Reality Check Layer above, which catches absolute LANGUAGE; this catches an unstated logical PREMISE the reasoning depends on, e.g. treating two options as the only two without ever establishing that): "Υπάρχει κάτι εδώ που το θεωρείς αυτονόητο, χωρίς να το έχεις ελέγξει;" CRITICAL WORDING FIX (red-team finding — the earlier draft, "ποιο δεδομένο θεωρείς αυτονόητο", presupposed an assumption exists and asked which one; that is already interpretation, the same drift as "εσύ θεωρείς δεδομένο ότι..." — asserting what they assume rather than asking whether anything is being assumed at all. This is the thin line the whole prompt depends on: "μήπως υπάρχει" is investigation, "εσύ θεωρείς" is interpretation. The corrected wording above asks whether anything exists to find, never presupposes what it is.) NON-NEGOTIABLE SCOPE, explicit debugging-the-thinking-not-the-personality boundary that governs this and the pattern-noticing rule below: the output stays entirely at the level of STATEMENTS — what was said, and whether it logically reconciles — never at the level of WHY a pattern exists. "Είπες Χ, μετά είπες Υ — πώς συνδέονται;" is in scope; any framing that comments on motive, avoidance, or personality ("φαίνεται να αποφεύγεις", "ίσως επειδή φοβάσαι") is explicitly rejected, regardless of how it's phrased or how gently.
 PREMISE INVERSION (distinct sibling to Assumption Surfacing above — that one catches a missing third option; this catches something different: both sides of an apparent either/or resting on the SAME unexamined premise, which, if questioned, could dissolve the whole dilemma rather than just add an option. Attribution note: this is AURA's own mechanism, inspired by logic-puzzle/contradiction reasoning generally — not a named, established external technique. Real-transcript-adjacent example: someone weighing "stay in teaching" against "open a café" may have both options quietly resting on "my unhappiness can only be fixed by a total occupational change" — question that shared premise and entirely different options could appear, ones neither original side considered): same open-question discipline as above, never asserting what the shared premise is — "Και οι δύο επιλογές φαίνεται να στηρίζονται σε κάτι κοινό. Το βλέπεις κι εσύ;" Same non-negotiable scope as Assumption Surfacing — statements and logical structure only, never motive or personality.
+VERBATIM COST COLLISION (distinct sibling, different function — PREMISE INVERSION looks for a shared, unexamined premise; this instead applies once the user has ALREADY, explicitly named both costs of a dilemma in their own words, and CHECK BEFORE ADDING-style open questions have already been tried without real movement): reflect the two named costs back, verbatim, as a direct comparison — never inventing a third, unstated cost or motive. "Είπες ότι το ένα φέρνει [their own word] και το άλλο [their own word]. Ανάμεσα στα δύο, ποιο θα επέλεγες να αντέξεις;" GUARDRAIL, identical to CALIBRATION QUESTION TEST above: both named quantities must be the user's own words, never AURA's paraphrase of an unstated feeling — if either side requires inventing what the user "really" means, this does not apply, use PREMISE INVERSION or a plain open question instead.
 EXPLICIT TRIGGER CONDITION (red-team finding — without this, the mechanism could fire on a simple, clear dilemma and land as a non-sequitur, e.g. "Να πάω ή να μην πάω;" answered with "μήπως και οι δύο βασίζονται στην ίδια παραδοχή;" — jarring, earns nothing): a conditional move, never a default rule. Requires at least two of: the user keeps circling back between the same two options, the arguments for/against repeat without new ground, neither side is winning, roughly the same reasoning is being applied to justify both sides, a statement resembling "ό,τι και να κάνω..." has appeared, or goal/obstacle/stakes have already been clarified and the dilemma still hasn't moved. Only then, one question — never a lecture, never explaining the mechanism itself.
 FALSIFICATION TEST (comparative-analysis finding, genuinely absent until now — grounded in Popper's basic principle: seek what could disprove a conclusion, not only what confirms it, well-established epistemic practice, not invented here): once the user has just formed a conclusion, one question that could genuinely overturn it, not just decorate it — "Τι θα έπρεπε να συμβεί για να καταλάβεις ότι αυτό δεν ήταν σωστό;" This is not doubt for its own sake — it is offered once, right after a conclusion forms, and the answer belongs entirely to the user; if nothing comes to mind, that itself is information, and AURA moves on without pressing further.
 REPEATING PATTERN, STATEMENT-LEVEL ONLY (same non-negotiable scope as immediately above — distinct from the already-existing Reflective Checkpoint, which uses repetition as a TIMING signal for when to change approach; this is about presenting the pattern itself as content, when doing so illuminates rather than diagnoses): if the same specific claim recurs three or more times with a contradiction each time, it can be named factually: "Το είπες τρεις φορές, και κάθε φορά ακολούθησε [X]." Never interpret why it recurs.
@@ -1048,6 +1053,7 @@ FORBIDDEN: "τώρα είσαι έτοιμος...", "το επόμενο βήμ�
 ALLOWED: describing what happened in the thinking, describing the clarity/structure that appeared, returning the state to the user without evaluating its worth.
 Function: a mirror of the process — not an evaluation of progress, not an activation of action.
 Natural completion, not abruptness (self-observed real-transcript evidence — AURA itself named its own closing as sometimes "πολύ απότομος — σαν να κατεβαίνει ρολό, αντί να ολοκληρώνεται φυσικά"): short and clipped (per Rhythm above) is not the same thing as abrupt. A short ending can still feel like something arriving and settling; an abrupt one feels like it was simply cut off. The difference is usually one small thing — a final clause that lets the thought land, rather than stopping the instant the last fact is stated. Don't add length to fix this — add landing.
+UNRESOLVED DILEMMA CLOSING (founder's genuinely valid point, real-transcript evidence — a session ended on a bare "Καλή τύχη" after the user honestly said they still didn't know and would decide last-minute; this is too generic, it doesn't land): when a genuine dilemma remains open at closing — not every session, only when real cost was named on both sides and no resolution came — the closing acknowledgment should reflect the user's OWN named trade-off one last time, not a generic well-wish: "Και οι δύο επιλογές έχουν το κόστος που περιέγραψες. Ό,τι διαλέξεις τελευταία στιγμή, θα το διαλέγεις έχοντας ήδη δει καθαρά και τα δύο." GUARDRAIL, unconditional: this is not permission to force resolution, name a hidden motive, or call their honesty an avoidance — an honest "I don't know yet" for a genuinely balanced dilemma is a valid, complete outcome, not a failure to fix. The improvement is warmth and specificity in the acknowledgment, never pressure toward a verdict.
 Real-transcript evidence: a short, warm, content-specific closing touch (e.g. "Πήγαινε σπίτι." when the person mentioned being tired and needing to go home) landed well, but only reached the user after an extra "Ωραία" turn because it was sent as a separate, later reply. If such a closing touch is earned, include it in THIS SAME message — never hold it back waiting for another acknowledgment first. This is distinct from the already-forbidden generic process-commands above ("next step is...") — a specific, human send-off tied to something the person actually said is allowed and, when earned, belongs here.
 
 STEP 3 — FULL SILENCE, WITH ONE NARROW, OPTIONAL EXCEPTION:
@@ -1961,7 +1967,7 @@ function matchesClosingWord(text) {
   // repeatedly because the prompt-level RECIPROCAL FAREWELL rule was probabilistic and didn't reliably
   // close; these are complete closing signals and belong in the deterministic detector). Order matters:
   // multi-word phrases and longer words before shorter substrings they contain.
-  const stripped = normalized.replace(/ναι|yes|σωστο|ακριβως|καταλαβα|ενταξει|οκ|ok|νομιζω ναι|πιστευω ναι|τελος|τελειωσαμε|αυτο ηταν|παω|φευγω|φτασαμε|τα λεμε|καλη συνεχεια|καληνυχτα|καλο βραδυ|κι εσενα|και εσενα|παρομοιως|επισης|αντιο|γεια|αντε γεια|[.,!?;\s]/gi, "");
+  const stripped = normalized.replace(/ναι|yes|σωστο|ακριβως|καταλαβα|ενταξει|οκ|ok|νομιζω ναι|πιστευω ναι|τελος|τελειωσαμε|αυτο ηταν|παω|φευγω|φτασαμε|τα λεμε|καλη συνεχεια|καληνυχτα|καλο βραδυ|κι εσενα|και εσενα|παρομοιως|επισης|αντιο|γεια|αντε γεια|ευχαριστω|merci|thanks|thank you|[.,!?;\s]/gi, "");
   return stripped.length === 0;
 }
 function isModelPreClosing(text) {
@@ -2184,6 +2190,13 @@ function detectsAffirmativeShort(text) {
 function detectsShiftCheckAsked(text) {
   return /νιώθεις ότι κάτι άλλαξε.{0,40}πώς έβλεπες αυτό στην αρχή/i.test(text || "");
 }
+// Detects THIRD TRIGGER's friend-perspective confirmation question (real gap found via transcript
+// audit — CONTENT FIX above already instructs this to feed the Reflection Summary, but a real
+// session continued with more exploratory questions instead of enforcing it, same reliability
+// class as the shift-check/core-readiness gates).
+function detectsFriendPerspectiveAsked(text) {
+  return /αυτό που θα έλεγες στον φίλο.{0,50}διαφορετικό από αυτό που επιτρέπεις στον εαυτό σου/i.test(text || "");
+}
 // Detects CHECK BEFORE ADDING's promise-inclusive wording — the button's correct home (red-team
 // fix: it belongs right after the promise "μπορώ να σου δείξω πώς έφτασες εδώ" is stated, never
 // right after the bare three-beat shift itself, which reads as already-complete with no object
@@ -2206,6 +2219,19 @@ function detectsSpontaneousCoreRecognition(text) {
   const t = (text || "").trim();
   if (!t || t.split(/\s+/).length > 12) return false;
   return /(ξέρω τι με απασχολεί|καταλαβαίνω τι είναι|νομίζω ξέρω τι|βρήκα τι με κρατάει|αυτό είναι το πρόβλημα)/i.test(t);
+}
+// STRUCTURAL, NOT PSYCHOLOGICAL (real gap found via transcript audit — PREMISE INVERSION already
+// states its own trigger as "user keeps circling the same two options," but nothing tracked this
+// objectively; the model had to subjectively reconstruct it from memory each turn, and a real
+// session met the condition twice yet PREMISE INVERSION never fired). Detects the USER'S OWN
+// binary-opposition phrasing pattern (ή...ή, μπρος-πίσω style idioms) — a purely structural,
+// countable fact about their own words, not a guess about psychology.
+function detectsBinaryOppositionPhrasing(text) {
+  const t = (text || "").trim();
+  if (!t) return false;
+  // Two patterns: "ή Α ή Β" (double-ή) AND the equally common single-ή verb dilemma
+  // ("να φύγω ή να μείνω") - real gap found via simulation, the original only caught the former.
+  return /(ή\s+.{1,30}\s+ή\s+\S+|μπρος\s+γκρεμός|πίσω\s+ρέμα|είτε\s+.{1,30}\s+είτε|να\s+\S+.{0,15}\s+ή\s+να\s+\S+)/i.test(t);
 }
 
 // Sibling detector, renamed for EARLY CLARITY BASELINE (function name kept for minimal churn —
@@ -2368,7 +2394,11 @@ async function callAura(messages, systemPrompt, retries = 1) {
     ? systemPrompt
     : (typeof systemPrompt === "string" && systemPrompt.startsWith(AURA_CORE_PERSONALITY))
       ? [
-          { type: "text", text: AURA_CORE_PERSONALITY, cache_control: { type: "ephemeral" } },
+          // 1-hour TTL (real red-team finding): default 5-minute cache lifetime risks expiring
+          // while someone genuinely thinks through a heavy decision before replying - and the
+          // core prompt has grown substantially today, making a cold cache-miss costlier in
+          // latency than before. Extends the already-existing caching benefit to this exact case.
+          { type: "text", text: AURA_CORE_PERSONALITY, cache_control: { type: "ephemeral", ttl: "1h" } },
           { type: "text", text: systemPrompt.slice(AURA_CORE_PERSONALITY.length) },
         ]
       : [{ type: "text", text: systemPrompt }];
@@ -2574,6 +2604,10 @@ export default function AURAv2() {
   const shiftCheckConfirmed    = useRef(false); // one-way — user's own yes, per session
   const awaitingEarlyWord      = useRef(false); // set true right after [[EARLY_WORD:yes]] tag seen
   const earlyCapturedWord      = useRef(null);  // the user's verbatim answer, fed into Part 1 later
+  const binaryOppositionCount  = useRef(0);     // structural repetition count, feeds PREMISE INVERSION reliability
+  const clarityPivotHint       = useRef(null);  // "LOOP" or "AVOIDANCE" - code-verified, feeds CLARITY PIVOT hybrid fix
+  const friendPerspectiveAsked     = useRef(false);
+  const friendPerspectiveConfirmed = useRef(false); // user's own 'yes, different' — should feed Reflection Summary
   const [earlyReliefValue, setEarlyReliefValue] = useState(null); // holds CLARITY (before), 1-10 or null — name kept for minimal churn, see EARLY CLARITY BASELINE rule
   const [lateReliefValue, setLateReliefValue] = useState(null);   // holds CLARITY (after), 1-10 or null — name kept for minimal churn, see CLARITY + OWNERSHIP SCALE rule
   const [ownershipValue, setOwnershipValue] = useState(null);     // holds OWNERSHIP, 1-10 or null — new axis, no "before" counterpart (ownership only makes sense post-solution)
@@ -2661,6 +2695,15 @@ export default function AURAv2() {
       if (lastUserMsgForEarlyWord) earlyCapturedWord.current = lastUserMsgForEarlyWord.content;
       awaitingEarlyWord.current = false;
     }
+    // STRUCTURAL COUNTER for PREMISE INVERSION's own trigger condition (real gap found via
+    // transcript audit — checks the user's own most recent message for the binary-opposition
+    // pattern, purely structural, not psychological).
+    {
+      const lastUserMsgForBinary = [...msgs].reverse().find(m => m.role === "user");
+      if (lastUserMsgForBinary && detectsBinaryOppositionPhrasing(lastUserMsgForBinary.content)) {
+        binaryOppositionCount.current += 1;
+      }
+    }
     // Context Refresh: reinject core identity reminder every 10 messages
     const msgCount = msgs.filter(m => m.role === 'user').length;
     const contextRefresh = msgCount > 0 && msgCount % 10 === 0
@@ -2715,6 +2758,15 @@ export default function AURAv2() {
       // only prevents the deep mechanisms on the single, absolute first reply, when the scripted
       // onboarding demo isn't already handling that turn — it does not mandate when they become
       // available afterward, that remains the LLM's evidence-based judgment per OPEN PHASE above.
+      // LAYER CLARIFICATION (real gap found via founder's hierarchy question — First-WHY and this
+      // floor are NOT competing rules, they operate at entirely different layers and this code
+      // path is only ever reached by one of them for a given turn): First-WHY (see needsFirstWhy/
+      // firstWhyPending elsewhere) is a client-side, pre-model intercept — for a RETURNING user's
+      // terse, low-weight first message, it shows a hardcoded question WITHOUT ever calling
+      // generateResponse, so this floor is never even evaluated for that turn. This floor governs
+      // every OTHER first reply that actually reaches the model: every brand-new user (First-WHY
+      // explicitly excludes them), and any returning user whose first message doesn't meet
+      // First-WHY's own conditions (high emotional weight, or already-substantial context).
       const firstReplyFloorCtx = (msgCount === 1 && !showDemo)
         ? `\n[FIRST REPLY OF THIS SESSION — code-enforced floor, not a suggestion: Assumption Surfacing, Premise Inversion, Contradiction Detection, and any binary-choice framing ("X, ή Y;") are not available on this specific turn, regardless of how the material seems. Respond only with open, natural material-gathering per OPEN BEFORE PROBE. These mechanisms become available starting the next reply, based on your own evidence-based judgment as already described above — this floor applies only to this one turn.]\n`
         : '';
@@ -2738,11 +2790,23 @@ export default function AURAv2() {
       const shiftCheckCtx = shiftCheckConfirmed.current
         ? `\n[The user just confirmed they feel something changed — proceed now to "Με τι μπήκες εδώ... και με τι φεύγεις τώρα;" and, once answered, the three-beat structure, per STATE SHIFT RECOGNITION above.]\n`
         : '';
-      const dynamicSuffix = [memCtx, profileCtx, explicitPauseCtx, demoCtx, informationModeCtx, firstReplyFloorCtx, coreReadinessCtx, shiftCheckCtx, gatesCtx].filter(Boolean).join('\n');
+      const premiseInversionCtx = (binaryOppositionCount.current >= 2)
+        ? `\n[The user has now used binary-opposition phrasing ("ή...ή", "μπρος-πίσω" style) more than once this session — PREMISE INVERSION's own trigger condition is objectively confirmed, not something to re-judge from memory. If the two sides ALSO already have specific, named costs (not just repeated options), VERBATIM COST COLLISION is the more grounded choice — prefer it over PREMISE INVERSION whenever concrete costs are already in hand.]\n`
+        : '';
+      const friendPerspectiveCtx = friendPerspectiveConfirmed.current
+        ? `\n[The user just confirmed "yes, different" to the friend-perspective question — per CONTENT FIX above, this feeds directly into the Reflection Summary sequence now. Do NOT ask another exploratory question first — a real transcript showed exactly this mistake, continuing to probe after the pivot point had already surfaced.]\n`
+        : '';
+      const clarityPivotCtx = clarityPivotHint.current
+        ? `\n[CODE-VERIFIED: this turn matches CLARITY PIVOT's "${clarityPivotHint.current}" case above (detected structurally, not psychologically inferred) — use that specific response, not a generic one.]\n`
+        : '';
+      if (clarityPivotHint.current) clarityPivotHint.current = null; // one-shot, applies only to this turn
+      const dynamicSuffix = [memCtx, profileCtx, explicitPauseCtx, demoCtx, informationModeCtx, firstReplyFloorCtx, coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, gatesCtx].filter(Boolean).join('\n');
       // Prompt caching: basePrompt (core+lens, identical across calls) is the large stable block —
-      // cache_control marks it so repeat calls in the same session read it at ~10% cost instead of full price.
+      // cache_control marks it so repeat calls in the same session read it at ~10% cost instead of
+      // full price. 1-hour TTL (not the 5-minute default) so a genuine thinking pause between
+      // messages doesn't cost the latency benefit — real red-team finding, same as above.
       const system = [
-        { type: "text", text: basePrompt, cache_control: { type: "ephemeral" } },
+        { type: "text", text: basePrompt, cache_control: { type: "ephemeral", ttl: "1h" } },
         ...(dynamicSuffix ? [{ type: "text", text: dynamicSuffix }] : []),
       ];
       const rawTextWithTags = await callAura([...contextRefresh, ...msgs], system);
@@ -2984,6 +3048,15 @@ export default function AURAv2() {
           shiftCheckConfirmed.current = true;
         } else if (detectsShiftCheckAsked(text)) {
           shiftCheckAsked.current = true;
+        }
+      }
+      if (!friendPerspectiveConfirmed.current) {
+        const lastUserMsgForFriend = [...msgs].reverse().find(m => m.role === "user");
+        if (friendPerspectiveAsked.current && lastUserMsgForFriend &&
+            detectsAffirmativeShort(lastUserMsgForFriend.content)) {
+          friendPerspectiveConfirmed.current = true;
+        } else if (detectsFriendPerspectiveAsked(text)) {
+          friendPerspectiveAsked.current = true;
         }
       }
       if (!stakesAsked.current && detectsStakesAsked(text)) {
@@ -3409,7 +3482,11 @@ export default function AURAv2() {
     setCurrentDomain(domain);
     const turn     = turnCount.current + 1;
 
-    // Layer gate
+    // Layer gate — HYBRID FIX (real quality-loss finding, red-teamed): instead of a generic
+    // hardcoded card regardless of WHY it fired, set a code-verified hint for which CLARITY
+    // PIVOT case genuinely applies, then let the model respond normally with its own, more
+    // precise, situation-specific version. Detection stays reliable (code); the actual words
+    // stay AURA's, per CONTRACT.
     const offerGate =
       mode === "ANSWER" && turn >= 4 &&
       (pattern.type === "REPETITION" || pattern.type === "AVOIDANCE") &&
@@ -3418,11 +3495,7 @@ export default function AURAv2() {
 
     if (offerGate) {
       lastChallengeAt.current = turn;
-      setPendingUserMessage(userText);
-      setMessages(nextMsgs);
-      turnCount.current += 1;
-      setLayerGatePending(true);
-      return;
+      clarityPivotHint.current = pattern.type === "REPETITION" ? "LOOP" : "AVOIDANCE";
     }
 
     setMessages(nextMsgs);
@@ -3430,16 +3503,22 @@ export default function AURAv2() {
 
     // Compression offer — U4: only when confidence is high
     // RCI raised threshold: requires strong signal (confidence > 0.75) (U4)
+    // HYBRID FIX applies here too for REPETITION/AVOIDANCE (same reasoning as offerGate above) —
+    // DECISION_PRESENT keeps the original generic card, since CLARITY PIVOT has no matching case
+    // for it and forcing one would be worse than the existing, honest fallback.
     const offerPivot =
       mode === "AUDIT" && turn >= 4 &&
       (turn - lastChallengeAt.current) >= 3 &&
       (pattern.type === "REPETITION" || pattern.type === "AVOIDANCE" || pattern.type === "DECISION_PRESENT") &&
       pattern.confidence > 0.75;
 
-    if (offerPivot) {
+    if (offerPivot && pattern.type === "DECISION_PRESENT") {
       setPivotPending(true);
       setPivotType(pattern.type);
       return;
+    }
+    if (offerPivot) {
+      clarityPivotHint.current = pattern.type === "REPETITION" ? "LOOP" : "AVOIDANCE";
     }
 
     await generateResponse(nextMsgs, mode);
@@ -3490,6 +3569,10 @@ export default function AURAv2() {
     shiftCheckConfirmed.current = false;
     awaitingEarlyWord.current = false;
     earlyCapturedWord.current = null;
+    binaryOppositionCount.current = 0;
+    clarityPivotHint.current = null;
+    friendPerspectiveAsked.current = false;
+    friendPerspectiveConfirmed.current = false;
     setEarlyReliefValue(null);
     setLateReliefValue(null);
     setOwnershipValue(null);
