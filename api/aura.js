@@ -30,12 +30,18 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
 
+    // STREAMING SUPPORT (added — perceived-speed improvement): pass-through, backward
+    // compatible. wantsStream defaults to false, so any existing caller that doesn't send
+    // stream:true gets the exact original, unchanged behavior below.
+    const wantsStream = body.stream === true;
+
     // Whitelist only the fields AURA needs — strip anything else
     const safeBody = {
       model: body.model,
       max_tokens: Math.min(body.max_tokens || 1000, 1000),
       system: body.system,
       messages: body.messages,
+      ...(wantsStream ? { stream: true } : {}),
     };
 
     const upstream = await fetch("https://api.anthropic.com/v1/messages", {
@@ -48,8 +54,37 @@ export default async function handler(req, res) {
       body: JSON.stringify(safeBody),
     });
 
-    const data = await upstream.json();
-    return res.status(upstream.status).json(data);
+    if (!wantsStream) {
+      // ORIGINAL, UNCHANGED PATH — exact same behavior as before this change.
+      const data = await upstream.json();
+      return res.status(upstream.status).json(data);
+    }
+
+    // STREAMING PATH: pipe Anthropic's Server-Sent Events straight through to the client,
+    // unmodified. AURA's own text-processing (tag stripping, ΑΡΑ backstop) stays entirely
+    // client-side and entirely unchanged — this only changes how bytes arrive, not what
+    // they mean.
+    if (!upstream.ok || !upstream.body) {
+      const errData = await upstream.json().catch(() => ({ error: "Upstream error" }));
+      return res.status(upstream.status || 502).json(errData);
+    }
+
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      "Connection": "keep-alive",
+    });
+
+    const reader = upstream.body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+    } finally {
+      res.end();
+    }
   } catch (err) {
     return res.status(502).json({ error: "Upstream error" });
   }
