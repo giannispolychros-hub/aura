@@ -1922,13 +1922,30 @@ function exportMemory(mem) {
 
 // ── Session context builder ──
 // Injects minimal relevant memory into system prompt (no facts, only trajectory signals)
+// SECURITY (confirmed vulnerability, proof-of-concept verified — adversarial red team):
+// user-authored text (anchor phrases, recent messages) is interpolated into prompt contexts.
+// Without this, a crafted anchor could escape its quoted string with newlines/quotes and become
+// a standalone directive line inside the [MEMORY CONTEXT] block — a PERSISTENT injection that
+// survives in localStorage across every future session, in the system-prompt position. This
+// neutralizes the structural characters that make such an escape possible, while leaving
+// ordinary text (including Greek punctuation and normal quotes in the middle of a phrase)
+// fully intact and readable.
+function sanitizeForPromptContext(text, maxLen = 300) {
+  return String(text || "")
+    .replace(/[\r\n]+/g, " ")        // no line breaks — cannot become its own directive line
+    .replace(/["""]/g, "'")          // no double quotes — cannot close the wrapping string
+    .replace(/[\[\]]/g, "")          // no brackets — cannot fake a [SYSTEM ...] block
+    .slice(0, maxLen)                // bounded — cannot flood the context window
+    .trim();
+}
+
 function buildMemoryContext(mem, category) {
   if (!mem.storageEnabled) return "";
   const traj = mem.trajectories.find(t => t.category === category);
   const obstacle = getStableObstacle(mem, category);
   const openAnchor = mem.anchors.find(a => a.status === "open" && a.category === category);
   const parts = [];
-  if (openAnchor) parts.push(`Open decision from previous session: "${openAnchor.text}"`);
+  if (openAnchor) parts.push(`Open decision from previous session: "${sanitizeForPromptContext(openAnchor.text)}"`);
   if (traj && traj.sessions >= 2) parts.push(`User has returned to this category ${traj.sessions} times.`);
   if (obstacle) parts.push(`Recurring obstacle (confirmed ${obstacle.confirmedCount}x): ${obstacle.type}.`);
   // Defensive `|| []` — existing stored memory objects created before this field existed won't
@@ -3401,7 +3418,7 @@ export default function AURAv2() {
 
     if (accept) {
       const userMsgs   = messages.filter(m => m.role === "user");
-      const ctxSummary = userMsgs.slice(-3).map(m => m.content).join(" / ");
+      const ctxSummary = userMsgs.slice(-3).map(m => sanitizeForPromptContext(m.content, 200)).join(" / ");
       const pivotMsgs  = [
         ...messages,
         { role: "user", content: `[Signal: ${pivotType}. Context: ${ctxSummary}. Apply Compression. Surface friction. Do not diagnose or pressure.]` }
@@ -3499,7 +3516,13 @@ export default function AURAv2() {
     if (!input.trim() || loading || sessionEnded || submittingRef.current) return;
     submittingRef.current = true; // RT-15: close same-tick double-invocation window
     try {
-    const userText = input.trim();
+    // SECURITY (confirmed vulnerability, proof-of-concept verified): control tags are parsed
+    // from AURA's own output, but AURA legitimately reflects the user's words verbatim in many
+    // places — so a user typing "[[EXIT:yes]]" could have it echoed back and then parsed as
+    // AURA's own tag, prematurely ending the session or hijacking flow. Neutralized here at the
+    // single entry point: the bracket structure is broken so the text still reads normally to
+    // both the user and the model, but can never match the tag-parsing regexes downstream.
+    const userText = input.trim().replace(/\[\[(EXIT:(yes|no)|EARLY_WORD:yes)\]\]/gi, "(  $1  )");
     setInput("");
     setError(null);
 
