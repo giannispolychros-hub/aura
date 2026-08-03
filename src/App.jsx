@@ -1687,6 +1687,14 @@ function parseThreeBeatShift(text) {
   if (!brought.trim() || !found.trim() || !changed.trim()) return null;
   return { brought: brought.trim(), found: found.trim(), changed: changed.trim() };
 }
+// DORMANT — NOT WIRED INTO THE APPLICATION (adversarial self-audit finding): this function is
+// defined and covered by 12 passing tests in test_anchor_coverage.js, but is called ZERO times
+// anywhere in the app. The tests therefore validate logic that never actually runs — a green
+// suite giving false confidence. Deliberately left executable-unchanged rather than wired in or
+// deleted: wiring it would activate untested-in-production behavior, and deleting it would
+// discard work that may be wanted later. Either is a product decision, not a safety fix, per
+// the standing "Measurement Before Modification" principle. If it is ever wired in, this
+// comment must be removed and its test header updated to reflect that it now runs live.
 function checkAnchorCoverage(messagesAfterAnchors, anchorWords) {
   // Reliability approach: exact substring match first (catches phrases and unchanged words),
   // then conservative single-word stemming as a second pass (catches genuine grammatical case
@@ -2307,7 +2315,12 @@ function detectsBinaryOppositionPhrasing(text) {
   if (!t) return false;
   // Two patterns: "ή Α ή Β" (double-ή) AND the equally common single-ή verb dilemma
   // ("να φύγω ή να μείνω") - real gap found via simulation, the original only caught the former.
-  return /(ή\s+.{1,30}\s+ή\s+\S+|μπρος\s+γκρεμός|πίσω\s+ρέμα|είτε\s+.{1,30}\s+είτε|να\s+\S+.{0,15}\s+ή\s+να\s+\S+)/i.test(t);
+  // ADVERSARIAL AUDIT FINDING (4 of 7 realistic phrasings bypassed the original): the old
+  // pattern required a "να" prefix and capped the gap at 30 chars, so "φεύγω ή μένω",
+  // "δουλειά ή οικογένεια", longer real dilemmas, and ALL English input escaped it — leaving
+  // binaryOppositionCount permanently at 0 and PREMISE INVERSION effectively dormant for the
+  // majority of real messages. Broadened to bare verbs/nouns, a 60-char gap, and English.
+  return /(ή\s+.{1,60}?\s+ή\s+\S+|μπρος\s+γκρεμός|πίσω\s+ρέμα|είτε\s+.{1,60}?\s+είτε|(να\s+)?\S+[\w\u0370-\u03ff]{2,}\s*,?\s+ή\s+(να\s+)?\S*[\w\u0370-\u03ff]{2,}|\b(whether|should I)\b.{1,60}?\bor\b|\bor\s+(should\s+I|not)\b)/i.test(t);
 }
 
 // Sibling detector, renamed for EARLY CLARITY BASELINE (function name kept for minimal churn —
@@ -2965,7 +2978,17 @@ export default function AURAv2() {
       const selfRepetitionCtx = selfRepCheck.repeated
         ? `\n[CODE-VERIFIED: your own last 2 replies were structurally similar (${selfRepCheck.sameOpening ? "same opening phrase" : "high word overlap"}) — this is exactly the kind of "no genuine movement" evidence that should trigger the Strategy Change pillar (see STRATEGY SWITCH TIMING/WHICH FAMILY TO SWITCH TO above), not just a wording tweak. Draw from a region of INTERVENTION SPACE you have not used yet this session.]\n`
         : '';
-      const dynamicSuffix = [memCtx, profileCtx, explicitPauseCtx, demoCtx, informationModeCtx, firstReplyFloorCtx, coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, gatesCtx].filter(Boolean).join('\n');
+      // ATTENTION-ORDER FIX (decision-architecture audit finding): position inside injected context
+      // affects how reliably an instruction is followed, and firstReplyFloorCtx — a HARD floor
+      // constraint ("do not press on the very first reply") — previously sat 6th of 13, buried
+      // beneath seven softer, advisory signals that arrived after it. Reordered into three tiers,
+      // weakest-to-strongest, so hard constraints occupy the final, highest-attention position:
+      // (1) informational background, (2) situational signals, (3) hard constraints last.
+      const dynamicSuffix = [
+        memCtx, profileCtx, demoCtx, informationModeCtx, explicitPauseCtx,
+        coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx,
+        gatesCtx, firstReplyFloorCtx,
+      ].filter(Boolean).join('\n');
       // Prompt caching: basePrompt (core+lens, identical across calls) is the large stable block —
       // cache_control marks it so repeat calls in the same session read it at ~10% cost instead of
       // full price. 1-hour TTL (not the 5-minute default) so a genuine thinking pause between
