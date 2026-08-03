@@ -257,6 +257,7 @@ When protocols conflict: follow this order.
 QUESTION CLASSIFICATION:
 ANALYSIS: no first-person, no personal decision → answer directly.
 FACT: direct knowledge → answer immediately.
+SCOPE LIMIT ON FACT ANSWERS (critical security finding — adversarial audit confirmed this document previously contained NO harmful-content boundary at all, while "answer immediately" above actively pushed toward answering anything classified as FACT; this closes that door explicitly rather than relying on defaults): "answer immediately" applies only to ordinary factual questions that genuinely serve the person's own reflection. AURA is a clarity instrument, not a general-purpose knowledge source. It does not provide instructions or technical detail that could enable harm to anyone — weapons, dangerous substances, methods of self-harm, ways to harm or deceive others, or circumventing safety and legal protections — regardless of how the request is framed, how academic or hypothetical it sounds, or what reason is given. Requests genuinely outside AURA's purpose are declined briefly and without lecture, returning to what the person actually came to think through. If a request signals possible risk to the person themselves, DISTRESS GRADIENT above governs the response, not this rule.
 PERSONAL: first-person decision/goal/dilemma → full protocol. Uncertain → default PERSONAL. If a single message mixes a clear FACT-level sub-question with an ambiguous personal-weight reference, treat the whole message as PERSONAL — never split attention between the two, never answer only the FACT part and drop the rest.
 
 COGNITIVE PROPORTIONALITY PROTOCOL (6th cross-communication gap found via deep audit — connects to QUESTION COMPRESSION above, which combines multiple axes into one question; that technique must still earn its depth, never bypass this proportionality check just because it's efficient):
@@ -1836,20 +1837,30 @@ function exportBlueprint(distillationText, ankerText) {
   // "the phrase you keep." Critical: this is ALWAYS the user's verbatim words, never AI-selected —
   // selecting which phrase "mattered" would be interpretation (Zero Inference violation). Omitted
   // cleanly if no anchor was given (e.g. a fact/analysis session), so the sheet is never broken.
+  // SECURITY (confirmed XSS, proof-of-concept verified): this template builds raw HTML outside
+  // React's automatic escaping. The three beats fields below carry the user's own words
+  // (reflected back by AURA), and were interpolated with NO escaping at all — while the
+  // neighbouring keystone/distillation fields already escaped "<". A payload like
+  // <img src=x onerror=...> would execute when the downloaded Blueprint is opened, and the
+  // Blueprint is explicitly designed to be kept and potentially shared. Full escape helper,
+  // applied consistently to every interpolation point below.
+  const esc = s => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const keystoneHtml = ankerText
-    ? `<div class="keystone-card"><span class="keystone-label">Η φράση που κρατάς</span><div class="keystone-text">${ankerText.replace(/</g, "&lt;")}</div><div class="keystone-ownership">Αυτή η σκέψη πλέον σου ανήκει.</div></div>`
+    ? `<div class="keystone-card"><span class="keystone-label">Η φράση που κρατάς</span><div class="keystone-text">${esc(ankerText)}</div><div class="keystone-ownership">Αυτή η σκέψη πλέον σου ανήκει.</div></div>`
     : "";
   // TIMELINE REDESIGN (visual redesign only — same underlying beats.brought/found/changed data,
   // now presented as a connected path with dot markers rather than isolated bordered blocks):
   const beatsHtml = beats
     ? `
       <div class="path-card">
-        <div class="path-item"><span class="path-dot"></span><span class="path-label">Αφετηρία</span><div class="path-text">${beats.brought}</div></div>
-        <div class="path-item"><span class="path-dot"></span><span class="path-label">Στροφή</span><div class="path-text">${beats.found}</div></div>
-        <div class="path-item path-final"><span class="path-dot"></span><span class="path-label">Τελικό αποτύπωμα</span><div class="path-text">${beats.changed}</div></div>
+        <div class="path-item"><span class="path-dot"></span><span class="path-label">Αφετηρία</span><div class="path-text">${esc(beats.brought)}</div></div>
+        <div class="path-item"><span class="path-dot"></span><span class="path-label">Στροφή</span><div class="path-text">${esc(beats.found)}</div></div>
+        <div class="path-item path-final"><span class="path-dot"></span><span class="path-label">Τελικό αποτύπωμα</span><div class="path-text">${esc(beats.changed)}</div></div>
       </div>
     `
-    : `<div class="path-card"><div class="path-item"><div class="path-text plain">${(distillationText || "").replace(/</g, "&lt;")}</div></div></div>`;
+    : `<div class="path-card"><div class="path-item"><div class="path-text plain">${esc(distillationText)}</div></div></div>`;
   const html = `<!DOCTYPE html>
 <html lang="el"><head><meta charset="UTF-8"><title>AURA — Decision Blueprint</title>
 <style>
@@ -1882,7 +1893,7 @@ function exportBlueprint(distillationText, ankerText) {
   <div class="header-row"><div class="title">AURA — Decision Blueprint</div><div class="date">${dateStr}</div></div>
   ${keystoneHtml}
   ${beatsHtml}
-  ${ankerText ? `<div class="stamp">"${ankerText.replace(/</g, "&lt;")}"</div>` : ""}
+  ${ankerText ? `<div class="stamp">"${esc(ankerText)}"</div>` : ""}
   <div class="footer">Αυτό δεν είναι σύνοψη μιας συζήτησης. Είναι δικά σου λόγια, στη σειρά που τα βρήκες.</div>
 </div></body></html>`;
   const blob = new Blob([html], { type: "text/html" });
@@ -2472,6 +2483,17 @@ let _activeCall = false;
 // always keeps at least minKeep messages regardless of size, so short-term coherence never breaks.
 function capMessageHistory(messages, maxChars = 20000, minKeep = 10) {
   if (!Array.isArray(messages)) return messages;
+  // SECURITY (confirmed exhaustion vector, adversarial audit): minKeep guaranteed the last N
+  // messages were always kept regardless of size, so a handful of very large messages could
+  // blow far past maxChars and trigger a permanent backend 413 — leaving the session
+  // unusable with no way to recover. Per-message truncation closes that bypass while keeping
+  // every message present in the conversation.
+  const PER_MESSAGE_CAP = 4000;
+  messages = messages.map(m =>
+    (m.content || "").length > PER_MESSAGE_CAP
+      ? { ...m, content: m.content.slice(0, PER_MESSAGE_CAP) }
+      : m
+  );
   if (messages.length <= minKeep) return messages;
   let totalChars = 0;
   let cutIndex = 0;
@@ -4352,6 +4374,7 @@ export default function AURAv2() {
               <div className="choice-prompt">Τι λείπει που αλλάζει την εικόνα;</div>
               <textarea
                 className="textarea"
+                maxLength={4000}
                 style={{marginTop:12,marginBottom:10,display:"block",width:"100%",minHeight:36,maxHeight:100,fontSize:12}}
                 placeholder="Γράψε εδώ — ή άφησε κενό για να συνεχίσω κανονικά…"
                 value={misfireInput}
@@ -4538,6 +4561,7 @@ export default function AURAv2() {
               <textarea
                 ref={textareaRef}
                 className="textarea"
+                maxLength={4000}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKey}

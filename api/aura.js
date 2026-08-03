@@ -15,6 +15,25 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Server configuration error" });
   }
 
+  // SECURITY (confirmed cost-attack vector — no rate limiting existed anywhere, client or
+  // server, so a scripted attacker could issue unlimited requests and drain the API budget).
+  // Simple in-memory sliding window, per IP. Serverless instances are recycled, so this is a
+  // deterrent against casual/scripted abuse rather than a hard guarantee — a persistent store
+  // (Upstash/Redis) would be the next step if real abuse is ever observed.
+  const RATE_WINDOW_MS = 60_000;
+  const RATE_MAX = 20;
+  const ip = (req.headers["x-forwarded-for"] || "unknown").split(",")[0].trim();
+  globalThis.__auraRate = globalThis.__auraRate || new Map();
+  const now = Date.now();
+  const hits = (globalThis.__auraRate.get(ip) || []).filter(t => now - t < RATE_WINDOW_MS);
+  if (hits.length >= RATE_MAX) {
+    return res.status(429).json({ error: "Too many requests. Please wait a moment." });
+  }
+  hits.push(now);
+  globalThis.__auraRate.set(ip, hits);
+  // Bound the map so it cannot grow without limit across many IPs.
+  if (globalThis.__auraRate.size > 5000) globalThis.__auraRate.clear();
+
   // Body size guard — real production evidence (2026-07-12): the system prompt alone is
   // now ~54KB after today's additions, leaving almost no room under the old 64KB limit for
   // any real conversation history — a 29-exchange session hit this and failed with 413.
@@ -36,8 +55,14 @@ export default async function handler(req, res) {
     const wantsStream = body.stream === true;
 
     // Whitelist only the fields AURA needs — strip anything else
+    // SECURITY (confirmed cost-attack vector): model was previously passed straight through
+    // from the request body, so anyone could request an arbitrary — potentially far more
+    // expensive — model and burn API credits. max_tokens was already capped here, which shows
+    // this was an oversight rather than a choice. The model is now pinned server-side; the
+    // client's value is ignored entirely.
+    const ALLOWED_MODEL = "claude-sonnet-4-6";
     const safeBody = {
-      model: body.model,
+      model: ALLOWED_MODEL,
       max_tokens: Math.min(body.max_tokens || 1000, 1000),
       system: body.system,
       messages: body.messages,
