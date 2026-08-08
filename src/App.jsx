@@ -2747,8 +2747,11 @@ export default function AURAv2() {
   // in a real dilemma who doesn't want a demo) or "see how it works first" (secondary → the
   // existing intro/demo overlay). null = choice not yet made.
   const [introChoice, setIntroChoice] = useState(null); // null | "demo" | "direct"
+  const [entryDoor, setEntryDoor] = useState(null); // which entry door the user picked, or null if they chose to say it themselves
+  const entryDoorRef = useRef(null);
   const introChoiceRef = useRef(null); // mirror for async access inside generateResponse
   useEffect(() => { introChoiceRef.current = introChoice; }, [introChoice]);
+  useEffect(() => { entryDoorRef.current = entryDoor; }, [entryDoor]);
   const [philosophyShown, setPhilosophyShown] = useState(() => {
     try { return !!localStorage.getItem("aura_philosophy_seen"); } catch { return false; }
   });
@@ -2969,7 +2972,13 @@ export default function AURAv2() {
       // intro-choice screen. isBrandNewUser is memory-based and stays correct for its other uses
       // (onboarding step tracking, duringOnboarding flag); only the DEMO injection is gated here, so
       // choosing "direct" skips the walkthrough while a first-time user who chose "demo" still gets it.
-      const showDemo = introChoiceRef.current === "demo" || (introChoiceRef.current === null && isBrandNewUser);
+      // DEMO REMOVED (founder's direct observation: "I never click it, it has no purpose"). The
+      // choice button is gone from the intro screen, but this fallback previously also triggered
+      // demo onboarding for any brand-new user who had not chosen — which would have kept the demo
+      // running invisibly after the button was removed. Now demo requires an explicit choice that
+      // the UI no longer offers, so it is effectively off while the code path stays intact and
+      // harmless should the intro ever be revisited.
+      const showDemo = introChoiceRef.current === "demo";
       const demoCtx = showDemo
         ? `\n[FIRST-EVER MESSAGE FROM THIS USER — a short onboarding demo happens before the real session, across this reply and several that follow:\nSTEP 1 (this reply): Say exactly: "Καλώς ήρθες. Η AURA ξεκαθαρίζει διλήμματα και αποφάσεις — δεν είναι ημερολόγιο, δεν δίνει απαντήσεις, σου δείχνει τις δικές σου, μέσα από ερωτήσεις. Ας κάνουμε μια μικρή δοκιμή, με ένα παράδειγμα:" Then on a new line ask exactly: "Ποια απόφαση πήρες που κανείς δεν επιβράβευσε, αλλά ξέρεις ότι ήταν σωστή;" (real-user evidence: a live user did not realize this specific question was a demo example, separate from their real topic -- the added "με ένα παράδειγμα" bridges the intro sentence to this question explicitly) — do not engage with whatever real topic the user just wrote; the demo comes first.\nSTEP 1b — DEEPENING (after they name a decision, over roughly 3-5 of your next replies, adaptive — use judgment, stop earlier if genuinely nothing new is emerging, never force past 5): Do not settle for their first answer. Go deeper into THIS SAME decision before moving on. Real live-user evidence: a user who had already stated clear, confident conviction (not hesitation) found repeated "why was it correct" style questions felt like doubt-casting, not exploration — describing it as evasive. Confident conviction in an answer is itself a signal that little new is emerging; do not mechanically work through all of the angles below just because — stop as soon as the conviction is clear, even after just one exchange. Ask in the direction of — not necessarily these exact questions, same depth (revised on real live-user evidence: justification-style angles like "why was it correct" felt like doubt-casting once conviction was already clear — these replacements are neutral, contextual, exploratory, never questioning whether the decision was right): how long they thought it over before deciding; whether they consulted someone or it was entirely their own call; what stops them from doing this sooner or more often now. Each question in your own words, adapted to what they just said, never repeat a question. NEVER evaluate the decision at any point — forbidden, in any form: "μπράβο", "σωστή επιλογή", "καταλαβαίνω", "συμφωνώ", "έκανες καλά", or any equivalent. Reflect only their own words back, then ask — nothing else. Real live-user evidence: a standalone "Εντάξει" here was read as agreement that the decision was correct (forbidden evaluation, even unintentional) — see the general NO BARE ACKNOWLEDGMENT rule above for the same pattern's other risk (being read as the end of the interaction).\nSTEP 2 (once the deepening has run its course): Ask exactly: "Από τη σημερινή δοκιμή, ποια λέξη ή φράση θέλεις να κρατήσεις για τον μελλοντικό σου εαυτό;"\nSTEP 3 (after they give a word/phrase): Say exactly: "Το «" + their exact word + "» το κρατάω — αυτό λέγεται Anchor. Θα το ξαναδείς όταν επιστρέψεις, όποτε κι αν είναι αυτό." Then, on new lines, in your own words but this exact meaning, no more content than this: that you didn't evaluate their decision, didn't say if it was right or wrong, didn't try to persuade them — the thoughts they arrived at were never yours, they were already theirs. Then say exactly, verbatim, as its own line: "Η AURA δεν είναι coach, ούτε therapist, ούτε assistant. Είναι ο ψηφιακός καθρέφτης του χρήστη." Then on a new line say exactly (real-user evidence — this exact wording was tested live in a real conversation and confirmed to build trust through safety/privacy/non-judgment, before the same session organically produced the tagline "Μίλα στη σιωπή"): "Ό,τι πεις θα μένει μόνο εδώ. Είσαι εσύ με εσένα — μην ντραπείς πουθενά. Μίλα στη σιωπή και άκου τι ψάχνεις να λύσεις — στη χρήση θα καταλάβεις γιατί. Φωνή ή γραφή, ό,τι σου ταιριάζει." This ends the demo — after this, respond normally to their real topic. Once, after this point (not repeated, not enforced), when it fits naturally: "Αν το πρόβλημα είναι ήδη καθαρό στο μυαλό σου, γράψε το. Αν ακόμα προσπαθείς να βρεις τι πραγματικά σε απασχολεί, δοκίμασε να το πεις όπως θα σου ερχόταν φυσικά." — an invitation, never a requirement; text remains fully available always. Alternative rationale, same invitation, occasionally usable instead of the above (fixed meaning, variable wording — do not repeat the same one every time): "Θυμήσου πόσες φορές κάτι που έγραψες διαβάστηκε με λάθος τρόπο από τον λήπτη. Σήμερα μη γίνεις εσύ ο λήπτης της δικής σου σκέψης — μίλα ελεύθερα." Or a third variant: "Κάποιες σκέψεις δεν θέλουν να γραφτούν. Θέλουν να ακουστούν."\nINSERTION SEQUENCE RULE (real-user evidence — this exact pattern has happened twice): if the user's reply to any demo question is itself a question, a clarification request, or otherwise not a real answer (e.g. "τι εννοείς;", "έχει νόημα αυτό;"), do NOT treat it as their answer and do NOT advance to the next step. Instead answer their question in one short sentence, then ask the exact same demo question again. Only advance once they give a real answer.\nSKIP REQUEST RULE (real-transcript evidence — a user had to repeat \"προσπέρασε αυτό το στάδιο, πάμε στη συνομιλία\" twice before the demo moved on): an explicit request to skip the demo (e.g. \"προσπέρασε αυτό\", \"πάμε στην κουβέντα\", \"θέλω να μιλήσουμε κατευθείαν\") is a different signal from a clarification question or a flat refusal — recognize it immediately, the first time, and move straight to the identity line plus their real topic (same wrap-up as the fallback below), without repeating the demo question again first.\nMENU CONFUSION RULE (real-transcript evidence -- a user said \"Πάμε στο βασικό μενού\" three times before getting a clear answer; AURA inconsistently treated it as skip-request once, then not at all): if the user mentions a \"menu\" (\"μενού\", \"βασικό μενού\", or equivalent), respond immediately and deterministically, the first time, with: \"Δεν υπάρχει \u2018βασικό μενού\u2019 -- η AURA δεν έχει μενού επιλογών. Ξεκινάς από κάτι που υπάρχει ήδη στο μυαλό σου.\" then ask the real-topic opening question. Do not guess whether they meant to skip the demo or are confused about the interface -- this response resolves both cases at once, consistently, every time.\nNON-COOPERATIVE USER FALLBACK: if after several tries the user still won't give a real word (only meta-commentary, refusal, or unrelated noise), gracefully wrap up the demo yourself within a few more turns — say the identity line verbatim ("Η AURA δεν είναι coach, ούτε therapist, ούτε assistant. Είναι ο ψηφιακός καθρέφτης του χρήστη.") before moving into their real topic, even without a word to keep. This line must never be silently skipped, regardless of how the demo ends.\nThis entire sequence happens only once, ever, for this user.]\n`
         : '';
@@ -3038,6 +3047,9 @@ export default function AURAv2() {
       const userStagnationCtx = detectUserStagnation(msgs).stagnant
         ? `\n[CODE-VERIFIED: the user's own last 2 replies introduced almost no new material AND became markedly shorter than their earlier ones. This is observed from what they actually wrote, not inferred about how they feel. It is direct evidence that the current approach has stopped producing movement FOR THEM — the strongest possible input to STRATEGY PRE-MORTEM GATE's "is this strategy failing here?" check. Do not wait for them to repeat themselves further or to say so explicitly: switch to a genuinely different region of INTERVENTION SPACE now, or if enough material already exists, stop gathering and reflect the shape of what they have already given (PROBLEM STRUCTURE MAP / VERBATIM COST COLLISION).]\n`
         : '';
+      const entryDoorCtx = entryDoorRef.current
+        ? `\n[USER'S OWN STATED ENTRY POINT, chosen before writing anything: "${entryDoorRef.current}". This is Level 1 evidence per SPECIFICITY ORDERING — their explicit words, the highest-trust tier. Use it as a HEAD START, never as a replacement: OPENING RADAR still runs, but one coordinate is already given, so do not ask for what they just told you — in particular, if the door already answers how urgent this is, do not ask about urgency again. It also sets TONE AND DEPTH from the first reply: "πρέπει να αποφασίσω σύντομα" means a real clock is running — be shorter, more direct, reach the decision space faster, and do not open long exploratory arcs; the chronic doors ("επιστρέφει", "αναβάλλω") mean there is no clock but there IS a pattern already available as material; "δεν ξέρω πώς να το ορίσω" means material must come first before any structure can be shown. It also narrows ORIENTATION DETECTION's dispatch table accordingly. NOT a classification of the person: it describes what they brought today, nothing about who they are, and it expires with this session.]\n`
+        : '';
       // ATTENTION-ORDER FIX (decision-architecture audit finding): position inside injected context
       // affects how reliably an instruction is followed, and firstReplyFloorCtx — a HARD floor
       // constraint ("do not press on the very first reply") — previously sat 6th of 13, buried
@@ -3045,7 +3057,7 @@ export default function AURAv2() {
       // weakest-to-strongest, so hard constraints occupy the final, highest-attention position:
       // (1) informational background, (2) situational signals, (3) hard constraints last.
       const dynamicSuffix = [
-        memCtx, profileCtx, demoCtx, informationModeCtx, explicitPauseCtx,
+        memCtx, profileCtx, demoCtx, informationModeCtx, explicitPauseCtx, entryDoorCtx,
         coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, userStagnationCtx,
         gatesCtx, firstReplyFloorCtx,
       ].filter(Boolean).join('\n');
@@ -3849,6 +3861,8 @@ export default function AURAv2() {
     informationModeActive.current = false;
     setValueUnlocked(false);
     setIntroChoice(null);
+    setEntryDoor(null);
+    entryDoorRef.current = null;
     setCustomAmount("");
     setError(null);
     setClaritySurge(false);
@@ -4193,38 +4207,37 @@ export default function AURAv2() {
               <div style={{fontSize:"13px",color:"#a8a49c",lineHeight:1.6,marginBottom:"4px"}}>
                 Όλοι δίνουν απαντήσεις.<br/>Δε χρειάζεσαι άλλη.
               </div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:300,color:"#d8d4cc",lineHeight:1.3,marginBottom:"18px"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:300,color:"#d8d4cc",lineHeight:1.3,marginBottom:"22px"}}>
                 Αύρα
               </div>
-              <div style={{fontSize:"12px",color:"#a8a49c",lineHeight:1.7,marginBottom:"22px"}}>
-                Η AURA δεν γεννήθηκε σε εργαστήριο, αλλά στην παρατήρηση της αξίας της σωστής ερώτησης — χρόνια πραγματικών αποφάσεων σε συνθήκες πίεσης, όπου πριν από κάθε σωστή απόφαση προηγείται πάντα μια σωστή διαλογή: το ουσιαστικό από τον θόρυβο, το επείγον από το σημαντικό, τη σύγχυση από το πραγματικό πρόβλημα.
-              </div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.5,marginBottom:"18px"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.5,marginBottom:"26px"}}>
                 Δες που κολλάς — χωρίς μασημένες συμβουλές.<br/>Εσύ στο τιμόνι.
               </div>
-              <div style={{fontSize:"12px",color:"#a8a49c",lineHeight:1.7,marginBottom:"18px"}}>
-                Όπου και να κοιτάξεις, κάποιος σου δίνει συμβουλές. Όλο το ίντερνετ αποφασίζει για σένα. Ίσως αυτό που χρειάζεσαι τώρα δεν είναι άλλη μία απάντηση.
-              </div>
-              <div style={{fontSize:"12px",color:"#a8a49c",lineHeight:1.7,marginBottom:"22px"}}>
-                Βάλε φρένο για λίγα λεπτά. Δες καθαρά τι σε μπερδεύει. Μόνο εσύ με εσένα. Να ακούσεις τι ήδη ξέρεις. Δύσκολο; Απλά ώριμο.
-              </div>
-              <div style={{fontSize:"12px",color:"#c9c5bc",lineHeight:1.9,marginBottom:"22px",textAlign:"left"}}>
-                <div style={{color:"#a8a49c",marginBottom:"4px"}}>Η AURA</div>
+              <div style={{fontSize:"13px",color:"#c9c5bc",lineHeight:2,marginBottom:"26px",textAlign:"left"}}>
                 Δεν αποφασίζει για σένα.<br/>
                 Δεν δίνει έτοιμες συμβουλές.<br/>
-                Δεν προσπαθεί να σε πείσει.<br/>
                 Σου κάνει τις ερωτήσεις που βάζουν τάξη στη σκέψη σου.
               </div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"14px",color:"#a8a49c",lineHeight:1.6,marginBottom:"28px"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"14px",color:"#a8a49c",lineHeight:1.6,marginBottom:"26px"}}>
                 Μερικές φορές η καλύτερη απάντηση δεν είναι μια απάντηση. Είναι η σωστή ερώτηση.
               </div>
-              <button onClick={()=>{setIntroChoice("direct");setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}}
-                style={{display:"block",width:"100%",background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.5)",color:"rgba(201,168,76,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"13px",letterSpacing:".12em",textTransform:"uppercase",padding:"14px 28px",marginBottom:"12px",cursor:"pointer",borderRadius:"4px"}}>
-                Ξεκινάμε κατευθείαν
-              </button>
-              <button onClick={()=>{setIntroChoice("demo");setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}}
-                style={{display:"block",width:"100%",background:"transparent",border:"1px solid rgba(201,168,76,0.15)",color:"#8a8680",fontFamily:"'DM Mono',monospace",fontSize:"12px",letterSpacing:".05em",padding:"12px 28px",cursor:"pointer",borderRadius:"4px"}}>
-                Δες πρώτα πώς λειτουργεί
+              {/* Entry doors — these already existed inside AURA's first message (Zeigarnik-grounded:
+                  unfinished, recurring thoughts stay mentally active). Surfacing them here, before the
+                  user types, so they know what kind of thing this is for. Deliberately NOT sent to the
+                  model and NOT stored: the choice exists to sharpen the USER's own sense of what they
+                  are bringing, never to let AURA classify them — so this adds no state and no inference. */}
+              <div style={{fontSize:"12px",color:"#8a8680",letterSpacing:".06em",marginBottom:"12px",textAlign:"left"}}>
+                Τι σε φέρνει εδώ;
+              </div>
+              {["Κάτι που πρέπει να αποφασίσω σύντομα","Κάτι που επιστρέφει στο μυαλό μου","Μια απόφαση που δεν έχει ξεκαθαρίσει","Κάτι που δεν ξέρω πώς να ορίσω","Κάτι που συνεχίζω να αναβάλλω"].map(door => (
+                <button key={door} onClick={()=>{setEntryDoor(door);setIntroChoice("direct");setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}}
+                  style={{display:"block",width:"100%",background:"transparent",border:"1px solid rgba(201,168,76,0.18)",color:"#c9c5bc",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",marginBottom:"8px",cursor:"pointer",borderRadius:"4px"}}>
+                  {door}
+                </button>
+              ))}
+              <button onClick={()=>{setEntryDoor(null);setIntroChoice("direct");setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}}
+                style={{display:"block",width:"100%",background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.35)",color:"rgba(201,168,76,0.85)",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",marginTop:"6px",cursor:"pointer",borderRadius:"4px"}}>
+                Θα το πω μόνος μου
               </button>
             </div>
           </div>
