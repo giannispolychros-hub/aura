@@ -42,7 +42,13 @@ export default async function handler(req, res) {
   // also caps conversation history by character budget (capMessageHistory in App.jsx) as a
   // second, independent layer of defense — this guard and that cap are not the same fix.
   const contentLength = parseInt(req.headers["content-length"] || "0", 10);
-  if (contentLength > 300000) {
+  // C1 FIX (verified 413 in production, measured): this ceiling was set when the system prompt was
+  // ~54 KB. The prompt is now ~275 KB, leaving under 5 KB for conversation history — so any real
+  // session failed. Vercel's own platform limit is 4.5 MB (documented), making 300 KB roughly 15x
+  // more conservative than necessary. Raised to 1 MB: still 4.5x under the platform ceiling, but
+  // with genuine room for the prompt plus a full session. capMessageHistory in App.jsx computes a
+  // dynamic budget against this same number as a second, independent layer.
+  if (contentLength > 1000000) {
     return res.status(413).json({ error: "Payload too large" });
   }
 
