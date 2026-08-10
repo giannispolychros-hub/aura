@@ -4306,9 +4306,28 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
               <div style={{marginBottom:"16px",color:"#9a9690"}}>Όχι εσύ και η AURA.<br />Εσύ και εσύ.</div>
               <div style={{color:"#c9a84c",fontStyle:"normal"}}>Αυτό είναι η AURA.</div>
             </div>
-            <div className="intro-actions">
+            {/* DOORS MOVED HERE (structural fix: philosophy and the doors were two separate full
+                screens, so a new user met three steps before typing — philosophy, doors, time. The
+                philosophy screen already does the introducing, so the doors belong on it directly.
+                Now: this screen, then time. Two steps.) */}
+            <div style={{width:"100%",maxWidth:"320px",margin:"0 auto"}}>
+              <div style={{fontSize:"12px",color:"#8a8680",letterSpacing:".06em",marginBottom:"12px",textAlign:"left",marginTop:"22px"}}>
+                Τι σε φέρνει εδώ;
+              </div>
+              {["Κάτι που επιστρέφει στο μυαλό μου","Ξέρω τις επιλογές μου αλλά δεν μπορώ να αποφασίσω","Έχω πολλά μαζί και δεν ξέρω τι έχει σημασία","Κάτι που συνεχίζω να αναβάλλω","Κάτι το αποφάσισα ήδη"].map(door => (
+                <button key={door} onClick={()=>{setEntryDoor(door);setIntroShown(true);try{localStorage.setItem("aura_intro_seen","1")}catch{}}}
+                  style={{display:"block",width:"100%",background:"transparent",border:"1px solid rgba(201,168,76,0.18)",color:"#c9c5bc",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",marginBottom:"8px",cursor:"pointer",borderRadius:"4px"}}>
+                  {door}
+                </button>
+              ))}
+              <button onClick={()=>{setEntryDoor(null);setIntroChoice("direct");setIntroShown(true);setSessionStarted(true);try{localStorage.setItem("aura_intro_seen","1")}catch{};setTimeout(()=>textareaRef.current?.focus(),50);}}
+                style={{display:"block",width:"100%",background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.35)",color:"rgba(201,168,76,0.85)",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",marginTop:"6px",cursor:"pointer",borderRadius:"4px"}}>
+                Θα το πω μόνος μου
+              </button>
+            </div>
+            <div className="intro-actions" style={{display:"none"}}>
               <button className="intro-continue" onClick={() => { setIntroShown(true); try { localStorage.setItem("aura_intro_seen","1"); } catch {} }}>Ξεκίνα</button>
-              <button className="intro-skip" onClick={() => { setIntroShown(true); setSessionStarted(true); try { localStorage.setItem("aura_intro_seen","1"); } catch {} }}>skip</button>
+              <button className="intro-skip" onClick={() => { setIntroShown(true); try { localStorage.setItem("aura_intro_seen","1"); } catch {} }}>skip</button>
             </div>
           </div>
         </div>
@@ -4323,29 +4342,20 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         {messages.length === 0 && !sessionStarted && introChoice === null && (
           <div ref={el => { if (el) el.scrollTop = 0; }} style={{position:"fixed",inset:0,zIndex:61,background:"#0d0c0a",overflowY:"auto",padding:"36px 24px 48px"}}>
             <div style={{maxWidth:"380px",width:"100%",margin:"0 auto",textAlign:"center"}}>
-              <div style={{fontSize:"13px",color:"#a8a49c",lineHeight:1.6,marginBottom:"4px"}}>
-                Όλοι δίνουν απαντήσεις.<br/>Δε χρειάζεσαι άλλη.
-              </div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:300,color:"#d8d4cc",lineHeight:1.3,marginBottom:"22px"}}>
-                Αύρα
-              </div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.5,marginBottom:"26px"}}>
-                Δες που κολλάς — χωρίς μασημένες συμβουλές.<br/>Εσύ στο τιμόνι.
-              </div>
-              <div style={{fontSize:"13px",color:"#c9c5bc",lineHeight:2,marginBottom:"26px",textAlign:"left"}}>
-                Δεν αποφασίζει για σένα.<br/>
-                Δεν δίνει έτοιμες συμβουλές.<br/>
-                Σου κάνει τις ερωτήσεις που βάζουν τάξη στη σκέψη σου.
-              </div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"14px",color:"#a8a49c",lineHeight:1.6,marginBottom:"26px"}}>
-                Μερικές φορές η καλύτερη απάντηση δεν είναι μια απάντηση. Είναι η σωστή ερώτηση.
-              </div>
+              {/* MERGED (structural finding: philosophy and intro were two separate full screens
+                  both doing introduction — the philosophy screen already carries the tagline and the
+                  explanation, so repeating five more sentences here made the entry three screens deep.
+                  The doors now follow the philosophy screen directly.) */}
+
+
+
+
               {/* Entry doors — these already existed inside AURA's first message (Zeigarnik-grounded:
                   unfinished, recurring thoughts stay mentally active). Surfacing them here, before the
                   user types, so they know what kind of thing this is for. Deliberately NOT sent to the
                   model and NOT stored: the choice exists to sharpen the USER's own sense of what they
                   are bringing, never to let AURA classify them — so this adds no state and no inference. */}
-              {entryDoor === null ? (<>
+              {false ? (<>
               {/* Header lives INSIDE the branch (live bug, reported three times and misdiagnosed twice
                   as a prompt problem): it was outside the conditional, so it stayed on screen when the
                   content switched to the time question — the user saw "Τι σε φέρνει εδώ;" above a set
@@ -4382,58 +4392,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         )}
 
         {/* ── Intro overlay — full-screen, fully independent of chat layout, closes instantly on CTA click ── */}
-        {messages.length === 0 && !sessionStarted && introChoice === "demo" && (
-          <div ref={el => { if (el) el.scrollTop = 0; }} style={{position:"fixed",inset:0,zIndex:60,background:"#0d0c0a",overflowY:"auto",padding:"36px 20px 60px"}}>
-            <div style={{maxWidth:"420px",margin:"0 auto",textAlign:"right"}}>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:300,color:"#d8d4cc",letterSpacing:".02em",lineHeight:1.3,marginBottom:"4px"}}>
-                AURA — Ο καθρέφτης της σκέψης σου
-              </div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#a8a49c",lineHeight:1.5,marginBottom:"14px"}}>
-                Δύσκολο δεν είναι οι δύσκολες αποφάσεις.<br/>Δύσκολο είναι να δεις καθαρά.
-              </div>
-              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
-                Οι περισσότεροι, όταν νιώθουν μπλοκαρισμένοι, ψάχνουν περισσότερες πληροφορίες, γνώμες, συμβουλές. Συνήθως όμως δεν τους λείπει τίποτα από αυτά — τους λείπει η διαύγεια.
-              </div>
-              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
-                Η AURA δεν γεννήθηκε σε εργαστήριο, αλλά στην παρατήρηση της αξίας της σωστής ερώτησης — χρόνια πραγματικών αποφάσεων σε συνθήκες πίεσης, όπου πριν από κάθε σωστή απόφαση προηγείται πάντα μια σωστή διαλογή: το ουσιαστικό από τον θόρυβο, το επείγον από το σημαντικό, τη σύγχυση από το πραγματικό πρόβλημα.
-              </div>
-              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
-                Αυτή η εμπειρία δεν έγινε βιβλίο. Έγινε ένας τρόπος σκέψης. Και αυτός ο τρόπος σκέψης έγινε η AURA.
-              </div>
-              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
-                Η AURA δεν αποφασίζει για σένα. Δεν δίνει έτοιμες συμβουλές. Δεν προσπαθεί να σε πείσει. Σου κάνει τις ερωτήσεις που βάζουν τάξη στη σκέψη σου — όχι επειδή σ' την είπε κάποιος, αλλά επειδή την είδες μόνος σου.
-              </div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"14px",color:"#a8a49c",lineHeight:1.6,marginBottom:"16px"}}>
-                Μερικές φορές η καλύτερη απάντηση δεν είναι μια απάντηση. Είναι η σωστή ερώτηση.
-              </div>
-              <div style={{border:"1px solid rgba(201,168,76,0.25)",borderRadius:"4px",padding:"14px 16px",marginBottom:"18px",fontFamily:"'DM Mono',monospace",fontSize:"11px",lineHeight:1.8}}>
-                <div style={{color:"#8a8680",marginBottom:"6px"}}>Έτσι μοιάζει μια πραγματική στιγμή:</div>
-                <div style={{color:"#c9c5bc",marginBottom:"6px"}}>"Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου."</div>
-                <div style={{color:"rgba(201,168,76,0.85)"}}>"Τι σε κάνει να πιστεύεις ότι η απόφαση είναι να φύγεις, και όχι να αλλάξεις κάτι στη σημερινή κατάσταση;"</div>
-              </div>
-              <div style={{marginBottom:"18px"}}>
-                <div style={{color:"#8a8680",marginBottom:"10px",fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".05em"}}>Τι σε έφερε εδώ;</div>
-                {[
-                  "Κάτι που σκέφτομαι και δεν ξεκαθαρίζει",
-                  "Μια απόφαση που αναβάλλω",
-                  "Κάτι που επιστρέφει ξανά και ξανά",
-                ].map((door) => (
-                  <button key={door} onClick={()=>{setInput(door + ": "); setSessionStarted(true); setTimeout(()=>textareaRef.current?.focus(),50);}}
-                    style={{display:"block",width:"100%",textAlign:"left",background:"rgba(10,9,8,0.35)",border:"1px solid rgba(201,168,76,0.18)",color:"#c9c5bc",fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",padding:"11px 14px",marginBottom:"8px",cursor:"pointer",borderRadius:"4px"}}>
-                    {door}
-                  </button>
-                ))}
-                <button onClick={()=>{setSessionStarted(true); setTimeout(()=>textareaRef.current?.focus(),50);}}
-                  style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"1px solid rgba(201,168,76,0.12)",color:"#8a8680",fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",fontStyle:"italic",padding:"11px 14px",cursor:"pointer",borderRadius:"4px"}}>
-                  Κάτι άλλο — θα το πω μόνος μου
-                </button>
-              </div>
-              <button onClick={()=>{setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}} style={{background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.5)",color:"rgba(201,168,76,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"12px",letterSpacing:".15em",textTransform:"uppercase",padding:"12px 28px",cursor:"pointer",borderRadius:"4px"}}>
-                Ξεκίνα να σβήνεις τη φασαρία
-              </button>
-            </div>
-          </div>
-        )}
+        {/* DEMO BLOCK REMOVED — unreachable since the demo button was deleted; ~4976 chars of dead JSX carrying its own duplicate entry-door list, which is exactly the kind of orphan that produced the third-screen bug. */}
 
 
         {/* ── Header ── */}
