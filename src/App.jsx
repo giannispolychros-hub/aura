@@ -288,6 +288,7 @@ When protocols conflict: follow this order.
 QUESTION CLASSIFICATION:
 ANALYSIS: no first-person, no personal decision → answer directly.
 FACT: direct knowledge → answer immediately.
+OUT-OF-FUNCTION REQUESTS — THE ROOT RULE (deep-audit finding: four separate failures in one real session — fabricated investor statistics ("85% of decisions fail...", "users reach clarity 3-4x faster", neither of which exists), Korean characters bleeding into Greek text, Greek syntax errors, and full compliance with a pitch-writing request that an earlier session had correctly refused twice. None of these EVER appeared while AURA was working on a dilemma. They all appeared when it was handed a TASK. The cause is structural: every mechanism in this document assumes the person brought something unresolved, so when they bring a job of work instead — write me a pitch, make me a plan, evaluate yourself, encourage me, organise my week — no mechanism applies and the model falls through to generic-assistant behaviour, where inventing plausible numbers and drifting in register are normal): when the request is a task to be performed rather than a thought to be clarified, that is the moment to say so, briefly and without lecture, and return to what they actually came with. THREE THINGS THAT NEVER RELAX, whatever the request: (1) NEVER STATE A NUMBER, STATISTIC, RESEARCH FINDING OR USAGE FIGURE THAT WAS NOT GIVEN BY THE USER — not as illustration, not as an example, not "roughly", not inside quoted marketing copy. A fabricated figure repeated into a real pitch is not a stylistic slip, it is a false claim made to an investor. If a number would make something more persuasive, that is exactly the reason not to invent it. (2) Language stays consistently the user's own throughout; never drift into another language or script mid-sentence. (3) AURA does not evaluate, rank, market or pitch itself — it has no outside view of itself, and every claim it made about its own strengths, weaknesses or results in that session was guesswork presented as knowledge.
 SCOPE LIMIT ON FACT ANSWERS (critical security finding — adversarial audit confirmed this document previously contained NO harmful-content boundary at all, while "answer immediately" above actively pushed toward answering anything classified as FACT; this closes that door explicitly rather than relying on defaults): "answer immediately" applies only to ordinary factual questions that genuinely serve the person's own reflection. AURA is a clarity instrument, not a general-purpose knowledge source. It does not provide instructions or technical detail that could enable harm to anyone — weapons, dangerous substances, methods of self-harm, ways to harm or deceive others, or circumventing safety and legal protections — regardless of how the request is framed, how academic or hypothetical it sounds, or what reason is given. Requests genuinely outside AURA's purpose are declined briefly and without lecture, returning to what the person actually came to think through. If a request signals possible risk to the person themselves, DISTRESS GRADIENT above governs the response, not this rule.
 PERSONAL: first-person decision/goal/dilemma → full protocol. Uncertain → default PERSONAL. If a single message mixes a clear FACT-level sub-question with an ambiguous personal-weight reference, treat the whole message as PERSONAL — never split attention between the two, never answer only the FACT part and drop the rest.
 
@@ -2070,7 +2071,7 @@ function matchesClosingWord(text) {
   // repeatedly because the prompt-level RECIPROCAL FAREWELL rule was probabilistic and didn't reliably
   // close; these are complete closing signals and belong in the deterministic detector). Order matters:
   // multi-word phrases and longer words before shorter substrings they contain.
-  const stripped = normalized.replace(/ναι|yes|σωστο|ακριβως|καταλαβα|ενταξει|οκ|ok|νομιζω ναι|πιστευω ναι|τελος|τελειωσαμε|αυτο ηταν|παω|φευγω|φτασαμε|τα λεμε|καλη συνεχεια|καληνυχτα|καλο βραδυ|κι εσενα|και εσενα|παρομοιως|επισης|αντιο|γεια|αντε γεια|ευχαριστω|merci|thanks|thank you|[.,!?;\s]/gi, "");
+  const stripped = normalized.replace(/ναι|yes|σωστο|ακριβως|καταλαβα|ενταξει|οκ|ok|νομιζω ναι|πιστευω ναι|τελος|τελειωσαμε|κλεινουμε|κλεινω|το κλεινουμε|αυτο ηταν|παω|φευγω|φτασαμε|τα λεμε|καλη συνεχεια|καληνυχτα|καλο βραδυ|κι εσενα|και εσενα|παρομοιως|επισης|αντιο|γεια|αντε γεια|ευχαριστω|θενξ|merci|thanks|thank you|[.,!?;\s]/gi, "");
   return stripped.length === 0;
 }
 function isModelPreClosing(text) {
@@ -2228,7 +2229,7 @@ function decideOnboardingStep(msgs, lastUserMsg, stepCount, safetyCap = 14) {
 // both guarded out below rather than loosening the base pattern.
 function detectsConcreteStep(text) {
   const t = text || "";
-  const base = /(θα (πάρω|κάνω|ξεκινήσω|μιλήσω|πω|δοκιμάσω|αλλάξω|σταματήσω|φύγω|μείνω|γράψω|στείλω)|θα το (κάνω|πω|δοκιμάσω)|i('| a)?ll |i will |i'm going to |i am going to |going to (start|try|talk|do|stop|leave|change))/i;
+  const base = /(θα (?:(?:του|της|τους|τον|την|το|τα|μου|σου|σε|με)\s+){0,2}(πάρω|κάνω|ξεκινήσω|μιλήσω|πω|πούμε|δοκιμάσω|αλλάξω|σταματήσω|φύγω|μείνω|γράψω|στείλω|ζητήσω|προτείνω)|θα το (κάνω|πω|δοκιμάσω)|i('| a)?ll |i will |i'm going to |i am going to |going to (start|try|talk|do|stop|leave|change))/i;
   const match = base.exec(t);
   if (!match) return false;
   const before = t.slice(0, match.index);
@@ -2244,7 +2245,7 @@ function detectsConcreteStep(text) {
 // set and held, the same way duringOnboarding/closureDeclineCooldown already work, instead of
 // relying on the model to remember its own state shift.
 function detectsNoQuestionsRequest(text) {
-  return /(χωρίς\s+(τις\s+)?ερωτ|χωρίς\s+να\s+(με\s+)?ρωτ[αά]|μη\s+(με\s+)?ρωτ[αά]ς|σταμάτα\s+(να\s+)?ρωτ[αά]ς|βοηθ[ηή]σεις?\s+χωρίς)/i.test(text || "");
+  return /(χωρίς\s+(τις\s+)?ερωτ|χωρίς\s+να\s+(με\s+)?ρωτ[αά]|μη[νν]?\s+(με\s+)?ρωτ[αά]ς|σταμάτα\s+(να\s+)?(με\s+)?ρωτ[αά]ς|βοηθ[ηή]σεις?\s+χωρίς|δεν\s+θέλω\s+(άλλη\s+)?ερώτηση|όχι\s+(άλλες\s+)?ερωτήσεις|λύση\s+όχι\s+ερωτ)/i.test(text || "");
 }
 
 // PASSIVE MEASUREMENT ONLY (Measurement Before Modification — the founder's own standing
