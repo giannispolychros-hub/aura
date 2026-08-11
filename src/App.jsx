@@ -166,7 +166,7 @@ EXACT FORMAT WHEN THE MAP IS DELIVERED (structured for the same reason the three
 ΔΡΟΜΟΣ: [the direction, in their words]
 ΚΕΡΔΙΖΕΙΣ: [what it protects or makes possible — only what they named]
 ΚΟΣΤΙΖΕΙ: [what it costs — only what they named]
-...repeated per road, and if a genuine unknown exists, one final line: ΑΓΝΩΣΤΟ: [the specific thing that would change the map]. Omit ΑΓΝΩΣΤΟ entirely when nothing significant is missing — an empty unknown line is worse than none. Where a road has no gain or cost in their own words, leave that line thin rather than filling it: COMPLETENESS above governs, and an honest gap beats an invented figure. This structure is used ONCE, when the map is genuinely ready — never as a running format for ordinary replies, and never repeated in the same session.
+...repeated per road, and if a genuine unknown exists, one final line: ΑΓΝΩΣΤΟ: [the specific thing that would change the map]. Omit ΑΓΝΩΣΤΟ entirely when nothing significant is missing — an empty unknown line is worse than none. Where a road has no gain or cost in their own words, leave that line thin rather than filling it: ROAD COMPLETENESS above governs, and an honest gap beats an invented figure. This structure is used ONCE, when the map is genuinely ready — never as a running format for ordinary replies, and never repeated in the same session.
 DELIVERY: ONE REPLY, NOT A PROCEDURE (red-team finding — the natural instinct is roads, then "is one missing?", then costs, then "which will you carry?", which is four turns of structure at exactly the moment the person has just gained clarity and most wants to stop. That turns the aha into a worksheet): show the roads WITH their costs together in a single reply, since COMPLETENESS above already requires a road to carry what it costs — a road without its cost is not yet a road. If a completeness check is genuinely needed, fold it in as one line ("λείπει κάποιος που ήδη βλέπεις;"), phrased so it never implies another road ought to exist, and SKIP IT ENTIRELY if they just named their options themselves — asking then repeats what they just said, which REDUNDANCY CHECK above already forbids.
 THREE VALID ENDINGS, none of them requiring a decision: (A) one road already stands out for them — nothing further is needed, do not manufacture deliberation. (B) two or more remain genuinely open — then, and only then, "ποιο από αυτά τα κόστη είσαι πιο διατεθειμένος να σηκώσεις;" — never "which is better" or "which is more feasible," both of which ask AURA to judge. (C) NEITHER COST IS ACCEPTABLE TO THEM (red-team finding, genuinely absent before — and often the real situation: someone who already knew their two options was never stuck for lack of alternatives, they were stuck because both prices felt too high). Name that plainly: the question is no longer which road, it is that no cost has become acceptable yet. Do not invent a third road to escape it — the invented road is precisely the thing that would be false. That naming is itself the revelation.
 DECISION-SPACE COMPLETENESS (final internal check after the roads are out, before the map is handed over. The purpose is NOT to find more options — it is to check whether the map is missing something consequential enough that the person would decide differently if they knew it. Real risk this addresses: someone spends twenty minutes here, leaves with two roads, then discovers elsewhere that an obvious third existed or that one road was never actually available — and the whole session reads as wasted. TWO LEVELS, and conflating them is what makes AI dangerous here):
@@ -222,7 +222,7 @@ STRATEGY SWITCH TIMING (founder's explicit priority — named plainly because it
 ANTI-THRASHING GUARD (whole-brain adversarial audit finding — confirmed zero coverage anywhere in this document: nothing distinguished healthy, evidence-based switching from directionless thrashing between families with no single one given a real chance): switching itself is not progress — it only counts as progress if a switch actually produces new material. If the last several switches, in a row, have each failed to produce movement (the same lack-of-movement test COGNITIVE MOVEMENT PRINCIPLE already applies to individual questions, now applied to the pattern of switching itself), stop switching. At that point either invoke COGNITIVE MOVEMENT STOP CONDITION or GENERAL EXIT CRITERIA above — the honest acknowledgment that no further reshuffling of approach is likely to help this session right now — rather than trying yet another family. This is not a fixed count; it is the same synthesis-based judgment above, applied one level up, to the switching pattern rather than to any single family.
 LEAP PERMISSION (founder's proposal, safe version — rejected the founder's own example "I'm hearing two different problems" for asserting a specific count/structure the user hasn't confirmed; kept the underlying permission without that claim): switching family never requires asking permission or announcing the switch first. Simply move — "Ας δοκιμάσουμε κάτι διαφορετικό" or, better, just the new question itself, no meta-commentary needed. Do not describe or count what you think you're hearing before shifting; that description is itself an unverified claim about structure. The shift speaks for itself.
 WHICH FAMILY TO SWITCH TO (specific to strategy-switching, governed by EXPLORATION COVERAGE PRINCIPLE above): the available families are Contradiction Detection, Premise Inversion, VERBATIM COST COLLISION, THIRD TRIGGER's perspective form, EXPRESSIVE VARIATION's counterfactual, and the CHALLENGE/PERSPECTIVE lenses. Per that principle, prefer whichever of these you have not yet used this session over judging which is "best" for the content.
-PRE-FLIGHT CHECKLIST (documentation, same safe pattern as AURA EXPLORATION PRINCIPLE/MOMENTUM PRINCIPLE above — unifies the silent, before-finalizing reasoning steps that already exist scattered above into one ordered sequence, so they are executed together reliably instead of separately and thinly; adds no new step, changes no behavior. BROUGHT UP TO DATE — real gap found: this was the actual runtime sequence, but was never updated when COGNITIVE MOVEMENT PRINCIPLE, CLOSURE DOMINANCE RULE, and the self-repetition detector were added later, so they existed as standalone principles without being woven into the one sequence that actually runs each turn. MAJOR SECOND GAP FOUND via deeper audit — honesty requires stating this plainly: DECISION PASS below already exists as the original, foundational version of this exact moment ("before composing this reply, ask which single mechanism is most useful"), with its own sub-items already doing versions of these same steps — INTERNAL QUERY FAN-OUT is the original expression of steps 3/5 below (hold 2-3 candidates, pick the sharpest), PROBLEM COMPRESSION CHECK is the original expression of step 1 (can this be stated in one sentence already known?), and SELF-REPETITION CHECK is already shared between both. This checklist is not a competing, separate process — it is DECISION PASS's own steps, now made more explicit and connected to INTERVENTION SPACE/SPECIFICITY ORDERING, which did not exist when DECISION PASS was first written): before finalizing any reply, run through this once, in order — (0) CLOSURE DOMINANCE RULE gate: if its three conditions are already met, stop here — no further steps below apply, only brief reflection and end. (1) REDUNDANCY CHECK + PREDICTABILITY TEST (same check PROBLEM COMPRESSION CHECK below already performs; EXTENDED per founder's directive, Section 16 — "previously rejected inquiry tracking" was confirmed absent from this document, and belongs here rather than as new machinery): is this candidate's likely answer already known? If so, discard it. ALSO check: has the user already, explicitly pushed back on this same line of inquiry as irrelevant, unhelpful, or beside the point — not merely "already answered," but actively rejected? If so, that line is closed; do not return to it in a new phrasing. Evaluated holistically, the same way PRIORITY INTERRUPT LAYER's four conditions are — never a keyword match, since rejection is expressed many ways. (2) SELF-REPETITION CHECK (code-verified via selfRepetitionCtx when present): were the last 2 replies already structurally similar? If so, this already answers step (4) below — switch now. (3) ANTICIPATORY SYNTHESIS (same act INTERNAL QUERY FAN-OUT below already names): for the surviving candidates, what would each plausible answer let me build immediately next turn? (4) STRATEGY SWITCH TIMING: does the answer to (1), (2), or (3) already show the current family isn't moving anything — if so, switch family (per WHICH FAMILY TO SWITCH TO and EXPLORATION COVERAGE PRINCIPLE) before step (5), not after. (5) MANDATORY SELECTION POLICY, searching the full INTERVENTION SPACE (the same silent pick INTERNAL QUERY FAN-OUT below already makes, now with a wider, named search space): among the surviving candidates, which genuinely different cognitive route serves the SELECTION OBJECTIVE best? (5b) REACHABILITY PASS — the mechanisms this checklist can actually select among (structural audit finding, same class as an unreachable UI block: six mechanisms were defined in this document and referenced by nothing, so they existed as text without being reachable from the decision chain. Named here so the selection in step 5 can actually see them): COGNITIVE PROPORTIONALITY PROTOCOL sets how deep this exchange should go at all; THE FOUR PILLARS is the shape the whole session moves through — ENTRY, then THE LOOP (question synthesis toward the core, with strategy change as its feedback path, which is where almost every turn of this checklist actually lands), then EXIT — THE LANDING — and every choice here serves that shape; ANTI-THRASHING GUARD checks whether switching has itself stopped producing movement; COGNITIVE LOAD MIRROR PROTOCOL applies when the person is carrying more than the conversation can hold; CONFIDENCE TO ACT settles that a candidate surviving the guardrails needs no further hesitation; and ADVERSARIAL RESISTANCE holds regardless of what any of the above select. None of these is a new step — they are options and constraints that were already written and simply could not be reached from here.
+PRE-FLIGHT CHECKLIST (documentation, same safe pattern as AURA EXPLORATION PRINCIPLE/MOMENTUM PRINCIPLE above — unifies the silent, before-finalizing reasoning steps that already exist scattered above into one ordered sequence, so they are executed together reliably instead of separately and thinly; adds no new step, changes no behavior. BROUGHT UP TO DATE — real gap found: this was the actual runtime sequence, but was never updated when COGNITIVE MOVEMENT PRINCIPLE, CLOSURE DOMINANCE RULE, and the self-repetition detector were added later, so they existed as standalone principles without being woven into the one sequence that actually runs each turn. MAJOR SECOND GAP FOUND via deeper audit — honesty requires stating this plainly: DECISION PASS below already exists as the original, foundational version of this exact moment ("before composing this reply, ask which single mechanism is most useful"), with its own sub-items already doing versions of these same steps — INTERNAL QUERY FAN-OUT is the original expression of steps 3/5 below (hold 2-3 candidates, pick the sharpest), PROBLEM COMPRESSION CHECK is the original expression of step 1 (can this be stated in one sentence already known?), and SELF-REPETITION CHECK is already shared between both. This checklist is not a competing, separate process — it is DECISION PASS's own steps, now made more explicit and connected to INTERVENTION SPACE/SPECIFICITY ORDERING, which did not exist when DECISION PASS was first written): before finalizing any reply, run through this once, in order — (0) CLOSURE DOMINANCE RULE gate: if its three conditions are already met, stop here — no further steps below apply, only brief reflection and end. (1) REDUNDANCY CHECK + PREDICTABILITY TEST (same check PROBLEM COMPRESSION CHECK below already performs; EXTENDED per founder's directive, Section 16 — "previously rejected inquiry tracking" was confirmed absent from this document, and belongs here rather than as new machinery): is this candidate's likely answer already known? If so, discard it. ALSO check: has the user already, explicitly pushed back on this same line of inquiry as irrelevant, unhelpful, or beside the point — not merely "already answered," but actively rejected? If so, that line is closed; do not return to it in a new phrasing. Evaluated holistically, the same way PRIORITY INTERRUPT LAYER's four conditions are — never a keyword match, since rejection is expressed many ways. (2) SELF-REPETITION CHECK (code-verified via selfRepetitionCtx when present): were the last 2 replies already structurally similar? If so, this already answers step (4) below — switch now. (3) ANTICIPATORY SYNTHESIS (same act INTERNAL QUERY FAN-OUT below already names): for the surviving candidates, what would each plausible answer let me build immediately next turn? (4) STRATEGY SWITCH TIMING: does the answer to (1), (2), or (3) already show the current family isn't moving anything — if so, switch family (per WHICH FAMILY TO SWITCH TO and EXPLORATION COVERAGE PRINCIPLE) before step (5), not after. (5) MANDATORY SELECTION POLICY, searching the full INTERVENTION SPACE (the same silent pick INTERNAL QUERY FAN-OUT below already makes, now with a wider, named search space): among the surviving candidates, which genuinely different cognitive route serves the SELECTION OBJECTIVE best? (5b) REACHABILITY PASS — the mechanisms this checklist can actually select among (structural audit finding, same class as an unreachable UI block: six mechanisms were defined in this document and referenced by nothing, so they existed as text without being reachable from the decision chain. Named here so the selection in step 5 can see them): COGNITIVE PROPORTIONALITY PROTOCOL sets how deep this exchange should go at all; THE FOUR PILLARS is the shape the whole session moves through — ENTRY, then THE LOOP (question synthesis toward the core, with strategy change as its feedback path, which is where almost every turn of this checklist actually lands), then EXIT — THE LANDING — and every choice here serves that shape; ANTI-THRASHING GUARD checks whether switching has itself stopped producing movement; COGNITIVE LOAD MIRROR PROTOCOL applies when the person is carrying more than the conversation can hold; CONFIDENCE TO ACT settles that a candidate surviving the guardrails needs no further hesitation; and ADVERSARIAL RESISTANCE holds regardless of what any of the above select. None is a new step — they are options and constraints already written that simply could not be reached from here.
 (6) COGNITIVE MOVEMENT PRINCIPLE final check: would the chosen candidate actually satisfy this — if it only confirms, restates, or rephrases, it fails even after surviving steps 1-5, and must be discarded.
 STRATEGY PRE-MORTEM GATE (founder's directive — not a second brain drafting and doubting every reply, but a named, evidence-gated veto immediately before commit, unifying six checks that already existed scattered across the steps above under one explicit question: "is there concrete evidence THIS chosen strategy is about to fail here?" DEFAULT IS NO CHANGE — if no concrete answer below points to an actual reason, this gate does nothing and commit proceeds exactly as already decided): before step 6 finalizes, run these once, each pointing to where the evidence already lives — no new detection, only unification:
 — Which strategy, and why (evidence from this transcript, not a feeling)? Already established by DECISION PASS above.
@@ -505,7 +505,7 @@ LANDING QUESTION (founder's repeated observation, real gap confirmed by audit �
 OFFER THE CLOSE, don't just check for the end (real-user evidence: after the three-beat shift landed, the app jumped straight to a bare "Τέλος;" — the user noted it should instead offer the next step: "αν δεν έχεις κάτι να προσθέσεις, θα σου δείξω κάτι"): when the conversation reaches its natural close, do not end on a bare "Τέλος;" / "Αυτό ήταν;" that puts the burden on the user. Instead, invite one last addition AND offer the next thing in the same breath — e.g. "Θέλεις να προσθέσεις κάτι, ή να σου φέρω τη σύνοψη αυτού που βρήκες;" This gives the user both a chance to add and a reason to continue to the summary/Blueprint, rather than a blunt end-check. Vary the wording naturally; never the same phrase twice.
 CHECK BEFORE ADDING, right after the three-beat shift (distinct gap, real-user evidence: the three-beat shift landed, the user said "Οκ" once — a natural signal of "I'm satisfied, we can stop" — and instead of checking, AURA volunteered an extra unprompted remark, "αν υπάρξει κάτι που σε σταματά πριν στείλεις..."; the user had to say "Οκ" a second time before it actually stopped, and noted plainly they would have left otherwise): the moment right after ΗΡΘΕΣ ΜΕ/ΒΡΗΚΕΣ/ΦΕΥΓΕΙΣ ΜΕ is itself a natural completion point. A short acknowledgment from the user here ("Οκ", "ωραία", "ναι") is not an invitation to add more unprompted — it is likely closure. Before adding ANY further remark, even a brief supportive one, check first: "Θέλεις να συνεχίσουμε, ή κλείνουμε εδώ;" Only add more if they say yes. Do not assume that because something could be added, it should be.
 CONDITIONAL PROMISE EXTENSION (red-team fix — the promise below must not become a fixed ritual appended every time; only extend it when the session had genuine substance to reflect on — several real exchanges before the shift, not a quick one): only when that's true, extend the check above to: "Θέλεις να συνεχίσουμε, ή κλείνουμε εδώ; Αν θες, μπορώ να σου δείξω πώς έφτασες εδώ." For short, quick sessions, the plain check above is enough — do not add the promise just to have something to say.
-EARLY PERSONAL WORD CAPTURE (architecture redesign — cognitive mode change, not a UI change: this word/phrase already existed at the very end of the Reflection Summary below; asked there, it risks being anchored to AURA's own just-heard synthesis rather than genuinely self-generated. Asking it HERE, before that synthesis exists at all, makes it authentically the user's own first, unprompted distillation): once the user confirms continuing (the check above), before proceeding to the Reflection Summary sequence, ask — varied wording each time, never the same phrasing twice, since this question in particular must never feel like ritual: "Αν έμενε μόνο μία σκέψη από αυτή τη συζήτηση, ποια θα ήταν;" or "Γράψ' το όπως θα το θυμόσουν αύριο." or "Ποια φράση αξίζει να κρατήσεις;" or an equally natural variant. HIDDEN TAG (same proven pattern as the EXIT tag rules below — detecting AURA's own varied wording here would be fragile by design, since variety is the whole point; a tag is reliable regardless of phrasing): end this specific message with, on its own line, invisible to the user: [[EARLY_WORD:yes]]. No ordering rule relative to the EXIT tag below — the application detects each hidden tag independently by presence, not by position. The user's next message is their answer — do not comment on it, do not evaluate it, simply proceed to the Reflection Summary sequence next, which will reference this word instead of asking again.
+EARLY PERSONAL WORD CAPTURE (architecture redesign — cognitive mode change, not a UI change: this word/phrase already existed at the very end of the Reflection Summary below; asked there, it risks being anchored to AURA's own just-heard synthesis rather than genuinely self-generated. Asking it HERE, before that synthesis exists at all, makes it authentically the user's own first, unprompted distillation): once the user confirms continuing (the check above), before proceeding to the Reflection Summary sequence, ask — varied wording each time, never the same phrasing twice, since this question in particular must never feel like ritual: "Αν έμενε μόνο μία σκέψη από αυτή τη συζήτηση, ποια θα ήταν;" or "Γράψ' το όπως θα το θυμόσουν αύριο." or "Ποια φράση αξίζει να κρατήσεις;" or an equally natural variant. HIDDEN TAG (same proven pattern as EXIT SIGNAL TAG below — detecting AURA's own varied wording here would be fragile by design, since variety is the whole point; a tag is reliable regardless of phrasing): end this specific message with, on its own line, invisible to the user: [[EARLY_WORD:yes]]. No ordering rule relative to the EXIT tag below — the application detects each hidden tag independently by presence, not by position. The user's next message is their answer — do not comment on it, do not evaluate it, simply proceed to the Reflection Summary sequence next, which will reference this word instead of asking again.
 CONDITIONAL SKIP (new real-transcript finding — this check itself becomes dead time in one specific case): if the user's own message right before the three-beat shift already contained explicit, clear satisfaction language ("καλύφθηκα πλήρως," "ευχαριστώ πολύ," or equivalent — not just a bare "Οκ"), skip this check entirely and proceed directly to the closing sequence. The check exists for genuine ambiguity about whether more is needed, not for cases where the user has already, plainly, said there is nothing more.
 THREE-WAY DEPTH CHOICE (comparative-analysis refinement — the check above is binary, continue-or-close; when something genuinely substantive just surfaced and there's real reason to think a different angle might matter, offer explicit agency over WHICH kind of continuation, not just whether): "Πιο βαθιά, από άλλη οπτική, ή το αφήνουμε εδώ;" "Άλλη οπτική" is genuine only if Assumption Surfacing or Premise Inversion's own trigger conditions are actually met — never offered as a default third button. If not earned, the binary check above remains the right one.
 MULTIPLE-CHOICE FORMAT — STRUCTURE ONLY, NEVER CONTENT (founder's refinement, explicit boundary): this three-way format, with an always-present open escape — "...ή κάτι άλλο, θα το εκφράσω εγώ" — may be used for PROCESS-level questions like this one (how to continue, what pace, what depth). It must NEVER be used for CONTENT-level questions about what the user thinks or feels (e.g. offering "φοβάσαι Χ, ή Υ, ή κάτι άλλο;" as a menu of possible fears). Even with an explicit "something else" option present, survey research shows named options still anchor answers more than an open question would — the INVERSE CONTENT RULE's real-transcript evidence (a third, deeper answer the binary menu didn't anticipate) is not fully resolved by adding an escape valve, only reduced. For content and feelings, stay with the open form the INVERSE CONTENT RULE already establishes; the "κάτι άλλο" structure belongs here, at the process layer, not there.
@@ -4116,6 +4116,12 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
           display:block; padding:10px 0 10px 16px; margin-bottom:2px;
           border-left:1px solid var(--gold-dim);
         }
+        .shift-beat-feeling{
+          /* CSS audit: this class was used in JSX with no definition, so the "Πώς νιώθεις τώρα;"
+             line inherited .shift-beat and looked identical to the beats around it — when it is a
+             question to the reader, not a statement about them. */
+          border-left-style:dashed; opacity:.85; padding-top:14px; padding-bottom:14px;
+        }
         .shift-beat-label{
           display:block; font-family:'DM Mono',monospace; font-size:9px;
           letter-spacing:.18em; text-transform:uppercase; color:var(--gold-dim);
@@ -4299,34 +4305,17 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
       {philosophyShown && !introShown && (
         <div className="intro-screen">
           <div style={{width:"100%",maxWidth:"480px"}}>
-            <div className="intro-tagline">Thinking with you. Not for you.</div>
-            <div className="intro-text" style={{textAlign:"center",maxWidth:"320px"}}>
-              <div style={{marginBottom:"8px",fontSize:"12px",letterSpacing:".12em",color:"#6a6660",textTransform:"uppercase",fontFamily:"'DM Mono',monospace"}}>After AI.</div>
-              <div style={{marginBottom:"16px"}}>Μια ερώτηση. Τη σωστή.</div>
-              <div style={{marginBottom:"16px",color:"#9a9690"}}>Δεν σου δίνει απαντήσεις ή κατεύθυνση. Δεν ολοκληρώνει τη σκέψη σου. Σε βοηθά να δεις πιο καθαρά τι ήδη σκέφτεσαι.</div>
-              <div style={{marginBottom:"16px",color:"#9a9690"}}>Όχι εσύ και η AURA.<br />Εσύ και εσύ.</div>
-              <div style={{color:"#c9a84c",fontStyle:"normal"}}>Αυτό είναι η AURA.</div>
+            <div className="intro-tagline">Αύρα</div>
+            <div className="intro-text" style={{textAlign:"left",maxWidth:"340px"}}>
+              <div style={{marginBottom:"16px",color:"#9a9690"}}>Πολλές φορές έχεις ένα πρόβλημα, ένα δίλημμα, ή κάτι που δεν μπορείς να εκφράσεις ακριβώς.</div>
+              <div style={{marginBottom:"16px"}}>Κάθε ερώτηση της εφαρμογής είναι <span style={{color:"#c9a84c"}}>δική σου ερώτηση</span> — μία που δεν έχεις κάνει ακόμα στον εαυτό σου, ή δεν σκέφτηκες να την κάνεις.</div>
+              <div style={{marginBottom:"16px",color:"#9a9690"}}>Γιατί πολλές φορές το πρόβλημα έχει <span style={{color:"#c9c5bc"}}>άλλη ρίζα</span> από αυτό που ζούμε και εκφράζουμε.</div>
+              <div style={{marginBottom:"16px",color:"#9a9690"}}>Μετά βλέπεις τις επιλογές σου καθαρά: <span style={{color:"#c9c5bc"}}>τι κερδίζεις, τι πληρώνεις.</span> Και αποφασίζεις τι κρατάς και τι αφήνεις.</div>
+              <div style={{marginBottom:"6px",color:"#9a9690"}}>Στόχος δεν είναι η μασημένη λύση που δίνουν όλοι.</div>
+              <div style={{marginBottom:"18px"}}>Στόχος είναι να βγεις από το χάος του μυαλού σου.</div>
+              <div style={{color:"#c9a84c",fontStyle:"normal"}}>Εσύ στο τιμόνι, στα δικά σου προβλήματα.</div>
             </div>
-            {/* DOORS MOVED HERE (structural fix: philosophy and the doors were two separate full
-                screens, so a new user met three steps before typing — philosophy, doors, time. The
-                philosophy screen already does the introducing, so the doors belong on it directly.
-                Now: this screen, then time. Two steps.) */}
-            <div style={{width:"100%",maxWidth:"320px",margin:"0 auto"}}>
-              <div style={{fontSize:"12px",color:"#8a8680",letterSpacing:".06em",marginBottom:"12px",textAlign:"left",marginTop:"22px"}}>
-                Τι σε φέρνει εδώ;
-              </div>
-              {["Κάτι που επιστρέφει στο μυαλό μου","Ξέρω τις επιλογές μου αλλά δεν μπορώ να αποφασίσω","Έχω πολλά μαζί και δεν ξέρω τι έχει σημασία","Κάτι που συνεχίζω να αναβάλλω","Κάτι το αποφάσισα ήδη"].map(door => (
-                <button key={door} onClick={()=>{setEntryDoor(door);setIntroShown(true);try{localStorage.setItem("aura_intro_seen","1")}catch{}}}
-                  style={{display:"block",width:"100%",background:"transparent",border:"1px solid rgba(201,168,76,0.18)",color:"#c9c5bc",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",marginBottom:"8px",cursor:"pointer",borderRadius:"4px"}}>
-                  {door}
-                </button>
-              ))}
-              <button onClick={()=>{setEntryDoor(null);setIntroChoice("direct");setIntroShown(true);setSessionStarted(true);try{localStorage.setItem("aura_intro_seen","1")}catch{};setTimeout(()=>textareaRef.current?.focus(),50);}}
-                style={{display:"block",width:"100%",background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.35)",color:"rgba(201,168,76,0.85)",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",marginTop:"6px",cursor:"pointer",borderRadius:"4px"}}>
-                Θα το πω μόνος μου
-              </button>
-            </div>
-            <div className="intro-actions" style={{display:"none"}}>
+            <div className="intro-actions">
               <button className="intro-continue" onClick={() => { setIntroShown(true); try { localStorage.setItem("aura_intro_seen","1"); } catch {} }}>Ξεκίνα</button>
               <button className="intro-skip" onClick={() => { setIntroShown(true); try { localStorage.setItem("aura_intro_seen","1"); } catch {} }}>skip</button>
             </div>
@@ -4343,20 +4332,29 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         {messages.length === 0 && !sessionStarted && introChoice === null && (
           <div ref={el => { if (el) el.scrollTop = 0; }} style={{position:"fixed",inset:0,zIndex:61,background:"#0d0c0a",overflowY:"auto",padding:"36px 24px 48px"}}>
             <div style={{maxWidth:"380px",width:"100%",margin:"0 auto",textAlign:"center"}}>
-              {/* MERGED (structural finding: philosophy and intro were two separate full screens
-                  both doing introduction — the philosophy screen already carries the tagline and the
-                  explanation, so repeating five more sentences here made the entry three screens deep.
-                  The doors now follow the philosophy screen directly.) */}
-
-
-
-
+              <div style={{fontSize:"13px",color:"#a8a49c",lineHeight:1.6,marginBottom:"4px"}}>
+                Όλοι δίνουν απαντήσεις.<br/>Δε χρειάζεσαι άλλη.
+              </div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:300,color:"#d8d4cc",lineHeight:1.3,marginBottom:"22px"}}>
+                Αύρα
+              </div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.5,marginBottom:"26px"}}>
+                Δες που κολλάς — χωρίς μασημένες συμβουλές.<br/>Εσύ στο τιμόνι.
+              </div>
+              <div style={{fontSize:"13px",color:"#c9c5bc",lineHeight:2,marginBottom:"26px",textAlign:"left"}}>
+                Δεν αποφασίζει για σένα.<br/>
+                Δεν δίνει έτοιμες συμβουλές.<br/>
+                Σου κάνει τις ερωτήσεις που βάζουν τάξη στη σκέψη σου.
+              </div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"14px",color:"#a8a49c",lineHeight:1.6,marginBottom:"26px"}}>
+                Μερικές φορές η καλύτερη απάντηση δεν είναι μια απάντηση. Είναι η σωστή ερώτηση.
+              </div>
               {/* Entry doors — these already existed inside AURA's first message (Zeigarnik-grounded:
                   unfinished, recurring thoughts stay mentally active). Surfacing them here, before the
                   user types, so they know what kind of thing this is for. Deliberately NOT sent to the
                   model and NOT stored: the choice exists to sharpen the USER's own sense of what they
                   are bringing, never to let AURA classify them — so this adds no state and no inference. */}
-              {false ? (<>
+              {entryDoor === null ? (<>
               {/* Header lives INSIDE the branch (live bug, reported three times and misdiagnosed twice
                   as a prompt problem): it was outside the conditional, so it stayed on screen when the
                   content switched to the time question — the user saw "Τι σε φέρνει εδώ;" above a set
@@ -4393,7 +4391,58 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         )}
 
         {/* ── Intro overlay — full-screen, fully independent of chat layout, closes instantly on CTA click ── */}
-        {/* DEMO BLOCK REMOVED — unreachable since the demo button was deleted; ~4976 chars of dead JSX carrying its own duplicate entry-door list, which is exactly the kind of orphan that produced the third-screen bug. */}
+        {messages.length === 0 && !sessionStarted && introChoice === "demo" && (
+          <div ref={el => { if (el) el.scrollTop = 0; }} style={{position:"fixed",inset:0,zIndex:60,background:"#0d0c0a",overflowY:"auto",padding:"36px 20px 60px"}}>
+            <div style={{maxWidth:"420px",margin:"0 auto",textAlign:"right"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:300,color:"#d8d4cc",letterSpacing:".02em",lineHeight:1.3,marginBottom:"4px"}}>
+                AURA — Ο καθρέφτης της σκέψης σου
+              </div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#a8a49c",lineHeight:1.5,marginBottom:"14px"}}>
+                Δύσκολο δεν είναι οι δύσκολες αποφάσεις.<br/>Δύσκολο είναι να δεις καθαρά.
+              </div>
+              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
+                Οι περισσότεροι, όταν νιώθουν μπλοκαρισμένοι, ψάχνουν περισσότερες πληροφορίες, γνώμες, συμβουλές. Συνήθως όμως δεν τους λείπει τίποτα από αυτά — τους λείπει η διαύγεια.
+              </div>
+              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
+                Η AURA δεν γεννήθηκε σε εργαστήριο, αλλά στην παρατήρηση της αξίας της σωστής ερώτησης — χρόνια πραγματικών αποφάσεων σε συνθήκες πίεσης, όπου πριν από κάθε σωστή απόφαση προηγείται πάντα μια σωστή διαλογή: το ουσιαστικό από τον θόρυβο, το επείγον από το σημαντικό, τη σύγχυση από το πραγματικό πρόβλημα.
+              </div>
+              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
+                Αυτή η εμπειρία δεν έγινε βιβλίο. Έγινε ένας τρόπος σκέψης. Και αυτός ο τρόπος σκέψης έγινε η AURA.
+              </div>
+              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
+                Η AURA δεν αποφασίζει για σένα. Δεν δίνει έτοιμες συμβουλές. Δεν προσπαθεί να σε πείσει. Σου κάνει τις ερωτήσεις που βάζουν τάξη στη σκέψη σου — όχι επειδή σ' την είπε κάποιος, αλλά επειδή την είδες μόνος σου.
+              </div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"14px",color:"#a8a49c",lineHeight:1.6,marginBottom:"16px"}}>
+                Μερικές φορές η καλύτερη απάντηση δεν είναι μια απάντηση. Είναι η σωστή ερώτηση.
+              </div>
+              <div style={{border:"1px solid rgba(201,168,76,0.25)",borderRadius:"4px",padding:"14px 16px",marginBottom:"18px",fontFamily:"'DM Mono',monospace",fontSize:"11px",lineHeight:1.8}}>
+                <div style={{color:"#8a8680",marginBottom:"6px"}}>Έτσι μοιάζει μια πραγματική στιγμή:</div>
+                <div style={{color:"#c9c5bc",marginBottom:"6px"}}>"Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου."</div>
+                <div style={{color:"rgba(201,168,76,0.85)"}}>"Τι σε κάνει να πιστεύεις ότι η απόφαση είναι να φύγεις, και όχι να αλλάξεις κάτι στη σημερινή κατάσταση;"</div>
+              </div>
+              <div style={{marginBottom:"18px"}}>
+                <div style={{color:"#8a8680",marginBottom:"10px",fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".05em"}}>Τι σε έφερε εδώ;</div>
+                {[
+                  "Κάτι που σκέφτομαι και δεν ξεκαθαρίζει",
+                  "Μια απόφαση που αναβάλλω",
+                  "Κάτι που επιστρέφει ξανά και ξανά",
+                ].map((door) => (
+                  <button key={door} onClick={()=>{setInput(door + ": "); setSessionStarted(true); setTimeout(()=>textareaRef.current?.focus(),50);}}
+                    style={{display:"block",width:"100%",textAlign:"left",background:"rgba(10,9,8,0.35)",border:"1px solid rgba(201,168,76,0.18)",color:"#c9c5bc",fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",padding:"11px 14px",marginBottom:"8px",cursor:"pointer",borderRadius:"4px"}}>
+                    {door}
+                  </button>
+                ))}
+                <button onClick={()=>{setSessionStarted(true); setTimeout(()=>textareaRef.current?.focus(),50);}}
+                  style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"1px solid rgba(201,168,76,0.12)",color:"#8a8680",fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",fontStyle:"italic",padding:"11px 14px",cursor:"pointer",borderRadius:"4px"}}>
+                  Κάτι άλλο — θα το πω μόνος μου
+                </button>
+              </div>
+              <button onClick={()=>{setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}} style={{background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.5)",color:"rgba(201,168,76,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"12px",letterSpacing:".15em",textTransform:"uppercase",padding:"12px 28px",cursor:"pointer",borderRadius:"4px"}}>
+                Ξεκίνα να σβήνεις τη φασαρία
+              </button>
+            </div>
+          </div>
+        )}
 
 
         {/* ── Header ── */}
@@ -4540,11 +4589,25 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
           {/* FIX: state-doors were orphaned inside the now-unreachable demo overlay after the
               demo-button fix skipped straight into session. Re-added here, reachable, for the
               'direct' path specifically — right after choosing to start, before the first message. */}
-          {/* THIRD ENTRY SCREEN REMOVED (live bug, reported three times, and the reason the previous two
-              fixes did not help: this was a separate, older block that ran AFTER the session started and
-              asked "Τι σε έφερε εδώ;" with three doors of its own. It predates the intro-screen doors and
-              was never found by earlier searches because it says "έφερε" while the intro says "φέρνει" —
-              a different word. The user tapped a door, answered the time question, and then met this. */}
+          {messages.length === 0 && sessionStarted && introChoice === "direct" && (
+            <div style={{marginBottom:"18px"}}>
+              <div style={{color:"#8a8680",marginBottom:"10px",fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".05em"}}>Τι σε έφερε εδώ;</div>
+              {[
+                "Κάτι που σκέφτομαι και δεν ξεκαθαρίζει",
+                "Μια απόφαση που αναβάλλω",
+                "Κάτι που επιστρέφει ξανά και ξανά",
+              ].map((door) => (
+                <button key={door} onClick={()=>{setInput(door + ": "); setTimeout(()=>textareaRef.current?.focus(),50);}}
+                  style={{display:"block",width:"100%",textAlign:"left",background:"rgba(10,9,8,0.35)",border:"1px solid rgba(201,168,76,0.18)",color:"#c9c5bc",fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",padding:"11px 14px",marginBottom:"8px",cursor:"pointer",borderRadius:"4px"}}>
+                  {door}
+                </button>
+              ))}
+              <button onClick={()=>{textareaRef.current?.focus();}}
+                style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"1px solid rgba(201,168,76,0.12)",color:"#8a8680",fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",fontStyle:"italic",padding:"11px 14px",cursor:"pointer",borderRadius:"4px"}}>
+                Κάτι άλλο — θα το πω μόνος μου
+              </button>
+            </div>
+          )}
           {messages.map((msg, i) => (
             <MessageBubble
               key={msg.id || i}
