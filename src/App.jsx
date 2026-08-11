@@ -1284,6 +1284,20 @@ function inferLensFallback(firstMessage, whyWord) {
   return best;
 }
 
+// ONE ENTRY CONTEXT, USED BY EVERY PATH (structural trace finding: three separate places build a
+// prompt — the main conversational path, the First-WHY branch, and misfire recovery — and only the
+// first carried the entry ticks. The First-WHY branch runs for RETURNING users specifically, so a
+// user who tapped a door and answered the time question reached the model with neither, on the very
+// path where their first real reply is generated. Built once here rather than duplicated, so the
+// three paths cannot drift apart again.)
+function buildEntryContext(door, time, isFirstReply) {
+  if (!door && !time && !isFirstReply) return '';
+  const parts = [];
+  if (isFirstReply) parts.push(`FIRST REPLY FLOOR (this branch generates the session's first substantive reply, and the code-level floor that guards it was only wired to the main path): Assumption Surfacing, Premise Inversion, Contradiction Detection and any binary-choice framing are all held back for this one turn regardless of how the material looks. Respond only with open, natural material-gathering per OPEN BEFORE PROBE. These become available from the next reply onward.`);
+  if (door) parts.push(`THE ENTRY QUESTION IS ALREADY ANSWERED — DO NOT ASK IT. They tapped "${door}" before writing a word. Level 1 evidence per SPECIFICITY ORDERING: use it as a head start for OPENING RADAR and to narrow which dispatch entry fits, and never ask what brings them here again in any form.`);
+  if (time) parts.push(`TIME THEY HAVE, their own answer: "${time}". Changes HOW rather than WHAT: "Καθόλου" means markedly shorter, skip what can wait, reach the decision space fast, and do not ask about urgency again since they just answered it. "Αρκετό" permits real depth.`);
+  return `\n[${parts.join(' ')}]\n`;
+}
 function getLensPrompt(lens) {
   switch(lens) {
     case 'CHALLENGE':   return SYSTEM_LENS_CHALLENGE;
@@ -2098,6 +2112,17 @@ function detectDomain(text) {
 // Also: "Τέλος ε;" (a very natural, common Greek colloquial tag-question, like adding "right?" at
 // the end) never matched anywhere, since the strict word-only regex didn't allow the trailing "ε"
 // filler. One shared matcher now, used by both checks, with accent-normalization and the tag allowed.
+// Compound-message closing signal (structural finding: matchesClosingWord requires the WHOLE
+// message to reduce to closing words, which is correct for termination — a message carrying real
+// content must not end the session — but wrong for drift detection. "Θα ζητήσω αύξηση, τέλος"
+// closes; it just does not close ALONE. This is the softer signal, used only by closingDriftCtx,
+// and deliberately separate so termination logic is untouched.)
+function endsWithClosingSignal(text) {
+  const t = String(text == null ? "" : text).trim();
+  if (!t) return false;
+  const tail = t.split(/[,.!;·\n]/).filter(Boolean).pop();
+  return tail ? matchesClosingWord(tail) : false;
+}
 function matchesClosingWord(text) {
   const t = String(text == null ? "" : text).trim();
   if (!t) return false;
@@ -2115,7 +2140,7 @@ function matchesClosingWord(text) {
   // repeatedly because the prompt-level RECIPROCAL FAREWELL rule was probabilistic and didn't reliably
   // close; these are complete closing signals and belong in the deterministic detector). Order matters:
   // multi-word phrases and longer words before shorter substrings they contain.
-  const stripped = normalized.replace(/ναι|yes|σωστο|ακριβως|καταλαβα|ενταξει|οκ|ok|νομιζω ναι|πιστευω ναι|τελος|τελειωσαμε|κλεινουμε|κλεινω|το κλεινουμε|αυτο ηταν|παω|φευγω|φτασαμε|τα λεμε|καλη συνεχεια|καληνυχτα|καλο βραδυ|κι εσενα|και εσενα|παρομοιως|επισης|αντιο|γεια|αντε γεια|ευχαριστω|θενξ|merci|thanks|thank you|[.,!?;\s]/gi, "");
+  const stripped = normalized.replace(/ναι|yes|σωστο|ακριβως|καταλαβα|ενταξει|οκ|ok|νομιζω ναι|πιστευω ναι|τελος|τελειωσαμε|κλεινουμε|κλεινω|το κλεινω|το κλεινουμε|αρκετα για σημερα|ας το αφησουμε εδω|φτανει|σταματαμε|θα τα πουμε|μπαι|bye|αυτο ηταν|παω|φευγω|φτασαμε|τα λεμε|καλη συνεχεια|καληνυχτα|καλο βραδυ|κι εσενα|και εσενα|παρομοιως|επισης|αντιο|γεια|αντε γεια|ευχαριστω|θενξ|merci|thanks|thank you|[.,!?;\s]/gi, "");
   return stripped.length === 0;
 }
 function isModelPreClosing(text) {
@@ -2278,7 +2303,10 @@ function detectsConcreteStep(text) {
   if (!match) return false;
   const before = t.slice(0, match.index);
   const isNegated = /(δεν|όχι|won'?t|will not|not going to)\s*$/i.test(before.trim());
-  const isConditional = /(?:^|\s)(αν|εάν)(?:\s|$)|\bif\b/i.test(before);
+  // Adversarial phrase testing (30 near-miss inputs): "Σκέφτομαι μήπως θα του πω" was read as a
+  // committed step. "μήπως", "ίσως", "σκέφτομαι να" and "λέω να" all mark a thought being weighed,
+  // not a decision taken — the same category as "αν", which was already handled.
+  const isConditional = /(?:^|\s)(αν|εάν|μήπως|ίσως|μπορεί)(?:\s|$)|σκέφτομαι\s|λέω\s+να\s|\bif\b|\bmaybe\b/i.test(before);
   return !isNegated && !isConditional;
 }
 // State-machine fix (real-transcript evidence, severe): the user explicitly asked "μπορείς να
@@ -2289,7 +2317,7 @@ function detectsConcreteStep(text) {
 // set and held, the same way duringOnboarding/closureDeclineCooldown already work, instead of
 // relying on the model to remember its own state shift.
 function detectsNoQuestionsRequest(text) {
-  return /(χωρίς\s+(τις\s+)?ερωτ|χωρίς\s+να\s+(με\s+)?ρωτ[αά]|μη[νν]?\s+(με\s+)?ρωτ[αά]ς|σταμάτα\s+(να\s+)?(με\s+)?ρωτ[αά]ς|βοηθ[ηή]σεις?\s+χωρίς|δεν\s+θέλω\s+(άλλη\s+)?ερώτηση|όχι\s+(άλλες\s+)?ερωτήσεις|λύση\s+όχι\s+ερωτ)/i.test(text || "");
+  return /(χωρίς\s+(τις\s+)?ερωτ|χωρίς\s+να\s+(με\s+)?ρωτ[αά]|μη[νν]?\s+(με\s+)?ρωτ[αά]ς|σταμάτα\s+(να\s+)?(με\s+)?ρωτ[αά]ς|βοηθ[ηή]σεις?\s+χωρίς|δεν\s+θέλω\s+(άλλη\s+)?ερώτηση|όχι\s+(άλλες\s+)?ερωτήσεις|λύση\s+όχι\s+ερωτ|πες\s+μου\s+τι\s+να\s+κάνω|τι\s+προτείνεις|δώσ'?ε\s+μου\s+(μια\s+)?λύση|θέλω\s+λύση|βοήθησέ\s+με\s+να\s+αποφασίσω|αρκετά\s+με\s+τις\s+ερωτ|πάμε\s+στο\s+ψητό|τι\s+θα\s+έκανες\s+εσύ|δώσ'?ε\s+μου\s+κατευθ|γυρίζουμε\s+γύρω|δεν\s+πάμε\s+πουθενά|χάνω\s+τον\s+χρόνο\s+μου|το\s+ίδιο\s+λέμε|δεν\s+με\s+βοηθάς)/i.test(text || "");
 }
 
 // PASSIVE MEASUREMENT ONLY (Measurement Before Modification — the founder's own standing
@@ -2375,13 +2403,13 @@ function detectsContinuationPromiseAsked(text) {
 // that merely mentions these words in passing as part of a longer, unrelated point.
 function detectsSpontaneousShiftRecognition(text) {
   const t = String(text == null ? "" : text).trim();
-  if (!t || t.split(/\s+/).length > 12) return false;
-  return /(τώρα κατάλαβα|τώρα το βλέπω|τώρα ξέρω|αυτό ήταν|τώρα καταλαβαίνω|άλλαξε κάτι|το βλέπω αλλιώς)/i.test(t);
+  if (!t || t.split(/\s+/).length > 25) return false; // was 12 — same reason
+  return /(τώρα κατάλαβα|τώρα το βλέπω|τώρα ξέρω|αυτό ήταν|τώρα καταλαβαίνω|άλλαξε κάτι|το βλέπω αλλιώς|το βλέπω τώρα|άλλαξε η οπτική|σκέφτομαι διαφορετικά)/i.test(t);
 }
 function detectsSpontaneousCoreRecognition(text) {
   const t = String(text == null ? "" : text).trim();
-  if (!t || t.split(/\s+/).length > 12) return false;
-  return /(ξέρω τι με απασχολεί|καταλαβαίνω τι είναι|νομίζω ξέρω τι|βρήκα τι με κρατάει|αυτό είναι το πρόβλημα)/i.test(t);
+  if (!t || t.split(/\s+/).length > 25) return false; // was 12 — genuine recognition often arrives inside a longer sentence
+  return /(ξέρω τι με απασχολεί|καταλαβαίνω τι είναι|νομίζω ξέρω τι|βρήκα τι με κρατάει|αυτό είναι το πρόβλημα|τώρα κατάλαβα|αυτό ήταν|το βρήκα|αυτό ακριβώς|μου βγάζει νόημα|κατάλαβα τι με κρατάει|ξέρω τι με κρατάει|αυτό με κρατάει)/i.test(t);
 }
 // STRUCTURAL, NOT PSYCHOLOGICAL (real gap found via transcript audit — PREMISE INVERSION already
 // states its own trigger as "user keeps circling the same two options," but nothing tracked this
@@ -2399,7 +2427,7 @@ function detectsBinaryOppositionPhrasing(text) {
   // "δουλειά ή οικογένεια", longer real dilemmas, and ALL English input escaped it — leaving
   // binaryOppositionCount permanently at 0 and PREMISE INVERSION effectively dormant for the
   // majority of real messages. Broadened to bare verbs/nouns, a 60-char gap, and English.
-  return /(ή\s+.{1,60}?\s+ή\s+\S+|μπρος\s+γκρεμός|πίσω\s+ρέμα|είτε\s+.{1,60}?\s+είτε|(να\s+)?\S+[\w\u0370-\u03ff]{2,}\s*,?\s+ή\s+(να\s+)?\S*[\w\u0370-\u03ff]{2,}|\b(whether|should I)\b.{1,60}?\bor\b|\bor\s+(should\s+I|not)\b)/i.test(t);
+  return /(ή\s+.{1,60}?\s+ή\s+\S+|μπρος\s+γκρεμός|πίσω\s+ρέμα|είτε\s+.{1,60}?\s+είτε|(να\s+)?\S+[\w\u0370-\u03ff]{2,}\s*,?\s+ή\s+(να\s+)?\S*[\w\u0370-\u03ff]{2,}|\b(whether|should I)\b.{1,60}?\bor\b|\bor\s+(should\s+I|not)\b|δύο\s+επιλογές|δυο\s+επιλογές|δύο\s+δρόμ|δυο\s+δρόμ|από\s+τη\s+μία.{0,40}από\s+την\s+άλλη)/i.test(t);
 }
 
 // Sibling detector, renamed for EARLY CLARITY BASELINE (function name kept for minimal churn —
@@ -2847,9 +2875,7 @@ export default function AURAv2() {
   useEffect(() => { introChoiceRef.current = introChoice; }, [introChoice]);
   useEffect(() => { entryDoorRef.current = entryDoor; }, [entryDoor]);
   useEffect(() => { entryTimeRef.current = entryTime; }, [entryTime]);
-  const [philosophyShown, setPhilosophyShown] = useState(() => {
-    try { return !!localStorage.getItem("aura_philosophy_seen"); } catch { return false; }
-  });
+  // philosophyShown removed — its screen («Γνώθι σαυτόν») was deleted and nothing set it
   const [introShown, setIntroShown] = useState(() => {
     // Returning users skip intro — only show once per install
     try { return !!localStorage.getItem("aura_intro_seen"); } catch { return false; }
@@ -3063,7 +3089,7 @@ export default function AURAv2() {
       const closingDriftCtx = (() => {
         const userMsgs = msgs.filter(m => m.role === "user");
         if (userMsgs.length < 2) return '';
-        const idx = userMsgs.findIndex(m => matchesClosingWord(m.content));
+        const idx = userMsgs.findIndex(m => matchesClosingWord(m.content) || endsWithClosingSignal(m.content));
         if (idx < 0 || idx === userMsgs.length - 1) return '';
         return `\n[CODE-VERIFIED: the user gave a closing signal ${userMsgs.length - 1 - idx} message(s) ago and the exchange is still going. Do not reciprocate farewells, emoji, or pleasantries — that is what extended this. If the closing sequence has not run yet, run it NOW, in this reply. If it has already run, end here with nothing further: no summary, no anchor question, no second closing. Starting a fresh closing sequence after farewells have already been exchanged reads as not having noticed the conversation ended.]\n`;
       })();
@@ -3087,10 +3113,8 @@ export default function AURAv2() {
       // running invisibly after the button was removed. Now demo requires an explicit choice that
       // the UI no longer offers, so it is effectively off while the code path stays intact and
       // harmless should the intro ever be revisited.
-      const showDemo = introChoiceRef.current === "demo";
-      const demoCtx = showDemo
-        ? `\n[FIRST-EVER MESSAGE FROM THIS USER — a short onboarding demo happens before the real session, across this reply and several that follow:\nSTEP 1 (this reply): Say exactly: "Καλώς ήρθες. Η AURA ξεκαθαρίζει διλήμματα και αποφάσεις — δεν είναι ημερολόγιο, δεν δίνει απαντήσεις, σου δείχνει τις δικές σου, μέσα από ερωτήσεις. Ας κάνουμε μια μικρή δοκιμή, με ένα παράδειγμα:" Then on a new line ask exactly: "Ποια απόφαση πήρες που κανείς δεν επιβράβευσε, αλλά ξέρεις ότι ήταν σωστή;" (real-user evidence: a live user did not realize this specific question was a demo example, separate from their real topic -- the added "με ένα παράδειγμα" bridges the intro sentence to this question explicitly) — do not engage with whatever real topic the user just wrote; the demo comes first.\nSTEP 1b — DEEPENING (after they name a decision, over roughly 3-5 of your next replies, adaptive — use judgment, stop earlier if genuinely nothing new is emerging, never force past 5): Do not settle for their first answer. Go deeper into THIS SAME decision before moving on. Real live-user evidence: a user who had already stated clear, confident conviction (not hesitation) found repeated "why was it correct" style questions felt like doubt-casting, not exploration — describing it as evasive. Confident conviction in an answer is itself a signal that little new is emerging; do not mechanically work through all of the angles below just because — stop as soon as the conviction is clear, even after just one exchange. Ask in the direction of — not necessarily these exact questions, same depth (revised on real live-user evidence: justification-style angles like "why was it correct" felt like doubt-casting once conviction was already clear — these replacements are neutral, contextual, exploratory, never questioning whether the decision was right): how long they thought it over before deciding; whether they consulted someone or it was entirely their own call; what stops them from doing this sooner or more often now. Each question in your own words, adapted to what they just said, never repeat a question. NEVER evaluate the decision at any point — forbidden, in any form: "μπράβο", "σωστή επιλογή", "καταλαβαίνω", "συμφωνώ", "έκανες καλά", or any equivalent. Reflect only their own words back, then ask — nothing else. Real live-user evidence: a standalone "Εντάξει" here was read as agreement that the decision was correct (forbidden evaluation, even unintentional) — see the general NO BARE ACKNOWLEDGMENT rule above for the same pattern's other risk (being read as the end of the interaction).\nSTEP 2 (once the deepening has run its course): Ask exactly: "Από τη σημερινή δοκιμή, ποια λέξη ή φράση θέλεις να κρατήσεις για τον μελλοντικό σου εαυτό;"\nSTEP 3 (after they give a word/phrase): Say exactly: "Το «" + their exact word + "» το κρατάω — αυτό λέγεται Anchor. Θα το ξαναδείς όταν επιστρέψεις, όποτε κι αν είναι αυτό." Then, on new lines, in your own words but this exact meaning, no more content than this: that you didn't evaluate their decision, didn't say if it was right or wrong, didn't try to persuade them — the thoughts they arrived at were never yours, they were already theirs. Then say exactly, verbatim, as its own line: "Η AURA δεν είναι coach, ούτε therapist, ούτε assistant. Είναι ο ψηφιακός καθρέφτης του χρήστη." Then on a new line say exactly (real-user evidence — this exact wording was tested live in a real conversation and confirmed to build trust through safety/privacy/non-judgment, before the same session organically produced the tagline "Μίλα στη σιωπή"): "Ό,τι πεις θα μένει μόνο εδώ. Είσαι εσύ με εσένα — μην ντραπείς πουθενά. Μίλα στη σιωπή και άκου τι ψάχνεις να λύσεις — στη χρήση θα καταλάβεις γιατί. Φωνή ή γραφή, ό,τι σου ταιριάζει." This ends the demo — after this, respond normally to their real topic. Once, after this point (not repeated, not enforced), when it fits naturally: "Αν το πρόβλημα είναι ήδη καθαρό στο μυαλό σου, γράψε το. Αν ακόμα προσπαθείς να βρεις τι πραγματικά σε απασχολεί, δοκίμασε να το πεις όπως θα σου ερχόταν φυσικά." — an invitation, never a requirement; text remains fully available always. Alternative rationale, same invitation, occasionally usable instead of the above (fixed meaning, variable wording — do not repeat the same one every time): "Θυμήσου πόσες φορές κάτι που έγραψες διαβάστηκε με λάθος τρόπο από τον λήπτη. Σήμερα μη γίνεις εσύ ο λήπτης της δικής σου σκέψης — μίλα ελεύθερα." Or a third variant: "Κάποιες σκέψεις δεν θέλουν να γραφτούν. Θέλουν να ακουστούν."\nINSERTION SEQUENCE RULE (real-user evidence — this exact pattern has happened twice): if the user's reply to any demo question is itself a question, a clarification request, or otherwise not a real answer (e.g. "τι εννοείς;", "έχει νόημα αυτό;"), do NOT treat it as their answer and do NOT advance to the next step. Instead answer their question in one short sentence, then ask the exact same demo question again. Only advance once they give a real answer.\nSKIP REQUEST RULE (real-transcript evidence — a user had to repeat \"προσπέρασε αυτό το στάδιο, πάμε στη συνομιλία\" twice before the demo moved on): an explicit request to skip the demo (e.g. \"προσπέρασε αυτό\", \"πάμε στην κουβέντα\", \"θέλω να μιλήσουμε κατευθείαν\") is a different signal from a clarification question or a flat refusal — recognize it immediately, the first time, and move straight to the identity line plus their real topic (same wrap-up as the fallback below), without repeating the demo question again first.\nMENU CONFUSION RULE (real-transcript evidence -- a user said \"Πάμε στο βασικό μενού\" three times before getting a clear answer; AURA inconsistently treated it as skip-request once, then not at all): if the user mentions a \"menu\" (\"μενού\", \"βασικό μενού\", or equivalent), respond immediately and deterministically, the first time, with: \"Δεν υπάρχει \u2018βασικό μενού\u2019 -- η AURA δεν έχει μενού επιλογών. Ξεκινάς από κάτι που υπάρχει ήδη στο μυαλό σου.\" then ask the real-topic opening question. Do not guess whether they meant to skip the demo or are confused about the interface -- this response resolves both cases at once, consistently, every time.\nNON-COOPERATIVE USER FALLBACK: if after several tries the user still won't give a real word (only meta-commentary, refusal, or unrelated noise), gracefully wrap up the demo yourself within a few more turns — say the identity line verbatim ("Η AURA δεν είναι coach, ούτε therapist, ούτε assistant. Είναι ο ψηφιακός καθρέφτης του χρήστη.") before moving into their real topic, even without a word to keep. This line must never be silently skipped, regardless of how the demo ends.\nThis entire sequence happens only once, ever, for this user.]\n`
-        : '';
+      const showDemo = false; // demo removed entirely
+      const demoCtx = ''; // demo path removed — showDemo can never be true (no button sets it)
       const informationModeCtx = informationModeActive.current
         ? `\n[INFORMATION MODE ACTIVE — the user explicitly asked to stop being questioned ("χωρίς ερωτήσεις" or equivalent). This is a real, held state, set by the application, not something to re-derive from memory each turn: the missing piece here is not clarity of thought, it is data/expertise the user does not have — reflective questioning cannot supply that, no matter how well-phrased. On first entering this state, say so plainly, once: "Από εδώ και πέρα για λίγο βγαίνουμε από τη διερεύνηση — φαίνεται ότι λείπει βασική πληροφορία." Then give concise, categorical information — never statistics, never "η βιβλιογραφία λέει", never "το 80%" — only general, well-known approaches/categories (e.g. "με βάση όσα γνωρίζουμε για marketing νέων εφαρμογών, υπάρχουν μερικές συνήθεις προσεγγίσεις..."), the same restraint already used elsewhere for factual claims. Then say, once: "Τώρα που έχουμε αυτή την πληροφορία, ας επιστρέψουμε στο δικό σου δίλημμα." Knowledge is a bridge back to the mirror, never a new identity for AURA. Do not ask Socratic questions, do not run Cognitive Engine reasoning-operation switches, do not offer Perspective Swap while actually delivering the information. This stays active for the rest of this topic until natural closure — it does not silently lapse after a few replies.]\n`
         : '';
@@ -3629,7 +3653,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
       ...messages,
       { role: "user", content: userCorrection || "[User indicated the observation was inaccurate. Apply misfire recovery protocol.]" }
     ];
-    const recoveryPrompt = getLensPrompt(activeLens) + `\n\nMISFIRE RECOVERY: The user has indicated your previous observation was inaccurate or incomplete. Your response must begin with: "Understood. My interpretation appears incomplete." Then ask: "What am I missing that changes the picture?" Do not repeat the original observation.`;
+    const recoveryPrompt = getLensPrompt(activeLens) + buildEntryContext(entryDoorRef.current, entryTimeRef.current, false) + `\n\nMISFIRE RECOVERY: The user has indicated your previous observation was inaccurate or incomplete. Your response must begin with: "Understood. My interpretation appears incomplete." Then ask: "What am I missing that changes the picture?" Do not repeat the original observation.`;
     setLoading(true);
     try {
       const text = stripAraDeclarative(await callAura(correctionMsgs, recoveryPrompt));
@@ -3847,7 +3871,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         // #10 fix: inject profile summary in firstWhy path too
         const profileCtx = getProfileSummary(memory);
         const profileWithRules = profileCtx ? profileCtx + HONEST_UNCERTAINTY_RULE : '';
-        const prompt = [getLensPrompt(inferred), memCtx, profileWithRules].filter(Boolean).join('\n');
+        const prompt = [getLensPrompt(inferred), memCtx, profileWithRules, buildEntryContext(entryDoorRef.current, entryTimeRef.current, true)].filter(Boolean).join('\n');
         const text = stripAraDeclarative(await callAura(initMsgs, prompt));
         setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "ANSWER" }]);
         // U1: Start trajectory for this category
@@ -4284,25 +4308,10 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         ::-webkit-scrollbar-thumb{background:var(--border-mid)}
       `}</style>
 
-      {!philosophyShown && (
-        <div className="intro-screen">
-          <div style={{width:"100%",maxWidth:"480px"}}>
-            <div className="intro-tagline">Τι σε απασχολεί περισσότερο αυτή την περίοδο;</div>
-            <div className="intro-text" style={{textAlign:"center",maxWidth:"340px"}}>
-              <div style={{marginBottom:"16px"}}>Θα το εξερευνήσουμε μαζί, μία ερώτηση τη φορά.</div>
-              <div style={{marginBottom:"16px",color:"#9a9690"}}>Πολλές φορές η απάντηση υπάρχει ήδη μέσα μας. Το δύσκολο είναι να βρεθεί η ερώτηση που την αποκαλύπτει.</div>
-              <div style={{marginBottom:"16px",color:"#c9a84c",fontStyle:"italic"}}>«Γνώθι σαυτόν».</div>
-              <div style={{marginBottom:"16px",color:"#9a9690"}}>Η αναζήτηση της αυτογνωσίας ξεκίνησε πολύ πριν από την τεχνητή νοημοσύνη. Η AURA αξιοποιεί τη δύναμη των ερωτήσεων για να σε βοηθήσει να δεις πιο καθαρά τη δική σου σκέψη.</div>
-              <div style={{color:"#9a9690"}}>Η επίγνωση σπάνια έρχεται τη στιγμή που τη ζητάμε. Συχνά εμφανίζεται αργότερα, όταν μια εμπειρία της καθημερινότητας φωτίσει όσα ήδη είχες ανακαλύψει.</div>
-            </div>
-            <div className="intro-actions">
-              <button className="intro-continue" onClick={() => { setPhilosophyShown(true); try { localStorage.setItem("aura_philosophy_seen","1"); } catch {} }}>Συνέχεια</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* «Γνώθι σαυτόν» screen removed — it was a second, separate full screen before the real
+          intro, making the entry three screens deep. The intro below now carries the whole message. */}
 
-      {philosophyShown && !introShown && (
+      {!introShown && (
         <div className="intro-screen">
           <div style={{width:"100%",maxWidth:"480px"}}>
             <div className="intro-tagline">Αύρα</div>
@@ -4313,7 +4322,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
               <div style={{marginBottom:"16px",color:"#9a9690"}}>Μετά βλέπεις τις επιλογές σου καθαρά: <span style={{color:"#c9c5bc"}}>τι κερδίζεις, τι πληρώνεις.</span> Και αποφασίζεις τι κρατάς και τι αφήνεις.</div>
               <div style={{marginBottom:"6px",color:"#9a9690"}}>Στόχος δεν είναι η μασημένη λύση που δίνουν όλοι.</div>
               <div style={{marginBottom:"18px"}}>Στόχος είναι να βγεις από το χάος του μυαλού σου.</div>
-              <div style={{color:"#c9a84c",fontStyle:"normal"}}>Εσύ στο τιμόνι, στα δικά σου προβλήματα.</div>
+              <div style={{color:"#c9a84c",fontFamily:"'Cormorant Garamond',serif",fontSize:"20px",lineHeight:1.35,marginTop:"22px"}}>Εσύ στο τιμόνι,<br/>στα δικά σου προβλήματα.</div>
             </div>
             <div className="intro-actions">
               <button className="intro-continue" onClick={() => { setIntroShown(true); try { localStorage.setItem("aura_intro_seen","1"); } catch {} }}>Ξεκίνα</button>
@@ -4391,58 +4400,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         )}
 
         {/* ── Intro overlay — full-screen, fully independent of chat layout, closes instantly on CTA click ── */}
-        {messages.length === 0 && !sessionStarted && introChoice === "demo" && (
-          <div ref={el => { if (el) el.scrollTop = 0; }} style={{position:"fixed",inset:0,zIndex:60,background:"#0d0c0a",overflowY:"auto",padding:"36px 20px 60px"}}>
-            <div style={{maxWidth:"420px",margin:"0 auto",textAlign:"right"}}>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:300,color:"#d8d4cc",letterSpacing:".02em",lineHeight:1.3,marginBottom:"4px"}}>
-                AURA — Ο καθρέφτης της σκέψης σου
-              </div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#a8a49c",lineHeight:1.5,marginBottom:"14px"}}>
-                Δύσκολο δεν είναι οι δύσκολες αποφάσεις.<br/>Δύσκολο είναι να δεις καθαρά.
-              </div>
-              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
-                Οι περισσότεροι, όταν νιώθουν μπλοκαρισμένοι, ψάχνουν περισσότερες πληροφορίες, γνώμες, συμβουλές. Συνήθως όμως δεν τους λείπει τίποτα από αυτά — τους λείπει η διαύγεια.
-              </div>
-              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
-                Η AURA δεν γεννήθηκε σε εργαστήριο, αλλά στην παρατήρηση της αξίας της σωστής ερώτησης — χρόνια πραγματικών αποφάσεων σε συνθήκες πίεσης, όπου πριν από κάθε σωστή απόφαση προηγείται πάντα μια σωστή διαλογή: το ουσιαστικό από τον θόρυβο, το επείγον από το σημαντικό, τη σύγχυση από το πραγματικό πρόβλημα.
-              </div>
-              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
-                Αυτή η εμπειρία δεν έγινε βιβλίο. Έγινε ένας τρόπος σκέψης. Και αυτός ο τρόπος σκέψης έγινε η AURA.
-              </div>
-              <div style={{fontSize:"12px",color:"#cfc9c0",lineHeight:1.7,marginBottom:"10px"}}>
-                Η AURA δεν αποφασίζει για σένα. Δεν δίνει έτοιμες συμβουλές. Δεν προσπαθεί να σε πείσει. Σου κάνει τις ερωτήσεις που βάζουν τάξη στη σκέψη σου — όχι επειδή σ' την είπε κάποιος, αλλά επειδή την είδες μόνος σου.
-              </div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"14px",color:"#a8a49c",lineHeight:1.6,marginBottom:"16px"}}>
-                Μερικές φορές η καλύτερη απάντηση δεν είναι μια απάντηση. Είναι η σωστή ερώτηση.
-              </div>
-              <div style={{border:"1px solid rgba(201,168,76,0.25)",borderRadius:"4px",padding:"14px 16px",marginBottom:"18px",fontFamily:"'DM Mono',monospace",fontSize:"11px",lineHeight:1.8}}>
-                <div style={{color:"#8a8680",marginBottom:"6px"}}>Έτσι μοιάζει μια πραγματική στιγμή:</div>
-                <div style={{color:"#c9c5bc",marginBottom:"6px"}}>"Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου."</div>
-                <div style={{color:"rgba(201,168,76,0.85)"}}>"Τι σε κάνει να πιστεύεις ότι η απόφαση είναι να φύγεις, και όχι να αλλάξεις κάτι στη σημερινή κατάσταση;"</div>
-              </div>
-              <div style={{marginBottom:"18px"}}>
-                <div style={{color:"#8a8680",marginBottom:"10px",fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".05em"}}>Τι σε έφερε εδώ;</div>
-                {[
-                  "Κάτι που σκέφτομαι και δεν ξεκαθαρίζει",
-                  "Μια απόφαση που αναβάλλω",
-                  "Κάτι που επιστρέφει ξανά και ξανά",
-                ].map((door) => (
-                  <button key={door} onClick={()=>{setInput(door + ": "); setSessionStarted(true); setTimeout(()=>textareaRef.current?.focus(),50);}}
-                    style={{display:"block",width:"100%",textAlign:"left",background:"rgba(10,9,8,0.35)",border:"1px solid rgba(201,168,76,0.18)",color:"#c9c5bc",fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",padding:"11px 14px",marginBottom:"8px",cursor:"pointer",borderRadius:"4px"}}>
-                    {door}
-                  </button>
-                ))}
-                <button onClick={()=>{setSessionStarted(true); setTimeout(()=>textareaRef.current?.focus(),50);}}
-                  style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"1px solid rgba(201,168,76,0.12)",color:"#8a8680",fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",fontStyle:"italic",padding:"11px 14px",cursor:"pointer",borderRadius:"4px"}}>
-                  Κάτι άλλο — θα το πω μόνος μου
-                </button>
-              </div>
-              <button onClick={()=>{setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}} style={{background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.5)",color:"rgba(201,168,76,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"12px",letterSpacing:".15em",textTransform:"uppercase",padding:"12px 28px",cursor:"pointer",borderRadius:"4px"}}>
-                Ξεκίνα να σβήνεις τη φασαρία
-              </button>
-            </div>
-          </div>
-        )}
+        {/* demo render branch removed — unreachable */}
 
 
         {/* ── Header ── */}
