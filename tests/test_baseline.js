@@ -138,5 +138,18 @@ check(
   'confirm'
 );
 
+// ── Baseline 11: advice-cascade detector (real μάγειρας transcript evidence) ──
+{
+  const { looksLikeAdviceCascade } = require('./aura_pure.js');
+  check('looksLikeAdviceCascade: real numbered-list advice → true',
+    looksLikeAdviceCascade('Υπάρχουν τρεις κατηγορίες: 1. Online πλατφόρμες. 2. Bootcamps. 3. ΔΥΠΑ.'), true);
+  check('looksLikeAdviceCascade: real imperative advice → true',
+    looksLikeAdviceCascade('Πήγαινε στην τράπεζά σου και ρώτα απλά: Μπορώ να κάνω ρύθμιση;'), true);
+  check('looksLikeAdviceCascade: normal question → false',
+    looksLikeAdviceCascade('Τι σε δυσκολεύει πιο πολύ στην εφαρμογή αυτή τη στιγμή;'), false);
+  check('looksLikeAdviceCascade: normal ack → false',
+    looksLikeAdviceCascade('Είπες "τα λέμε" — το δέχτηκα. Υπάρχει κάτι ακόμα;'), false);
+}
+
 console.log(`\n${pass} passed, ${fail} failed — baseline ${fail === 0 ? 'ESTABLISHED' : 'HAS ISSUES'}`);
 process.exit(fail === 0 ? 0 : 1);
