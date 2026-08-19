@@ -44,6 +44,41 @@ function asksIt(text, pattern) {
 const screens = (CODE.match(/className="intro-screen"/g) || []).length;
 assert('Ακριβώς μία οθόνη εισόδου (βρέθηκαν ' + screens + ')', screens === 1);
 
+// 1b — ΚΑΜΙΑ οθόνη πυλών μετά την έναρξη συνεδρίας (πέμπτη εμφάνιση του ίδιου bug: ένα μπλοκ
+//      με «Τι σε έφερε εδώ;» και τρεις πύλες έτρεχε στο messages.length === 0 && sessionStarted,
+//      και επέζησε πέντε διορθώσεις επειδή είναι σκέτο div — ο έλεγχος που μετρούσε intro-screen
+//      περνούσε ενώ το bug ήταν ζωντανό. Ο έλεγχος τώρα είναι δομικός, όχι βασισμένος σε class.)
+assert('Καμία οθόνη μετά το sessionStarted', !/messages\.length === 0 && sessionStarted/.test(CODE));
+// Μετράει ΜΟΝΟ πραγματική απόδοση UI (μέσα σε JSX element), όχι αναφορές σε σχόλια
+const rendered = (CODE.match(/>\s*\n?\s*(Τι σε φέρνει εδώ;|Τι σε έφερε εδώ;)/g) || []);
+assert('Ακριβώς μία ερώτηση εισόδου στο UI (βρέθηκαν ' + rendered.length + ')', rendered.length === 1);
+// Οποιοδήποτε .map πάνω σε λίστα ελληνικών φράσεων που παράγει κουμπιά = υποψήφια λίστα πυλών
+const doorLists = (CODE.match(/\[\s*"[^"]*(?:σκέφτομαι|απόφαση|επιστρέφει|αναβάλλ|αγχώνει|ξεκαθαρ)[^"]*"[\s\S]{0,400}?\]\.map/g) || []);
+assert('Ακριβώς μία λίστα πυλών σε όλο το UI (βρέθηκαν ' + doorLists.length + ')', doorLists.length === 1);
+
+// 1b — ΕΝΑ ΜΟΝΟ εισαγωγικό κείμενο (5η εμφάνιση του «τρεις οθόνες»: ο έλεγχος παραπάνω
+//      μετρούσε μόνο className="intro-screen", ενώ η δεύτερη οθόνη χρησιμοποιεί inline
+//      position:fixed — έτσι δύο εισαγωγικά κείμενα συνυπήρχαν και το test περνούσε).
+const liveText = (phrase) => {
+  const re = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+  let m;
+  while ((m = re.exec(CODE)) !== null) {
+    const before = CODE.slice(Math.max(0, m.index - 300), m.index);
+    if (before.lastIndexOf('{/*') > before.lastIndexOf('*/}')) continue; // σε σχόλιο
+    return true;
+  }
+  return false;
+};
+assert('Καμία παλιά εισαγωγή «Όλοι δίνουν απαντήσεις»', !liveText('Όλοι δίνουν απαντήσεις'));
+assert('Καμία παλιά «Δες που κολλάς»', !liveText('Δες που κολλάς'));
+assert('Καμία παλιά «Μερικές φορές η καλύτερη»', !liveText('Μερικές φορές η καλύτερη'));
+assert('Το νέο κείμενο υπάρχει ζωντανό', liveText('δική σου ερώτηση'));
+
+// 1c — Συνολικός αριθμός full-screen overlays πριν το chat (και οι δύο τύποι)
+const overlays = (CODE.match(/position:"fixed",inset:0/g) || []).length
+               + (CODE.match(/className="intro-screen"/g) || []).length;
+assert('Το πολύ δύο overlays εισόδου (βρέθηκαν ' + overlays + ')', overlays <= 2);
+
 // 2 — Το prompt δεν ζητά την ερώτηση εισόδου, σε καμία διατύπωση
 assert('Prompt: δεν ζητά «τι σε φέρνει»', !asksIt(PROMPT, 'τι σε φέρνει'));
 assert('Prompt: δεν ζητά «τι σε έφερε»', !asksIt(PROMPT, 'τι σε έφερε'));

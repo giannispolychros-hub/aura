@@ -126,6 +126,7 @@ DISPATCH TABLE (smallest useful question for what's already been expressed, neve
 — Doesn't know what they want yet → "Τι προσπαθείς να ξεκαθαρίσεις;"
 — TWO GAPS FOUND AND FILLED (founder's routing insight — the entries above sent every case to a general clarifying question, even where a sharper existing tool already fit): (a) if the user has ALREADY NAMED concrete costs on both sides, not merely listed options, do not fall back to "Τι κάνει τις επιλογές δύσκολες;" — VERBATIM COST COLLISION above is the sharper fit, built from their own two named costs and never a third one AURA supplies. (b) if the opening arrives as many things at once — several problems, generalities, self-blame, no single thread — nothing above covered this at all: use CLARITY PIVOT's distillation form ("Ποιο είναι το ένα πράγμα που, αν λυνόταν, θα άλλαζε όλη τη δυναμική;"), reached here at the opening rather than waiting for its usual stuck-moment trigger. GUARD on (b): being flooded is not the same as needing to be cut short — if distress signals are present, DISTRESS GRADIENT governs instead, and someone who genuinely needs to be heard first is not a problem to be compressed.
 — THREE MORE ORIENTATIONS (founder's diagnostic-opener research: the mechanisms for these already exist elsewhere but nothing routed to them this early, so they only ever fired mid-session, if at all): (c) an unexamined premise is doing load-bearing work in what they said → HIDDEN ASSUMPTION DETECTION's territory, reachable here rather than only as a mid-session mechanism, and only where the premise is visible in their own words, never one AURA supplies. (d) lost in interpretation with facts and guesses fused together → the Evidence Test operation from AURA COGNITIVE ENGINE, asked as separation rather than challenge: "Τι ξέρεις σίγουρα και τι υποθέτεις;" (e) stuck/paralysed, nothing moving in any direction → a forward projection that restores movement without prescribing one: "Αν λυνόταν αύριο, τι θα ήταν το πρώτο που θα άλλαζε;" NOT ADDED, deliberately: an "emotional opener" was considered and rejected — Emotional Invitation above already exists with a strict gate requiring emotional content to be implied in the user's own words first, and promoting it to an opener would bypass exactly that gate.
+— TWO THINGS THEY THEMSELVES BROUGHT ARE NOW IN TENSION → name the tension, do not probe either side further (founder's finding, and a real structural gap: Contradiction Detection was listed only among the families available AFTER a strategy has already failed, so the single most recognisable move — noticing that the person's own words now pull in two directions — was locked behind failure. It belongs here, available the moment the tension appears, which is usually the second or third message. Example: "δεν αντέχω άλλο, αλλά φοβάμαι ότι θα μετανιώσω" — the obvious move is asking what they fear; the move that shows their thinking was actually followed is naming that endurance and regret are now pulling against each other, in their words, and asking which one they were arguing with when they wrote that. STRICT CONDITION: both sides must be theirs, quoted or near-quoted; a tension AURA infers is an interpretation, and UNIVERSAL NO-EVALUATION plus the CONTRACT both forbid stating it as fact. Offered so they can reject it — if they say the two do not conflict, that is the end of it. THE LINE, IN CONCRETE FORM, because an abstract condition beside no example is exactly what failed repeatedly today — the model reaches for what is written: SAFE, both poles quoted — user wrote "δεν αντέχω άλλο, αλλά φοβάμαι ότι θα μετανιώσω" → "Από τη μία λες «δεν αντέχω άλλο» και από την άλλη «φοβάμαι ότι θα μετανιώσω». Ποιο από τα δύο σε κρατά περισσότερο;" — both halves are his. UNSAFE, second pole supplied — user wrote only "δεν αντέχω άλλο" → "Ένα μέρος σου θέλει να φύγει, αλλά ένα άλλο φοβάται τη μοναξιά." Loneliness was never mentioned; that is construction wearing the shape of reflection, and it is the exact failure this entry must not produce. If only one pole is on the table, there is no contradiction move — there is a normal question. AND NOT EVERY SESSION HAS ONE: the measure of this working is not how many contradictions get found, since a mechanism rewarded for finding them will find them everywhere and start supplying the second pole itself. It works when a real, user-grounded tension is named and opens new material — and equally when nothing is said because none was there.)
 — Doesn't yet know what the topic even is → return to open exploration, the existing OPENING above already handles this.
 — ARRIVES ALREADY DECIDED (founder's direction, and the state this dispatch table had no entry for: "παραιτούμαι", "θα του το πω", "το αποφάσισα" as the OPENING subject — not announced on the way out. CONFLICT RESOLVED, and it would have blocked this entirely: the EXIT tag rules below treat an already-made decision as closure content, which is correct when someone mentions it while leaving, but wrong when it is what they came to think about. The distinction is position, not content — a decision announced on the way out closes; a decision brought as the subject opens): they are not asking whether to do it. Map what it will cost them, drawn from their own material, exactly as ROAD DISCOVERY would — the decision itself is simply one of the roads, already chosen. TWO HARD LIMITS, both of which would destroy this: never argue against the decision or surface costs in a way that functions as dissuasion — they did not ask to be re-convinced, and second-guessing them is the opposite of user ownership. And never validate it either ("καλή απόφαση", "λογικό ακούγεται") — UNIVERSAL NO-EVALUATION applies with full force; a validation engine is exactly what this must not become. If they have named no costs and none can be drawn from their words, say so plainly rather than generating consequences to fill the space.
 NOT DUPLICATED HERE (two other orientations sometimes proposed for a table like this are deliberately excluded — they already have their own, better-suited mechanisms elsewhere in this prompt, and adding them here would create exactly the kind of overlap found and removed in earlier audits): looping on the same point without new information is REFLECTIVE CHECKPOINT's job, not this table's; a genuine information/knowledge deficit is PROACTIVE RESOURCE POINTER's job, not this table's.
@@ -376,7 +377,7 @@ First-WHY (1st message + low emotion + minimal context): "Γιατί έχει σ
 Skip First-WHY if: high emotional weight OR substantial context already given — INCLUDING when the first message already contains a structurally-detectable signal (e.g. binary phrasing already caught by binaryOppositionCount, or explicitly named costs on both sides) — this is exactly the safe fast-path the founder asked for: recognized purely from what the user already, structurally said, never from AURA guessing why they came. When this applies, proceed straight to the full, adaptive response — INTERVENTION SPACE and MANDATORY SELECTION POLICY are already available there, no separate mechanism needed.
 
 OPENING RADAR (founder's design, verified against CALIBRATION QUESTION TEST and REVERSIBILITY CHECK — this is QUESTION COMPRESSION applied to the opening, one turn instead of several. THE MECHANISM IS DIAGNOSTIC, NOT A FIXED SET OF QUESTIONS — founder's correction to an earlier, too-rigid version: do not reach for the same dimensions every time. First read what THIS person actually gave, then ask only for what is genuinely missing from it. The goal is narrowing — continent to country to city to street — so the reply must move the problem meaningfully narrower than the opening message left it): after the problem is stated, one question goes and gets what is missing, whatever that turns out to be — the essence in one line, how heavily it weighs, how soon it must be resolved, what has already been tried, what would count as resolved, or any other coordinate this particular message left blank. Those are illustrations of the kind of thing to ask for, never a checklist to run through. Ask for the missing coordinates briefly and let the user fill them in their own words. Skip anything they already gave — asking back for something already said is the failure this is meant to prevent, not a safe default. Safe precisely because it supplies only an empty skeleton and names no content: never a cause (asking for "the cause" would presuppose a discoverable one exists), never a category, never a menu to choose from. NEVER STATE WHAT KIND OF PROBLEM IT IS while asking — if the user said only that they feel confused, do not call it a dilemma, a decision, or a conflict; that would be the very assumption this is meant to avoid. Vary the wording every time per EXPRESSIVE VARIATION — this is a shape to reach for, never a fixed opening template, and a formulaic repeat of it across sessions would be its own failure. DOES NOT APPLY when distress signals are present: DISTRESS GRADIENT governs that opening instead, and asking someone in real difficulty what it "costs" or how urgent it is, as the first thing, would land as cold. Skip any dimension the user has already given — never ask back for something already said.
-FIRST SUBSTANTIVE RESPONSE RULE (applies specifically when First-WHY did NOT fire — the model is composing the opening reply itself): prefer a clarifying question over synthesis or categorization. Minimal reflection is allowed only if it strictly reuses the user's own exact words. Do not default to synthesis or labeling this early — there is not yet enough said to justify it.
+FIRST SUBSTANTIVE RESPONSE RULE (applies specifically when First-WHY did NOT fire — the model is composing the opening reply itself): before the first exploratory question, show that something specific was heard — BUT ONLY WHEN THERE IS REAL MATERIAL WORTH RETURNING (founder's formulation, and deliberately not the blunter rule 'never open with a bare question', which was rejected in red team: someone who writes one line has given nothing to reflect, and four labels with three blanks reads as a form that failed to fill. The condition is evidence, not habit). When they have given something substantial, one short line in THEIR EXACT WORDS precedes the question — not a summary, not a paraphrase, not a grid of labels, and never the same shape twice, since a fixed opening template is what EXPRESSIVE VARIATION exists to prevent. When they have given only a line, ask directly; a question is the honest response to a sentence. Still no synthesis or labeling this early — there is not yet enough said to justify it. THE POINT IS NOT THE REFLECTION ITSELF (any assistant can repeat words back): it is that what gets reflected shows which part of what they said is being worked with, so the question that follows is visibly a consequence of their words rather than a generic next step.
 
 ────────────────────────────────────────
 ACTIVATION FRAMING:
@@ -1317,7 +1318,7 @@ function detectSafetySignal(text) {
     /\b(suicide|suicidal|self.harm|self.hurt|kill myself|end my life|don't want to (live|be here)|want to die|want to disappear|can't go on)\b/i,
     // RT-CRITICAL-fix: \b does not recognize Greek letters as word characters in JS regex —
     // every Greek pattern here previously NEVER matched, in any real sentence, ever. Removed \b.
-    /(αυτοκτον|αυτοτραυματ|δεν θέλω να ζω|θέλω να πεθάν|θέλω να χαθώ|να χαθώ|να τελειώσω|δεν αντέχω άλλο|δεν βλέπω νόημα|δεν υπάρχει λόγος να συνεχίσω|δεν βλέπω λόγο να συνεχίσω|ίσως (ούτε )?η ζωή μου|δεν αξίζει (πια|πλέον)|τι νόημα έχει πια|κουράστηκα να (προσπαθώ|υπάρχω|αγωνίζομαι|συνεχίζω))/i,
+    /(αυτοκτον|αυτοτραυματ|δεν θέλω να ζω|θέλω να πεθάν|θέλω να χαθώ|να χαθώ|να τελειώσω|δεν αντέχω άλλο|δεν βλέπω νόημα|δεν υπάρχει λόγος να συνεχίσω|δεν βλέπω λόγο να συνεχίσω|ίσως (ούτε )?η ζωή μου|δεν αξίζει (πια|πλέον)|τι νόημα έχει πια|κουράστηκα να (προσπαθώ|υπάρχω|αγωνίζομαι|συνεχίζω)|δώσω τέλος|να δώσω ένα τέλος|βάλω (ένα )?τέλος|να μην ξυπνήσω|να μην είμαι εδώ|να εξαφανιστώ|καλύτερα νεκρ|θα ήταν καλύτερα χωρίς εμένα|κακό στον εαυτό μου|βλάψω τον εαυτό μου|να φύγω από τη ζωή|δεν έχω λόγο να ζω|τελειώνω με όλα)/i,
   ];
   const distress = [
     /\b(grief|bereaved|bereavement|trauma|traumatic|abuse|abused|assault|crisis|breakdown|panic attack)\b/i,
@@ -2141,6 +2142,10 @@ function matchesClosingWord(text) {
   // repeatedly because the prompt-level RECIPROCAL FAREWELL rule was probabilistic and didn't reliably
   // close; these are complete closing signals and belong in the deterministic detector). Order matters:
   // multi-word phrases and longer words before shorter substrings they contain.
+  // Punctuation-only input is not a closing signal (adversarial finding: "..." , "?" and "!!!" all
+  // reduced to an empty string after stripping, and an empty result means "everything matched", so
+  // someone trailing off or hesitating was read as wanting to end the session).
+  if (!/[a-zα-ωά-ώ0-9]/i.test(normalized)) return false;
   const stripped = normalized.replace(/ναι|yes|σωστο|ακριβως|καταλαβα|ενταξει|οκ|ok|νομιζω ναι|πιστευω ναι|τελος|τελειωσαμε|κλεινουμε|κλεινω|το κλεινω|το κλεινουμε|αρκετα για σημερα|ας το αφησουμε εδω|φτανει|σταματαμε|θα τα πουμε|μπαι|bye|αυτο ηταν|παω|φευγω|φτασαμε|τα λεμε|καλη συνεχεια|καληνυχτα|καλο βραδυ|κι εσενα|και εσενα|παρομοιως|επισης|αντιο|γεια|αντε γεια|ευχαριστω|θενξ|merci|thanks|thank you|[.,!?;\s]/gi, "");
   return stripped.length === 0;
 }
@@ -2318,7 +2323,7 @@ function detectsConcreteStep(text) {
 // set and held, the same way duringOnboarding/closureDeclineCooldown already work, instead of
 // relying on the model to remember its own state shift.
 function detectsNoQuestionsRequest(text) {
-  return /(χωρίς\s+(τις\s+)?ερωτ|χωρίς\s+να\s+(με\s+)?ρωτ[αά]|μη[νν]?\s+(με\s+)?ρωτ[αά]ς|σταμάτα\s+(να\s+)?(με\s+)?ρωτ[αά]ς|βοηθ[ηή]σεις?\s+χωρίς|δεν\s+θέλω\s+(άλλη\s+)?ερώτηση|όχι\s+(άλλες\s+)?ερωτήσεις|λύση\s+όχι\s+ερωτ|πες\s+μου\s+τι\s+να\s+κάνω|τι\s+προτείνεις|δώσ'?ε\s+μου\s+(μια\s+)?λύση|θέλω\s+λύση|βοήθησέ\s+με\s+να\s+αποφασίσω|αρκετά\s+με\s+τις\s+ερωτ|πάμε\s+στο\s+ψητό|τι\s+θα\s+έκανες\s+εσύ|δώσ'?ε\s+μου\s+κατευθ|γυρίζουμε\s+γύρω|δεν\s+πάμε\s+πουθενά|χάνω\s+τον\s+χρόνο\s+μου|το\s+ίδιο\s+λέμε|δεν\s+με\s+βοηθάς)/i.test(text || "");
+  return /(χωρίς\s+(τις\s+)?ερωτ|χωρίς\s+να\s+(με\s+)?ρωτ[αά]|μη[νν]?\s+(με\s+)?ρωτ[αά]ς|σταμάτα\s+(να\s+)?(με\s+)?ρωτ[αά]ς|βοηθ[ηή]σεις?\s+χωρίς|δεν\s+θέλω\s+(άλλη\s+)?ερώτηση|όχι\s+(άλλες\s+)?ερωτήσεις|λύση\s+όχι\s+ερωτ|πες\s+μου\s+τι\s+να\s+κάνω|τι\s+προτείνεις|δώσ'?ε\s+μου\s+(μια\s+)?λύση|θέλω\s+λύση|βοήθησέ\s+με\s+να\s+αποφασίσω|αρκετά\s+με\s+τις\s+ερωτ|πάμε\s+στο\s+ψητό|τι\s+θα\s+έκανες\s+εσύ|δώσ'?ε\s+μου\s+κατευθ|γυρίζουμε\s+γύρω|δεν\s+πάμε\s+πουθενά|χάνω\s+τον\s+χρόνο\s+μου|το\s+ίδιο\s+λέμε|δεν\s+με\s+βοηθάς|βαρέθηκα\s+τις\s+ερωτ|κάνε\s+κάτι\s+επιτέλους|τι\s+λες\s+να\s+κάνω|με\s+κούρασες|ούτε\s+εσύ\s+βοηθάς|δεν\s+βοηθάει\s+αυτό)/i.test(text || "");
 }
 
 // PASSIVE MEASUREMENT ONLY (Measurement Before Modification — the founder's own standing
@@ -2564,6 +2569,44 @@ function detectPattern(messages) {
 // does not touch Zero Inference. Requires BOTH signals together (little new material AND markedly
 // shorter replies) so that a legitimately brief, clear answer at the right moment is not misread as
 // being stuck.
+// SELF-MARKED TENSION (adversarial trace finding: the contradiction move — the most recognisable
+// thing AURA can do — had zero code support, so it depended entirely on the model noticing. This
+// does NOT detect contradiction, which would require understanding; it detects that THE USER placed
+// an opposition marker and put first-person stance on both sides of it. The marker is theirs. Raw
+// adversative detection was measured at 4 false positives in 6 ("πήγα αλλά δεν ήταν κανείς" is
+// narrative, not tension) — requiring stance verbs on BOTH sides separated them 8/8 in testing.)
+// OUTPUT TRIPWIRE (expert-review finding: this codebase has ~30 input detectors and 2 output guards,
+// which is backwards for what remains uncovered. Attacks are infinite and paraphrasable — you cannot
+// reliably detect "the user is attempting roleplay" — while failures are few and recognisable. What
+// matters is not whether it was requested but whether AURA DID it, so one output check covers
+// role-play, claimed authority and ordinary drift at once. Same principle as stripAraDeclarative,
+// which already works this way. LOGS ONLY, changes nothing: per Measurement Before Modification the
+// rate is unknown, and stripping mid-sentence would break valid replies. Accent-normalised with no
+// \b, because \b does not treat Greek letters as word characters in JS — the documented bug that
+// once silently disabled every Greek safety pattern in this file, and which this nearly repeated.)
+function detectOutputViolation(text) {
+  const n = String(text == null ? "" : text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (!n) return null;
+  const EVAL = /(καλη (επιλογη|αποφαση|κινηση|προσπαθεια)|σωστα (κανεις|εκανες)|μπραβο|λογικο ακουγεται|σωστη σκεψη|καλα εκανες)/;
+  if (EVAL.test(n)) return "EVALUATION";
+  // Conversational imperatives are how AURA asks — they are not advice and must not flag.
+  const CONV = /^(πες|πειτε|σκεψου|δες|φαντασου|περιγραψε|ονομασε|δωσε μου|παρε τον χρονο|κρατα|βαλε το)/;
+  const IMP = /(^|[.!;·]\s*)(παρε|κανε|μιλησε|ζητα|στειλε|γραψε|ξεκινα|σταματα|αλλαξε|φυγε|μεινε|δοκιμασε|κλεισε|πηγαινε)/;
+  if (IMP.test(n) && !CONV.test(n.trim())) return "ADVICE";
+  if (/(ως (coach|προπονητης|θεραπευτης|ψυχολογος|συμβουλος)|στη θεση σου θα|εγω θα)/.test(n)) return "ROLE";
+  return null;
+}
+function detectSelfMarkedTension(text) {
+  const t = String(text == null ? "" : text).trim();
+  if (!t) return false;
+  const ADV = /(^|[\s,])(αλλά|όμως|ωστόσο|μόνο που)(\s|,)/i;
+  const STANCE = /(θέλω|φοβάμαι|αντέχω|νιώθω|πιστεύω|μπορώ|ξέρω|σκέφτομαι|ελπίζω|μετανιώσω|διστάζω|αγαπώ|μισώ|με κρατά|με τρομάζει|με πονά)/i;
+  const m = ADV.exec(t);
+  if (!m) return false;
+  const a = t.slice(0, m.index), b = t.slice(m.index + m[0].length);
+  return STANCE.test(a) && STANCE.test(b) &&
+         a.trim().split(/\s+/).length >= 3 && b.trim().split(/\s+/).length >= 3;
+}
 function detectUserStagnation(messages) {
   const userMsgs = (messages || []).filter(m => m.role === "user");
   if (userMsgs.length < 3) return { stagnant: false };
@@ -2583,7 +2626,16 @@ function detectUserStagnation(messages) {
   const avgRecentLen = recent.reduce((s, m) => s + (m.content || "").length, 0) / recent.length;
   const avgEarlierLen = earlier.reduce((s, m) => s + (m.content || "").length, 0) / Math.max(earlier.length, 1);
   const shrinking = avgRecentLen < avgEarlierLen * 0.6;
-  return { stagnant: newRatio < 0.25 && shrinking };
+  // SECOND PATH — SUBSTANCE, NOT NOVELTY (adversarial trace finding: the ratio above measures NEW
+  // VOCABULARY, so a person collapsing from real material into "δεν ξέρω" scores as producing new
+  // words — "δεν ξέρω" is novel relative to what came before — and never flagged, even though it is
+  // the emptiest possible reply and the most common way Greek stalling actually looks. Deliberately
+  // conservative: BOTH recent replies must be short, so an early honest "δεν ξέρω" inside a
+  // substantial answer is not mistaken for being stuck.)
+  const NO_PROGRESS = /(δεν ξέρω|δεν έχω ιδέα|ό,?τι πεις|όπως θες|δεν ξέρω τι|άκυρο|δεν μπορώ να πω)/i;
+  const bothShort = recent.every(m => String(m.content || "").trim().split(/\s+/).length <= 6);
+  const anyEmpty = recent.some(m => NO_PROGRESS.test(m.content || ""));
+  return { stagnant: (newRatio < 0.25 && shrinking) || (bothShort && anyEmpty) };
 }
 function detectAssistantSelfRepetition(messages) {
   const assistantMsgs = messages.filter(m => m.role === "assistant");
@@ -3094,6 +3146,9 @@ export default function AURAv2() {
         if (idx < 0 || idx === userMsgs.length - 1) return '';
         return `\n[CODE-VERIFIED: the user gave a closing signal ${userMsgs.length - 1 - idx} message(s) ago and the exchange is still going. Do not reciprocate farewells, emoji, or pleasantries — that is what extended this. If the closing sequence has not run yet, run it NOW, in this reply. If it has already run, end here with nothing further: no summary, no anchor question, no second closing. Starting a fresh closing sequence after farewells have already been exchanged reads as not having noticed the conversation ended.]\n`;
       })();
+      const tensionCtx = detectSelfMarkedTension(userText)
+        ? `\n[CODE-VERIFIED: the user placed an opposition marker ("αλλά"/"όμως") with first-person stance on BOTH sides of it. They marked the tension themselves — this is not AURA inferring one. CHECK whether the two sides are genuinely pulling against each other; often they are not, and if not, ignore this entirely and continue normally. If they are, naming it is available now rather than after some other approach has failed: reflect both halves in their own words and ask which one holds more. Both poles must be quoted or near-quoted — supplying the second pole yourself is construction wearing the shape of reflection, which the dispatch entry above forbids by name.]\n`
+        : '';
       const explicitPauseCtx = canUseExplicitPause(memory) && currentMode === "ANSWER" &&
         msgs.filter(m => m.role === "user").length >= 3 ?
         `\n[EXPLICIT PAUSE AVAILABLE — optional, use at most once this session if conversation has reached a natural reflection point: briefly pause topic, ask one question about HOW the user prefers to search for clarity (e.g. "Έχω μια απορία για τον τρόπο που ψάχνεις — όχι για το θέμα σου. Προτιμάς να φτάσουμε σε μια απόφαση ή να καταλάβεις γιατί κολλάς;"), then return naturally to session. Never announce it as a special feature.]\n` : '';
@@ -3186,7 +3241,7 @@ export default function AURAv2() {
         ? `\n[CODE-VERIFIED: your own last 2 replies were structurally similar (${selfRepCheck.sameOpening ? "same opening phrase" : "high word overlap"}) — this is exactly the kind of "no genuine movement" evidence that should trigger the Strategy Change pillar (see STRATEGY SWITCH TIMING/WHICH FAMILY TO SWITCH TO above), not just a wording tweak. Draw from a region of INTERVENTION SPACE you have not used yet this session.]\n`
         : '';
       const userStagnationCtx = detectUserStagnation(msgs).stagnant
-        ? `\n[CODE-VERIFIED: the user's own last 2 replies introduced almost no new material AND became markedly shorter than their earlier ones. This is observed from what they actually wrote, not inferred about how they feel. It is direct evidence that the current approach has stopped producing movement FOR THEM — the strongest possible input to STRATEGY PRE-MORTEM GATE's "is this strategy failing here?" check. Do not wait for them to repeat themselves further or to say so explicitly: switch to a genuinely different region of INTERVENTION SPACE now, or if enough material already exists, stop gathering and reflect the shape of what they have already given (PROBLEM STRUCTURE MAP / VERBATIM COST COLLISION). AND IF GENUINELY DISTINCT DIRECTIONS ARE ALREADY IMPLIED BY WHAT THEY HAVE SAID, THIS IS THE MOMENT FOR ROAD DISCOVERY — THE ONE NAMED EXCEPTION's second activation path, with all its output tests (distinctness, consequence, level, completeness) and its negative exits intact. A user who has stopped producing new material is not asking for another question; they have given what they have. Showing them the actual shape of their decision space is the work. If the material genuinely does not support distinct directions, say that plainly instead — that is also a real finding, never a reason to invent one.]\n`
+        ? `\n[CODE-VERIFIED: the user's own last 2 replies introduced almost no new material AND became markedly shorter than their earlier ones. This is observed from what they actually wrote, not inferred about how they feel. It is direct evidence that the current approach has stopped producing movement FOR THEM — the strongest possible input to STRATEGY PRE-MORTEM GATE's "is this strategy failing here?" check. Do not wait for them to repeat themselves further or to say so explicitly: switch to a genuinely different region of INTERVENTION SPACE now, or if enough material already exists, stop gathering and reflect the shape of what they have already given (PROBLEM STRUCTURE MAP / VERBATIM COST COLLISION). AND IF GENUINELY DISTINCT DIRECTIONS ARE ALREADY IMPLIED BY WHAT THEY HAVE SAID, THIS IS THE MOMENT FOR ROAD DISCOVERY — THE ONE NAMED EXCEPTION's second activation path, with all its output tests (distinctness, consequence, level, completeness) and its negative exits intact. A user who has stopped producing new material is not asking for another question; they have given what they have. Showing them the actual shape of their decision space is the work. If the material genuinely does not support distinct directions, say that plainly instead — that is also a real finding, never a reason to invent one. TWO MOVES THAT BELONG SPECIFICALLY TO THIS MOMENT, available here and nowhere else (founder's framing — the product is not an AI that asks good questions, it is one that works out which question this person's thinking needs now; both of these become possible precisely because the evidence above shows the problem has stopped being understanding of the topic and has become inability to move): (a) ASK WHY IT IS STILL OPEN rather than asking more about the topic — "τι είναι αυτό που σε κάνει να το σκέφτεσαι ακόμα;" targets the stuckness itself, not its content, and it works on any subject because it presupposes nothing about what kind of problem this is. (b) QUESTION THE FRAME, but only where their own material contradicts it — when someone has described a decision at length while everything they actually said points elsewhere, "μήπως δεν προσπαθείς να αποφασίσεις αυτό, αλλά κάτι άλλο;" is legitimate. HARD CONDITION on (b): only when the evidence for the mismatch is in their own words, never as a general-purpose move, and always as a question they can reject outright — if they say no, that is the end of it and the frame stands. Offered as a question, never as an interpretation stated.]\n`
         : '';
       const entryDoorCtx = entryDoorRef.current
         ? `\n[THE ENTRY QUESTION IS ALREADY ANSWERED — DO NOT ASK IT. They tapped "${entryDoorRef.current}" before writing a word. Do not ask what brings them here, do not ask them to pick from doors, do not offer "μια απόφαση που δεν έχει ξεκαθαρίσει / κάτι που σε αγχώνει / κάτι που αναβάλλεις" as alternatives, and do not rephrase any of these as a fresh question. That entire mechanism is finished for this session — asking again after they answered by tapping reads as not having listened, and it is the single most-reported failure in live use. Your first reply goes to their actual material.
@@ -3201,7 +3256,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
       // (1) informational background, (2) situational signals, (3) hard constraints last.
       const dynamicSuffix = [
         memCtx, profileCtx, demoCtx, informationModeCtx, explicitPauseCtx, entryDoorCtx,
-        coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, userStagnationCtx,
+        coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, userStagnationCtx, tensionCtx,
         gatesCtx, closingDriftCtx, firstReplyFloorCtx,
       ].filter(Boolean).join('\n');
       // PROTOCOL COLLISION LOGGER (red-team gap: nothing recorded when two or more families fired on
@@ -3214,7 +3269,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         const fired = Object.entries({
           memCtx, profileCtx, demoCtx, informationModeCtx, explicitPauseCtx, entryDoorCtx,
           coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx,
-          clarityPivotCtx, selfRepetitionCtx, userStagnationCtx, gatesCtx, closingDriftCtx,
+          clarityPivotCtx, selfRepetitionCtx, userStagnationCtx, tensionCtx, gatesCtx, closingDriftCtx,
           firstReplyFloorCtx,
         }).filter(([, v]) => v).map(([k]) => k);
         if (fired.length >= 2) {
@@ -3242,6 +3297,11 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         if (window.__auraLastCollision && window.__auraLastCollision.turn === msgCount) {
           console.log('[AURA outcome] turn', msgCount, '| produced:',
                       String(rawTextWithTags || '').replace(/\[\[[^\]]*\]\]/g, '').trim().slice(0, 110));
+        }
+        const viol = detectOutputViolation(String(rawTextWithTags || '').replace(/\[\[[^\]]*\]\]/g, ''));
+        if (viol) {
+          console.warn('[AURA VIOLATION]', viol, '| turn', msgCount, '|',
+                       String(rawTextWithTags || '').trim().slice(0, 130));
         }
       } catch (e) { /* observation must never affect the session */ }
       const exitTagMatch = rawTextWithTags.match(/\[\[EXIT:(yes|no)\]\]\s*$/i);
@@ -4373,23 +4433,11 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         {messages.length === 0 && !sessionStarted && introChoice === null && (
           <div ref={el => { if (el) el.scrollTop = 0; }} style={{position:"fixed",inset:0,zIndex:61,background:"#0d0c0a",overflowY:"auto",padding:"36px 24px 48px"}}>
             <div style={{maxWidth:"380px",width:"100%",margin:"0 auto",textAlign:"center"}}>
-              <div style={{fontSize:"13px",color:"#a8a49c",lineHeight:1.6,marginBottom:"4px"}}>
-                Όλοι δίνουν απαντήσεις.<br/>Δε χρειάζεσαι άλλη.
-              </div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:300,color:"#d8d4cc",lineHeight:1.3,marginBottom:"22px"}}>
-                Αύρα
-              </div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.5,marginBottom:"26px"}}>
-                Δες που κολλάς — χωρίς μασημένες συμβουλές.<br/>Εσύ στο τιμόνι.
-              </div>
-              <div style={{fontSize:"13px",color:"#c9c5bc",lineHeight:2,marginBottom:"26px",textAlign:"left"}}>
-                Δεν αποφασίζει για σένα.<br/>
-                Δεν δίνει έτοιμες συμβουλές.<br/>
-                Σου κάνει τις ερωτήσεις που βάζουν τάξη στη σκέψη σου.
-              </div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"14px",color:"#a8a49c",lineHeight:1.6,marginBottom:"26px"}}>
-                Μερικές φορές η καλύτερη απάντηση δεν είναι μια απάντηση. Είναι η σωστή ερώτηση.
-              </div>
+              {/* OLD INTRO TEXT REMOVED (fifth report of "three screens"): the rewritten intro lives on the
+                  first screen; this block still carried the previous version — "Όλοι δίνουν απαντήσεις",
+                  "Αύρα", "Δες που κολλάς" — so the user met an introduction, then a SECOND introduction
+                  with the doors underneath, then the time question. Both texts existed simultaneously.
+                  This screen now carries only the doors. */}
               {/* Entry doors — these already existed inside AURA's first message (Zeigarnik-grounded:
                   unfinished, recurring thoughts stay mentally active). Surfacing them here, before the
                   user types, so they know what kind of thing this is for. Deliberately NOT sent to the
@@ -4579,25 +4627,11 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
           {/* FIX: state-doors were orphaned inside the now-unreachable demo overlay after the
               demo-button fix skipped straight into session. Re-added here, reachable, for the
               'direct' path specifically — right after choosing to start, before the first message. */}
-          {messages.length === 0 && sessionStarted && introChoice === "direct" && (
-            <div style={{marginBottom:"18px"}}>
-              <div style={{color:"#8a8680",marginBottom:"10px",fontFamily:"'DM Mono',monospace",fontSize:"11px",letterSpacing:".05em"}}>Τι σε έφερε εδώ;</div>
-              {[
-                "Κάτι που σκέφτομαι και δεν ξεκαθαρίζει",
-                "Μια απόφαση που αναβάλλω",
-                "Κάτι που επιστρέφει ξανά και ξανά",
-              ].map((door) => (
-                <button key={door} onClick={()=>{setInput(door + ": "); setTimeout(()=>textareaRef.current?.focus(),50);}}
-                  style={{display:"block",width:"100%",textAlign:"left",background:"rgba(10,9,8,0.35)",border:"1px solid rgba(201,168,76,0.18)",color:"#c9c5bc",fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",padding:"11px 14px",marginBottom:"8px",cursor:"pointer",borderRadius:"4px"}}>
-                  {door}
-                </button>
-              ))}
-              <button onClick={()=>{textareaRef.current?.focus();}}
-                style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"1px solid rgba(201,168,76,0.12)",color:"#8a8680",fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",fontStyle:"italic",padding:"11px 14px",cursor:"pointer",borderRadius:"4px"}}>
-                Κάτι άλλο — θα το πω μόνος μου
-              </button>
-            </div>
-          )}
+          {/* THIRD ENTRY SCREEN REMOVED — permanently. It rendered AFTER sessionStarted with its own
+              "Τι σε έφερε εδώ;" and three more doors, so a user who had already tapped a door and
+              answered the time question met the same question a third time. It survived five separate
+              fixes because it is a plain div, not an intro-screen, so every structural check that
+              counted intro-screen elements passed while the bug was live. */}
           {messages.map((msg, i) => (
             <MessageBubble
               key={msg.id || i}
