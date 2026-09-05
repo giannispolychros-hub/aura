@@ -27,10 +27,10 @@
 |---|---|
 | **Αρχείο-αλήθεια** | `src/App.jsx` (~4.800 γραμμές, ~620 KB) |
 | **Backend** | `api/aura.js` |
-| **Branch εργασίας** | `hardening-sprint` |
-| **Production branch** | `main` — **το Vercel διαβάζει από εδώ** |
+| **Branch** | `main` — δουλεύουμε κατευθείαν εδώ, το hardening έκλεισε |
+| **Deploy** | Vercel, αυτόματα σε κάθε push στο `main` |
 | **Live** | https://aura-ruddy-six.vercel.app |
-| **Tests** | 373 σε 32 suites, φάκελος `auratests/` |
+| **Tests** | 375 σε 33 suites, φάκελος `auratests/` |
 
 **Το `App.jsx` περιέχει τα πάντα:** το system prompt (~50%), τον κώδικα, το UI. Δεν είναι σπασμένο σε modules — και **δεν πρέπει να σπάσει**: το prompt caching εξαρτάται από σταθερό πρόθεμα, και τα tests εξάγουν συναρτήσεις με `indexOf('function X')`.
 
@@ -70,7 +70,14 @@
 
 **Architecture First.** Σε μεγάλα audits: ανακάλυψη **όλων** των ευρημάτων → ομαδοποίηση → **μία** πρόταση ανά cluster → προσομοίωση → **ένα** σημείο έγκρισης. Όχι διόρθωση ανά εύρημα.
 
-**Delivery format.** Κάθε παράδοση `App.jsx`: (1) `notepad src\App.jsx`, (2) `git checkout hardening-sprint` ξεχωριστά, (3) τα τρία git μαζί, (4) το αρχείο μέσω present_files.
+**Delivery format.** Κάθε παράδοση `App.jsx`: το αρχείο μέσω present_files, και μετά:
+```
+notepad src\App.jsx
+git add .
+git commit -m "..."
+git push
+```
+Κανένα `git checkout` — δουλεύουμε στο `main`.
 
 ---
 
@@ -104,7 +111,7 @@
 
 **Τα tests είναι στο repo — ΜΗΝ τα ζητήσεις ως αρχεία.** Ζουν στο `auratests/` του χρήστη. Δεν χρειάζεται να τα δεις· χρειάζεται να του **ζητάς να τα τρέχει**.
 
-**Ο κανόνας:** πριν και μετά από **κάθε** αλλαγή στο `App.jsx`, ζήτα του να τρέξει `auratests\RUN_ALL.bat`. Αν πέσει έστω ένα από τα 373, η τελευταία αλλαγή έσπασε κάτι — **μην προχωρήσεις σε push**.
+**Ο κανόνας:** πριν και μετά από **κάθε** αλλαγή στο `App.jsx`, ζήτα του να τρέξει `auratests\RUN_ALL.bat`. Αν πέσει έστω ένα από τα 375, η τελευταία αλλαγή έσπασε κάτι — **μην προχωρήσεις σε push**.
 
 **Τι σου ανεβάζει ο χρήστης:** μόνο `App.jsx`, `api/aura.js` και αυτό το αρχείο. Τίποτα άλλο.
 

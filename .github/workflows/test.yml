@@ -1,0 +1,52 @@
+name: AURA tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install parser (needed by test_scope_integrity)
+        run: npm install @babel/parser @babel/traverse
+
+      - name: Run all suites
+        run: |
+          cd auratests
+          FAILED=0
+          for f in \
+            test_scope_integrity test_entry_flow test_adversarial_topicjump \
+            stress_test_closing test_carry_forward test_anchor_coverage \
+            test_no_questions test_shift_parser test_bare_emoji \
+            test_farewell_closing test_conflict_matrix test_outcome_gate \
+            test_gates_dispatch test_showdemo_matrix test_dual_gates \
+            test_style_preference test_20_personas test_extreme_topics \
+            test_clarity_ownership test_core_readiness test_shift_check \
+            test_gate_proof test_early_word test_10_session_stress \
+            test_clarity_pivot_hybrid test_ara_backstop test_self_repetition \
+            test_english_ara test_tag_injection test_prompt_injection \
+            test_exhaustion test_xss test_user_stagnation ; do
+            if [ -f "$f.js" ]; then
+              if node "$f.js" > /tmp/out.txt 2>&1; then
+                echo "PASS  $f"
+              else
+                echo "FAIL  $f"
+                cat /tmp/out.txt
+                FAILED=$((FAILED+1))
+              fi
+            fi
+          done
+          echo ""
+          if [ "$FAILED" -gt 0 ]; then
+            echo "$FAILED suites failed — do not trust this deploy"
+            exit 1
+          fi
+          echo "All suites passed"
