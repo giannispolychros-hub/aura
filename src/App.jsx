@@ -2922,6 +2922,9 @@ export default function AURAv2() {
   const [introChoice, setIntroChoice] = useState(null); // null | "demo" | "direct"
   const [entryDoor, setEntryDoor] = useState(null);
   const [entryTime, setEntryTime] = useState(null);
+  // SCOPE FIX (AST analysis): misfireInput and setMisfireInput are used in the misfire-recovery
+  // panel but were never declared anywhere — that panel threw ReferenceError the moment it rendered.
+  const [misfireInput, setMisfireInput] = useState("");
   const entryTimeRef = useRef(null); // which entry door the user picked, or null if they chose to say it themselves
   const entryDoorRef = useRef(null);
   const introChoiceRef = useRef(null); // mirror for async access inside generateResponse
@@ -3146,7 +3149,12 @@ export default function AURAv2() {
         if (idx < 0 || idx === userMsgs.length - 1) return '';
         return `\n[CODE-VERIFIED: the user gave a closing signal ${userMsgs.length - 1 - idx} message(s) ago and the exchange is still going. Do not reciprocate farewells, emoji, or pleasantries — that is what extended this. If the closing sequence has not run yet, run it NOW, in this reply. If it has already run, end here with nothing further: no summary, no anchor question, no second closing. Starting a fresh closing sequence after farewells have already been exchanged reads as not having noticed the conversation ended.]\n`;
       })();
-      const tensionCtx = detectSelfMarkedTension(userText)
+      const tensionCtx = detectSelfMarkedTension(
+        // SCOPE FIX: userText lives in handleSubmit, ~730 lines below and in a different function.
+        // Referencing it here threw ReferenceError on every free-text entry. The last user message
+        // is the same value and IS in scope, exactly as closingDriftCtx above already reads it.
+        ([...msgs].reverse().find(m => m.role === "user") || {}).content || ""
+      )
         ? `\n[CODE-VERIFIED: the user placed an opposition marker ("αλλά"/"όμως") with first-person stance on BOTH sides of it. They marked the tension themselves — this is not AURA inferring one. CHECK whether the two sides are genuinely pulling against each other; often they are not, and if not, ignore this entirely and continue normally. If they are, naming it is available now rather than after some other approach has failed: reflect both halves in their own words and ask which one holds more. Both poles must be quoted or near-quoted — supplying the second pole yourself is construction wearing the shape of reflection, which the dispatch entry above forbids by name.]\n`
         : '';
       const explicitPauseCtx = canUseExplicitPause(memory) && currentMode === "ANSWER" &&
@@ -4099,7 +4107,6 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
     entryDoorRef.current = null;
     setEntryTime(null);
     entryTimeRef.current = null;
-    setCustomAmount("");
     setError(null);
     setClaritySurge(false);
     setIllumLevel(0);
