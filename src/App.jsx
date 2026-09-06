@@ -2584,7 +2584,7 @@ function detectPattern(messages) {
 // rate is unknown, and stripping mid-sentence would break valid replies. Accent-normalised with no
 // \b, because \b does not treat Greek letters as word characters in JS — the documented bug that
 // once silently disabled every Greek safety pattern in this file, and which this nearly repeated.)
-function detectOutputViolation(text) {
+function detectOutputViolation(text, ctx) {
   const n = String(text == null ? "" : text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   if (!n) return null;
   const EVAL = /(καλη (επιλογη|αποφαση|κινηση|προσπαθεια)|σωστα (κανεις|εκανες)|μπραβο|λογικο ακουγεται|σωστη σκεψη|καλα εκανες)/;
@@ -2594,6 +2594,19 @@ function detectOutputViolation(text) {
   const IMP = /(^|[.!;·]\s*)(παρε|κανε|μιλησε|ζητα|στειλε|γραψε|ξεκινα|σταματα|αλλαξε|φυγε|μεινε|δοκιμασε|κλεισε|πηγαινε)/;
   if (IMP.test(n) && !CONV.test(n.trim())) return "ADVICE";
   if (/(ως (coach|προπονητης|θεραπευτης|ψυχολογος|συμβουλος)|στη θεση σου θα|εγω θα)/.test(n)) return "ROLE";
+  // OBSERVATION-ONLY, passive counter (same instrumentation principle as the collision logger
+  // below — never blocks or changes the reply, only logs): when userStagnationCtx already
+  // signalled this is a ROAD DISCOVERY moment, and the reply lists 3+ options as prose lines
+  // instead of ever using the ΔΡΟΜΟΣ/ΚΕΡΔΙΖΕΙΣ/ΚΟΣΤΙΖΕΙ map format, that is worth counting.
+  // Real-transcript finding (2026-09): the trigger fired, the model listed career categories in
+  // plain prose across several turns, no map ever appeared. NOT treated as a hard rule — the
+  // injected context also offers other legitimate replies for this moment (the two named
+  // alternative moves) — this only measures how often the map is skipped, before any decision
+  // to build an active fix.
+  if (ctx && ctx.roadDiscoveryDue && !parseRoadMap(text)) {
+    const optionLines = (text.match(/^\s*(?:[0-9]+[.)]|[-•\u2022])\s+\S/gm) || []).length;
+    if (optionLines >= 3) return "ROAD_MAP_MISSING";
+  }
   return null;
 }
 function detectSelfMarkedTension(text) {
@@ -3306,7 +3319,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
           console.log('[AURA outcome] turn', msgCount, '| produced:',
                       String(rawTextWithTags || '').replace(/\[\[[^\]]*\]\]/g, '').trim().slice(0, 110));
         }
-        const viol = detectOutputViolation(String(rawTextWithTags || '').replace(/\[\[[^\]]*\]\]/g, ''));
+        const viol = detectOutputViolation(String(rawTextWithTags || '').replace(/\[\[[^\]]*\]\]/g, ''), { roadDiscoveryDue: !!userStagnationCtx });
         if (viol) {
           console.warn('[AURA VIOLATION]', viol, '| turn', msgCount, '|',
                        String(rawTextWithTags || '').trim().slice(0, 130));
