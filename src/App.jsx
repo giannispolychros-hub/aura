@@ -2854,6 +2854,13 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
   // convention already used by closureConfirmPending, reused here rather than inventing a new
   // one, right where the three-beat shift itself just appeared, per founder's request):
   const isPromiseMsg  = !isUser && !isTermination && detectsContinuationPromiseAsked(msg.content);
+  const roadMap = !isUser ? parseRoadMap(msg.content) : null;
+  const displayContent = roadMap
+    ? msg.content
+        .replace(/ΔΡΟΜΟΣ:\s*[^\n]+\n\s*ΚΕΡΔΙΖΕΙΣ:\s*[^\n]+\n\s*ΚΟΣΤΙΖΕΙ:\s*[^\n]+/g, '')
+        .replace(/ΑΓΝΩΣΤΟ:\s*[^\n]+/g, '')
+        .trim()
+    : msg.content;
 
   return (
     <div className={`turn ${isUser ? "turn-user" : "turn-aura"}`}>
@@ -2863,8 +2870,8 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
         // a defined form at a defined moment, given visual weight so the transformation is seen
         // rather than read. Falls through to normal rendering when no map is present.
         if (isUser) return null;
-        const rm = parseRoadMap(msg.content);
-        if (!rm) return null;
+        if (!roadMap) return null;
+        const rm = roadMap;
         return (
           <div className="msg-aura" style={{marginBottom:"10px"}}>
             {rm.roads.map((r, k) => (
@@ -2882,20 +2889,22 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
           </div>
         );
       })()}
-      <div className={isUser ? "msg-user" : `msg-aura ${isObs ? "obs" : ""} ${isInsight ? "ins" : ""} ${isTermination ? "term" : ""} ${isSafe ? "safe" : ""} ${isExplo ? "expl" : ""} ${isSnapshot ? "snapshot-msg" : ""}`}>
-        {msg.content.split("\n").map((line, j, arr) => (
-          <span key={j}>
-            {isTermination
-              ? line.split(/(\*\*[^*]+\*\*)/g).map((part, k) =>
-                  part.startsWith("**") && part.endsWith("**")
-                    ? <strong key={k}>{part.slice(2, -2)}</strong>
-                    : <span key={k}>{part}</span>
-                )
-              : line}
-            {j < arr.length-1 && <br/>}
-          </span>
-        ))}
-      </div>
+      {displayContent && (
+        <div className={isUser ? "msg-user" : `msg-aura ${isObs ? "obs" : ""} ${isInsight ? "ins" : ""} ${isTermination ? "term" : ""} ${isSafe ? "safe" : ""} ${isExplo ? "expl" : ""} ${isSnapshot ? "snapshot-msg" : ""}`}>
+          {displayContent.split("\n").map((line, j, arr) => (
+            <span key={j}>
+              {isTermination
+                ? line.split(/(\*\*[^*]+\*\*)/g).map((part, k) =>
+                    part.startsWith("**") && part.endsWith("**")
+                      ? <strong key={k}>{part.slice(2, -2)}</strong>
+                      : <span key={k}>{part}</span>
+                  )
+                : line}
+              {j < arr.length-1 && <br/>}
+            </span>
+          ))}
+        </div>
+      )}
       {isInsight           && <div className="msg-badge compress"><span style={{width:3,height:3,borderRadius:"50%",background:"var(--gold)",display:"inline-block"}}/>συμπίεση</div>}
       {isSnapshot          && <div className="msg-badge snapshot"><span style={{width:3,height:3,borderRadius:"50%",background:"#7a8a7a",display:"inline-block"}}/>διαύγεια</div>}
       {msg.isExploration   && <div className="msg-badge" style={{color:"#5a5a7a"}}><span style={{width:3,height:3,borderRadius:"50%",background:"#7a7aaa",display:"inline-block"}}/>εξερεύνηση μοτίβου</div>}
