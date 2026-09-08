@@ -3174,6 +3174,20 @@ export default function AURAv2() {
         binaryOppositionCount.current += 1;
       }
     }
+    // TIMING FIX (causal-inventory audit — detectsMethodFailureSignal previously ran after the API
+    // call, inside the post-response tracking block below, so its own signal only reached the
+    // model one full turn after the message that produced it. Moved here, same pattern as
+    // binaryOppositionCount above, so methodFailureCtx can reflect THIS turn's message instead of
+    // the previous one. Guard condition unchanged: !informationModeActive.current still reads
+    // whatever that flag's value is at this point — since informationModeActive detection itself
+    // stays in its original post-API location below, that is the value as of the END of the
+    // PREVIOUS turn, not this one.)
+    {
+      const lastUserMsgForMethodFailure = [...msgs].reverse().find(m => m.role === "user");
+      if (!informationModeActive.current && lastUserMsgForMethodFailure && detectsMethodFailureSignal(lastUserMsgForMethodFailure.content)) {
+        methodFailureHint.current = true;
+      }
+    }
     // Context Refresh: reinject core identity reminder every 10 messages
     const msgCount = msgs.filter(m => m.role === 'user').length;
     const contextRefresh = msgCount > 0 && msgCount % 10 === 0
@@ -3648,9 +3662,6 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
       // State-machine fix: once set, stays set — does not silently revert mid-conversation.
       if (!informationModeActive.current && detectsNoQuestionsRequest(lastUserMsg)) {
         informationModeActive.current = true;
-      }
-      if (!informationModeActive.current && detectsMethodFailureSignal(lastUserMsg)) {
-        methodFailureHint.current = true;
       }
 
       // Termination decision — extracted to decideTermination() for testability, same logic as before.
