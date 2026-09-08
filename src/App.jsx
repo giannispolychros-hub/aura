@@ -3026,6 +3026,9 @@ export default function AURAv2() {
   const clarificationRound = useRef(0); // tracks clarification depth — max 3
   const lastChallengeAt  = useRef(-99);
   const compressionCount = useRef(0);
+  const violationCounts = useRef({}); // per-session tally of detectOutputViolation categories, debug-panel only
+  // Debug panel gate — read once from the URL, never re-derived on later renders/navigation.
+  const debugMode = useRef(typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1');
   // RT-hardening: replaces text-based detection ("does the model's reply say 'το κρατάω'?")
   // with a plain count of how many replies have happened during the brand-new-user window —
   // works regardless of the model's exact phrasing.
@@ -3346,6 +3349,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
           console.warn('[AURA VIOLATION]', viol, '| turn', msgCount, '|',
                        String(rawTextWithTags || '').trim().slice(0, 130));
         }
+        if (viol) violationCounts.current[viol] = (violationCounts.current[viol] || 0) + 1;
       } catch (e) { /* observation must never affect the session */ }
       const exitTagMatch = rawTextWithTags.match(/\[\[EXIT:(yes|no)\]\]\s*$/i);
       const modelJudgesEnd = exitTagMatch ? exitTagMatch[1].toLowerCase() === "yes" : false;
@@ -4139,6 +4143,8 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
     closureDeclineCooldown.current = 0;
     reflectionDelivered.current = false;
     informationModeActive.current = false;
+    violationCounts.current = {};
+    window.__auraLastCollision = null;
     setValueUnlocked(false);
     setIntroChoice(null);
     setEntryDoor(null);
@@ -4611,6 +4617,24 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ── Debug panel: read-only view of already-existing counters (turnCount, the passive
+            detectOutputViolation tally). Counters only — never reply text, never localStorage,
+            never user data. Gated on ?debug=1, read once via debugMode.current. Re-renders
+            naturally whenever `messages` changes, since that's this component's own render
+            trigger — no interval, no dedicated state. ── */}
+        {debugMode.current && (
+          <div style={{position:"fixed",bottom:"8px",right:"8px",zIndex:9999,pointerEvents:"none",background:"rgba(0,0,0,0.55)",color:"#d8d4cc",fontSize:"11px",lineHeight:1.5,padding:"6px 9px",borderRadius:"4px",fontFamily:"monospace",maxWidth:"220px"}}>
+            <div>turn: {turnCount.current}</div>
+            {Object.keys(violationCounts.current).length === 0 ? (
+              <div>καμία παραβίαση</div>
+            ) : (
+              Object.entries(violationCounts.current).map(([k, v]) => (
+                <div key={k}>{k}: {v}</div>
+              ))
+            )}
           </div>
         )}
 
