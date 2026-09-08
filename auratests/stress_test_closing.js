@@ -9,7 +9,7 @@ const fs = require('fs');
     if (_f.existsSync(x)) { raw = _f.readFileSync(x, 'utf8'); break; }
   }
   if (!raw) throw new Error('App.jsx not found. Put these files next to App.jsx, or in a tests/ folder beside src/');
-  const names = ['isBareEmojiOrAcknowledgment','matchesClosingWord','endsWithClosingSignal','wasThirdTriggerAsked','isModelPreClosing','decideTermination','stripAraDeclarative','detectPattern','detectAssistantSelfRepetition','sanitizeForPromptContext','capMessageHistory','detectsBinaryOppositionPhrasing','parseThreeBeatShift','parseRoadMap','detectUserStagnation','normalizeGreekText'];
+  const names = ['isBareEmojiOrAcknowledgment','matchesClosingWord','endsWithClosingSignal','wasThirdTriggerAsked','isModelPreClosing','isExplicitClosure','decideTermination','stripAraDeclarative','detectPattern','detectAssistantSelfRepetition','sanitizeForPromptContext','capMessageHistory','detectsBinaryOppositionPhrasing','parseThreeBeatShift','parseRoadMap','detectUserStagnation','normalizeGreekText'];
   let src = '';
   for (const n of names) {
     const s = raw.indexOf('function ' + n + '(');
@@ -122,5 +122,55 @@ edgeCases.forEach(([msg, expected, desc]) => check("EC-" + msg, `edge case '${ms
 check("REGRESSION-1", "long message 2 turns back does NOT block clean last-message closing (the real bug)", fires("φτάσαμε", { longPad: true }) === true);
 check("REGRESSION-2", "same check with short pad too, for comparison", fires("φτάσαμε", { longPad: false }) === true);
 check("REGRESSION-3", "'Τα λέμε.' — real transcript, second missing-word finding, same category as φτάσαμε", fires("Τα λέμε.") === true);
+
+// ── F015: explicit user closure must override AURA's own trailing question ──
+// Real-transcript bug: user wrote "Θα το σκεφτώ... Κλείνουμε" and AURA answered with a new
+// question instead of closing. Root cause: textAsksRealQuestion in decideTermination forced
+// decision back to "none" whenever AURA's OWN reply ended in ;/?, with zero regard for how
+// explicit the user's own closing request was. NONE of the 55 scenarios above exercise this
+// path — fires() always passes a hardcoded text with no trailing question mark. This helper
+// exists specifically to exercise it.
+function firesWithQuestion(lastUserMsg, opts = {}) {
+  const auraText = opts.auraText || "Τι σε κάνει να νιώθεις έτσι;";
+  return decideTermination(buildMsgs(lastUserMsg, opts), auraText, {
+    safetyMode: opts.safetyMode || false, currentMode: "ANSWER", warningIssued: false, compressionCount: 0, modelJudgesEnd: false
+  });
+}
+
+// (a) POSITIVE: explicit closure + AURA's reply ends in a question → must still close.
+["Κλείνουμε", "τέλος", "τα λέμε", "ευχαριστώ"].forEach(msg => {
+  check("F015-POS-" + msg, `explicit closure '${msg}' + AURA question -> decision is "confirm" (does NOT get blocked)`, firesWithQuestion(msg) === "confirm");
+});
+
+// (b) NEGATIVE (safety): safetyMode must win regardless of explicit closure or trailing question.
+check("F015-SAFETY", 'safetyMode=true + "Κλείνουμε" + AURA question -> decision is "none" (safety always wins)',
+  firesWithQuestion("Κλείνουμε", { safetyMode: true }) === "none");
+
+// (c) NEGATIVE (false positive guard): a message that merely contains closing-adjacent words
+// inside a longer, still-open thought must NOT be treated as explicit closure.
+check("F015-FALSEPOS", '"νομίζω τελειώσαμε προς το παρόν, αλλά θέλω να πω κάτι ακόμα" + AURA question -> does NOT close',
+  firesWithQuestion("νομίζω τελειώσαμε προς το παρόν, αλλά θέλω να πω κάτι ακόμα") !== "confirm");
+
+// (d) NEGATIVE (original rule preserved): a plain substantive message, not a closing signal at
+// all, + AURA's reply ending in a real question -> must still NOT close. This is the exact
+// scenario the original textAsksRealQuestion guard was built for (real-user evidence: a genuine
+// question interrupted by the closure dialog on the same turn) — the narrowing must not break it.
+check("F015-ORIGINAL-PROTECTED", 'plain substantive message + AURA question -> does NOT close (original evidence still protected)',
+  firesWithQuestion("Δεν είμαι σίγουρος τι να κάνω με αυτό") !== "confirm");
+
+// (e) isExplicitClosure unit tests — every termination/farewell word fires, every bare
+// acknowledgement does not.
+const explicitClosurePositives = ["Κλείνουμε", "κλεινω", "τέλος", "τελειώσαμε", "σταματάμε", "φεύγω", "παω",
+  "αυτό ήταν", "αρκετά για σήμερα", "ας το αφήσουμε εδώ", "φτάνει", "αντίο", "γεια", "τα λέμε",
+  "καληνύχτα", "καλή συνέχεια", "καλό βράδυ", "μπάι", "bye", "ευχαριστώ", "επίσης", "παρομοίως"];
+explicitClosurePositives.forEach(msg => check("EXPLICIT-POS-" + msg, `isExplicitClosure('${msg}') is true`, isExplicitClosure(msg) === true));
+
+const explicitClosureNegatives = ["ναι", "οκ", "ok", "κατάλαβα", "εντάξει", "σωστό", "ακριβώς", "νομίζω ναι", "πιστεύω ναι", "φτάσαμε"];
+explicitClosureNegatives.forEach(msg => check("EXPLICIT-NEG-" + msg, `isExplicitClosure('${msg}') is false`, isExplicitClosure(msg) === false));
+
+check("EXPLICIT-SUBSTRING-1", "isExplicitClosure('στο τέλος της μέρας θα δούμε') is false (substring, not the whole message)",
+  isExplicitClosure("στο τέλος της μέρας θα δούμε") === false);
+check("EXPLICIT-SUBSTRING-2", "isExplicitClosure('νομίζω τελειώσαμε προς το παρόν, αλλά θέλω να πω κάτι ακόμα') is false",
+  isExplicitClosure("νομίζω τελειώσαμε προς το παρόν, αλλά θέλω να πω κάτι ακόμα") === false);
 
 console.log(`\n${pass} passed, ${fail} failed (out of ${pass + fail} scenarios)`);

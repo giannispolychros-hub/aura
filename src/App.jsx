@@ -2155,6 +2155,24 @@ function isModelPreClosing(text) {
   if (t.split(/\s+/).length > 6) return false;
   return matchesClosingWord(t);
 }
+// F015: narrower sibling of matchesClosingWord — same technique (NFD normalize, strip accents,
+// lowercase, collapse doubled letters, reject no-letter input, then strip every known word/
+// punctuation and require nothing remains), but a deliberately SMALLER wordlist: only genuine
+// termination declarations and farewells, never bare acknowledgements (ναι/οκ/κατάλαβα/εντάξει/
+// σωστό/ακριβώς/νομίζω ναι/πιστεύω ναι/φτάσαμε — those stay candidates for a hold, never an
+// unconditional override). The "strip known words, require the remainder is empty" mechanic is
+// what makes this safe against substring false-positives ("στο τέλος της μέρας θα δούμε", "νομίζω
+// τελειώσαμε προς το παρόν, αλλά θέλω να πω κάτι ακόμα") — a message is only explicit closure if
+// it consists of NOTHING BUT closing words, exactly as matchesClosingWord already requires.
+function isExplicitClosure(text) {
+  const t = String(text == null ? "" : text).trim();
+  if (!t) return false;
+  let normalized = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  normalized = normalized.replace(/([a-zα-ω])\1+/gi, "$1");
+  if (!/[a-zα-ωά-ώ0-9]/i.test(normalized)) return false;
+  const stripped = normalized.replace(/αρκετα για σημερα|ας το αφησουμε εδω|αυτο ηταν|τα λεμε|καλη συνεχεια|καλο βραδυ|κλεινουμε|κλεινω|τελειωσαμε|τελος|σταματαμε|φευγω|παω|φτανει|αντιο|γεια|καληνυχτα|μπαι|bye|ευχαριστω|επισης|παρομοιως|[.,!?;\s]/gi, "");
+  return stripped.length === 0;
+}
 
 function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued, compressionCount, modelJudgesEnd, concreteStepStated = false, outcomeScaleAsked = false, outcomeScaleBlockUsed = false, duringOnboarding = false, duringDeclineCooldown = false }) {
   if (safetyMode) return "none";
@@ -2252,7 +2270,13 @@ function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued,
 
   // Same-turn override: never close on a turn whose own displayed reply is a real open
   // question — see textAsksRealQuestion above. Applies regardless of which heuristic fired.
-  if ((decision === "confirm" || decision === "terminate") && textAsksRealQuestion) {
+  // F015 NARROWING (real-transcript evidence: user wrote "Θα το σκεφτώ... Κλείνουμε" and AURA
+  // answered with a new question instead of closing): this guard was built to protect a genuine
+  // Socratic question from being interrupted by the closure dialog — it was never meant to let
+  // AURA's own non-compliant reply override an explicit user closing request. Narrowed, not
+  // removed: the override still applies to everything except the one case where the user's own
+  // last message is itself an explicit termination/farewell (isExplicitClosure).
+  if ((decision === "confirm" || decision === "terminate") && textAsksRealQuestion && !isExplicitClosure(lastUserMsg?.content || "")) {
     decision = "none";
   }
 
