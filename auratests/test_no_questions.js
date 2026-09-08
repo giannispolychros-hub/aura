@@ -75,5 +75,45 @@ assert("A/B split: 'θέλω λύση' does NOT fire detectsMethodFailureSignal"
 assert("Neutral: 'δεν ξέρω τι να κάνω' does NOT fire detectsMethodFailureSignal", !detectsMethodFailureSignal("δεν ξέρω τι να κάνω"));
 assert("Neutral: 'δεν ξέρω τι να κάνω' does NOT fire detectsNoQuestionsRequest", !detectsNoQuestionsRequest("δεν ξέρω τι να κάνω"));
 
+// LEVEL 1 LEXICAL GAPS (structural audit finding: SPECIFICITY ORDERING's own worked examples for
+// Level 1 "explicit user words" — CONVERSATION STRATEGY SWITCH's "γύρω γύρω"/"δεν βοηθήθηκα"/
+// "αναμασάμε"/"δεν αλλάζει κάτι", and PRIORITY INTERRUPT LAYER's "σταμάτα τις ερωτήσεις" — were
+// not actually caught by the detectors the prompt implies back them. Filling the gap so the
+// prompt's own canonical examples are code-verified, not just asserted.)
+const methodFailureLevel1Phrases = [
+  "γύρω γύρω", "γυρω γυρω",
+  "δεν βοηθήθηκα", "δεν βοηθηθηκα",
+  "αναμασάμε", "αναμασαμε", "αναμασάς", "αναμασάει",
+  "δεν αλλάζει κάτι", "δεν αλλαζει κατι", "δεν αλλάζει τίποτα",
+];
+methodFailureLevel1Phrases.forEach(msg => {
+  assert(`LEVEL1 GAP: '${msg}' fires detectsMethodFailureSignal`, detectsMethodFailureSignal(msg));
+  assert(`LEVEL1 GAP: '${msg}' does NOT fire detectsNoQuestionsRequest`, !detectsNoQuestionsRequest(msg));
+});
+
+// Negative controls for the 4 new detectsMethodFailureSignal patterns.
+assert("LEVEL1 GAP negative: 'γύρισα γύρω από το τετράγωνο' does NOT fire (literal, not method failure)",
+  !detectsMethodFailureSignal("γύρισα γύρω από το τετράγωνο"));
+assert("LEVEL1 GAP negative: 'με βοήθησε πολύ αυτό' does NOT fire (positive, not a failure)",
+  !detectsMethodFailureSignal("με βοήθησε πολύ αυτό"));
+assert("LEVEL1 GAP negative: 'αναμασούσα το φαγητό μου' does NOT fire (literal chewing, different verb form)",
+  !detectsMethodFailureSignal("αναμασούσα το φαγητό μου"));
+// KNOWN BROAD MATCH, confirmed and reported per instructions, NOT silently fixed: the pattern is a
+// plain substring test, so "δεν αλλάζει κάτι" inside a longer sentence still fires — same behavior
+// class as every other pattern in this detector (substring match, no anchoring). Documented here
+// as a known characteristic, not asserted as "correctly rejected".
+assert("LEVEL1 GAP known-broad: 'δεν αλλάζει κάτι στη ζωή μου αυτή τη στιγμή' DOES fire (substring match — reported, not fixed, per instructions)",
+  detectsMethodFailureSignal("δεν αλλάζει κάτι στη ζωή μου αυτή τη στιγμή"));
+
+// New detectsNoQuestionsRequest pattern: "σταμάτα (τις) ερωτήσεις" (noun form — the existing
+// pattern only caught the verb form "ρωτάς").
+const noQuestionsLevel1Phrases = ["σταμάτα τις ερωτήσεις", "σταματα τις ερωτησεις", "σταμάτα ερωτήσεις"];
+noQuestionsLevel1Phrases.forEach(msg => {
+  assert(`LEVEL1 GAP: '${msg}' fires detectsNoQuestionsRequest`, detectsNoQuestionsRequest(msg));
+  assert(`LEVEL1 GAP: '${msg}' does NOT fire detectsMethodFailureSignal`, !detectsMethodFailureSignal(msg));
+});
+assert("LEVEL1 GAP negative: 'θα σταματήσω τις ερωτήσεις που κάνω στον εαυτό μου' does NOT fire (different verb form, not a request to AURA)",
+  !detectsNoQuestionsRequest("θα σταματήσω τις ερωτήσεις που κάνω στον εαυτό μου"));
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

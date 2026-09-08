@@ -173,4 +173,16 @@ check("EXPLICIT-SUBSTRING-1", "isExplicitClosure('στο τέλος της μέ�
 check("EXPLICIT-SUBSTRING-2", "isExplicitClosure('νομίζω τελειώσαμε προς το παρόν, αλλά θέλω να πω κάτι ακόμα') is false",
   isExplicitClosure("νομίζω τελειώσαμε προς το παρόν, αλλά θέλω να πω κάτι ακόμα") === false);
 
+// LEVEL 1 LEXICAL GAP: "έληξε" — CLOSURE DOMINANCE RULE's own example word ("έληξε", "βρήκα
+// λύση", "κλείνουμε") was missing from isExplicitClosure's wordlist. Only "έληξε" is added —
+// NOT "βρήκα λύση", which is not itself a termination declaration and would risk premature
+// closing on phrases like "νομίζω βρήκα λύση, αλλά...".
+check("EXPLICIT-POS-εληξε-1", "isExplicitClosure('Έληξε') is true", isExplicitClosure("Έληξε") === true);
+check("EXPLICIT-POS-εληξε-2", "isExplicitClosure('εληξε') (unaccented) is true", isExplicitClosure("εληξε") === true);
+// KNOWN SAFE per the strip-and-check-empty mechanic: a literal, unrelated use of "έληξε" inside a
+// longer sentence does NOT fire, because the rest of the sentence survives the strip and the
+// remainder is non-empty — confirmed here, not just asserted.
+check("EXPLICIT-SUBSTRING-3", "isExplicitClosure('έληξε η σύμβασή μου') is false (literal contract-expiry sentence, not a closing declaration)",
+  isExplicitClosure("έληξε η σύμβασή μου") === false);
+
 console.log(`\n${pass} passed, ${fail} failed (out of ${pass + fail} scenarios)`);
