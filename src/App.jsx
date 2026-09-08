@@ -2323,7 +2323,14 @@ function detectsConcreteStep(text) {
 // set and held, the same way duringOnboarding/closureDeclineCooldown already work, instead of
 // relying on the model to remember its own state shift.
 function detectsNoQuestionsRequest(text) {
-  return /(χωρίς\s+(τις\s+)?ερωτ|χωρίς\s+να\s+(με\s+)?ρωτ[αά]|μη[νν]?\s+(με\s+)?ρωτ[αά]ς|σταμάτα\s+(να\s+)?(με\s+)?ρωτ[αά]ς|βοηθ[ηή]σεις?\s+χωρίς|δεν\s+θέλω\s+(άλλη\s+)?ερώτηση|όχι\s+(άλλες\s+)?ερωτήσεις|λύση\s+όχι\s+ερωτ|πες\s+μου\s+τι\s+να\s+κάνω|τι\s+προτείνεις|δώσ'?ε\s+μου\s+(μια\s+)?λύση|θέλω\s+λύση|βοήθησέ\s+με\s+να\s+αποφασίσω|αρκετά\s+με\s+τις\s+ερωτ|πάμε\s+στο\s+ψητό|τι\s+θα\s+έκανες\s+εσύ|δώσ'?ε\s+μου\s+κατευθ|γυρίζουμε\s+γύρω|δεν\s+πάμε\s+πουθενά|χάνω\s+τον\s+χρόνο\s+μου|το\s+ίδιο\s+λέμε|δεν\s+με\s+βοηθάς|βαρέθηκα\s+τις\s+ερωτ|κάνε\s+κάτι\s+επιτέλους|τι\s+λες\s+να\s+κάνω|με\s+κούρασες|ούτε\s+εσύ\s+βοηθάς|δεν\s+βοηθάει\s+αυτό)/i.test(text || "");
+  return /(χωρίς\s+(τις\s+)?ερωτ|χωρίς\s+να\s+(με\s+)?ρωτ[αά]|μη[νν]?\s+(με\s+)?ρωτ[αά]ς|σταμάτα\s+(να\s+)?(με\s+)?ρωτ[αά]ς|βοηθ[ηή]σεις?\s+χωρίς|δεν\s+θέλω\s+(άλλη\s+)?ερώτηση|όχι\s+(άλλες\s+)?ερωτήσεις|λύση\s+όχι\s+ερωτ|πες\s+μου\s+τι\s+να\s+κάνω|τι\s+προτείνεις|δώσ'?ε\s+μου\s+(μια\s+)?λύση|θέλω\s+λύση|βοήθησέ\s+με\s+να\s+αποφασίσω|αρκετά\s+με\s+τις\s+ερωτ|πάμε\s+στο\s+ψητό|τι\s+θα\s+έκανες\s+εσύ|δώσ'?ε\s+μου\s+κατευθ|βαρέθηκα\s+τις\s+ερωτ|κάνε\s+κάτι\s+επιτέλους|τι\s+λες\s+να\s+κάνω)/i.test(text || "");
+}
+
+// F011: intent routing split from detectsNoQuestionsRequest above — these 8 patterns describe the
+// user experiencing the CURRENT METHOD as stalled (repetition, wasted time, "you're not helping"),
+// a distinct intent from asking AURA to skip straight to an answer.
+function detectsMethodFailureSignal(text) {
+  return /(γυρίζουμε\s+γύρω|δεν\s+πάμε\s+πουθενά|χάνω\s+τον\s+χρόνο\s+μου|το\s+ίδιο\s+λέμε|δεν\s+με\s+βοηθάς|με\s+κούρασες|ούτε\s+εσύ\s+βοηθάς|δεν\s+βοηθάει\s+αυτό)/i.test(text || "");
 }
 
 // PASSIVE MEASUREMENT ONLY (Measurement Before Modification — the founder's own standing
@@ -3058,6 +3065,8 @@ export default function AURAv2() {
   // questioned, this stays true — held by code, not by the model's own attention across turns —
   // until natural closure. Prevents the drift-back-to-questions failure documented above.
   const informationModeActive = useRef(false);
+  const methodFailureHint = useRef(false); // F011: one-shot signal that the user's words this turn
+  // named the CURRENT APPROACH as stalled (not a request for an answer, which is informationMode's territory).
   const submittingRef    = useRef(false); // RT-15: synchronous double-submit guard
   const currentSessionId   = useRef(Date.now().toString(36));
   const sessionStartTime   = useRef(Date.now());
@@ -3262,6 +3271,10 @@ export default function AURAv2() {
         ? `\n[CODE-VERIFIED: this turn matches CLARITY PIVOT's "${clarityPivotHint.current}" case above (detected structurally, not psychologically inferred) — use that specific response, not a generic one.]\n`
         : '';
       if (clarityPivotHint.current) clarityPivotHint.current = null; // one-shot, applies only to this turn
+      const methodFailureCtx = methodFailureHint.current
+        ? `\n[CODE-VERIFIED: the user's own words this turn signal the CURRENT APPROACH is not producing movement for them — they are NOT asking for an answer (informationMode's territory, which did not fire here). This is CONVERSATION STRATEGY SWITCH's Level 1 trigger. TREAT AS CANDIDATE SIGNAL, NOT VERDICT: it means the previous interaction mode stopped producing movement, never that AURA failed or that you should apologize or evaluate your own performance. Per LEAP PERMISSION above: simply move, no meta-commentary, do not announce the switch. WHAT IT REQUIRES: do not produce another question from the same family, reworded. Switch to a genuinely different family — per EXPLORATION COVERAGE PRINCIPLE prefer one not yet used this session. Families, named here so no recall is needed: Contradiction Detection, Premise Inversion / Assumption Surfacing, VERBATIM COST COLLISION, THIRD TRIGGER's perspective form, EXPRESSIVE VARIATION's counterfactual, the CHALLENGE lens, the PERSPECTIVE lens. WHAT IT IS NOT: not permission to give advice, propose solutions, or supply strategy — that is the exact No-Advice violation this switch exists to prevent. The output is a different QUESTION, not an answer. If enough material already exists, showing the shape of what they gave (PROBLEM STRUCTURE MAP / ROAD DISCOVERY) is also valid. ANTI-THRASHING GUARD still applies: if several switches in a row produced no movement, stop switching and use GENERAL EXIT CRITERIA instead.]\n`
+        : '';
+      if (methodFailureHint.current) methodFailureHint.current = false;
       // Hybrid backstop for SELF-REPETITION CHECK (Self-BLEU-inspired, see detectAssistantSelfRepetition
       // above) — checks AURA's own last 2 replies for lexical or opening-phrase similarity, purely
       // structural, never about the user. Checked against msgs (prior turns) before this turn's reply
@@ -3286,7 +3299,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
       // (1) informational background, (2) situational signals, (3) hard constraints last.
       const dynamicSuffix = [
         memCtx, profileCtx, demoCtx, informationModeCtx, explicitPauseCtx, entryDoorCtx,
-        coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, userStagnationCtx, tensionCtx,
+        coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx,
         gatesCtx, closingDriftCtx, firstReplyFloorCtx,
       ].filter(Boolean).join('\n');
       // PROTOCOL COLLISION LOGGER (red-team gap: nothing recorded when two or more families fired on
@@ -3299,7 +3312,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         const fired = Object.entries({
           memCtx, profileCtx, demoCtx, informationModeCtx, explicitPauseCtx, entryDoorCtx,
           coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx,
-          clarityPivotCtx, selfRepetitionCtx, userStagnationCtx, tensionCtx, gatesCtx, closingDriftCtx,
+          clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx, gatesCtx, closingDriftCtx,
           firstReplyFloorCtx,
         }).filter(([, v]) => v).map(([k]) => k);
         if (fired.length >= 2) {
@@ -3602,6 +3615,9 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
       // State-machine fix: once set, stays set — does not silently revert mid-conversation.
       if (!informationModeActive.current && detectsNoQuestionsRequest(lastUserMsg)) {
         informationModeActive.current = true;
+      }
+      if (!informationModeActive.current && detectsMethodFailureSignal(lastUserMsg)) {
+        methodFailureHint.current = true;
       }
 
       // Termination decision — extracted to decideTermination() for testability, same logic as before.
