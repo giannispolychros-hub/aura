@@ -2330,7 +2330,7 @@ function detectsNoQuestionsRequest(text) {
 // user experiencing the CURRENT METHOD as stalled (repetition, wasted time, "you're not helping"),
 // a distinct intent from asking AURA to skip straight to an answer.
 function detectsMethodFailureSignal(text) {
-  return /(γυρίζουμε\s+γύρω|δεν\s+πάμε\s+πουθενά|χάνω\s+τον\s+χρόνο\s+μου|το\s+ίδιο\s+λέμε|δεν\s+με\s+βοηθάς|με\s+κούρασες|ούτε\s+εσύ\s+βοηθάς|δεν\s+βοηθάει\s+αυτό)/i.test(text || "");
+  return /(γυρίζουμε\s+γύρω|δεν\s+πάμε\s+πουθενά|χάνω\s+τον\s+χρόνο\s+μου|το\s+ίδιο\s+λέμε|δεν\s+με\s+βοηθάς|με\s+κούρασες|ούτε\s+εσύ\s+βοηθάς|δεν\s+βοηθάει\s+αυτό|δεν\s+(βρ[ήη]καμε|βγ[άα]λαμε)\s+(και\s+)?τ[ίι]ποτα|δεν\s+βγ[άα]ζουμε\s+(κ[άα]τι|[άα]κρη|τ[ίι]ποτα)|τρ[ύυ]πα\s+στο\s+νερ[όο]|δεν\s+καταλ[ήη]ξαμε|χ[άα]σαμε\s+τον\s+χρ[όο]νο\s+μας|δεν\s+προχωρ[άα]με|μ[άα]ταια)/i.test(text || "");
 }
 
 // PASSIVE MEASUREMENT ONLY (Measurement Before Modification — the founder's own standing

@@ -35,5 +35,45 @@ methodFailurePhrases.forEach(msg => {
   assert(`F011: '${msg}' does NOT fire detectsNoQuestionsRequest`, !detectsNoQuestionsRequest(msg));
 });
 
+// WIDENED NET (real-transcript evidence: "δεν βρήκαμε και τίποτα... μια τρύπα στο νερό" and
+// "τα αναλύσαμε όλα και δεν βγάζουμε κάτι" — genuine method-failure signals the original net
+// missed). One accented and one unaccented variant per new pattern, since the existing patterns
+// are accent-sensitive and this is the known weakness being addressed here.
+const widenedNetPhrases = [
+  "δεν βρήκαμε τίποτα", "δεν βρηκαμε τιποτα",
+  "δεν βγάλαμε και τίποτα",
+  "δεν βγάζουμε άκρη", "δεν βγαζουμε τιποτα",
+  "τρύπα στο νερό", "τρυπα στο νερο",
+  "δεν καταλήξαμε", "δεν καταληξαμε",
+  "χάσαμε τον χρόνο μας", "χασαμε τον χρονο μας",
+  "δεν προχωράμε", "δεν προχωραμε",
+  "μάταια", "ματαια",
+];
+widenedNetPhrases.forEach(msg => {
+  assert(`WIDENED NET: '${msg}' fires detectsMethodFailureSignal`, detectsMethodFailureSignal(msg));
+  assert(`WIDENED NET: '${msg}' does NOT fire detectsNoQuestionsRequest`, !detectsNoQuestionsRequest(msg));
+});
+
+// The two real, full transcript sentences that motivated this widening.
+const realTranscriptSentences = [
+  "δεν βρήκαμε και τίποτα τι έπαθες με τι κάναμε τίποτα δεν καταλάβαμε μία τρύπα στο νερό",
+  "δεν νομίζω ότι έχει κάποιο νόημα τα αναλύσαμε όλα και δεν βγάζουμε κάτι",
+];
+realTranscriptSentences.forEach(msg => {
+  assert(`REAL TRANSCRIPT: '${msg}' fires detectsMethodFailureSignal`, detectsMethodFailureSignal(msg));
+  assert(`REAL TRANSCRIPT: '${msg}' does NOT fire detectsNoQuestionsRequest`, !detectsNoQuestionsRequest(msg));
+});
+
+// NEGATIVE CONTROLS: prove the A/B split still holds after widening the net. "τι προτείνεις"
+// and "θέλω λύση" belong to detectsNoQuestionsRequest's own territory (information-request,
+// not method-failure) — they must still fire there and must NOT fire the widened net.
+assert("A/B split: 'τι προτείνεις' still fires detectsNoQuestionsRequest", detectsNoQuestionsRequest("τι προτείνεις"));
+assert("A/B split: 'τι προτείνεις' does NOT fire detectsMethodFailureSignal", !detectsMethodFailureSignal("τι προτείνεις"));
+assert("A/B split: 'θέλω λύση' still fires detectsNoQuestionsRequest", detectsNoQuestionsRequest("θέλω λύση"));
+assert("A/B split: 'θέλω λύση' does NOT fire detectsMethodFailureSignal", !detectsMethodFailureSignal("θέλω λύση"));
+// General neutral phrase — must not fire either detector.
+assert("Neutral: 'δεν ξέρω τι να κάνω' does NOT fire detectsMethodFailureSignal", !detectsMethodFailureSignal("δεν ξέρω τι να κάνω"));
+assert("Neutral: 'δεν ξέρω τι να κάνω' does NOT fire detectsNoQuestionsRequest", !detectsNoQuestionsRequest("δεν ξέρω τι να κάνω"));
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);
