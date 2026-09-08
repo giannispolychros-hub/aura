@@ -67,6 +67,7 @@ const CHECKED = [
   { name: 'detectUserStagnation',            needle: 'userStagnationCtx = detectUserStagnation(' },
   { name: 'detectAssistantSelfRepetition',   needle: 'selfRepCheck = detectAssistantSelfRepetition(' },
   { name: 'detectsMethodFailureSignal',      needle: 'detectsMethodFailureSignal(lastUserMsgForMethodFailure.content)' },
+  { name: 'detectsConcreteStep',             needle: 'detectsConcreteStep(lastUserMsgForConcreteStep.content)' },
 ];
 
 for (const { name, needle } of CHECKED) {
@@ -86,9 +87,6 @@ for (const { name, needle } of CHECKED) {
 //   resetSession(), never one-shot). Moving its detection pre-API would change what the very
 //   first reply after the trigger phrase looks like, not merely when the existing behavior
 //   arrives — a real UX decision, out of scope today.
-//
-// - detectsConcreteStep — user-side, currently one-turn-late (post-API), same class of fix as
-//   detectsMethodFailureSignal above, but not yet moved — pending its own follow-up pass.
 //
 // - detectsCoreReadinessAsked / detectsShiftCheckAsked / detectsFriendPerspectiveAsked /
 //   detectsStakesAsked / detectsAnchorsInvited — these read `text`, the model's OWN reply

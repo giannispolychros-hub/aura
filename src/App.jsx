@@ -3203,6 +3203,17 @@ export default function AURAv2() {
         methodFailureHint.current = true;
       }
     }
+    // TIMING FIX (causal-inventory audit, same follow-up pass as detectsMethodFailureSignal above):
+    // detectsConcreteStep previously ran after the API call, inside the post-response tracking
+    // block below, so gatesCtx/coreReadinessCtx (built before the API call) only ever saw this
+    // turn's concrete-step statement starting the NEXT turn. Moved here, same pattern as
+    // binaryOppositionCount/detectsMethodFailureSignal above. Guard condition unchanged.
+    {
+      const lastUserMsgForConcreteStep = [...msgs].reverse().find(m => m.role === "user");
+      if (!concreteStepStated.current && lastUserMsgForConcreteStep && detectsConcreteStep(lastUserMsgForConcreteStep.content)) {
+        concreteStepStated.current = true;
+      }
+    }
     // Context Refresh: reinject core identity reminder every 10 messages
     const msgCount = msgs.filter(m => m.role === 'user').length;
     const contextRefresh = msgCount > 0 && msgCount % 10 === 0
@@ -3595,11 +3606,6 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         if (memory.storageEnabled) saveMemory(updatedWithTraj);
       }
 
-      // Clarity + Ownership Scale gate — passive tracking only, updated from what was
-      // actually said this turn (user's message and AURA's own reply), never inferred.
-      if (!concreteStepStated.current && detectsConcreteStep(lastUserMsg)) {
-        concreteStepStated.current = true;
-      }
       // CAPTURE step (runs first, using flags set by the PRIOR turn): if AURA asked the early
       // clarity or late clarity+ownership question last turn, this turn's user message is the
       // answer — extract the number(s) now, before checking whether THIS turn's reply asks
