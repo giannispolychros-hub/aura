@@ -4143,6 +4143,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
     closureDeclineCooldown.current = 0;
     reflectionDelivered.current = false;
     informationModeActive.current = false;
+    methodFailureHint.current = false;
     violationCounts.current = {};
     window.__auraLastCollision = null;
     setValueUnlocked(false);
