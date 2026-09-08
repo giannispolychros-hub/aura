@@ -2161,21 +2161,36 @@ function isModelPreClosing(text) {
   return matchesClosingWord(t);
 }
 // F015: narrower sibling of matchesClosingWord — same technique (NFD normalize, strip accents,
-// lowercase, collapse doubled letters, reject no-letter input, then strip every known word/
-// punctuation and require nothing remains), but a deliberately SMALLER wordlist: only genuine
-// termination declarations and farewells, never bare acknowledgements (ναι/οκ/κατάλαβα/εντάξει/
-// σωστό/ακριβώς/νομίζω ναι/πιστεύω ναι/φτάσαμε — those stay candidates for a hold, never an
-// unconditional override). The "strip known words, require the remainder is empty" mechanic is
-// what makes this safe against substring false-positives ("στο τέλος της μέρας θα δούμε", "νομίζω
+// lowercase, collapse doubled letters, reject no-letter input), but a deliberately SMALLER
+// wordlist: only genuine termination declarations and farewells count as closure. The "strip
+// known words, require the remainder is empty" mechanic is what makes this safe against substring
+// false-positives ("στο τέλος της μέρας θα δούμε", "νομίζω
 // τελειώσαμε προς το παρόν, αλλά θέλω να πω κάτι ακόμα") — a message is only explicit closure if
-// it consists of NOTHING BUT closing words, exactly as matchesClosingWord already requires.
+// EVERYTHING in it reduces to closing words and/or acknowledgement noise, exactly as
+// matchesClosingWord requires for its own wordlist.
+// NOISE-TOLERANT (real-transcript bug: "Εντάξει, κλείνουμε" returned false, because the original version
+// required the ENTIRE message to be nothing but termination words — one bare acknowledgement next
+// to a genuine termination declaration was enough to fail the whole message. Fixed in two steps:
+// (1) at least one genuine termination declaration must be present somewhere — this is the check
+// that keeps false positives out, unchanged in spirit from before; (2) once that is confirmed,
+// acknowledgement/filler words (ναι/οκ/κατάλαβα/εντάξει/σωστό/ακριβώς/νομίζω ναι/πιστεύω ναι/φτάσαμε/
+// ωραία/καλά/εδώ) and punctuation may surround it as noise and are stripped too — but noise
+// alone, with no termination declaration anywhere, still fails at step (1), exactly as before.
 function isExplicitClosure(text) {
   const t = String(text == null ? "" : text).trim();
   if (!t) return false;
   let normalized = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   normalized = normalized.replace(/([a-zα-ω])\1+/gi, "$1");
   if (!/[a-zα-ωά-ώ0-9]/i.test(normalized)) return false;
-  const stripped = normalized.replace(/αρκετα για σημερα|ας το αφησουμε εδω|αυτο ηταν|τα λεμε|καλη συνεχεια|καλο βραδυ|εληξε|κλεινουμε|κλεινω|τελειωσαμε|τελος|σταματαμε|φευγω|παω|φτανει|αντιο|γεια|καληνυχτα|μπαι|bye|ευχαριστω|επισης|παρομοιως|[.,!?;\s]/gi, "");
+  // Genuine termination declarations — unchanged wordlist, still the only words that count as an
+  // actual closing statement.
+  if (!/αρκετα για σημερα|ας το αφησουμε εδω|αυτο ηταν|τα λεμε|καλη συνεχεια|καλο βραδυ|εληξε|κλεινουμε|κλεινω|τελειωσαμε|τελος|σταματαμε|φευγω|παω|φτανει|αντιο|γεια|καληνυχτα|μπαι|bye|ευχαριστω|επισης|παρομοιως/i.test(normalized)) {
+    return false;
+  }
+  const stripped = normalized
+    .replace(/αρκετα για σημερα|ας το αφησουμε εδω|αυτο ηταν|τα λεμε|καλη συνεχεια|καλο βραδυ|εληξε|κλεινουμε|κλεινω|τελειωσαμε|τελος|σταματαμε|φευγω|παω|φτανει|αντιο|γεια|καληνυχτα|μπαι|bye|ευχαριστω|επισης|παρομοιως/gi, "")
+    .replace(/νομιζω ναι|πιστευω ναι|καταλαβα|ενταξει|ακριβως|φτασαμε|σωστο|ωραια|καλα|εδω|ναι|οκ/gi, "")
+    .replace(/[.,!?;\s]/g, "");
   return stripped.length === 0;
 }
 

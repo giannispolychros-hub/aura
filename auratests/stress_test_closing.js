@@ -185,4 +185,23 @@ check("EXPLICIT-POS-εληξε-2", "isExplicitClosure('εληξε') (unaccented)
 check("EXPLICIT-SUBSTRING-3", "isExplicitClosure('έληξε η σύμβασή μου') is false (literal contract-expiry sentence, not a closing declaration)",
   isExplicitClosure("έληξε η σύμβασή μου") === false);
 
+// NOISE-TOLERANT CLOSURE (real-transcript bug, today: user wrote "Εντάξει, κλείνουμε" and AURA
+// answered with a new question instead of closing. Root cause: isExplicitClosure's original
+// "strip every known word, require the remainder is empty" mechanic treated "εντάξει" as an
+// unknown word same as any real content — one bare acknowledgement sitting next to a genuine
+// termination declaration was enough to make the whole message fail. Fixed to require at least
+// one genuine termination declaration is PRESENT, then allow acknowledgement/filler words and
+// punctuation to be stripped as noise around it — but noise alone, with no termination word at
+// all, must still fail exactly as before (covered by the untouched negatives above).
+const explicitClosureNoisePositives = [
+  "Εντάξει, κλείνουμε", "Ναι, τέλος", "Οκ, τα λέμε", "Καλά, φεύγω", "Εντάξει ευχαριστώ",
+  "Κλείνουμε.", "Ωραία, κλείνουμε εδώ",
+];
+explicitClosureNoisePositives.forEach(msg => check("EXPLICIT-NOISE-POS-" + msg, `isExplicitClosure('${msg}') is true (genuine termination word present, acknowledgement is just noise around it)`, isExplicitClosure(msg) === true));
+
+// Two or more acknowledgements combined, with NO genuine termination declaration anywhere, must
+// still fail — noise alone, however much of it, is never sufficient by itself.
+const explicitClosureNoiseOnlyNegatives = ["Ναι εντάξει", "Οκ κατάλαβα"];
+explicitClosureNoiseOnlyNegatives.forEach(msg => check("EXPLICIT-NOISE-NEG-" + msg, `isExplicitClosure('${msg}') is false (acknowledgements only, no genuine termination word)`, isExplicitClosure(msg) === false));
+
 console.log(`\n${pass} passed, ${fail} failed (out of ${pass + fail} scenarios)`);
