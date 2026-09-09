@@ -3408,6 +3408,39 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         ...(dynamicSuffix ? [{ type: "text", text: dynamicSuffix }] : []),
       ];
       const rawTextWithTags = await callAura([...contextRefresh, ...msgs], system);
+      // DIAGNOSTIC SHADOW TRACE — road-map extraction chain (purely observational, zero behavioural
+      // effect). Added because the ΔΡΟΜΟΣ/ΚΕΡΔΙΖΕΙΣ/ΚΟΣΤΙΖΕΙ map never appeared across 5 real
+      // sessions, and the existing logs could not distinguish "the model never produced one" from
+      // "the model produced one and something downstream destroyed it": [AURA outcome] below only
+      // fires when 2+ ctx collided and truncates at 110 chars, [AURA VIOLATION] only fires on a
+      // violation and truncates at 130 — a map is longer than both. This prints the untouched raw
+      // reply, then walks the same three transformations the real flow applies further down,
+      // counting roads at each step so the exact step that loses them is visible.
+      // STRICTLY SHADOW: every value is computed into its own _trace* local, nothing here is read
+      // by the real flow, no existing transformation is reordered or reused, and the whole block is
+      // wrapped so a diagnostic can never affect a session — same instrumentation principle as the
+      // collision logger above. parseRoadMap's own /g regex is declared inside that function, so a
+      // fresh RegExp (lastIndex 0) is built per call and these three calls cannot interfere.
+      try {
+        console.log('[AURA RAW]', rawTextWithTags);
+        const _traceRoads = t => { const p = parseRoadMap(t); return p ? p.roads.length : 0; };
+        // Labels in ANY form: asterisks removed first, accented capitals and lowercase both allowed.
+        const _traceHasLabels = /ΔΡ[ΟΌ]ΜΟΣ|ΚΕΡΔ[ΙΊ]ΖΕΙΣ|ΚΟΣΤ[ΙΊ]ΖΕΙ/i.test(String(rawTextWithTags || '').replace(/\*/g, ''));
+        // Mirrors the real chain at rawText/text below, on a throwaway copy. Deliberately uses the
+        // GENERIC hidden-tag pattern already used by [AURA outcome] and detectOutputViolation just
+        // below, not copies of the two specific tag regexes: a diagnostic must not register as a
+        // new parse site in the [[EXIT]]/[[EARLY_WORD]] prompt-code contract that
+        // test_tag_contract_integrity.js guards. Effect on road parsing is identical — both tags
+        // are removed either way, and only whitespace around them differs.
+        const _traceAfterTags = String(rawTextWithTags || '').replace(/\s*\[\[[^\]]*\]\]\s*/g, "\n").trim();
+        const _traceAfterStrip = stripAraDeclarative(_traceAfterTags);
+        console.log('[AURA ROAD TRACE]', {
+          rawHasLabels: _traceHasLabels,
+          parseRaw: _traceRoads(rawTextWithTags),
+          parseAfterTags: _traceRoads(_traceAfterTags),
+          parseAfterStrip: _traceRoads(_traceAfterStrip),
+        });
+      } catch (e) { /* diagnostics must never affect the session */ }
       try {
         if (window.__auraLastCollision && window.__auraLastCollision.turn === msgCount) {
           console.log('[AURA outcome] turn', msgCount, '| produced:',
