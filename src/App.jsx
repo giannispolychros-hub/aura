@@ -3071,6 +3071,7 @@ export default function AURAv2() {
   const lastChallengeAt  = useRef(-99);
   const compressionCount = useRef(0);
   const violationCounts = useRef({}); // per-session tally of detectOutputViolation categories, debug-panel only
+  const roadTraceLast = useRef(null); // last turn's road-map trace counters (numbers/booleans only), debug-panel only
   // Debug panel gate — read once from the URL, never re-derived on later renders/navigation.
   const debugMode = useRef(typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1');
   // RT-hardening: replaces text-based detection ("does the model's reply say 'το κρατάω'?")
@@ -3440,12 +3441,17 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         // are removed either way, and only whitespace around them differs.
         const _traceAfterTags = String(rawTextWithTags || '').replace(/\s*\[\[[^\]]*\]\]\s*/g, "\n").trim();
         const _traceAfterStrip = stripAraDeclarative(_traceAfterTags);
-        console.log('[AURA ROAD TRACE]', {
+        // Same values, computed once: logged to the console as before, and kept on a ref so the
+        // ?debug=1 panel can show them too — the browser console is unreachable on mobile, which
+        // is where these sessions actually happen. Counters and one boolean only, never content.
+        const _traceOut = {
           rawHasLabels: _traceHasLabels,
           parseRaw: _traceRoads(rawTextWithTags),
           parseAfterTags: _traceRoads(_traceAfterTags),
           parseAfterStrip: _traceRoads(_traceAfterStrip),
-        });
+        };
+        console.log('[AURA ROAD TRACE]', _traceOut);
+        roadTraceLast.current = _traceOut;
       } catch (e) { /* diagnostics must never affect the session */ }
       try {
         if (window.__auraLastCollision && window.__auraLastCollision.turn === msgCount) {
@@ -4245,6 +4251,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
     informationModeActive.current = false;
     methodFailureHint.current = false;
     violationCounts.current = {};
+    roadTraceLast.current = null;
     window.__auraLastCollision = null;
     setValueUnlocked(false);
     setIntroChoice(null);
@@ -4735,6 +4742,9 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
               Object.entries(violationCounts.current).map(([k, v]) => (
                 <div key={k}>{k}: {v}</div>
               ))
+            )}
+            {roadTraceLast.current && (
+              <div>road: labels={roadTraceLast.current.rawHasLabels ? "Y" : "N"} raw={roadTraceLast.current.parseRaw} tags={roadTraceLast.current.parseAfterTags} strip={roadTraceLast.current.parseAfterStrip}</div>
             )}
           </div>
         )}
