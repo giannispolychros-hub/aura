@@ -3422,7 +3422,13 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
       // collision logger above. parseRoadMap's own /g regex is declared inside that function, so a
       // fresh RegExp (lastIndex 0) is built per call and these three calls cannot interfere.
       try {
-        console.log('[AURA RAW]', rawTextWithTags);
+        // GATED ON ?debug=1, unlike the counters below: this is the one line here that prints
+        // actual conversation content, and this file already commits to the opposite by name —
+        // see the ΑΡΑ measurement log further down, "logs NO conversation content ... same privacy
+        // caution already established for this app applies even to local, ephemeral browser
+        // console output". The road counters stay unconditional precisely because they carry
+        // numbers and booleans only, never a word the user or AURA wrote.
+        if (debugMode.current) console.log('[AURA RAW]', rawTextWithTags);
         const _traceRoads = t => { const p = parseRoadMap(t); return p ? p.roads.length : 0; };
         // Labels in ANY form: asterisks removed first, accented capitals and lowercase both allowed.
         const _traceHasLabels = /ΔΡ[ΟΌ]ΜΟΣ|ΚΕΡΔ[ΙΊ]ΖΕΙΣ|ΚΟΣΤ[ΙΊ]ΖΕΙ/i.test(String(rawTextWithTags || '').replace(/\*/g, ''));
