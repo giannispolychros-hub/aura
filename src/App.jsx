@@ -2698,6 +2698,49 @@ function detectUserStagnation(messages) {
   const anyEmpty = recent.some(m => NO_PROGRESS.test(m.content || ""));
   return { stagnant: (newRatio < 0.25 && shrinking) || (bothShort && anyEmpty) };
 }
+// ONE-TIME CTX DELIVERY (live-session finding: the three-beat ΗΡΘΕΣ ΜΕ/ΒΡΗΚΕΣ/ΦΕΥΓΕΙΣ ΜΕ block
+// appeared TWICE in one session even though the prompt says "NO SECOND THREE-BEAT" explicitly.
+// Cause: shiftCheckConfirmed is deliberately one-way per session — other mechanisms read it — but
+// shiftCheckCtx, which is built from it, was re-injected on EVERY subsequent turn, still saying
+// "the user JUST confirmed... proceed now to the three-beat structure". Three turns later that
+// sentence is simply false, and it sits in the highest-attention position (end of prompt) while
+// the prohibition it contradicts is prompt text 12% into a 290KB document. The FACT must persist;
+// only the DIRECTIVE must stop repeating — which is what this does. Same pattern clarityPivotCtx
+// and methodFailureCtx already use inline; those keep their own one-shot clears and are not
+// routed through here.
+//
+// WHY A BUDGET INSTEAD OF A PLAIN ONE-SHOT — shiftCheckCtx specifically needs 2, not 1: its text
+// commands a TWO-STEP sequence — first ask "Με τι μπήκες εδώ... και με τι φεύγεις τώρα;", then,
+// once the user has answered THAT, compose the three-beat. Those land on two different turns, so
+// a single emission would cover the question and leave the three-beat itself unsupported —
+// trading a duplicated three-beat for a possibly absent one, which is the worse failure. The code
+// cannot simply detect which of the two steps is pending: detectsShiftCheckAsked above matches
+// only the FIRST question ("νιώθεις ότι κάτι άλλαξε..."), and there is no detector anywhere in
+// this file for the second one ("με τι μπήκες... με τι φεύγεις"). Writing that detector is the
+// real fix and is deliberately NOT built here — it is new detection plus new state, a larger
+// change than this one; recorded as pending so it is a decision, not an oversight.
+//
+// TWO KNOWN GAPS THIS BUDGET DOES NOT CLOSE, stated plainly so nobody re-derives them later:
+//   (1) CROSS-CHECK FIRST path (STATE SHIFT RECOGNITION in the prompt): when First Insight Mirror
+//       already named the shift, the prompt says to go straight to composing the beats — step one
+//       never happens, the three-beat lands on emission 1, and emission 2 is surplus and can ask
+//       for a second three-beat. One surplus turn instead of every remaining turn: much smaller
+//       than the bug being fixed, but not zero.
+//   (2) A vague answer to "με τι μπήκες" that needs a follow-up question pushes the three-beat to
+//       a third emission, past the budget — so that turn falls back to prompt-only support.
+// Both are closed only by the second-question detector described above, not by any budget value.
+//
+// Pure with respect to the ref it is given, and deliberately does NOT consume budget on an empty
+// ctxString: a turn where the signal is not active must not spend an emission the active turns need.
+function deliverOnce(ctxString, deliveredRef, budget) {
+  if (!ctxString) return '';
+  const max = (budget === undefined || budget === null) ? 1 : budget;
+  if (!deliveredRef || typeof deliveredRef !== 'object') return ctxString;
+  const used = deliveredRef.current || 0;
+  if (used >= max) return '';
+  deliveredRef.current = used + 1;
+  return ctxString;
+}
 function detectAssistantSelfRepetition(messages) {
   const assistantMsgs = messages.filter(m => m.role === "assistant");
   if (assistantMsgs.length < 2) return { repeated: false };
@@ -3083,6 +3126,12 @@ export default function AURAv2() {
   const coreReadinessConfirmed = useRef(false);
   const shiftCheckAsked        = useRef(false); // three-beat shift verification question just posed
   const shiftCheckConfirmed    = useRef(false); // one-way — user's own yes, per session
+  // Emission counters for deliverOnce above — these gate how many turns the DIRECTIVE is repeated.
+  // They never gate the facts themselves (shiftCheckConfirmed / friendPerspectiveConfirmed /
+  // binaryOppositionCount stay exactly as they were, one-way, read by other mechanisms).
+  const shiftCheckCtxDelivered        = useRef(0); // budget 2 — two-step sequence, see deliverOnce
+  const friendPerspectiveCtxDelivered = useRef(0); // budget 1 — single-turn directive
+  const premiseInversionCtxDelivered  = useRef(0); // budget 1 — single-turn directive
   const awaitingEarlyWord      = useRef(false); // set true right after [[EARLY_WORD:yes]] tag seen
   const earlyCapturedWord      = useRef(null);  // the user's verbatim answer, fed into Part 1 later
   const binaryOppositionCount  = useRef(0);     // structural repetition count, feeds PREMISE INVERSION reliability
@@ -3328,15 +3377,15 @@ export default function AURAv2() {
       const coreReadinessCtx = (coreReadinessConfirmed.current && !concreteStepStated.current)
         ? `\n[The user just confirmed readiness to name the core themselves — proceed now to ROOT RE-FOCUS's Step Two, the voice-first compression/paper invitation, in your own natural wording.]\n`
         : '';
-      const shiftCheckCtx = shiftCheckConfirmed.current
+      const shiftCheckCtx = deliverOnce(shiftCheckConfirmed.current
         ? `\n[The user just confirmed they feel something changed — proceed now to "Με τι μπήκες εδώ... και με τι φεύγεις τώρα;" and, once answered, the three-beat structure, per STATE SHIFT RECOGNITION above.]\n`
-        : '';
-      const premiseInversionCtx = (binaryOppositionCount.current >= 2)
+        : '', shiftCheckCtxDelivered, 2);
+      const premiseInversionCtx = deliverOnce((binaryOppositionCount.current >= 2)
         ? `\n[The user has now used binary-opposition phrasing ("ή...ή", "μπρος-πίσω" style) more than once this session — PREMISE INVERSION's own trigger condition is objectively confirmed, not something to re-judge from memory. If the two sides ALSO already have specific, named costs (not just repeated options), VERBATIM COST COLLISION is the more grounded choice — prefer it over PREMISE INVERSION whenever concrete costs are already in hand.]\n`
-        : '';
-      const friendPerspectiveCtx = friendPerspectiveConfirmed.current
+        : '', premiseInversionCtxDelivered, 1);
+      const friendPerspectiveCtx = deliverOnce(friendPerspectiveConfirmed.current
         ? `\n[The user just confirmed "yes, different" to the friend-perspective question — per CONTENT FIX above, this feeds directly into the Reflection Summary sequence now. Do NOT ask another exploratory question first — a real transcript showed exactly this mistake, continuing to probe after the pivot point had already surfaced.]\n`
-        : '';
+        : '', friendPerspectiveCtxDelivered, 1);
       const clarityPivotCtx = clarityPivotHint.current
         ? `\n[CODE-VERIFIED: this turn matches CLARITY PIVOT's "${clarityPivotHint.current}" case above (detected structurally, not psychologically inferred) — use that specific response, not a generic one.]\n`
         : '';
@@ -4227,6 +4276,9 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
     coreReadinessConfirmed.current = false;
     shiftCheckAsked.current = false;
     shiftCheckConfirmed.current = false;
+    shiftCheckCtxDelivered.current = 0;
+    friendPerspectiveCtxDelivered.current = 0;
+    premiseInversionCtxDelivered.current = 0;
     awaitingEarlyWord.current = false;
     earlyCapturedWord.current = null;
     binaryOppositionCount.current = 0;

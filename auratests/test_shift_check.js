@@ -60,5 +60,87 @@ const s3 = simulateShiftSequence([
 assert("CRITICAL: bare 'Ναι' to an unrelated question never confirms a shift without the real check having been asked first",
   s3[1].confirmed === false);
 
+// ── deliverOnce: the emission budget that stops shiftCheckCtx repeating forever ──
+// WHY HERE: this is the shift-check file, and shiftCheckCtx is the directive that caused the bug
+// deliverOnce exists to fix — a live session produced the three-beat ΗΡΘΕΣ ΜΕ/ΒΡΗΚΕΣ/ΦΕΥΓΕΙΣ ΜΕ
+// block TWICE, because shiftCheckConfirmed is (correctly) one-way for the whole session while the
+// ctx built from it was re-sent every single turn still saying "the user JUST confirmed". The fact
+// has to persist; the directive must not repeat. These tests pin the budget semantics themselves.
+eval(extract('deliverOnce'));
+
+const CTX = "[proceed now to the three-beat structure]";
+
+// budget 2 — shiftCheckCtx's real value: its text commands two steps landing on two different
+// turns (ask "με τι μπήκες... με τι φεύγεις", THEN compose the beats once answered). A budget of 1
+// would cover the question and leave the three-beat itself unsupported.
+const b2 = { current: 0 };
+assert("budget 2: 1st emission returns the directive",
+  deliverOnce(CTX, b2, 2) === CTX);
+assert("budget 2: 2nd emission still returns it (the three-beat turn is the one that needs it)",
+  deliverOnce(CTX, b2, 2) === CTX);
+assert("budget 2: 3rd emission returns empty — this is exactly the repetition that produced the duplicate three-beat",
+  deliverOnce(CTX, b2, 2) === "");
+assert("budget 2: counter stops at the budget, never runs away",
+  b2.current === 2);
+
+// budget 1 — friendPerspectiveCtx and premiseInversionCtx: single-turn directives.
+const b1 = { current: 0 };
+assert("budget 1: 1st emission returns the directive", deliverOnce(CTX, b1, 1) === CTX);
+assert("budget 1: 2nd emission returns empty",         deliverOnce(CTX, b1, 1) === "");
+assert("budget 1: counter is exactly 1",               b1.current === 1);
+
+// Empty input must NOT consume budget — the signal is inactive on this turn, and spending an
+// emission here would silently steal it from the turn that actually needs it.
+const bEmpty = { current: 0 };
+assert("empty ctx returns empty",
+  deliverOnce("", bEmpty, 2) === "");
+assert("CRITICAL: empty ctx does NOT consume budget",
+  bEmpty.current === 0);
+assert("after an inactive turn, the full budget is still available",
+  deliverOnce(CTX, bEmpty, 2) === CTX && bEmpty.current === 1);
+assert("null ctx also returns empty without consuming",
+  deliverOnce(null, { current: 0 }, 1) === "" );
+
+// Independence: each ctx carries its own counter, so one exhausting its budget never silences
+// another. All three wrapped ctx share this one function.
+const refA = { current: 0 }, refB = { current: 0 };
+deliverOnce(CTX, refA, 1);
+assert("refs are independent — exhausting one leaves the other untouched",
+  deliverOnce(CTX, refA, 1) === "" && deliverOnce(CTX, refB, 1) === CTX);
+
+// resetSession sets the counters back to 0; a new session must get the directive again.
+const reused = { current: 2 };
+assert("an exhausted counter stays silent until reset",
+  deliverOnce(CTX, reused, 2) === "");
+reused.current = 0; // what resetSession() does
+assert("after reset, the directive is delivered again for the new session",
+  deliverOnce(CTX, reused, 2) === CTX);
+
+// Default budget is 1 when omitted.
+const bDef = { current: 0 };
+assert("omitted budget defaults to 1",
+  deliverOnce(CTX, bDef) === CTX && deliverOnce(CTX, bDef) === "");
+
+// ── STRUCTURAL: the three ctx are actually wired to deliverOnce with the agreed budgets, and the
+// facts feeding them stay one-way. A value test on deliverOnce alone cannot prove either.
+const CODE = (() => {
+  const i = raw.indexOf('const AURA_CORE_PERSONALITY');
+  const s = raw.indexOf('`', i) + 1;
+  return raw.slice(0, i) + raw.slice(raw.indexOf('`;', s));
+})();
+assert("shiftCheckCtx is wired through deliverOnce with budget 2",
+  /const shiftCheckCtx = deliverOnce\(/.test(CODE) && /shiftCheckCtxDelivered,\s*2\)/.test(CODE));
+assert("friendPerspectiveCtx is wired through deliverOnce with budget 1",
+  /const friendPerspectiveCtx = deliverOnce\(/.test(CODE) && /friendPerspectiveCtxDelivered,\s*1\)/.test(CODE));
+assert("premiseInversionCtx is wired through deliverOnce with budget 1",
+  /const premiseInversionCtx = deliverOnce\(/.test(CODE) && /premiseInversionCtxDelivered,\s*1\)/.test(CODE));
+assert("CRITICAL: shiftCheckConfirmed stays one-way — the FACT is not made one-shot, only the directive",
+  (CODE.match(/shiftCheckConfirmed\.current = false/g) || []).length === 1);
+assert("CRITICAL: friendPerspectiveConfirmed stays one-way too",
+  (CODE.match(/friendPerspectiveConfirmed\.current = false/g) || []).length === 1);
+assert("clarityPivotCtx and methodFailureCtx keep their own inline one-shot clears, not routed through deliverOnce",
+  !/clarityPivotCtx = deliverOnce/.test(CODE) && !/methodFailureCtx = deliverOnce/.test(CODE) &&
+  /clarityPivotHint\.current = null/.test(CODE) && /methodFailureHint\.current = false/.test(CODE));
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed > 0 ? 1 : 0);
