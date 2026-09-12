@@ -2398,8 +2398,15 @@ function detectsPossibleAraPatternViolation(text) {
 // detector above still fires for that case, so real frequency data keeps accumulating on it too.
 function stripAraDeclarative(text) {
   return (text || "")
-    .replace(/\s*Άρα[^.]*\.\s*/gi, " ")
-    .replace(/\s*\bSo,?\s+(the\s+)?(real\s+)?(question|issue|problem)[^.]*\.\s*/gi, " ")
+    // CONTAINED TO ONE LINE (bug reproduced executably): [^.]* matches newlines in JS, and the
+    // surrounding \s* swallowed them too — so one "Άρα" deleted everything up to the next period
+    // however far below it was, and glued the surviving lines together. A complete two-road
+    // ΔΡΟΜΟΣ/ΚΕΡΔΙΖΕΙΣ/ΚΟΣΤΙΖΕΙ map became the empty string, which isBareEmojiOrAcknowledgment
+    // then turned into a bare "Τι σκέφτεσαι τώρα;" — the user's map replaced by a question. This
+    // is a sentence-level rule, so every part of the match now stays on its own line: [^.\n] for
+    // the body, [ \t] for the surrounding space. Same flaw, same fix, in the English pattern.
+    .replace(/[ \t]*Άρα[^.\n]*\.[ \t]*/gi, " ")
+    .replace(/[ \t]*\bSo,?[ \t]+(the[ \t]+)?(real[ \t]+)?(question|issue|problem)[^.\n]*\.[ \t]*/gi, " ")
     .trim();
 }
 
