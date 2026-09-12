@@ -95,5 +95,29 @@ for (const { name, needle } of CHECKED) {
 //   assistant message already present in `msgs`, instead of the freshly-generated `text`), a
 //   different kind of change than the ones this test protects.
 
+// ── ORDER WITHIN THE PRE-API BLOCK — detectsConcreteStep BEFORE coreReadinessCtx ──
+// Everything above proves detectors run before dynamicSuffix. This proves one ordering INSIDE that
+// block, because a specific suppression depends on it and nothing else would catch a move.
+//
+// WHY THIS ORDER IS DELIBERATE — read this before moving either line. coreReadinessCtx is built as
+// `coreReadinessConfirmed && !concreteStepStated`. Its directive invites the user to compress and
+// name their core. Once they have stated a concrete step ("θα το κάνω"), they have moved past
+// naming the core to naming an action, and inviting them back is going backwards. For the guard to
+// suppress the directive on the SAME turn the user names that step, concreteStepStated must
+// already be true when the ctx is built — which is exactly what this ordering guarantees.
+//
+// This is not theoretical. Before detectsConcreteStep was moved pre-API, the flag only flipped in
+// the post-API block, so coreReadinessCtx was still emitted on the very turn the user named their
+// step: the wrong reply at exactly the wrong moment. Move the detector call back below the ctx and
+// that behaviour returns silently — no exception, no other failing test, just a directive firing
+// one turn too late for the rest of the session.
+const concreteIdx = CODE.indexOf('detectsConcreteStep(lastUserMsgForConcreteStep.content)');
+const coreCtxIdx  = CODE.indexOf('const coreReadinessCtx =');
+assert('coreReadinessCtx declaration found in CODE', coreCtxIdx >= 0);
+assert('detectsConcreteStep runs BEFORE coreReadinessCtx is built (same-turn suppression depends on it)',
+  concreteIdx >= 0 && coreCtxIdx >= 0 && concreteIdx < coreCtxIdx);
+assert('The suppression guard itself is still in place on coreReadinessCtx',
+  /const coreReadinessCtx = \(coreReadinessConfirmed\.current && !concreteStepStated\.current\)/.test(CODE));
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

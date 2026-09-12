@@ -121,6 +121,38 @@ const bDef = { current: 0 };
 assert("omitted budget defaults to 1",
   deliverOnce(CTX, bDef) === CTX && deliverOnce(CTX, bDef) === "");
 
+// ── premiseInversionCtx's budget-2 SEMANTICS, not just its wiring ──
+// The wiring assertion below pins the number 2 in the source. These pin what 2 actually buys, so
+// the value cannot be changed to 1 "because the tests still pass". Why 2 and not 1: this ctx was
+// swept into the deliverOnce change because it shared the SHAPE of the duplicated-three-beat bug —
+// a directive re-sent every turn — not because it caused it; that came from shiftCheckCtx alone.
+// Budget 1 then cost real coverage: binaryOppositionCount is monotonic and never resets outside
+// resetSession, so one turn where the model did not act on the signal lost it for the whole
+// session. A second emission is safe here and is NOT safe for shiftCheckCtx, for two reasons that
+// do not transfer: this ctx's claim never goes stale ("has now used … more than once this session"
+// stays true, unlike "the user just confirmed"), and it commands no once-per-session structured
+// output, so there is no artifact that could be produced twice.
+const PIV_CTX = "[binary-opposition phrasing confirmed — PREMISE INVERSION trigger]";
+const piv = { current: 0 };
+assert("premiseInversion budget 2: 1st emission delivers",
+  deliverOnce(PIV_CTX, piv, 2) === PIV_CTX);
+assert("premiseInversion budget 2: 2nd emission ALSO delivers — this is the coverage budget 1 lost",
+  deliverOnce(PIV_CTX, piv, 2) === PIV_CTX);
+assert("premiseInversion budget 2: 3rd emission is silent",
+  deliverOnce(PIV_CTX, piv, 2) === "");
+assert("premiseInversion budget 2: every further emission stays silent, counter never runs away",
+  deliverOnce(PIV_CTX, piv, 2) === "" && deliverOnce(PIV_CTX, piv, 2) === "" && piv.current === 2);
+
+// A turn where the signal is inactive must not spend an emission the active turns need. With a
+// monotonic counter the condition is usually true once reached, but the guard has to hold anyway:
+// the ctx string is empty whenever the condition is false, and that must cost nothing.
+const pivGap = { current: 0 };
+assert("premiseInversion budget 2: an inactive turn (empty ctx) does NOT consume budget",
+  deliverOnce("", pivGap, 2) === "" && pivGap.current === 0);
+assert("premiseInversion budget 2: after inactive turns the full budget is still available",
+  deliverOnce(PIV_CTX, pivGap, 2) === PIV_CTX && deliverOnce(PIV_CTX, pivGap, 2) === PIV_CTX &&
+  deliverOnce(PIV_CTX, pivGap, 2) === "" && pivGap.current === 2);
+
 // ── STRUCTURAL: the three ctx are actually wired to deliverOnce with the agreed budgets, and the
 // facts feeding them stay one-way. A value test on deliverOnce alone cannot prove either.
 const CODE = (() => {
