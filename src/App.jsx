@@ -2403,6 +2403,14 @@ function stripAraDeclarative(text) {
     // however far below it was, and glued the surviving lines together. A complete two-road
     // ΔΡΟΜΟΣ/ΚΕΡΔΙΖΕΙΣ/ΚΟΣΤΙΖΕΙ map became the empty string, which isBareEmojiOrAcknowledgment
     // then turned into a bare "Τι σκέφτεσαι τώρα;" — the user's map replaced by a question. This
+    // WHAT THIS TRADE COSTS, stated so it reads as a decision rather than an oversight: a
+    // declarative that spans a line break ("Άρα το πραγματικό πρόβλημα\nείναι ο φόβος.") is no
+    // longer removed, because the removal now stops at the end of its own line. That is a real,
+    // narrow loss of ΑΡΑ-backstop coverage, accepted knowingly: the alternative — letting the match
+    // cross newlines — is what erased a complete road map down to the empty string. A missed
+    // multi-line "Άρα" leaves one declarative sentence standing; the unbounded version deleted the
+    // user's whole map and replaced it with a bare question. Widening this again requires knowing
+    // where the map region is, which this function deliberately does not know.
     // is a sentence-level rule, so every part of the match now stays on its own line: [^.\n] for
     // the body, [ \t] for the surrounding space. Same flaw, same fix, in the English pattern.
     .replace(/[ \t]*Άρα[^.\n]*\.[ \t]*/gi, " ")
@@ -3176,7 +3184,7 @@ export default function AURAv2() {
   // binaryOppositionCount stay exactly as they were, one-way, read by other mechanisms).
   const shiftCheckCtxDelivered        = useRef(0); // budget 2 — two-step sequence, see deliverOnce
   const friendPerspectiveCtxDelivered = useRef(0); // budget 1 — single-turn directive
-  const premiseInversionCtxDelivered  = useRef(0); // budget 1 — single-turn directive
+  const premiseInversionCtxDelivered  = useRef(0); // budget 2 — see the note above its ctx
   const awaitingEarlyWord      = useRef(false); // set true right after [[EARLY_WORD:yes]] tag seen
   const earlyCapturedWord      = useRef(null);  // the user's verbatim answer, fed into Part 1 later
   const binaryOppositionCount  = useRef(0);     // structural repetition count, feeds PREMISE INVERSION reliability
@@ -3419,15 +3427,33 @@ export default function AURAv2() {
         // command — only fires if the situation genuinely calls for it; the model still judges.
         return `\n[GATES DUE CHECK — if this is a genuine dilemma and any of these are still due and haven't naturally happened yet, they take priority over composing a closing move: ${due.join(' | ')}. SEMANTIC COVERAGE CHECK FIRST (audit-approved wiring, critical constraint): before treating any of these as due, check whether the user has already, in their own words, expressed the substance of what it asks — paraphrase counts (e.g. "με φοβίζει ότι θα χάσω την οικονομική μου ασφάλεια" already covers the stakes axis), but an implication that would require you to interpret or guess does NOT count as covered. If already covered this way, skip it silently rather than re-asking with the formal phrasing — a brief acknowledgment in your own next reply is enough, not a repeated formal question. If only partially covered, ask only about the specific remaining gap, not the whole thing again. If the user later corrects or contradicts what they said earlier, the newer statement governs — treat the axis as no longer covered by the earlier, now-superseded statement. Skip silently if not genuinely applicable (e.g. this is FACT/ANALYSIS or PRODUCT DISCUSSION without a real personal dilemma) — this is a reminder, not a forced insertion.]\n`;
       })();
+      // NOT A BUG, recorded so it is never "fixed" later: moving detectsConcreteStep pre-API made
+      // this suppression fire one turn EARLIER, and that is the correct direction. This directive
+      // invites the user to compress and name their core; once they have stated a concrete step
+      // ("θα το κάνω"), they have moved past naming the core to naming an action, and inviting
+      // them back is going backwards. Before the timing fix, concreteStepStated only flipped in the
+      // post-API block, so this ctx was still emitted on the very turn the user named their step —
+      // the wrong reply at exactly the wrong moment. The guard itself is unchanged and predates
+      // today; only its timing tightened.
       const coreReadinessCtx = (coreReadinessConfirmed.current && !concreteStepStated.current)
         ? `\n[The user just confirmed readiness to name the core themselves — proceed now to ROOT RE-FOCUS's Step Two, the voice-first compression/paper invitation, in your own natural wording.]\n`
         : '';
       const shiftCheckCtx = deliverOnce(shiftCheckConfirmed.current
         ? `\n[The user just confirmed they feel something changed — proceed now to "Με τι μπήκες εδώ... και με τι φεύγεις τώρα;" and, once answered, the three-beat structure, per STATE SHIFT RECOGNITION above.]\n`
         : '', shiftCheckCtxDelivered, 2);
+      // BUDGET 2, NOT 1 (corrected the same day it was introduced): this ctx was swept into the
+      // deliverOnce change because it shared the shape of the bug — a directive re-sent every turn
+      // — not because it caused it. The duplicated three-beat came from shiftCheckCtx alone. Two
+      // differences make a second emission safe here: its claim never goes stale ("has now used …
+      // more than once this session" stays true, unlike shiftCheckCtx's "just confirmed"), and it
+      // commands no once-per-session structured output, so there is no artifact that could appear
+      // twice. Budget 1 cost real coverage instead: binaryOppositionCount is monotonic and never
+      // resets, so a single missed turn lost a code-verified signal for the whole session. Two
+      // consecutive emissions widen that window while staying far inside the unbounded behaviour
+      // this replaced.
       const premiseInversionCtx = deliverOnce((binaryOppositionCount.current >= 2)
         ? `\n[The user has now used binary-opposition phrasing ("ή...ή", "μπρος-πίσω" style) more than once this session — PREMISE INVERSION's own trigger condition is objectively confirmed, not something to re-judge from memory. If the two sides ALSO already have specific, named costs (not just repeated options), VERBATIM COST COLLISION is the more grounded choice — prefer it over PREMISE INVERSION whenever concrete costs are already in hand.]\n`
-        : '', premiseInversionCtxDelivered, 1);
+        : '', premiseInversionCtxDelivered, 2);
       const friendPerspectiveCtx = deliverOnce(friendPerspectiveConfirmed.current
         ? `\n[The user just confirmed "yes, different" to the friend-perspective question — per CONTENT FIX above, this feeds directly into the Reflection Summary sequence now. Do NOT ask another exploratory question first — a real transcript showed exactly this mistake, continuing to probe after the pivot point had already surfaced.]\n`
         : '', friendPerspectiveCtxDelivered, 1);
@@ -3448,7 +3474,7 @@ export default function AURAv2() {
         ? `\n[CODE-VERIFIED: your own last 2 replies were structurally similar (${selfRepCheck.sameOpening ? "same opening phrase" : "high word overlap"}) — this is exactly the kind of "no genuine movement" evidence that should trigger the Strategy Change pillar (see STRATEGY SWITCH TIMING/WHICH FAMILY TO SWITCH TO above), not just a wording tweak. Draw from a region of INTERVENTION SPACE you have not used yet this session.]\n`
         : '';
       const userStagnationCtx = detectUserStagnation(msgs).stagnant
-        ? `\n[CODE-VERIFIED: the user's own last 2 replies introduced almost no new material AND became markedly shorter than their earlier ones. This is observed from what they actually wrote, not inferred about how they feel. It is direct evidence that the current approach has stopped producing movement FOR THEM — the strongest possible input to STRATEGY PRE-MORTEM GATE's "is this strategy failing here?" check. Do not wait for them to repeat themselves further or to say so explicitly: switch to a genuinely different region of INTERVENTION SPACE now, or if enough material already exists, stop gathering and reflect the shape of what they have already given (PROBLEM STRUCTURE MAP / VERBATIM COST COLLISION). AND IF GENUINELY DISTINCT DIRECTIONS ARE ALREADY IMPLIED BY WHAT THEY HAVE SAID, THIS IS THE MOMENT FOR ROAD DISCOVERY — THE ONE NAMED EXCEPTION's second activation path, with all its output tests (distinctness, consequence, level, completeness) and their QUALITY BAILOUT clauses intact. A user who has stopped producing new material is not asking for another question; they have given what they have. Showing them the actual shape of their decision space is the work. If the material genuinely does not support distinct directions, say that plainly instead — that is also a real finding, never a reason to invent one. TWO MOVES THAT BELONG SPECIFICALLY TO THIS MOMENT, available here and nowhere else (founder's framing — the product is not an AI that asks good questions, it is one that works out which question this person's thinking needs now; both of these become possible precisely because the evidence above shows the problem has stopped being understanding of the topic and has become inability to move): (a) ASK WHY IT IS STILL OPEN rather than asking more about the topic — "τι είναι αυτό που σε κάνει να το σκέφτεσαι ακόμα;" targets the stuckness itself, not its content, and it works on any subject because it presupposes nothing about what kind of problem this is. (b) QUESTION THE FRAME, but only where their own material contradicts it — when someone has described a decision at length while everything they actually said points elsewhere, "μήπως δεν προσπαθείς να αποφασίσεις αυτό, αλλά κάτι άλλο;" is legitimate. HARD CONDITION on (b): only when the evidence for the mismatch is in their own words, never as a general-purpose move, and always as a question they can reject outright — if they say no, that is the end of it and the frame stands. Offered as a question, never as an interpretation stated.]\n`
+        ? `\n[CODE-VERIFIED: the user's own last 2 replies introduced almost no new material AND became markedly shorter than their earlier ones. This is observed from what they actually wrote, not inferred about how they feel. It is direct evidence that the current approach has stopped producing movement FOR THEM — the strongest possible input to STRATEGY PRE-MORTEM GATE's "is this strategy failing here?" check. Do not wait for them to repeat themselves further or to say so explicitly: switch to a genuinely different region of INTERVENTION SPACE now, or if enough material already exists, stop gathering and reflect the shape of what they have already given (PROBLEM STRUCTURE MAP / VERBATIM COST COLLISION). AND IF GENUINELY DISTINCT DIRECTIONS ARE ALREADY IMPLIED BY WHAT THEY HAVE SAID, THIS IS THE MOMENT FOR ROAD DISCOVERY — THE ONE NAMED EXCEPTION's PATH TWO, with all its output tests (distinctness, consequence, level, completeness) and their QUALITY BAILOUT clauses intact. A user who has stopped producing new material is not asking for another question; they have given what they have. Showing them the actual shape of their decision space is the work. If the material genuinely does not support distinct directions, say that plainly instead — that is also a real finding, never a reason to invent one. TWO MOVES THAT BELONG SPECIFICALLY TO THIS MOMENT, available here and nowhere else (founder's framing — the product is not an AI that asks good questions, it is one that works out which question this person's thinking needs now; both of these become possible precisely because the evidence above shows the problem has stopped being understanding of the topic and has become inability to move): (a) ASK WHY IT IS STILL OPEN rather than asking more about the topic — "τι είναι αυτό που σε κάνει να το σκέφτεσαι ακόμα;" targets the stuckness itself, not its content, and it works on any subject because it presupposes nothing about what kind of problem this is. (b) QUESTION THE FRAME, but only where their own material contradicts it — when someone has described a decision at length while everything they actually said points elsewhere, "μήπως δεν προσπαθείς να αποφασίσεις αυτό, αλλά κάτι άλλο;" is legitimate. HARD CONDITION on (b): only when the evidence for the mismatch is in their own words, never as a general-purpose move, and always as a question they can reject outright — if they say no, that is the end of it and the frame stands. Offered as a question, never as an interpretation stated.]\n`
         : '';
       const entryDoorCtx = entryDoorRef.current
         ? `\n[THE ENTRY QUESTION IS ALREADY ANSWERED — DO NOT ASK IT. They tapped "${entryDoorRef.current}" before writing a word. Do not ask what brings them here, do not ask them to pick from doors, do not offer "μια απόφαση που δεν έχει ξεκαθαρίσει / κάτι που σε αγχώνει / κάτι που αναβάλλεις" as alternatives, and do not rephrase any of these as a fresh question. That entire mechanism is finished for this session — asking again after they answered by tapping reads as not having listened, and it is the single most-reported failure in live use. Your first reply goes to their actual material.

@@ -132,8 +132,11 @@ assert("shiftCheckCtx is wired through deliverOnce with budget 2",
   /const shiftCheckCtx = deliverOnce\(/.test(CODE) && /shiftCheckCtxDelivered,\s*2\)/.test(CODE));
 assert("friendPerspectiveCtx is wired through deliverOnce with budget 1",
   /const friendPerspectiveCtx = deliverOnce\(/.test(CODE) && /friendPerspectiveCtxDelivered,\s*1\)/.test(CODE));
-assert("premiseInversionCtx is wired through deliverOnce with budget 1",
-  /const premiseInversionCtx = deliverOnce\(/.test(CODE) && /premiseInversionCtxDelivered,\s*1\)/.test(CODE));
+// Budget 2, not 1 — see the note above its ctx in App.jsx: its claim never goes stale and it
+// commands no once-per-session structured output, so a second emission is safe, while budget 1
+// lost a code-verified signal for the whole session on a single unused turn.
+assert("premiseInversionCtx is wired through deliverOnce with budget 2",
+  /const premiseInversionCtx = deliverOnce\(/.test(CODE) && /premiseInversionCtxDelivered,\s*2\)/.test(CODE));
 assert("CRITICAL: shiftCheckConfirmed stays one-way — the FACT is not made one-shot, only the directive",
   (CODE.match(/shiftCheckConfirmed\.current = false/g) || []).length === 1);
 assert("CRITICAL: friendPerspectiveConfirmed stays one-way too",
