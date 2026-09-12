@@ -2281,6 +2281,19 @@ function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued,
     // Deliberately independent of compressionCount: this is exactly the gap found in real testing,
     // where a long/deep conversation that already used compression could never reach natural exit again.
     decision = "confirm";
+  // THE compressionCount >= 2 HALF OF THIS BRANCH IS DEAD (2026-09-12), verified as a closed
+  // cycle: the counter is incremented in exactly one place (γρ. 3643, inside generateResponse,
+  // only when currentMode === "COMPRESSION"); the only call to generateResponse with "COMPRESSION"
+  // is γρ. 4127, inside handleWarningChoice; and handleWarningChoice sets compressionCount to 0 at
+  // γρ. 4121, six lines earlier, on the same path. So a COMPRESSION pass always runs with the
+  // counter freshly zeroed and leaves it at 1. It can never reach 2. (handlePivotChoice calls
+  // callAura directly at γρ. 4059 and bypasses generateResponse entirely, so it does not increment
+  // either — and it is unreachable anyway. A third reset exists at γρ. 4258 on domain change.)
+  //
+  // CONSEQUENCE, stated plainly: with this half dead, three of the four branches that can end a
+  // session read AURA's own output — isModelPreClosing(text), modelJudgesEnd (the [[EXIT]] tag)
+  // and modelSignalsEnd (the regex just above). Only naturalExitReady reads the user's messages
+  // directly. ADR-003 names semantic self-report by the same model as the reason [[EXIT]] failed.
   } else if (compressionCount >= 2 || modelSignalsEnd) {
     decision = warningIssued ? "terminate" : "warn";
   }
@@ -3122,6 +3135,22 @@ export default function AURAv2() {
   // Compression / pivot gate
   const [pivotPending, setPivotPending]         = useState(false);
   const [pivotType, setPivotType]               = useState(null);
+  // UNREACHABLE — verified by exhaustive search, not inference (2026-09-12). setLayerGatePending
+  // is called exactly twice, both with false (γρ. 4035 inside handleLayerChoice, γρ. 4328 inside
+  // resetSession); setPendingUserMessage likewise only ever with null (γρ. 4036, 4329). The gate's
+  // UI block (γρ. 4968) renders only when this flag is true, so it never renders; its two buttons
+  // (γρ. 4977-4978) are the only callers of handleLayerChoice, which additionally returns early on
+  // !pendingUserMessage. No eval, no Function(), no .call/.apply, no computed setter exists in this
+  // file (all counted at 0), so there is no indirect path either.
+  //
+  // WHY THIS MATTERS BEYOND DEAD CODE: prompt line 218 (LAYER CLARIFICATION) resolves a documented
+  // four-way overlap by asserting that "Layer Gate" and "Pivot" are PRE-MODEL intercepts and that
+  // "when either fires, generateResponse is never called for that turn", which is what shadows
+  // REFLECTIVE CHECKPOINT and ANALYSIS LOOP. Neither can fire. The declared precedence for the
+  // whole repetition/stuck family therefore rests on mechanisms that cannot execute.
+  //
+  // NOT DELETED ON PURPOSE. Removal is a founder decision, not a cleanup. auratests/test_dead_paths.js
+  // locks the current fact; if someone revives a path, that test fails and says what to update.
   const [layerGatePending, setLayerGatePending] = useState(false);
   const [pendingUserMessage, setPendingUserMessage] = useState(null);
 
@@ -4037,6 +4066,11 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
     if (choice === "continue") {
       await generateResponse(msgs, "ANSWER");
     } else {
+      // UNREACHABLE (2026-09-12). This is the ONLY setMode("AUDIT") in the file — the other
+      // setMode call is setMode("ANSWER") in resetSession (γρ. 4323). It lives inside
+      // handleLayerChoice, which is reachable only from the layerGatePending UI block, and that
+      // flag is never set true (see its declaration above). Consequence: currentMode can never be
+      // "AUDIT" in a live session, which is what makes offerPivot below unreachable in turn.
       setMode("AUDIT");
       await generateResponse(msgs, "AUDIT");
     }
@@ -4292,6 +4326,14 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
       (pattern.type === "REPETITION" || pattern.type === "AVOIDANCE" || pattern.type === "DECISION_PRESENT") &&
       pattern.confidence > 0.75;
 
+    // UNREACHABLE (2026-09-12). offerPivot above requires mode === "AUDIT", and AUDIT is
+    // unreachable (see setMode("AUDIT") in handleLayerChoice). So this is the only
+    // setPivotPending(true) in the file and it never runs: the pivot card (γρ. 4984) never
+    // renders, and handlePivotChoice is never invoked. The REPETITION/AVOIDANCE branch just below
+    // is ALSO dead for the same reason — but its live twin is offerGate (γρ. 4270, mode
+    // "ANSWER"), which sets the same clarityPivotHint and does NOT intercept: it falls through to
+    // generateResponse. That is the hybrid replacement described at γρ. 4245, and it means the
+    // user-repetition signal reaches the model as context, never as a pre-model intercept.
     if (offerPivot && pattern.type === "DECISION_PRESENT") {
       setPivotPending(true);
       setPivotType(pattern.type);
