@@ -2639,6 +2639,36 @@ function detectPattern(messages) {
 // rate is unknown, and stripping mid-sentence would break valid replies. Accent-normalised with no
 // \b, because \b does not treat Greek letters as word characters in JS — the documented bug that
 // once silently disabled every Greek safety pattern in this file, and which this nearly repeated.)
+// ADVICE-CASCADE OBSERVER — PASSIVE, NEVER GATING (restored 2026-09-12).
+//
+// WHY PASSIVE: ADR-003 named this the third code-enforced pillar and set an explicit review
+// condition — it moves from observational to active gating ONLY after a real, live test confirms
+// it does not produce many false positives. That evidence does not exist, so this counts and
+// nothing else. Turning it into a gate without that evidence would be the exact thing the ADR
+// forbids.
+//
+// WHY IT IS BEING RESTORED RATHER THAN WRITTEN: it already existed. It entered in commit 9e84e6f
+// (the same commit that wrote ADR-003), defined here and called once as an observational warning.
+// It was removed in b4867b8 — a file-restore that reapplied an App.jsx predating it — and no test
+// covered it in THIS file, so the loss was completely silent for months. ADR-003 went on
+// describing it as "waiting for evidence" while it produced no observation of any kind. The guard
+// in auratests/test_output_tripwire.js exists so that cannot happen a second time.
+//
+// WHAT IT UNIQUELY ADDS, measured rather than assumed: the ADVICE signature above is imperative-
+// verb based, so it already catches "Πήγαινε στην τράπεζα…". It does NOT catch a numbered or
+// bulleted list of options carrying no imperative at all — that surface is uncovered today, and is
+// the only thing this observer contributes. Honest limitation, also measured: a comma-separated
+// list of options in running prose ("Διδασκαλία σε ΕΠΑΛ/ΙΕΚ ως ωρομίσθιος, φροντιστήρια…", from a
+// real transcript) is caught by NEITHER this nor ADVICE. Restoring this does not close that gap.
+//
+// Called on the raw `text`, never on the accent-stripped `n` used above: these patterns are
+// written with Greek accents, and would silently never match the normalised string.
+function looksLikeAdviceCascade(text) {
+  const t = text || "";
+  const hasList = /(\d\.\s|[•]\s)/.test(t) || (t.match(/\n\s*[-•]\s/g) || []).length >= 2;
+  const hasImperative = /(^|\s)(πήγαινε|δες|ρώτα|κάνε|επικοινώνησε|διάβασε|ψάξε|στείλε)(\s|[.,!;]|$)/i.test(t);
+  return hasList || hasImperative;
+}
 function detectOutputViolation(text, ctx) {
   const n = String(text == null ? "" : text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   if (!n) return null;
@@ -2662,6 +2692,14 @@ function detectOutputViolation(text, ctx) {
     const optionLines = (text.match(/^\s*(?:[0-9]+[.)]|[-•\u2022])\s+\S/gm) || []).length;
     if (optionLines >= 3) return "ROAD_MAP_MISSING";
   }
+  // ORDER IS DELIBERATE — this runs LAST, and the reason is measured, not stylistic. Two of the
+  // signatures above share a surface with it: ADVICE fires on the same imperative verbs, and
+  // ROAD_MAP_MISSING fires on the same numbered/bulleted lines. Placed earlier, it would swallow
+  // both — ADVICE would quietly stop being reported for imperative replies, and ROAD_MAP_MISSING,
+  // whose whole detection is "3+ numbered option lines where a map was due", would never be
+  // returned again. Running last leaves both counters meaning exactly what they meant before, and
+  // ADVICE_CASCADE reports only what nothing else already claimed.
+  if (looksLikeAdviceCascade(text)) return "ADVICE_CASCADE";
   return null;
 }
 function detectSelfMarkedTension(text) {
