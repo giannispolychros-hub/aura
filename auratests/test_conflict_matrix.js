@@ -221,5 +221,91 @@ assert('binaryOppositionCount increments at most once per turn, so it cannot rea
 assert('premiseInversionCtx requires binaryOppositionCount >= 2, so it is excluded on a first reply',
   /const premiseInversionCtx = deliverOnce\(\(binaryOppositionCount\.current >= 2\)/.test(CODE_SPLIT));
 
+console.log("\n=== CTX CONFLICT: closing signal × procedural gates ===");
+
+eval(extract('isExplicitClosure'));
+
+// gatesCtx is an inline IIFE, not a named function, so it is located by its own opening text and
+// then EVALUATED — the same behavioural approach the first-reply-floor section above uses, and for
+// the same reason that section records: a structural "does the source mention isExplicitClosure"
+// check would happily pass a fix that calls the detector and then ignores its result. What decides
+// this is the text the real template actually produces.
+const gatesTemplate = (() => {
+  const s = CODE_SPLIT.indexOf('const gatesCtx = (() => {');
+  if (s < 0) return null;
+  const b = CODE_SPLIT.indexOf('(() => {', s);
+  const e = CODE_SPLIT.indexOf('})();', b);
+  return e < 0 ? null : CODE_SPLIT.slice(b, e + 5);
+})();
+assert('gatesCtx IIFE extracted for evaluation', gatesTemplate !== null && gatesTemplate.length > 2000);
+assert('The extracted block is the real one — it still contains all three gates',
+  gatesTemplate !== null &&
+  ['Clarity + Ownership Scale', 'Decision Space Anchors', 'Stakes Question'].every(g => gatesTemplate.includes(g)));
+
+// Evaluates the real template against controlled state: the four refs the block reads, plus `msgs`
+// and `msgCount`, so every guard inside it runs exactly as it does in production.
+function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = false, anchors = false, stakes = false }) {
+  const msgs = [
+    { role: 'user',      content: 'Έχω ένα δίλημμα με τη δουλειά μου και δεν ξεκαθαρίζει.' },
+    { role: 'assistant', content: 'Τι σε κρατάει εκεί;' },
+    { role: 'user',      content: 'Η σταθερότητα, κυρίως.' },
+    { role: 'assistant', content: 'Και τι σε τραβάει αλλού;' },
+    { role: 'user',      content: lastUserText },
+  ];
+  const concreteStepStated = { current: concrete };
+  const outcomeScaleAsked  = { current: scaleAsked };
+  const anchorsInvited     = { current: anchors };
+  const stakesAsked        = { current: stakes };
+  return eval(gatesTemplate);
+}
+
+// Exactly two gates due: the Scale is marked asked; Anchors and Stakes are not.
+const TWO_DUE = { msgCount: 5, concrete: false, scaleAsked: true, anchors: false, stakes: false };
+const SUBSTANTIVE = 'Με φοβίζει ότι θα χάσω τη σταθερότητά μου.';
+
+// CONTROL FIRST, deliberately: without it the two suppression assertions below could be satisfied
+// by a block that returns '' for everything, i.e. by breaking the gates entirely.
+assert('CONTROL: two gates due + a substantive last message → gatesCtx still fires (normal operation intact)',
+  gatesTextWhen({ ...TWO_DUE, lastUserText: SUBSTANTIVE }) !== '');
+assert('CONTROL: that output really carries BOTH due gates, not merely some text',
+  (() => { const t = gatesTextWhen({ ...TWO_DUE, lastUserText: SUBSTANTIVE });
+           return t.includes('Decision Space Anchors') && t.includes('Stakes Question'); })());
+
+// THE FIX ITSELF.
+assert('CRITICAL: on the turn the user says «κλείνουμε», gatesCtx is silent',
+  gatesTextWhen({ ...TWO_DUE, lastUserText: 'κλείνουμε' }) === '');
+assert('CRITICAL: the agreement-prefixed form «Εντάξει, κλείνουμε» is suppressed too',
+  gatesTextWhen({ ...TWO_DUE, lastUserText: 'Εντάξει, κλείνουμε' }) === '');
+
+// DETECTOR CHOICE, PINNED BEHAVIOURALLY — the assertions that actually rule out the wrong fix.
+// Swapping isExplicitClosure for the broader matchesClosingWord leaves every CRITICAL assertion
+// above green while silently suppressing the gates on ordinary mid-session agreement. Measured over
+// a 38-message corpus before choosing: on 15 realistic mid-session acknowledgments the broad
+// detector matches 13 and the narrow one 0, while on 16 genuine closings the two score identically.
+// «Κατάλαβα» / «Ακριβώς» are the sharpest case — the user has just converged on something nameable,
+// which is the best moment to invite Decision Space Anchors, not to withhold it.
+for (const ack of ['Ναι', 'Οκ', 'Εντάξει', 'Κατάλαβα', 'Ακριβώς', 'Νομίζω ναι', 'Φτάσαμε']) {
+  assert(`Mid-session acknowledgment «${ack}» must NOT suppress the gates (this is what rules out the broad detector)`,
+    gatesTextWhen({ ...TWO_DUE, lastUserText: ack }) !== '');
+}
+assert('The guard names isExplicitClosure (narrow); matchesClosingWord must not appear in this block',
+  gatesTemplate !== null && /isExplicitClosure\(/.test(gatesTemplate) && !/matchesClosingWord\(/.test(gatesTemplate));
+
+// The block's pre-existing guards are untouched.
+assert('UNCHANGED: the msgCount < 3 guard still wins — before turn 3 the block is silent anyway',
+  gatesTextWhen({ ...TWO_DUE, msgCount: 2, lastUserText: SUBSTANTIVE }) === '');
+assert('UNCHANGED: with all three gates satisfied the block still returns "" whatever the message',
+  gatesTextWhen({ msgCount: 5, scaleAsked: true, anchors: true, stakes: true, lastUserText: SUBSTANTIVE }) === '');
+
+// KNOWN GAPS, measured and recorded rather than assumed away. These two pass both before and after
+// the fix — they are documentation, never evidence that it works. isExplicitClosure requires the
+// WHOLE message to reduce to closing words, so a closing word trailing real content is not caught;
+// and unlike matchesClosingWord it does not strip the colloquial trailing «ε». Both are also true of
+// decideTermination, which uses the same detector — so this change does not widen an existing gap.
+assert('KNOWN GAP (documented): «Θα το σκεφτώ. Κλείνουμε.» is NOT suppressed — the message does not reduce to closing words',
+  gatesTextWhen({ ...TWO_DUE, lastUserText: 'Θα το σκεφτώ. Κλείνουμε.' }) !== '');
+assert('KNOWN GAP (documented): «Τέλος ε;» is NOT suppressed — isExplicitClosure does not strip the trailing «ε»',
+  gatesTextWhen({ ...TWO_DUE, lastUserText: 'Τέλος ε;' }) !== '');
+
 console.log("\n" + passed + " invariants passed, " + failed + " failed, " + warnings + " overlap warnings");
 process.exit(failed > 0 ? 1 : 0);

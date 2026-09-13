@@ -3441,6 +3441,31 @@ export default function AURAv2() {
         : '';
       const gatesCtx = (() => {
         if (msgCount < 3) return ''; // too early — matches existing 2-4 exchange timing elsewhere
+        // CLOSING SUPPRESSION (forensic trace of the next-question authority map). On the turn the
+        // user actually closes, this block was the ONLY code voice in the ctx zone — and what it
+        // said was "these gates take priority over composing a closing move". closingDriftCtx above
+        // cannot balance it: its own guard is `idx === userMsgs.length - 1 → ''`, so it fires only
+        // for a closing signal in an EARLIER message and is silent on the turn that matters. The
+        // visible result is a procedural question, and only then the closure card — decideTermination
+        // runs ~120 lines after setMessages, so the user reads the wrong question first.
+        // SAME SUPPRESSION PRINCIPLE already used for the Outcome Scale override further down
+        // ("if the user's own message that prompted this reply was itself a closing/stop signal, do
+        // not override it with a measurement question"), which in turn cites the documented harm of
+        // the reverted Anchors/Stakes hard gates. This is that principle applied one layer earlier.
+        // NARROW DETECTOR ON PURPOSE — isExplicitClosure, not matchesClosingWord. Measured over a
+        // 38-message corpus before choosing: on 16 genuine closings the two score identically (14
+        // each), but on 15 realistic mid-session acknowledgments the broad one matches 13 and the
+        // narrow one 0. matchesClosingWord treats a bare "Ναι"/"Οκ"/"Κατάλαβα"/"Ακριβώς" as a
+        // closing word, and those are ordinary Greek agreement mid-dilemma — "Κατάλαβα" is arguably
+        // the BEST moment to invite Decision Space Anchors, since the user has just converged on
+        // something nameable. Using the broad detector would trade one wrong question at the close
+        // for silently withholding gates across the whole middle of every session.
+        // KNOWN GAP, not widened by this change: isExplicitClosure requires the whole message to
+        // reduce to closing words, so "Θα το σκεφτώ. Κλείνουμε." is not caught here — and it is not
+        // caught by decideTermination's own use of the same detector either. Recorded in
+        // test_conflict_matrix.js rather than papered over.
+        const lastUserMsgForGates = [...msgs].reverse().find(m => m.role === "user")?.content || "";
+        if (isExplicitClosure(lastUserMsgForGates)) return '';
         const due = [];
         // LIVE-EVIDENCE FIX (real session, the clearest instance of a code-verified gate beating a
         // prompt-only rule): the moment the user named their options — "Έχω 2 επιλογές" —
