@@ -3432,7 +3432,11 @@ export default function AURAv2() {
       // every OTHER first reply that actually reaches the model: every brand-new user (First-WHY
       // explicitly excludes them), and any returning user whose first message doesn't meet
       // First-WHY's own conditions (high emotional weight, or already-substantial context).
-      const firstReplyFloorCtx = (msgCount === 1 && !showDemo)
+      // ONE NAMED CONDITION, read by BOTH blocks that depend on it. Previously the floor computed
+      // this inline and methodFailureCtx below knew nothing about it, which is how the two came to
+      // name the same three families in opposite directions on the same turn.
+      const firstReplyFloorActive = (msgCount === 1 && !showDemo);
+      const firstReplyFloorCtx = firstReplyFloorActive
         ? `\n[FIRST REPLY OF THIS SESSION — code-enforced floor, not a suggestion: Assumption Surfacing, Premise Inversion, Contradiction Detection, and any binary-choice framing ("X, ή Y;") are not available on this specific turn, regardless of how the material seems. Respond only with open, natural material-gathering per OPEN BEFORE PROBE. These mechanisms become available starting the next reply, based on your own evidence-based judgment as already described above — this floor applies only to this one turn.]\n`
         : '';
       const gatesCtx = (() => {
@@ -3490,8 +3494,23 @@ export default function AURAv2() {
         ? `\n[CODE-VERIFIED: this turn matches CLARITY PIVOT's "${clarityPivotHint.current}" case above (detected structurally, not psychologically inferred) — use that specific response, not a generic one.]\n`
         : '';
       if (clarityPivotHint.current) clarityPivotHint.current = null; // one-shot, applies only to this turn
+      // FLOOR-AWARE FAMILY LIST (live-reproducible contradiction, fixed 2026-09-13). A returning user
+      // can open with "Πάλι τα ίδια, δεν προχωράμε": needsFirstWhy is false so First-WHY does not
+      // intercept, generateResponse runs with msgCount === 1, and detectsMethodFailureSignal is true.
+      // The floor then forbids "Assumption Surfacing, Premise Inversion, Contradiction Detection …
+      // regardless of how the material seems" while this block named those same three as the
+      // families to switch to. Two opposite instructions, one prompt, one turn.
+      //
+      // NOT FIXED BY ORDERING, on purpose: the dynamicSuffix tiers already put the floor last, so it
+      // wins on attention position — but that resolution lives in a comment the model never reads,
+      // and the model still sees both sentences. The contradictory text is simply not produced now.
+      // The other families are still named, so the switch instruction stays useful on the exact turn
+      // the user is already frustrated. premiseInversionCtx also names PREMISE INVERSION but cannot
+      // collide: it needs binaryOppositionCount >= 2 and that counter rises at most once per turn.
       const methodFailureCtx = methodFailureHint.current
-        ? `\n[CODE-VERIFIED: the user's own words this turn signal the CURRENT APPROACH is not producing movement for them — they are NOT asking for an answer (informationMode's territory, which did not fire here). This is CONVERSATION STRATEGY SWITCH's Level 1 trigger. TREAT AS CANDIDATE SIGNAL, NOT VERDICT: it means the previous interaction mode stopped producing movement, never that AURA failed or that you should apologize or evaluate your own performance. Per LEAP PERMISSION above: simply move, no meta-commentary, do not announce the switch. WHAT IT REQUIRES: do not produce another question from the same family, reworded. Switch to a genuinely different family — per EXPLORATION COVERAGE PRINCIPLE prefer one not yet used this session. Families, named here so no recall is needed: Contradiction Detection, Premise Inversion / Assumption Surfacing, VERBATIM COST COLLISION, THIRD TRIGGER's perspective form, EXPRESSIVE VARIATION's counterfactual, the CHALLENGE lens, the PERSPECTIVE lens. WHAT IT IS NOT: not permission to give advice, propose solutions, or supply strategy — that is the exact No-Advice violation this switch exists to prevent. The output is a different QUESTION, not an answer. If enough material already exists, showing the shape of what they gave (PROBLEM STRUCTURE MAP / ROAD DISCOVERY) is also valid. ANTI-THRASHING GUARD still applies: if several switches in a row produced no movement, stop switching and use GENERAL EXIT CRITERIA instead.]\n`
+        ? `\n[CODE-VERIFIED: the user's own words this turn signal the CURRENT APPROACH is not producing movement for them — they are NOT asking for an answer (informationMode's territory, which did not fire here). This is CONVERSATION STRATEGY SWITCH's Level 1 trigger. TREAT AS CANDIDATE SIGNAL, NOT VERDICT: it means the previous interaction mode stopped producing movement, never that AURA failed or that you should apologize or evaluate your own performance. Per LEAP PERMISSION above: simply move, no meta-commentary, do not announce the switch. WHAT IT REQUIRES: do not produce another question from the same family, reworded. Switch to a genuinely different family — per EXPLORATION COVERAGE PRINCIPLE prefer one not yet used this session. ${firstReplyFloorActive
+          ? `Families, named here so no recall is needed: VERBATIM COST COLLISION, THIRD TRIGGER's perspective form, EXPRESSIVE VARIATION's counterfactual, the CHALLENGE lens, the PERSPECTIVE lens. THIS IS THE FIRST REPLY OF THE SESSION, so that list is deliberately shorter than usual: the FIRST REPLY FLOOR below rules the remaining families out for this one turn, and they become available again from the next reply on. Nothing is missing by accident.`
+          : `Families, named here so no recall is needed: Contradiction Detection, Premise Inversion / Assumption Surfacing, VERBATIM COST COLLISION, THIRD TRIGGER's perspective form, EXPRESSIVE VARIATION's counterfactual, the CHALLENGE lens, the PERSPECTIVE lens.`} WHAT IT IS NOT: not permission to give advice, propose solutions, or supply strategy — that is the exact No-Advice violation this switch exists to prevent. The output is a different QUESTION, not an answer. If enough material already exists, showing the shape of what they gave (PROBLEM STRUCTURE MAP / ROAD DISCOVERY) is also valid. ANTI-THRASHING GUARD still applies: if several switches in a row produced no movement, stop switching and use GENERAL EXIT CRITERIA instead.]\n`
         : '';
       if (methodFailureHint.current) methodFailureHint.current = false;
       // Hybrid backstop for SELF-REPETITION CHECK (Self-BLEU-inspired, see detectAssistantSelfRepetition

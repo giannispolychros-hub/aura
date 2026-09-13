@@ -84,5 +84,142 @@ assert("real concrete step 'θα + verb' detected", detectsConcreteStep("Θα φ
 assert("present-tense fact statement is intentionally NOT a step", !detectsConcreteStep("Φεύγω αύριο για τη νέα δουλειά"));
 assert("past-tense decision is intentionally NOT a step", !detectsConcreteStep("Αποφάσισα να στείλω το email το Σαββατοκύριακο"));
 
+// ── CTX-LEVEL CONFLICT: first-reply floor vs method-failure families ──
+// Every other assertion in this file compares DETECTORS. This block compares the two CONTEXT
+// BLOCKS two detectors produce, because the conflict is not in what they detect — both are
+// correct — but in the text they put into the same prompt on the same turn.
+//
+// THE BUG, reproduced executably before this test was written: a returning user opens with
+// "Πάλι τα ίδια, δεν προχωράμε". needsFirstWhy is false, so First-WHY does not intercept and
+// generateResponse runs with msgCount === 1. That makes firstReplyFloorCtx active, which forbids
+// "Assumption Surfacing, Premise Inversion, Contradiction Detection ... regardless of how the
+// material seems". detectsMethodFailureSignal is true on the same message, so methodFailureCtx is
+// also active — and it names those same three families as the ones to switch to, "named here so
+// no recall is needed". Two directly contradictory instructions, one prompt, one turn.
+//
+// WHY THE FIX IS NOT ORDERING: the dynamicSuffix tiers already place the floor last, so it wins on
+// attention position. That resolution lives in a code comment the model never sees, and the model
+// still reads both sentences. The contradictory text must not be PRODUCED, which is what the
+// assertions below pin.
+//
+// SCOPE, verified rather than assumed: methodFailureCtx is the only ctx that can name those three
+// families on the same turn as the floor. premiseInversionCtx also names PREMISE INVERSION, but it
+// requires binaryOppositionCount >= 2 and that counter increments at most once per turn, so at
+// msgCount === 1 it can only be 1. That invariant is asserted below so the exclusion is proved,
+// not relied upon.
+console.log("\n=== CTX CONFLICT: first-reply floor × method-failure ===");
+
+eval(extract('detectsMethodFailureSignal'));
+eval(extract('classifyQuestion'));
+eval(extract('isFactQuestion'));
+eval(extract('needsFirstWhy'));
+
+const CODE_SPLIT = (() => {
+  const i = raw.indexOf('const AURA_CORE_PERSONALITY');
+  const s = raw.indexOf('`', i) + 1;
+  return raw.slice(0, i) + raw.slice(raw.indexOf('`;', s));
+})();
+
+const FORBIDDEN_ON_FIRST_REPLY = ['Assumption Surfacing', 'Premise Inversion', 'Contradiction Detection'];
+
+// Openers that are BOTH a method-failure signal AND not intercepted by First-WHY, so they land in
+// generateResponse with msgCount === 1. Verified by running the real detectors, not assumed.
+const COLLIDING_OPENERS = [
+  'Πάλι τα ίδια, δεν προχωράμε',
+  'Δεν προχωράμε καθόλου.',
+];
+// Same family of complaint, but these do NOT trigger the signal today — kept so the test documents
+// the real detector surface instead of implying it is broader than it is.
+const NON_COLLIDING_OPENERS = [
+  'Πάλι τα ίδια.',
+  'Κάνουμε κύκλους.',
+  'Δεν με βοηθάει αυτό, ξαναγυρίζουμε στα ίδια.',
+  'Έχουμε κολλήσει από την πρώτη ερώτηση.',
+];
+
+for (const opener of COLLIDING_OPENERS) {
+  assert(`collision precondition holds for "${opener.slice(0, 28)}…" (methodFailure=true, firstWhy=false)`,
+    detectsMethodFailureSignal(opener) === true && needsFirstWhy(opener) === false);
+}
+for (const opener of NON_COLLIDING_OPENERS) {
+  assert(`documented non-trigger: "${opener.slice(0, 28)}…" does not raise the method-failure signal today`,
+    detectsMethodFailureSignal(opener) === false);
+}
+
+// The floor's only live condition is msgCount === 1: showDemo is a hardcoded false constant.
+// Pins the SHARED condition rather than an inline expression: the fix's whole point is that one
+// named value feeds both blocks, so a future inline copy in either place would defeat it silently.
+assert('The floor condition is computed once, named, and is msgCount === 1 (showDemo is a constant false)',
+  /const firstReplyFloorActive = \(msgCount === 1 && !showDemo\)/.test(CODE_SPLIT) &&
+  /const showDemo = false/.test(CODE_SPLIT) &&
+  /const firstReplyFloorCtx = firstReplyFloorActive/.test(CODE_SPLIT));
+
+// The floor must keep naming the three families — it needs them to state the prohibition.
+assert('firstReplyFloorCtx still names all three families (it must, to forbid them)',
+  (() => {
+    const s = CODE_SPLIT.indexOf('const firstReplyFloorCtx');
+    const block = CODE_SPLIT.slice(s, CODE_SPLIT.indexOf('const gatesCtx', s));
+    return FORBIDDEN_ON_FIRST_REPLY.every(f => block.includes(f));
+  })());
+
+// THE FIX ITSELF: methodFailureCtx must be built from the floor condition, and must not name the
+// forbidden three when the floor is active.
+const mfBlock = (() => {
+  const s = CODE_SPLIT.indexOf('const methodFailureCtx');
+  const e = CODE_SPLIT.indexOf('if (methodFailureHint.current)', s);
+  return e < 0 ? '' : CODE_SPLIT.slice(s, e);
+})();
+assert('methodFailureCtx block located', mfBlock.length > 200);
+assert('CRITICAL: methodFailureCtx is aware of the first-reply floor condition',
+  /firstReplyFloor/.test(mfBlock) || /msgCount === 1/.test(mfBlock));
+// Discriminating on purpose: the block must contain at least one family list that names NONE of
+// the forbidden three. Before the fix there is exactly one list and it names all three, so this
+// fails; a loose "does the block mention them at all" check would have passed either way.
+assert('CRITICAL: a family list exists that names NONE of the three forbidden families',
+  (() => {
+    const lists = [...mfBlock.matchAll(/Families[^:]*:([^.]*)\./g)].map(m => m[1]);
+    return lists.length > 0 &&
+           lists.some(l => FORBIDDEN_ON_FIRST_REPLY.every(f => !l.includes(f)) &&
+                           l.includes('VERBATIM COST COLLISION'));
+  })());
+
+// The families that survive on a first reply are still named — the switch instruction must not
+// become empty, or the ctx stops being useful exactly when the user is already frustrated.
+assert('The surviving families are still named on a first reply',
+  ['VERBATIM COST COLLISION', 'THIRD TRIGGER', 'EXPRESSIVE VARIATION', 'CHALLENGE lens', 'PERSPECTIVE lens']
+    .every(f => mfBlock.includes(f)));
+
+// BEHAVIOURAL, not structural: evaluate the real template and read the text it produces. This is
+// the assertion that matters, and it caught a flaw the structural ones missed — the first version
+// of the fix removed the three families from the list but re-named them in the sentence explaining
+// their absence, so the forbidden names were still in the prompt. Checking the source shape would
+// never have shown that; checking the output did.
+const mfTemplate = (() => {
+  const s = CODE_SPLIT.indexOf('const methodFailureCtx = methodFailureHint.current');
+  const e = CODE_SPLIT.indexOf('if (methodFailureHint.current)', s);
+  return e < 0 ? null : CODE_SPLIT.slice(CODE_SPLIT.indexOf('?', s), e).trim().replace(/;\s*$/, '');
+})();
+assert('methodFailureCtx template extracted for evaluation', mfTemplate !== null && mfTemplate.length > 200);
+
+function methodFailureTextWhen(firstReplyFloorActive) {
+  return eval('(true ' + mfTemplate + ')');
+}
+
+assert('CRITICAL (behavioural): on a first reply the produced text names NONE of the three forbidden families',
+  FORBIDDEN_ON_FIRST_REPLY.every(f => !methodFailureTextWhen(true).includes(f)));
+assert('CRITICAL (behavioural): from the second reply on it still names all three — normal operation intact',
+  FORBIDDEN_ON_FIRST_REPLY.every(f => methodFailureTextWhen(false).includes(f)));
+assert('Behavioural: the surviving families are named in BOTH branches, so the switch instruction is never empty',
+  ['VERBATIM COST COLLISION', 'THIRD TRIGGER', 'EXPRESSIVE VARIATION', 'CHALLENGE lens', 'PERSPECTIVE lens']
+    .every(f => methodFailureTextWhen(true).includes(f) && methodFailureTextWhen(false).includes(f)));
+assert('Behavioural: the first-reply branch explains the shorter list rather than leaving it unexplained',
+  /FIRST REPLY FLOOR/.test(methodFailureTextWhen(true)));
+
+// premiseInversionCtx cannot co-fire — proved, not assumed.
+assert('binaryOppositionCount increments at most once per turn, so it cannot reach 2 at msgCount === 1',
+  (CODE_SPLIT.match(/binaryOppositionCount\.current \+= 1/g) || []).length === 1);
+assert('premiseInversionCtx requires binaryOppositionCount >= 2, so it is excluded on a first reply',
+  /const premiseInversionCtx = deliverOnce\(\(binaryOppositionCount\.current >= 2\)/.test(CODE_SPLIT));
+
 console.log("\n" + passed + " invariants passed, " + failed + " failed, " + warnings + " overlap warnings");
 process.exit(failed > 0 ? 1 : 0);
