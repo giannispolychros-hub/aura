@@ -2723,6 +2723,80 @@ function detectOutputViolation(text, ctx) {
   if (looksLikeAdviceCascade(text)) return "ADVICE_CASCADE";
   return null;
 }
+// ── MATERIAL EVIDENCE DETECTORS (observation only — see auratests/test_material_evidence.js) ──
+// WHY THESE EXIST. A forensic pass established that "is there enough material yet?" is decided in
+// sixteen prompt-only places and zero code places: parseRoadMap and parseThreeBeatShift both
+// validate the shape of AURA'S OWN OUTPUT, never the user's material, and no detector anywhere
+// measures anything the user supplied. The prompt names the cost of that itself (ROAD DISCOVERY,
+// PATH TWO): "a threshold stated only as 'when the material suffices' is never reached ... the map
+// keeps receding by one turn indefinitely." A real session showed exactly that — a stated 3.000€
+// target, four dependants, a hard weekly time ceiling and an explicit legal blocker were all on
+// the table, and no map was ever produced.
+//
+// THESE THREE DECIDE NOTHING, AND THAT IS THE DESIGN, NOT A FIRST STEP TOWARD A GATE. They count
+// three narrow structural facts and hand them to the model as context, exactly as the existing
+// observation-only blocks do. They are deliberately NOT the three ROAD DISCOVERY criteria and do
+// not approximate them: "the real problem", "what is stopping them" and "what they would gain or
+// lose" are semantic judgments, and a regex pretending to measure them would be a worse failure
+// than the one this addresses. Nothing is gated on any of them.
+//
+// NO SESSION STATE BY DESIGN: all three are pure functions and the ctx that consumes them is
+// recomputed from `msgs` every turn, so there is no ref to leak across sessions and nothing for
+// test_ref_reset_integrity to have to learn about.
+
+// NAMED FOR WHAT IT ACTUALLY MATCHES, not for what prompted it: this finds an amount the user
+// WROTE, which may be a target, a current salary, a rent or a price — calling it a "goal detector"
+// would claim an intent the regex cannot see. The 100 floor keeps everyday purchases out
+// ("πλήρωσα 50€ για το βιβλίο") while keeping real Greek salary figures in. A range ("1200-1300€")
+// yields both ends, since either may be the one that matters. The negative lookahead on "ευρ-"
+// stops "ευρωπαϊκό" from reading as a currency word (Greek letters are invisible to \b in JS).
+function detectsStatedMoneyFigure(text) {
+  const t = String(text == null ? "" : text);
+  const values = [];
+  const re = /(\d[\d.,]*)\s*(?:[-–—]\s*(\d[\d.,]*)\s*)?(?:€|ευρ[ωώοό](?![α-ωά-ώ]))|€\s*(\d[\d.,]*)/gi;
+  let m;
+  while ((m = re.exec(t)) !== null) {
+    for (const g of [m[1], m[2], m[3]]) {
+      if (!g) continue;
+      // Greek convention: "." groups thousands ("3.000"), "," is the decimal mark.
+      const n = parseFloat(String(g).replace(/\.(?=\d{3}\b)/g, "").replace(/\s/g, "").replace(",", "."));
+      if (Number.isFinite(n) && n >= 100) values.push(Math.round(n));
+    }
+  }
+  return { found: values.length > 0, values };
+}
+
+// Limits the user stated IN THEIR OWN WORDS. Deliberately narrow phrase-matching, never inference:
+// a person saying they are tired is not a constraint, a person saying "ο χρόνος είναι ελάχιστος"
+// is. Each kind is returned separately rather than collapsed to a boolean, because which limit
+// they named is the informative part.
+// SELF-CONTAINED ON PURPOSE: the patterns live inside the function rather than in a module-level
+// const, because every test in auratests/ extracts a detector with raw.indexOf('function X(') and
+// slices to its closing brace — an external const would simply not come along, and the extracted
+// copy would throw. Every other detector in this file already obeys that constraint. The regexes
+// carry no /g flag, so rebuilding them per call has no lastIndex semantics to worry about.
+function detectsExplicitConstraint(text) {
+  const t = String(text == null ? "" : text);
+  const PATTERNS = [
+    ["time",       /(ο\s+χρ[οό]νος\s+ε[ιί]ναι\s+ελ[αά]χιστος|ελ[αά]χιστος\s+χρ[οό]νος|δεν\s+[εέ]χω\s+(καθ[οό]λου\s+)?χρ[οό]νο|δεν\s+προλαβα[ιί]νω|δεν\s+μου\s+μ[εέ]νει\s+χρ[οό]νος)/i],
+    ["dependants", /([εέ]χω\s+οικογ[εέ]νεια|[εέ]χω\s+\S{1,10}\s+παιδι[αά]|τ[εέ]σσερα\s+παιδι[αά]|δ[ιί]δυμα|μονογονε|πολ[υύ]τεκν)/i],
+    ["risk",       /(μεγ[αά]λο\s+(κ[ιί]νδυνο|ρ[ιί]σκο)|[εέ]χει\s+ρ[ιί]σκ|ε[ιί]ναι\s+επικ[ιί]νδυν)/i],
+    ["money",      /(δεν\s+[εέ]χω\s+(λεφτ[αά]|χρ[ηή]ματα)|δεν\s+βγα[ιί]νω\s+οικονομικ|δεν\s+ανταποκρ[ιί]νεται|ελ[αά]χιστα\s+[εέ]ξτρα)/i],
+  ];
+  const kinds = PATTERNS.filter(([, re]) => re.test(t)).map(([k]) => k);
+  return { found: kinds.length > 0, kinds };
+}
+
+// Uncertainty about what is PERMITTED — institutionally or legally, never about the self.
+function detectsPermissionUncertainty(text) {
+  const t = String(text == null ? "" : text);
+  // AURA's own friend-perspective question contains "επιτρέπεις στον εαυτό σου"; a user echoing it
+  // is talking about self-permission, not about what the law or their employer allows. Excluded
+  // first so that echo can never register as a legal question.
+  if (/επιτρ[εέ]π\w*\s+στον\s+εαυτ[οό]/i.test(t)) return false;
+  return /(επιτρ[εέ]πεται|απαγορε[υύ]εται|ε[ιί]ναι\s+ν[οό]μιμ|ν[οό]μιμ[εοη]ς|υπαλληλικ[οό][ςυ]\s+κ[ωώ]δικα|ασυμβ[ιί]βαστ|[αά]δεια\s+απ[οό]\s+την\s+υπηρεσ[ιί]α)/i.test(t);
+}
+
 function detectSelfMarkedTension(text) {
   const t = String(text == null ? "" : text).trim();
   if (!t) return false;
@@ -3365,6 +3439,30 @@ export default function AURAv2() {
       const profileSummary = getProfileSummary(memory);
       const profileCtx = profileSummary ? profileSummary + HONEST_UNCERTAINTY_RULE : '';
 
+      // STRUCTURAL EVIDENCE (observation only — see the detector comments further up and
+      // auratests/test_material_evidence.js for the contract this must keep). Recomputed from
+      // `msgs` every turn, so it tracks the conversation instead of latching, and it holds no
+      // session state of its own. Placed in the informational tier on purpose: it reports, it
+      // never directs. It is NOT wired to any gate, and the tests assert that it stays that way.
+      const materialEvidenceCtx = (() => {
+        const userMsgs = msgs.filter(m => m.role === "user");
+        if (userMsgs.length === 0) return '';
+        const amounts = [];
+        const kinds = [];
+        let permissionTurns = 0;
+        for (const um of userMsgs) {
+          detectsStatedMoneyFigure(um.content).values.forEach(v => { if (!amounts.includes(v)) amounts.push(v); });
+          detectsExplicitConstraint(um.content).kinds.forEach(k => { if (!kinds.includes(k)) kinds.push(k); });
+          if (detectsPermissionUncertainty(um.content)) permissionTurns += 1;
+        }
+        if (amounts.length === 0 && kinds.length === 0 && permissionTurns === 0) return '';
+        const moneyLine = amounts.length ? `\n· Money amounts the user stated: ${amounts.join(', ')} (amounts they wrote — not necessarily a target).` : '';
+        const limitLine = kinds.length ? `\n· Limits they named in their own words: ${kinds.join(', ')}.` : '';
+        const permLine = permissionTurns ? `\n· Turns in which they voiced uncertainty about what is permitted: ${permissionTurns}.` : '';
+        return `\n[STRUCTURAL EVIDENCE — OBSERVATION ONLY, NOT A SUFFICIENCY JUDGMENT. The lines below are counted mechanically from the user's own messages this session and surfaced here so they do not have to be recalled from a long transcript. This block does not measure ROAD DISCOVERY's three criteria — the real problem as they name it, what is stopping them, what they would gain or lose — those remain entirely your own judgment, and it authorizes nothing and blocks nothing. Weigh it exactly as you would weigh re-reading the transcript yourself.${moneyLine}${limitLine}${permLine}
+A line missing above means only that one pattern was not matched — the absence of THAT pattern, never evidence that the material as a whole is thin.]\n`;
+      })();
+
       // ── Explicit Pause injection (#5 fix) ──
       // Max 1 per 5 sessions. Injected as system instruction — AURA decides when to use it naturally.
       // CLOSING DRIFT (live evidence, second occurrence of the same failure): the prompt rule
@@ -3561,7 +3659,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
       // weakest-to-strongest, so hard constraints occupy the final, highest-attention position:
       // (1) informational background, (2) situational signals, (3) hard constraints last.
       const dynamicSuffix = [
-        memCtx, profileCtx, demoCtx, informationModeCtx, explicitPauseCtx, entryDoorCtx,
+        memCtx, profileCtx, materialEvidenceCtx, demoCtx, informationModeCtx, explicitPauseCtx, entryDoorCtx,
         coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx,
         gatesCtx, closingDriftCtx, firstReplyFloorCtx,
       ].filter(Boolean).join('\n');
@@ -3573,7 +3671,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
       // every fix today lacked.)
       try {
         const fired = Object.entries({
-          memCtx, profileCtx, demoCtx, informationModeCtx, explicitPauseCtx, entryDoorCtx,
+          memCtx, profileCtx, materialEvidenceCtx, demoCtx, informationModeCtx, explicitPauseCtx, entryDoorCtx,
           coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx,
           clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx, gatesCtx, closingDriftCtx,
           firstReplyFloorCtx,
