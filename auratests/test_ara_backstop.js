@@ -283,5 +283,38 @@ assert('NO CONTENT LOGGED: only counts reach the trace object, never a map line 
   (() => { const o = _pWindow.slice(0, _pWindow.indexOf('console.log'));
            return o.includes('lines, supported, unsupported, mild, severe, novelFactLines') && !o.includes('detail'); })());
 
+// ── PROVENANCE ON SCREEN (?debug=1 panel) ───────────────────────────────────────────────────
+// WHY THIS EXISTS AT ALL: [AURA PROVENANCE] is a console line, and this file's own debug-panel
+// comment records why that is not enough — "the browser console is unreachable on mobile, which is
+// where these sessions actually happen". Without a panel line the measurement is written but
+// uncollectable on the device the real Road Map sessions run on.
+const _PANEL = (() => {
+  const start = _PROMPT_SPLIT.CODE.indexOf('{debugMode.current && (');
+  const end = _PROMPT_SPLIT.CODE.indexOf('Open anchors', start);
+  return start >= 0 && end > start ? _PROMPT_SPLIT.CODE.slice(start, end) : '';
+})();
+assert('Debug panel block located', _PANEL.length > 200);
+
+assert('PANEL: a prov: line exists', _PANEL.includes('prov:'));
+assert('PANEL: it reads the provenance summary off roadTraceLast',
+  /roadTraceLast\.current[?.]*\.provenance/.test(_PANEL));
+assert('PANEL: it is GATED — it lives inside the debugMode.current block, never in the normal UI',
+  _PANEL.startsWith('{debugMode.current && (') && _PANEL.includes('prov:'));
+assert('PANEL: it is guarded against a turn with no map, so a null provenance renders nothing',
+  /roadTraceLast\.current\?\.provenance\s*&&/.test(_PANEL));
+
+// COUNTS ONLY. The panel is pixels on a real user's screen, so this is the assertion that keeps a
+// map line or a user's own words from ever being painted there.
+for (const field of ['supported', 'lines', 'unsupported', 'mild', 'severe', 'novelFactLines']) {
+  assert(`PANEL: the count «${field}» is displayed`, _PANEL.includes('provenance.' + field));
+}
+assert('PANEL: the per-line detail array is NEVER rendered — counts only, no content',
+  !_PANEL.includes('provenance.detail') && !_PANEL.includes('.on') && !_PANEL.includes('.novel}'));
+
+// REGRESSION: the existing road: line must survive untouched.
+assert('REGRESSION: the road: trace line is still rendered unchanged',
+  /road: labels=\{roadTraceLast\.current\.rawHasLabels/.test(_PANEL) &&
+  _PANEL.includes('roadTraceLast.current.parseAfterStrip'));
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed > 0 ? 1 : 0);

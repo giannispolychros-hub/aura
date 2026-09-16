@@ -5123,6 +5123,16 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
             {roadTraceLast.current && (
               <div>road: labels={roadTraceLast.current.rawHasLabels ? "Y" : "N"} raw={roadTraceLast.current.parseRaw} tags={roadTraceLast.current.parseAfterTags} strip={roadTraceLast.current.parseAfterStrip}</div>
             )}
+            {/* Provenance, same counters already logged as [AURA PROVENANCE]. On screen because the
+                console is unreachable on mobile, which is where the real Road Map sessions happen —
+                without this the measurement is written but uncollectable. Its own guard, so a turn
+                that produced no map renders nothing rather than an empty row. COUNTS ONLY: the
+                per-line `detail` array is deliberately not shown, since this paints pixels and must
+                never put a map line or a user's own words on a real screen. `novel` is the number
+                to read — `unsup` is known to under-report, see classifyRoadProvenance. */}
+            {roadTraceLast.current?.provenance && (
+              <div>prov: sup={roadTraceLast.current.provenance.supported}/{roadTraceLast.current.provenance.lines} unsup={roadTraceLast.current.provenance.unsupported} mild={roadTraceLast.current.provenance.mild} sev={roadTraceLast.current.provenance.severe} novel={roadTraceLast.current.provenance.novelFactLines}</div>
+            )}
           </div>
         )}
 
