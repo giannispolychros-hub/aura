@@ -109,5 +109,86 @@ assert("English pattern is contained to its own line too",
     return p !== null && p.roads.length === 1;
   })());
 
+// ── REAL-TRANSCRIPT LABEL TOLERANCE (numbered / bold road headings) ──────────────────────────
+// The map format is prompt text ("Use these exact labels"), so what actually arrives is whatever
+// the model wrote. In a real session the model numbered and bolded the headings —
+// "**ΔΡΟΜΟΣ 1: ...**" instead of "ΔΡΟΜΟΣ:" — and parseRoadMap returned null on a map that had
+// genuinely been produced. Measured consequences of that null: the dedicated road rendering in
+// MessageBubble returns early, ΑΓΝΩΣΤΟ is never extracted, and [AURA ROAD TRACE] logs parseRaw: 0,
+// which reads as "the model never produced one" — the exact opposite of what happened.
+//
+// THE STRIP REGEX IS TESTED TOGETHER WITH THE PARSER, ON PURPOSE. They are two halves of one
+// contract: the parser decides that a map exists, and the strip removes the raw block so it is not
+// shown twice. Making the parser more tolerant on its own would render every road TWICE — once as
+// a styled block, once as leftover text. That coupling is invisible in the source and is exactly
+// what a test has to hold.
+const REAL_TRANSCRIPT_MAP = [
+  'Εντάξει. Έχω αρκετό υλικό.',
+  '',
+  'Τρεις διαφορετικές κατευθύνσεις υπάρχουν με βάση αυτά που είπες:',
+  '',
+  '**ΔΡΟΜΟΣ 1: Παράλληλη εργασία στη νοσηλευτική**',
+  'ΚΕΡΔΙΖΕΙΣ: Χρησιμοποιείς γνώσεις που ήδη έχεις, χωρίς σπουδές',
+  'ΚΟΣΤΙΖΕΙ: Χρειάζεται να ξέρεις τι επιτρέπεται νομικά — αυτό παραμένει άγνωστο',
+  '',
+  '**ΔΡΟΜΟΣ 2: Gig economy (e-food, delivery κ.λπ.)**',
+  'ΚΕΡΔΙΖΕΙΣ: Ξεκινάς αμέσως, ευέλικτο ωράριο με 4 παιδιά',
+  'ΚΟΣΤΙΖΕΙ: Σκληρή δουλειά για σχετικά χαμηλό ρυθμό εισοδήματος',
+  '',
+  '**ΔΡΟΜΟΣ 3: Νέες σπουδές / επανακατάρτιση**',
+  'ΚΕΡΔΙΖΕΙΣ: Πιθανά υψηλότερο εισόδημα μακροπρόθεσμα',
+  'ΚΟΣΤΙΖΕΙ: Χρόνος με 4 παιδιά, και ο στόχος είναι 2-3 χρόνια',
+  '',
+  '**ΑΓΝΩΣΤΟ:** Τι επιτρέπεται νομικά παράλληλα με τη δημόσια θέση',
+  '',
+  'Ποιον δρόμο βλέπεις πιο ρεαλιστικό με τον ελεύθερο χρόνο που έχεις;',
+].join('\n');
+
+const _rtParsed = parseRoadMap(REAL_TRANSCRIPT_MAP);
+assert('REAL TRANSCRIPT: the numbered/bold map parses at all', _rtParsed !== null);
+assert('REAL TRANSCRIPT: all three roads are recovered',
+  _rtParsed !== null && _rtParsed.roads.length === 3);
+assert('REAL TRANSCRIPT: the road name carries no leftover markdown asterisks',
+  _rtParsed !== null && _rtParsed.roads[0].name === 'Παράλληλη εργασία στη νοσηλευτική');
+assert('REAL TRANSCRIPT: gain and cost are the model\'s own lines, unchanged',
+  _rtParsed !== null &&
+  _rtParsed.roads[1].cost === 'Σκληρή δουλειά για σχετικά χαμηλό ρυθμό εισοδήματος' &&
+  _rtParsed.roads[2].gain === 'Πιθανά υψηλότερο εισόδημα μακροπρόθεσμα');
+assert('REAL TRANSCRIPT: ΑΓΝΩΣΤΟ is extracted, without the bold label bleeding into the value',
+  _rtParsed !== null && _rtParsed.unknown === 'Τι επιτρέπεται νομικά παράλληλα με τη δημόσια θέση');
+
+// REGRESSION CONTROL, stated first so the assertions above cannot be satisfied by a parser that
+// simply got looser about everything: the canonical unnumbered form must keep working exactly.
+const CANONICAL_MAP = 'ΔΡΟΜΟΣ: Να μείνω\nΚΕΡΔΙΖΕΙΣ: σταθερότητα\nΚΟΣΤΙΖΕΙ: χρόνο\n\nΔΡΟΜΟΣ: Να φύγω\nΚΕΡΔΙΖΕΙΣ: χώρο\nΚΟΣΤΙΖΕΙ: ασφάλεια';
+const _canon = parseRoadMap(CANONICAL_MAP);
+assert('REGRESSION: the canonical unnumbered map still parses to 2 roads',
+  _canon !== null && _canon.roads.length === 2 && _canon.roads[0].name === 'Να μείνω');
+assert('REGRESSION: a reply with no map at all still returns null',
+  parseRoadMap('Τι σε κρατάει περισσότερο σε αυτό;') === null);
+
+// BEHAVIOURAL, against the REAL source of the display path rather than a copy of it: whatever the
+// parser accepts, the strip must remove, or the user sees every road twice.
+const _CODE_FOR_DISPLAY = (() => {
+  const i = raw.indexOf('const AURA_CORE_PERSONALITY');
+  const s = raw.indexOf('`', i) + 1;
+  return raw.slice(0, i) + raw.slice(raw.indexOf('`;', s));
+})();
+const _dcStart = _CODE_FOR_DISPLAY.indexOf('const displayContent = roadMap');
+const _dcEnd = _CODE_FOR_DISPLAY.indexOf(': msg.content;', _dcStart);
+assert('Display path located for evaluation', _dcStart >= 0 && _dcEnd > _dcStart);
+if (_dcStart >= 0 && _dcEnd > _dcStart) {
+  const _dcSrc = _CODE_FOR_DISPLAY.slice(_dcStart, _dcEnd + ': msg.content;'.length);
+  eval('function _stripRoadBlocks(msg, roadMap) { ' + _dcSrc + ' return displayContent; }');
+  const _shown = _stripRoadBlocks({ content: REAL_TRANSCRIPT_MAP }, _rtParsed);
+  for (const label of ['ΔΡΟΜΟΣ', 'ΚΕΡΔΙΖΕΙΣ', 'ΚΟΣΤΙΖΕΙ', 'ΑΓΝΩΣΤΟ']) {
+    assert(`NO DOUBLE RENDER: «${label}» is fully stripped from the prose shown alongside the blocks`,
+      !_shown.includes(label));
+  }
+  assert('NO DOUBLE RENDER: no orphaned markdown asterisks survive the strip',
+    !_shown.includes('*'));
+  assert('The surrounding prose itself is preserved — only the map blocks are removed',
+    _shown.includes('Έχω αρκετό υλικό') && _shown.includes('Ποιον δρόμο βλέπεις'));
+}
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed > 0 ? 1 : 0);

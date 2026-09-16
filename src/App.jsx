@@ -1765,15 +1765,24 @@ function stemGreekWord(word) {
 // gives the map the same protection.)
 function parseRoadMap(text) {
   if (!text) return null;
-  const re = /ΔΡΟΜΟΣ:\s*([^\n]+)\n\s*ΚΕΡΔΙΖΕΙΣ:\s*([^\n]+)\n\s*ΚΟΣΤΙΖΕΙ:\s*([^\n]+)/g;
+  // LABEL TOLERANCE (real-transcript fix): the map format lives in the prompt ("Use these exact
+  // labels"), so what arrives is whatever the model wrote. A real session produced
+  // "**ΔΡΟΜΟΣ 1: ...**" and this returned null on a map that had genuinely been built — the road
+  // rendering returned early, ΑΓΝΩΣΤΟ was never extracted, and [AURA ROAD TRACE] logged
+  // parseRaw: 0, reading as "the model never produced one". `\d*` accepts the numbering; the
+  // asterisks are cleaned off the captured values below rather than in the pattern, because they
+  // can land on either end of a field and stripping them there covers both without a wider regex.
+  const re = /ΔΡΟΜΟΣ\s*\d*\s*:\s*([^\n]+)\n\s*ΚΕΡΔΙΖΕΙΣ:\s*([^\n]+)\n\s*ΚΟΣΤΙΖΕΙ:\s*([^\n]+)/g;
+  // Markdown emphasis is never meaningful content in these fields — only formatting the model added.
+  const clean = s => String(s).replace(/\*/g, "").trim();
   const roads = [];
   let m;
   while ((m = re.exec(text)) !== null) {
-    roads.push({ name: m[1].trim(), gain: m[2].trim(), cost: m[3].trim() });
+    roads.push({ name: clean(m[1]), gain: clean(m[2]), cost: clean(m[3]) });
   }
   if (roads.length === 0) return null;
   const unknown = /ΑΓΝΩΣΤΟ:\s*([^\n]+)/.exec(text);
-  return { roads, unknown: unknown ? unknown[1].trim() : null };
+  return { roads, unknown: unknown ? clean(unknown[1]) : null };
 }
 function parseThreeBeatShift(text) {
   if (!text) return null;
@@ -3088,8 +3097,10 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
   const roadMap = !isUser ? parseRoadMap(msg.content) : null;
   const displayContent = roadMap
     ? msg.content
-        .replace(/ΔΡΟΜΟΣ:\s*[^\n]+\n\s*ΚΕΡΔΙΖΕΙΣ:\s*[^\n]+\n\s*ΚΟΣΤΙΖΕΙ:\s*[^\n]+/g, '')
-        .replace(/ΑΓΝΩΣΤΟ:\s*[^\n]+/g, '')
+        // KEPT IN LOCKSTEP WITH parseRoadMap's pattern above — whatever the parser accepts as a
+        // road block, this must remove, or the user sees each road twice.
+        .replace(/\*{0,2}ΔΡΟΜΟΣ\s*\d*\s*:\s*[^\n]+\n\s*ΚΕΡΔΙΖΕΙΣ:\s*[^\n]+\n\s*ΚΟΣΤΙΖΕΙ:\s*[^\n]+/g, '')
+        .replace(/\*{0,2}ΑΓΝΩΣΤΟ:\s*[^\n]+/g, '')
         .trim()
     : msg.content;
 
