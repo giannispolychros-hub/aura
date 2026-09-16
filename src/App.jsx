@@ -1784,6 +1784,55 @@ function parseRoadMap(text) {
   const unknown = /ΑΓΝΩΣΤΟ:\s*([^\n]+)/.exec(text);
   return { roads, unknown: unknown ? clean(unknown[1]) : null };
 }
+// ROAD-MAP PROVENANCE, PASSIVE MEASUREMENT ONLY (Measurement Before Modification — same standing
+// principle as the collision logger and the ΑΡΑ log). The prompt requires each ΚΕΡΔΙΖΕΙΣ/ΚΟΣΤΙΖΕΙ
+// to carry "only what they named", and nothing verifies that today. This counts; it decides
+// nothing, gates nothing, and is never shown to the user.
+//
+// READ THE NUMBERS WITH THIS CAVEAT, IT IS NOT A DETAIL. `supported` is a DELIBERATELY LOOSE
+// indicator: one content word of four or more characters reappearing anywhere in the user's
+// messages. Measured against the real transcript that motivated this, it reports 5 of 6 lines
+// supported — including both lines we know were fabricated, which pass on "χαμηλό" and "εισόδημα".
+// That is not a bug in the counter, it is the property being measured: a model writing a
+// fabricated cost naturally reuses the user's vocabulary, which is what makes it read as grounded.
+// So a low `unsupported` count is NOT evidence that provenance is fine.
+//
+// `novelFactLines` EXISTS BECAUSE OF THAT, and is computed INDEPENDENTLY of the loose gate rather
+// than nested inside it. Nested, it was unreachable: an invented "Ο ΕΟΠΥΥ αποζημιώνει 45 ευρώ"
+// scored SUPPORTED on the word "ευρώ" and the severity check never ran — which would have made
+// the SEVERE signal useless for the very decision it is meant to inform. "ευρώ" is in the stoplist
+// for the same reason: a bare unit word grounds nothing in a conversation about money.
+//
+// DECLARED CLASSIFICATION RULE, deliberately shallow and not a semantic classifier: a line carries
+// a novel fact when it contains a number, a percentage, or an all-caps token of three or more
+// characters that does not appear anywhere in the user's own messages. SEVERE = unsupported AND
+// carrying a novel fact. MILD = unsupported with no novel fact (stylistic phrasing, a mild
+// inference). Both are shallow labels on a shallow signal.
+function classifyRoadProvenance(roadMap, userTexts) {
+  const norm = s => String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const STOP = new Set(['για','και','που','αυτο','ειναι','τους','την','της','του','στο','στη','στον','στην',
+                        'με','σε','απο','των','δεν','θα','να','τι','ενα','μια','ολα','κατι','αλλα','οτι','ευρω']);
+  const corpus = norm((userTexts || []).join(" ◎ "));
+  const detail = [];
+  let supported = 0, mild = 0, severe = 0, novelFactLines = 0;
+  const fields = [];
+  ((roadMap && roadMap.roads) || []).forEach((r, i) => {
+    fields.push(['ΚΕΡΔΙΖΕΙΣ#' + (i + 1), r.gain]);
+    fields.push(['ΚΟΣΤΙΖΕΙ#' + (i + 1), r.cost]);
+  });
+  for (const [label, line] of fields) {
+    const tokens = String(line).match(/\d[\d.,%-]*|[Α-ΩA-Z]{3,}/g) || [];
+    const novel = tokens.filter(t => !corpus.includes(norm(t)));
+    if (novel.length > 0) novelFactLines++;
+    const content = norm(line).split(/[^a-zα-ω0-9]+/i).filter(w => w.length >= 4 && !STOP.has(w));
+    const hit = content.find(w => corpus.includes(w));
+    if (hit) { supported++; detail.push({ label, verdict: 'SUPPORTED', on: hit, novel }); continue; }
+    if (novel.length > 0) { severe++; detail.push({ label, verdict: 'SEVERE', novel }); }
+    else { mild++; detail.push({ label, verdict: 'MILD', novel }); }
+  }
+  return { lines: fields.length, supported, unsupported: mild + severe, mild, severe, novelFactLines, detail };
+}
+
 function parseThreeBeatShift(text) {
   if (!text) return null;
   const re = /ΗΡΘΕΣ ΜΕ:\s*([\s\S]*?)\nΒΡΗΚΕΣ:\s*([\s\S]*?)\nΦΕΥΓΕΙΣ ΜΕ:\s*([\s\S]*)/;
@@ -3743,13 +3792,26 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         // Same values, computed once: logged to the console as before, and kept on a ref so the
         // ?debug=1 panel can show them too — the browser console is unreachable on mobile, which
         // is where these sessions actually happen. Counters and one boolean only, never content.
+        // Provenance rides on the ref that already exists and is already cleared in resetSession,
+        // so this adds no session state and nothing for test_ref_reset_integrity to learn about.
+        // Counts and shallow labels only — never a line of the map, never a word the user wrote.
+        const _traceMap = parseRoadMap(_traceAfterStrip);
+        const _traceProv = _traceMap
+          ? (() => {
+              const { lines, supported, unsupported, mild, severe, novelFactLines } =
+                classifyRoadProvenance(_traceMap, msgs.filter(m => m.role === "user").map(m => m.content));
+              return { lines, supported, unsupported, mild, severe, novelFactLines };
+            })()
+          : null;
         const _traceOut = {
           rawHasLabels: _traceHasLabels,
           parseRaw: _traceRoads(rawTextWithTags),
           parseAfterTags: _traceRoads(_traceAfterTags),
           parseAfterStrip: _traceRoads(_traceAfterStrip),
+          provenance: _traceProv,
         };
         console.log('[AURA ROAD TRACE]', _traceOut);
+        if (_traceProv) console.log('[AURA PROVENANCE]', _traceProv);
         roadTraceLast.current = _traceOut;
       } catch (e) { /* diagnostics must never affect the session */ }
       try {

@@ -190,5 +190,98 @@ if (_dcStart >= 0 && _dcEnd > _dcStart) {
     _shown.includes('Έχω αρκετό υλικό') && _shown.includes('Ποιον δρόμο βλέπεις'));
 }
 
+// ── ROAD-MAP PROVENANCE INSTRUMENTATION (passive) ───────────────────────────────────────────
+// Measurement only. These assertions test two things with equal weight: that the counter counts
+// what it claims, and that it STAYS PASSIVE. If a later change wires it to a decision, the
+// passivity assertions fail first — that is their job.
+const _PROMPT_SPLIT = (() => {
+  const i = raw.indexOf('const AURA_CORE_PERSONALITY');
+  const s = raw.indexOf('`', i) + 1;
+  const e = raw.indexOf('`;', s);
+  return { PROMPT: raw.slice(s, e), CODE: raw.slice(0, i) + raw.slice(e) };
+})();
+
+// CACHE SAFETY, asserted structurally: the whole mechanism must live outside the cached prefix.
+assert('CACHE: classifyRoadProvenance is defined in CODE, not inside the prompt literal',
+  _PROMPT_SPLIT.CODE.includes('function classifyRoadProvenance(') &&
+  !_PROMPT_SPLIT.PROMPT.includes('classifyRoadProvenance'));
+assert('CACHE: no provenance wiring leaked into the prompt literal',
+  !_PROMPT_SPLIT.PROMPT.includes('AURA PROVENANCE') && !_PROMPT_SPLIT.PROMPT.includes('novelFactLines'));
+
+assert('classifyRoadProvenance is CALLED (defined-but-unused is the same failure)',
+  (_PROMPT_SPLIT.CODE.match(/classifyRoadProvenance\(/g) || []).length - 1 >= 1);
+
+eval(extract('classifyRoadProvenance'));
+
+const _PROV_USER = [
+  'νοσηλευτής αλλά είμαι στη δευτεροβάθμια εκπαίδευση και ταυτόχρονα στην ειδική αγωγή, τα 1.200€ που δίνει το κράτος στους εκπαιδευτικούς είναι πλέον πολύ χαμηλό εισόδημα και στόχος μου είναι οι τρεις χιλιάδες ευρώ το μήνα αλλά δεν ξέρω ποιον τρόπο θα το αποκτήσω',
+  'δεν ξέρω τις επιλογές μου σκέφτομαι να ξανασπουδάσω, δεν ξέρω και τι επιτρέπεται νομικά θέλω βοήθεια',
+  'αν ήξερα ότι μέσα σε δύο χρόνια αλλάζοντας καριέρα θα μου έφερνε εισόδημα θα έκανα τα πάντα αλλά όχι 15 χρόνια να γίνω υποδιευθυντής',
+  'ναι ανοιχτός σε οτιδήποτε, έχω βέβαια 4 παιδιά περιορισμένο χρόνο αλλά είμαι διατεθειμένος είτε να ξανασπουδάσω είτε να κάνω e-food και να φτάσω σε 2-3 χρόνια αυτό το εισόδημα',
+];
+const _prov = classifyRoadProvenance(parseRoadMap(REAL_TRANSCRIPT_MAP), _PROV_USER);
+assert('PROVENANCE: all six gain/cost lines of the real map are counted', _prov.lines === 6);
+
+// CALIBRATION PINNED ON PURPOSE, and it is the most important assertion here. On the very
+// transcript that motivated this instrument, the loose indicator reports FIVE OF SIX lines
+// supported — including both lines we independently know were fabricated, which pass on the single
+// words "χαμηλό" and "εισόδημα". This number is recorded so nobody later reads a low `unsupported`
+// count in production as evidence that provenance is fine. It measures vocabulary reuse, and a
+// fabricated line reuses vocabulary by construction.
+assert('CALIBRATION: the loose indicator scores 5/6 supported on the real transcript',
+  _prov.supported === 5 && _prov.unsupported === 1);
+assert('CALIBRATION: both known-fabricated lines score SUPPORTED — the documented blind spot',
+  (() => {
+    const cost2 = _prov.detail.find(d => d.label === 'ΚΟΣΤΙΖΕΙ#2');
+    const gain3 = _prov.detail.find(d => d.label === 'ΚΕΡΔΙΖΕΙΣ#3');
+    return cost2.verdict === 'SUPPORTED' && cost2.on === 'χαμηλο'
+        && gain3.verdict === 'SUPPORTED' && gain3.on === 'εισοδημα';
+  })());
+assert('CALIBRATION: the real transcript carries no novel fact, so it is MILD not SEVERE',
+  _prov.severe === 0 && _prov.mild === 1 && _prov.novelFactLines === 0);
+
+// SEVERE MUST BE REACHABLE. It was not, in the first version: novelty was nested inside the loose
+// gate, so an invented "Ο ΕΟΠΥΥ αποζημιώνει 45 ευρώ" scored SUPPORTED on the word "ευρώ" and the
+// severity check never ran. Since Step 4's decision rule keys on SEVERE, an unreachable SEVERE
+// would have made the whole measurement useless for the decision it exists to inform.
+const _fabricated = classifyRoadProvenance(
+  parseRoadMap('ΔΡΟΜΟΣ: Συμβάσεις\nΚΕΡΔΙΖΕΙΣ: Ο ΕΟΠΥΥ αποζημιώνει 45 ευρώ ανά επίσκεψη\nΚΟΣΤΙΖΕΙ: απαιτεί πιστοποίηση'),
+  _PROV_USER);
+assert('SEVERE IS REACHABLE: an invented organisation plus an invented number is flagged SEVERE',
+  _fabricated.severe === 1 && _fabricated.novelFactLines === 1);
+assert('SEVERE names the novel tokens it found, so the log can be audited',
+  (() => { const d = _fabricated.detail.find(x => x.verdict === 'SEVERE');
+           return d && d.novel.includes('ΕΟΠΥΥ') && d.novel.includes('45'); })());
+assert('A figure the user DID state is not novel (4 παιδιά appears in their own words)',
+  (() => { const r = classifyRoadProvenance(
+             parseRoadMap('ΔΡΟΜΟΣ: Χ\nΚΕΡΔΙΖΕΙΣ: ωράριο με 4 παιδιά\nΚΟΣΤΙΖΕΙ: χρόνος'), _PROV_USER);
+           return r.novelFactLines === 0; })());
+assert('No map at all yields no counting and does not throw',
+  (() => { const r = classifyRoadProvenance(null, _PROV_USER); return r.lines === 0 && r.unsupported === 0; })());
+
+// ── PASSIVE: the result may reach a console line and the existing trace ref, nothing else ──
+const _pIdx = _PROMPT_SPLIT.CODE.indexOf('const _traceProv =');
+assert('Provenance call site located', _pIdx >= 0);
+const _pWindow = _pIdx >= 0 ? _PROMPT_SPLIT.CODE.slice(_pIdx, _pIdx + 1400) : '';
+assert('PASSIVE: the result reaches console.log and roadTraceLast, and nothing else',
+  /console\.log\('\[AURA PROVENANCE\]'/.test(_pWindow) && /roadTraceLast\.current = _traceOut/.test(_pWindow));
+for (const forbidden of ['displayText', 'setMessages', 'setLoading', 'setMemory', 'saveMemory']) {
+  assert(`PASSIVE: «${forbidden}» never appears in the provenance window`,
+    !_pWindow.split('roadTraceLast.current = _traceOut')[0].includes(forbidden));
+}
+// Targeted at the one return that would matter: a BARE `return;` aborts the turn handler. A
+// `return { ... }` inside the local arrow is how the summary object is built and is not an exit —
+// an earlier, looser version of this assertion flagged exactly that and was wrong, not the code.
+assert('PASSIVE: no bare `return;` — the instrumentation can never abort the turn',
+  !_pWindow.split('roadTraceLast.current = _traceOut')[0].includes('return;'));
+assert('PASSIVE: the whole block is inside the diagnostics try/catch that can never break a turn',
+  _PROMPT_SPLIT.CODE.slice(_pIdx, _pIdx + 2200).includes('/* diagnostics must never affect the session */'));
+assert('NO NEW SESSION STATE: provenance rides roadTraceLast, which resetSession already clears',
+  /roadTraceLast\.current = null/.test(_PROMPT_SPLIT.CODE) &&
+  !/const\s+\w*[Pp]rovenance\w*\s*=\s*useRef/.test(_PROMPT_SPLIT.CODE));
+assert('NO CONTENT LOGGED: only counts reach the trace object, never a map line or a user word',
+  (() => { const o = _pWindow.slice(0, _pWindow.indexOf('console.log'));
+           return o.includes('lines, supported, unsupported, mild, severe, novelFactLines') && !o.includes('detail'); })());
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed > 0 ? 1 : 0);
