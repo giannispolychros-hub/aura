@@ -3081,28 +3081,46 @@ function capMessageHistory(messages, systemPrompt = "", maxChars = 20000, minKee
 }
 
 async function callAura(messages, systemPrompt, retries = 1, onChunk = null) {
-  // Prompt caching (Anthropic docs, confirmed 2026-07): AURA_CORE_PERSONALITY (~54KB) is the
-  // exact same prefix shared by every lens/compression system prompt, every turn, within a
-  // session — and across sessions too. Splitting it into its own cache_control block means
-  // repeated calls hit the cache (0.1x price) instead of full-price reprocessing every turn.
-  // No beta header needed for the standard 5-minute ephemeral cache. SYSTEM_TERMINATION doesn't
-  // share this prefix, so it's sent as a single block — harmless no-op if under the 1,024-token
-  // minimum cacheable length for Sonnet models.
-  // RT-fix (real production crash — "t.startsWith is not a function"): one call site already
-  // builds systemPrompt as an array with its own cache_control (the main conversation turn).
-  // Handle both shapes defensively instead of assuming every caller passes a plain string.
+  // PROMPT CACHING — THE ONLY PLACE IN THE CODEBASE THAT DECIDES CACHE BLOCKS. It has to be the
+  // only one: caching is a byte-exact prefix match, so a second construction site means a second
+  // cache entry for the same text, and a ~75,000-token entry costs ~$0.45 to write against
+  // ~$0.0225 to read. The main conversational path used to build its own array here and put the
+  // marker after the lens suffix, which is exactly how five near-identical ~292,000-character
+  // entries came to exist; it now passes a string like every other call site.
+  //
+  // AURA_CORE_PERSONALITY is the exact shared prefix of every lens prompt and of SYSTEM_COMPRESSION,
+  // so the breakpoint goes at its END and nowhere else. Whatever follows — the lens suffix, the
+  // memory and profile context, the per-turn dynamicSuffix, the misfire or First-WHY instructions —
+  // lands in the uncached second block, which is correct: that content changes every turn.
+  //
+  // MINIMUM CACHEABLE PREFIX is 1,024 tokens on Sonnet models, and a shorter block silently caches
+  // nothing while still consuming one of the four available breakpoints. CACHEABLE_MIN_CHARS is set
+  // against the worst case (pure ASCII at ~4 chars/token needs ~4,096 characters) with margin, so
+  // SYSTEM_TERMINATION (~19,400 chars, completely static, three call sites at the end of a session,
+  // previously sent at full price every time) gets marked and SYSTEM_SUPPORTIVE (~851 chars, far
+  // below the floor) correctly does not.
+  //
+  // TTL is deliberately NOT uniform. CORE keeps 1h because a genuine thinking pause mid-session
+  // would otherwise expire it; the static non-CORE prompts take the 5-minute default, whose write
+  // is 1.25x instead of 2x, because the calls that use them arrive seconds apart. Whether 1h earns
+  // its doubled write price on CORE is an open question — the usage counters logged below are what
+  // will answer it, rather than another guess.
+  //
+  // RT-fix kept (real production crash — "t.startsWith is not a function"): the array branch is
+  // defensive only. No call site passes an array any more.
+  const CACHEABLE_MIN_CHARS = 6000;
   const systemBlocks = Array.isArray(systemPrompt)
     ? systemPrompt
     : (typeof systemPrompt === "string" && systemPrompt.startsWith(AURA_CORE_PERSONALITY))
       ? [
-          // 1-hour TTL (real red-team finding): default 5-minute cache lifetime risks expiring
-          // while someone genuinely thinks through a heavy decision before replying - and the
-          // core prompt has grown substantially today, making a cold cache-miss costlier in
-          // latency than before. Extends the already-existing caching benefit to this exact case.
           { type: "text", text: AURA_CORE_PERSONALITY, cache_control: { type: "ephemeral", ttl: "1h" } },
           { type: "text", text: systemPrompt.slice(AURA_CORE_PERSONALITY.length) },
         ]
-      : [{ type: "text", text: systemPrompt }];
+      : [
+          typeof systemPrompt === "string" && systemPrompt.length >= CACHEABLE_MIN_CHARS
+            ? { type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }
+            : { type: "text", text: systemPrompt }
+        ];
   if (_activeCall && retries === 1) {
     // RT-fix: brief grace window instead of immediate hard fail — two legitimate
     // actions can overlap by a few hundred ms without either being a real error.
@@ -3163,6 +3181,27 @@ async function callAura(messages, systemPrompt, retries = 1, onChunk = null) {
       return full;
     }
     const data = await res.json();
+    // COST INSTRUMENTATION — counts only, strictly passive, same principle as the collision logger.
+    // The API already returns token usage on every response and the proxy passes it through
+    // untouched; the client simply threw it away. That left the three questions the cost audit
+    // could not answer — what the real cache hit rate is, how often a cold write actually happens,
+    // and therefore whether the 1-hour TTL's doubled write price earns itself — answerable only by
+    // guessing. cacheWrite > 0 means this turn paid a cold write; cacheRead > 0 means it hit.
+    // FOUR INTEGERS. Nothing about the conversation is read here, and nothing is written to
+    // storage. __auraUsageLog exists because a phone has no console to read.
+    try {
+      const _u = data.usage || {};
+      const _counts = {
+        in:         _u.input_tokens || 0,
+        cacheRead:  _u.cache_read_input_tokens || 0,
+        cacheWrite: _u.cache_creation_input_tokens || 0,
+        out:        _u.output_tokens || 0,
+      };
+      window.__auraLastUsage = _counts;
+      (window.__auraUsageLog = window.__auraUsageLog || []).push(_counts);
+      console.log('[AURA usage] in', _counts.in, '| cacheRead', _counts.cacheRead,
+                  '| cacheWrite', _counts.cacheWrite, '| out', _counts.out);
+    } catch (e) { /* instrumentation must never affect a session */ }
     return data.content?.map(b => b.text || "").join("") || "";
   } catch (err) {
     if (err.name === "AbortError") {
@@ -3840,14 +3879,25 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
                       '| highest-attention:', fired[fired.length - 1]);
         }
       } catch (e) { /* logging must never affect the session */ }
-      // Prompt caching: basePrompt (core+lens, identical across calls) is the large stable block —
-      // cache_control marks it so repeat calls in the same session read it at ~10% cost instead of
-      // full price. 1-hour TTL (not the 5-minute default) so a genuine thinking pause between
-      // messages doesn't cost the latency benefit — real red-team finding, same as above.
-      const system = [
-        { type: "text", text: basePrompt, cache_control: { type: "ephemeral", ttl: "1h" } },
-        ...(dynamicSuffix ? [{ type: "text", text: dynamicSuffix }] : []),
-      ];
+      // PROMPT CACHING — this path hands callAura a plain STRING and lets it place the breakpoint,
+      // exactly as the other six call sites already did. It used to build its own array with the
+      // marker AFTER the lens suffix, and that one difference was the single largest avoidable cost
+      // in the product. Caching is a byte-exact prefix match, so CORE+SIMPLIFY, CORE+CHALLENGE,
+      // CORE+PERSPECTIVE, CORE+EXPLORE, CORE+COMPRESSION and the CORE-only block callAura builds
+      // for every other path were SIX separate cache entries, five of them ~292,000 characters.
+      // Each one costs its own write, and a 1-hour-TTL write is 2x input price against 0.1x for a
+      // read — one write is worth twenty reads.
+      //
+      // Measured consequences of that, per session: a returning user paid TWO writes guaranteed
+      // (First-WHY writes the CORE-only entry at their second message, then every main-path turn
+      // wrote the CORE+lens entry), and every lens switch — after COMPRESSION, on distress, on
+      // First-WHY inference — bought another. Estimated at ~75,000 tokens for CORE and Sonnet 4.6
+      // rates, that is ~$0.45 per avoidable write against ~$0.0225 for the read it replaces.
+      //
+      // Nothing is dropped: the lens suffix and dynamicSuffix simply move into the UNCACHED second
+      // block, which is where per-turn content belongs anyway. dynamicSuffix is already '' when no
+      // ctx fired, so concatenating is a no-op on those turns.
+      const system = basePrompt + dynamicSuffix;
       const rawTextWithTags = await callAura([...contextRefresh, ...msgs], system);
       // DIAGNOSTIC SHADOW TRACE — road-map extraction chain (purely observational, zero behavioural
       // effect). Added because the ΔΡΟΜΟΣ/ΚΕΡΔΙΖΕΙΣ/ΚΟΣΤΙΖΕΙ map never appeared across 5 real
