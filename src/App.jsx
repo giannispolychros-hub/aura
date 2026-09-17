@@ -106,7 +106,7 @@ VALIDATION: "Δεν μπορώ να το κάνω αυτό. Αν θέλεις ν
 STALLED: "Αν έπρεπε να πάρεις την ακριβώς αντίθετη απόφαση, ποιο θα ήταν το μοναδικό επιχείρημα που θα σε ανάγκαζε;"
 DISTRESS: "Αυτό ακούγεται βαρύ. Εννοείς ότι σκέφτεσαι να βλάψεις τον εαυτό σου;"
 IDENTITY DRIFT (3rd instance): "Η AURA είναι εργαλείο σκέψης. Ο ρόλος δεν αλλάζει."
-OPENING (first message of a new session, no prior open thread — real-user evidence: 0 of 20 real users returned after first use, and the entry point is the leading suspect; this is not a phrasing tweak, it is a reframe from "bring me a problem" to "help find what's already active"): Say something in the spirit of "Δεν χρειάζεται να έχεις έτοιμη απάντηση. Ξεκίνα από κάτι που υπάρχει ήδη στο μυαλό σου." EARLY SELF-CENSORSHIP FRAMING (research audit finding — the narrative-coherence/meaning-making cost of polishing applies from the very first words on a genuinely unresolved topic, not only once repetition is later detected; the psychological permission Burn Paper gives mid-session already exists, this just states it from the start instead of only once a trigger fires — pure framing, no new mechanism, no new trigger): weave in, naturally, not as a separate line: ό,τι πεις εδώ δεν αξιολογείται, δεν κρίνεται — μπορεί να είναι πρόχειρο, ημιτελές, αντιφατικό. ENTRY IS HANDLED BEFORE THIS CONVERSATION BEGINS — NEVER ASK WHAT BRINGS THEM HERE (structural fix after the same bug was reported three times and three separate suppressions failed: this rule previously contained the whole door-asking apparatus — the opening question and all four fallback doors written out verbatim in Greek — followed by an instruction not to use them when a door had already been tapped. That could not work. The prohibition was abstract while the doors were concrete text sitting right beside it, and a model reaches for what is written. The mechanism is now removed rather than suppressed, because the intro screen asks this question in every session, so the prompt asking it is a duplicate of a screen that always runs): the person has already answered why they are here — either by tapping a door, in which case a USER'S OWN STATED ENTRY POINT block appears above with their exact choice, or by choosing to say it themselves and then typing it. Either way they have told you. Do not ask what brings them here, do not offer categories to pick from, and do not rephrase either as a fresh opening question. Go straight to the material they actually wrote. OPENING RADAR and ORIENTATION DETECTION's dispatch table below run exactly as normal — a chosen door gives one coordinate, not the whole picture.
+OPENING (first message of a new session, no prior open thread — real-user evidence: 0 of 20 real users returned after first use, and the entry point is the leading suspect; this is not a phrasing tweak, it is a reframe from "bring me a problem" to "help find what's already active"): Say something in the spirit of "Δεν χρειάζεται να έχεις έτοιμη απάντηση. Ξεκίνα από κάτι που υπάρχει ήδη στο μυαλό σου." EARLY SELF-CENSORSHIP FRAMING (research audit finding — the narrative-coherence/meaning-making cost of polishing applies from the very first words on a genuinely unresolved topic, not only once repetition is later detected; the psychological permission Burn Paper gives mid-session already exists, this just states it from the start instead of only once a trigger fires — pure framing, no new mechanism, no new trigger): weave in, naturally, not as a separate line: ό,τι πεις εδώ δεν αξιολογείται, δεν κρίνεται — μπορεί να είναι πρόχειρο, ημιτελές, αντιφατικό. ENTRY IS HANDLED BEFORE THIS CONVERSATION BEGINS — NEVER ASK WHAT BRINGS THEM HERE (structural fix after the same bug was reported three times and three separate suppressions failed: this rule previously contained the whole door-asking apparatus — the opening question and all four fallback doors written out verbatim in Greek — followed by an instruction not to use them. That could not work. The prohibition was abstract while the doors were concrete text sitting right beside it, and a model reaches for what is written. The mechanism is removed rather than suppressed, here and everywhere else): the entry screen invites them to write their problem in their own words, and what you are reading is what they wrote. There is no menu of categories any more, in the product or in this prompt — the five-way tap that used to precede this was removed after measurement showed it classified the person without changing anything downstream, and classifying them is the one thing entry must never do. So they have already told you why they are here, in their own words, unprompted and uncategorised. Do not ask what brings them here, do not offer categories to pick from, and do not rephrase either as a fresh opening question. Go straight to the material they actually wrote. OPENING RADAR and ORIENTATION DETECTION's dispatch table below run exactly as normal, with no coordinate given in advance — their opening message is the only thing you have, and it is enough to start.
 OPEN BEFORE PROBE (architectural principle, not a new stage — makes the existing first step smarter, doesn't make AURA bigger; grounded in problem-formulation research: articulating an unclear problem is itself part of resolving it, and open-ended questions produce more problem-related statements and aid problem identification, without necessarily increasing how much the person talks overall): first make it easy for the user to unfold their own material. Only then ask a targeted question. Never introduce the possible dimensions of the problem yourself before the user offers them — this applies to any topic, not only dilemmas with two sides: a job decision, a pattern of procrastination, anything.
 NOT MECHANICAL (critical distinction — this does not fire on every turn regardless of what's already there): if what the user already said is thin, open first: "Άνοιξέ το λίγο. Τι σε προβληματίζει περισσότερο σε αυτό;" If what they already said is already rich — states multiple real dimensions in one breath, e.g. "Θέλω να πάω γιατί είναι σημαντικοί άνθρωποι για μένα, αλλά πλέον δεν πίνω και ξέρω ότι θα βαρεθώ" — do not say "άνοιξέ το λίγο" redundantly; go directly to the targeted question the material already earns. Same exception already documented for Orientation Detection below applies here, not a separate rule.
 FUNCTION, NOT CONTENT (what "άνοιξέ το λίγο" actually means, stated explicitly so it isn't misread as a content-question): it does not mean "tell me more because I didn't understand." It means "don't try to hand me the polished, perfect version of the problem yet — give me the material as it actually exists in your mind." Never offer categories to choose from ("είναι η κούραση, η υποχρέωση, το FOMO;") — that supplies the user's own answer before they generate it. DUMPING GUARD (real risk — an unfiltered response can run long): once material arrives, do not restate or summarize all of it — reuse the already-existing MANDATORY 3-STAGE PROTOCOL'S ACTIONABLE HOOK to find what keeps the confusion alive, then let Orientation Detection below apply to that, now richer, material.
@@ -1288,19 +1288,20 @@ function inferLensFallback(firstMessage, whyWord) {
   return best;
 }
 
-// ONE ENTRY CONTEXT, USED BY EVERY PATH (structural trace finding: three separate places build a
-// prompt — the main conversational path, the First-WHY branch, and misfire recovery — and only the
-// first carried the entry ticks. The First-WHY branch runs for RETURNING users specifically, so a
-// user who tapped a door and answered the time question reached the model with neither, on the very
-// path where their first real reply is generated. Built once here rather than duplicated, so the
-// three paths cannot drift apart again.)
-function buildEntryContext(door, time, isFirstReply) {
-  if (!door && !time && !isFirstReply) return '';
-  const parts = [];
-  if (isFirstReply) parts.push(`FIRST REPLY FLOOR (this branch generates the session's first substantive reply, and the code-level floor that guards it was only wired to the main path): Assumption Surfacing, Premise Inversion, Contradiction Detection and any binary-choice framing are all held back for this one turn regardless of how the material looks. Respond only with open, natural material-gathering per OPEN BEFORE PROBE. These become available from the next reply onward.`);
-  if (door) parts.push(`THE ENTRY QUESTION IS ALREADY ANSWERED — DO NOT ASK IT. They tapped "${door}" before writing a word. Level 1 evidence per SPECIFICITY ORDERING: use it as a head start for OPENING RADAR and to narrow which dispatch entry fits, and never ask what brings them here again in any form.`);
-  if (time) parts.push(`TIME THEY HAVE, their own answer: "${time}". Changes HOW rather than WHAT: "Καθόλου" means markedly shorter, skip what can wait, reach the decision space fast, and do not ask about urgency again since they just answered it. "Αρκετό" permits real depth. "Λίγο" is the middle setting and means neither of those: no push toward speed and no licence for a long exploratory arc — one question at a time, with room to answer it, no acceleration toward the decision space and no lengthening. It is a setting of intensity, not only of duration.`);
-  return `\n[${parts.join(' ')}]\n`;
+// FIRST REPLY FLOOR FOR THE First-WHY BRANCH. This used to be a shared entry-context builder that
+// carried three things to three prompt-building paths: the door the user tapped, the time they said
+// they had, and this floor. The doors and the time question were removed from the product — the
+// context they injected was measured to be 83.9% identical door-to-door and 99.8% identical
+// time-to-time, the routing table was sent whole on every session regardless of the tap, and a
+// four-condition experiment found no attributable difference in the first reply.
+//
+// THE FLOOR IS NOT PART OF THAT REMOVAL AND STAYS. The main conversational path has its own
+// firstReplyFloorCtx; the First-WHY branch generates the session's first substantive reply for
+// RETURNING users and never passed through it, so it needs its own copy. The misfire-recovery
+// path used to call the old builder too, but only ever for the entry ticks — with those gone it
+// asked for a floor it never wanted, so that call site is removed rather than left returning ''.
+function buildFirstWhyFloor() {
+  return `\n[FIRST REPLY FLOOR (this branch generates the session's first substantive reply, and the code-level floor that guards it was only wired to the main path): Assumption Surfacing, Premise Inversion, Contradiction Detection and any binary-choice framing are all held back for this one turn regardless of how the material looks. Respond only with open, natural material-gathering per OPEN BEFORE PROBE. These become available from the next reply onward.]\n`;
 }
 function getLensPrompt(lens) {
   switch(lens) {
@@ -3283,17 +3284,11 @@ export default function AURAv2() {
   // in a real dilemma who doesn't want a demo) or "see how it works first" (secondary → the
   // existing intro/demo overlay). null = choice not yet made.
   const [introChoice, setIntroChoice] = useState(null); // null | "demo" | "direct"
-  const [entryDoor, setEntryDoor] = useState(null);
-  const [entryTime, setEntryTime] = useState(null);
   // SCOPE FIX (AST analysis): misfireInput and setMisfireInput are used in the misfire-recovery
   // panel but were never declared anywhere — that panel threw ReferenceError the moment it rendered.
   const [misfireInput, setMisfireInput] = useState("");
-  const entryTimeRef = useRef(null); // which entry door the user picked, or null if they chose to say it themselves
-  const entryDoorRef = useRef(null);
   const introChoiceRef = useRef(null); // mirror for async access inside generateResponse
   useEffect(() => { introChoiceRef.current = introChoice; }, [introChoice]);
-  useEffect(() => { entryDoorRef.current = entryDoor; }, [entryDoor]);
-  useEffect(() => { entryTimeRef.current = entryTime; }, [entryTime]);
   // philosophyShown removed — its screen («Γνώθι σαυτόν») was deleted and nothing set it
   const [introShown, setIntroShown] = useState(() => {
     // Returning users skip intro — only show once per install
@@ -3809,11 +3804,6 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
       const userStagnationCtx = (!roadQuestionState.current && detectUserStagnation(msgs).stagnant)
         ? `\n[CODE-VERIFIED: the user's own last 2 replies introduced almost no new material AND became markedly shorter than their earlier ones. This is observed from what they actually wrote, not inferred about how they feel. It is direct evidence that the current approach has stopped producing movement FOR THEM — the strongest possible input to STRATEGY PRE-MORTEM GATE's "is this strategy failing here?" check. Do not wait for them to repeat themselves further or to say so explicitly: switch to a genuinely different region of INTERVENTION SPACE now, or if enough material already exists, stop gathering and reflect the shape of what they have already given (PROBLEM STRUCTURE MAP / VERBATIM COST COLLISION). AND IF GENUINELY DISTINCT DIRECTIONS ARE ALREADY IMPLIED BY WHAT THEY HAVE SAID, THIS IS THE MOMENT FOR ROAD DISCOVERY — THE ONE NAMED EXCEPTION's PATH TWO, with all its output tests (distinctness, consequence, level, completeness) and their QUALITY BAILOUT clauses intact. A user who has stopped producing new material is not asking for another question; they have given what they have. Showing them the actual shape of their decision space is the work. If the material genuinely does not support distinct directions, say that plainly instead — that is also a real finding, never a reason to invent one. TWO MOVES THAT BELONG SPECIFICALLY TO THIS MOMENT, available here and nowhere else (founder's framing — the product is not an AI that asks good questions, it is one that works out which question this person's thinking needs now; both of these become possible precisely because the evidence above shows the problem has stopped being understanding of the topic and has become inability to move): (a) ASK WHY IT IS STILL OPEN rather than asking more about the topic — "τι είναι αυτό που σε κάνει να το σκέφτεσαι ακόμα;" targets the stuckness itself, not its content, and it works on any subject because it presupposes nothing about what kind of problem this is. (b) QUESTION THE FRAME, but only where their own material contradicts it — when someone has described a decision at length while everything they actually said points elsewhere, "μήπως δεν προσπαθείς να αποφασίσεις αυτό, αλλά κάτι άλλο;" is legitimate. HARD CONDITION on (b): only when the evidence for the mismatch is in their own words, never as a general-purpose move, and always as a question they can reject outright — if they say no, that is the end of it and the frame stands. Offered as a question, never as an interpretation stated.]\n`
         : '';
-      const entryDoorCtx = entryDoorRef.current
-        ? `\n[THE ENTRY QUESTION IS ALREADY ANSWERED — DO NOT ASK IT. They tapped "${entryDoorRef.current}" before writing a word. Do not ask what brings them here, do not ask them to pick from doors, do not offer "μια απόφαση που δεν έχει ξεκαθαρίσει / κάτι που σε αγχώνει / κάτι που αναβάλλεις" as alternatives, and do not rephrase any of these as a fresh question. That entire mechanism is finished for this session — asking again after they answered by tapping reads as not having listened, and it is the single most-reported failure in live use. Your first reply goes to their actual material.
-USER'S OWN STATED ENTRY POINT: "${entryDoorRef.current}". This is Level 1 evidence per SPECIFICITY ORDERING — their explicit words, the highest-trust tier. Use it as a HEAD START, never as a replacement: OPENING RADAR still runs, but one coordinate is already given, so do not ask for what they just told you — in particular, if the door already answers how urgent this is, do not ask about urgency again. It also sets TONE AND DEPTH from the first reply: the chronic doors ("επιστρέφει", "αναβάλλω") mean there is no clock but there IS a pattern already available as material. Urgency is not read from the door at all — it is the TIME block below, their own separate answer, that sets pace. THE TWO OPENING QUESTIONS ARE ONE MOVE, NOT TWO STEPS (founder's requirement — they must be inseparably linked): OPENING RADAR gathers what is missing, and ORIENTATION DETECTION's dispatch table decides what the second question does with it. They are not sequential stages that each get a turn — the first is shaped by what the door already gave, and the second is determined by what the first surfaced. If the door plus their opening message already supply the coordinates, OPENING RADAR asks nothing and the dispatch entry fires immediately. Two turns is the maximum this pair ever costs, and often it is one.
-EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded but actually determines the second question: "επιστρέφει στο μυαλό μου" → a pattern already exists as material, so ask what keeps bringing it back rather than gathering more. "ξέρω τις επιλογές μου αλλά δεν μπορώ να αποφασίσω" → the decision space is already named; go straight to VERBATIM COST COLLISION and the neither-cost-acceptable ending, do NOT re-collect options they just told you they have. "έχω πολλά μαζί" → the flooded-opening entry, CLARITY PIVOT's distillation form. "συνεχίζω να αναβάλλω" → the paralysis entry, the forward projection that restores movement. "το αποφάσισα ήδη" → ARRIVES ALREADY DECIDED, map what it costs, never re-open the decision. Each door removes work the first question would otherwise have to do; treating it as background colour and asking anyway is the failure this exists to prevent. NOT a classification of the person: it describes what they brought today, nothing about who they are, and it expires with this session.]\n${entryTimeRef.current ? `[TIME THEY HAVE, their own answer: "${entryTimeRef.current}". Also Level 1 evidence, and it changes HOW rather than WHAT: "Καθόλου" means be markedly shorter, skip anything that can wait, and reach the decision space fast — do not open long exploratory arcs and do not ask about urgency again, they just answered it. "Αρκετό" permits real depth. "Λίγο" is the middle setting and means neither of those: no push toward speed and no licence for a long exploratory arc — one question at a time, with room to answer it, no acceleration toward the decision space and no lengthening. It is a setting of intensity, not only of duration. This is a factual answer about their calendar, never a judgement about how much the problem matters.]\n` : ""}`
-        : '';
       // ATTENTION-ORDER FIX (decision-architecture audit finding): position inside injected context
       // affects how reliably an instruction is followed, and firstReplyFloorCtx — a HARD floor
       // constraint ("do not press on the very first reply") — previously sat 6th of 13, buried
@@ -3821,7 +3811,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
       // weakest-to-strongest, so hard constraints occupy the final, highest-attention position:
       // (1) informational background, (2) situational signals, (3) hard constraints last.
       const dynamicSuffix = [
-        memCtx, profileCtx, materialEvidenceCtx, demoCtx, informationModeCtx, explicitPauseCtx, entryDoorCtx,
+        memCtx, profileCtx, materialEvidenceCtx, demoCtx, informationModeCtx, explicitPauseCtx,
         coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx, roadQuestionCtx,
         gatesCtx, closingDriftCtx, firstReplyFloorCtx,
       ].filter(Boolean).join('\n');
@@ -3833,7 +3823,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
       // every fix today lacked.)
       try {
         const fired = Object.entries({
-          memCtx, profileCtx, materialEvidenceCtx, demoCtx, informationModeCtx, explicitPauseCtx, entryDoorCtx,
+          memCtx, profileCtx, materialEvidenceCtx, demoCtx, informationModeCtx, explicitPauseCtx,
           coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx,
           clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx, roadQuestionCtx, gatesCtx, closingDriftCtx,
           firstReplyFloorCtx,
@@ -4402,7 +4392,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
       ...messages,
       { role: "user", content: userCorrection || "[User indicated the observation was inaccurate. Apply misfire recovery protocol.]" }
     ];
-    const recoveryPrompt = getLensPrompt(activeLens) + buildEntryContext(entryDoorRef.current, entryTimeRef.current, false) + `\n\nMISFIRE RECOVERY: The user has indicated your previous observation was inaccurate or incomplete. Your response must begin with: "Understood. My interpretation appears incomplete." Then ask: "What am I missing that changes the picture?" Do not repeat the original observation.`;
+    const recoveryPrompt = getLensPrompt(activeLens) + `\n\nMISFIRE RECOVERY: The user has indicated your previous observation was inaccurate or incomplete. Your response must begin with: "Understood. My interpretation appears incomplete." Then ask: "What am I missing that changes the picture?" Do not repeat the original observation.`;
     setLoading(true);
     try {
       const text = stripAraDeclarative(await callAura(correctionMsgs, recoveryPrompt));
@@ -4625,7 +4615,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         // #10 fix: inject profile summary in firstWhy path too
         const profileCtx = getProfileSummary(memory);
         const profileWithRules = profileCtx ? profileCtx + HONEST_UNCERTAINTY_RULE : '';
-        const prompt = [getLensPrompt(inferred), memCtx, profileWithRules, buildEntryContext(entryDoorRef.current, entryTimeRef.current, true)].filter(Boolean).join('\n');
+        const prompt = [getLensPrompt(inferred), memCtx, profileWithRules, buildFirstWhyFloor()].filter(Boolean).join('\n');
         const text = stripAraDeclarative(await callAura(initMsgs, prompt));
         setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "ANSWER" }]);
         // U1: Start trajectory for this category
@@ -4773,10 +4763,6 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
     window.__auraLastCollision = null;
     setValueUnlocked(false);
     setIntroChoice(null);
-    setEntryDoor(null);
-    entryDoorRef.current = null;
-    setEntryTime(null);
-    entryTimeRef.current = null;
     setError(null);
     setClaritySurge(false);
     setIllumLevel(0);
@@ -5106,52 +5092,32 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         {/* ── AURA Light Field (background, state-driven) ── */}
         <div className={`light-field ${illumLevel > 0 ? "clear" : ""} ${claritySurge ? "surge" : ""}`} />
 
-        {/* ── Intro choice — first thing shown: start directly (primary) or see the demo first ── */}
+        {/* ── Entry — ONE open invitation, then the chat ── */}
+        {/* WHAT THIS SCREEN USED TO BE, and why it is one line now. It carried five taps ("what
+            brings you here") followed by a second screen asking how much time they had. Both were
+            removed after measurement, not after a hunch:
+              • the context each tap injected was 83.9% identical to every other tap's, and the
+                three time answers were 99.8% identical to each other;
+              • the routing table it sent named all five routes and all three time descriptions on
+                EVERY session, whatever was tapped — so the tap was recorded, never used;
+              • the two instruction headings it sent existed nowhere in the prompt: the model was
+                being handed a mechanism its own instructions never mentioned;
+              • a four-condition experiment found no difference in the first reply attributable to
+                which door was tapped.
+            That is a five-way classification of the person that changed nothing downstream, priced
+            at two screens before they type a word — and classifying them is the one thing this
+            screen was explicitly never supposed to do. What remains is the invitation itself.
+            The old "Θα το πω μόνος μου" escape hatch is now simply the entry. */}
         {messages.length === 0 && !sessionStarted && introChoice === null && (
           <div ref={el => { if (el) el.scrollTop = 0; }} style={{position:"fixed",inset:0,zIndex:61,background:"#0d0c0a",overflowY:"auto",padding:"36px 24px 48px"}}>
             <div style={{maxWidth:"380px",width:"100%",margin:"0 auto",textAlign:"center"}}>
-              {/* OLD INTRO TEXT REMOVED (fifth report of "three screens"): the rewritten intro lives on the
-                  first screen; this block still carried the previous version — "Όλοι δίνουν απαντήσεις",
-                  "Αύρα", "Δες που κολλάς" — so the user met an introduction, then a SECOND introduction
-                  with the doors underneath, then the time question. Both texts existed simultaneously.
-                  This screen now carries only the doors. */}
-              {/* Entry doors — these already existed inside AURA's first message (Zeigarnik-grounded:
-                  unfinished, recurring thoughts stay mentally active). Surfacing them here, before the
-                  user types, so they know what kind of thing this is for. Deliberately NOT sent to the
-                  model and NOT stored: the choice exists to sharpen the USER's own sense of what they
-                  are bringing, never to let AURA classify them — so this adds no state and no inference. */}
-              {entryDoor === null ? (<>
-              {/* Header lives INSIDE the branch (live bug, reported three times and misdiagnosed twice
-                  as a prompt problem): it was outside the conditional, so it stayed on screen when the
-                  content switched to the time question — the user saw "Τι σε φέρνει εδώ;" above a set
-                  of time options and read it as being asked the same thing again. */}
-              <div style={{fontSize:"12px",color:"#8a8680",letterSpacing:".06em",marginBottom:"12px",textAlign:"left"}}>
-                Τι σε φέρνει εδώ;
+              <div style={{fontSize:"13px",color:"#8a8680",lineHeight:1.6,marginBottom:"18px",textAlign:"left"}}>
+                Δεν χρειάζεται να το έχεις καθαρό. Γράψ' το όπως είναι.
               </div>
-              {["Κάτι που επιστρέφει στο μυαλό μου","Ξέρω τις επιλογές μου αλλά δεν μπορώ να αποφασίσω","Έχω πολλά μαζί και δεν ξέρω τι έχει σημασία","Κάτι που συνεχίζω να αναβάλλω","Κάτι το αποφάσισα ήδη"].map(door => (
-                <button key={door} onClick={()=>setEntryDoor(door)}
-                  style={{display:"block",width:"100%",background:"transparent",border:"1px solid rgba(201,168,76,0.18)",color:"#c9c5bc",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",marginBottom:"8px",cursor:"pointer",borderRadius:"4px"}}>
-                  {door}
-                </button>
-              ))}
-              <button onClick={()=>{setEntryDoor(null);setIntroChoice("direct");setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}}
-                style={{display:"block",width:"100%",background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.35)",color:"rgba(201,168,76,0.85)",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",marginTop:"6px",cursor:"pointer",borderRadius:"4px"}}>
-                Θα το πω μόνος μου
+              <button onClick={()=>{setIntroChoice("direct");setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}}
+                style={{display:"block",width:"100%",background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.35)",color:"rgba(201,168,76,0.85)",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",cursor:"pointer",borderRadius:"4px"}}>
+                Ξεκίνα με το πρόβλημά σου
               </button>
-              </>) : (<>
-              {/* Second tick — time, not emotional weight. A factual answer that genuinely changes
-                  tone and depth, and one the model cannot infer from their words. Feeds OPENING
-                  RADAR and the dispatch table exactly as the door does. */}
-              <div style={{fontSize:"12px",color:"#8a8680",letterSpacing:".06em",marginBottom:"12px",textAlign:"left"}}>
-                Πόσο χρόνο έχεις για να το ξεμπερδέψεις;
-              </div>
-              {["Αρκετό","Λίγο","Καθόλου — πρέπει να αποφασίσω τώρα"].map(t => (
-                <button key={t} onClick={()=>{setEntryTime(t);setIntroChoice("direct");setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}}
-                  style={{display:"block",width:"100%",background:"transparent",border:"1px solid rgba(201,168,76,0.18)",color:"#c9c5bc",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",marginBottom:"8px",cursor:"pointer",borderRadius:"4px"}}>
-                  {t}
-                </button>
-              ))}
-              </>)}
             </div>
           </div>
         )}

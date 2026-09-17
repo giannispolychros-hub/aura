@@ -1,13 +1,28 @@
 // AURA — ENTRY FLOW GUARD
 //
-// Γιατί υπάρχει: το ίδιο bug εμφανίστηκε ΤΡΕΙΣ φορές — ο χρήστης πατούσε πύλη, απαντούσε για
-// τον χρόνο, και μετά η AURA ξαναρωτούσε «τι σε φέρνει εδώ» με λίστα επιλογών. Κάθε φορά
-// διορθωνόταν και κάθε φορά επέστρεφε από άλλο σημείο: πρώτα από το UI, μετά από ξεχωριστή
-// οθόνη με άλλη διατύπωση («τι σε έφερε»), μετά από το prompt που είχε τις πύλες γραμμένες
-// αυτούσια δίπλα στην απαγόρευση χρήσης τους.
+// WHAT THIS FILE USED TO GUARD, and why it now guards the opposite. The same bug appeared THREE
+// times: the user tapped an entry door, answered the time question, and AURA then asked "τι σε
+// φέρνει εδώ" again with a list to choose from. Each fix came from a different place — the UI, a
+// second screen with different wording, and finally the prompt, which had the doors written out
+// verbatim next to an abstract instruction not to use them. This file was the guard that kept
+// each fix from being undone, and its assertions asserted the doors' PRESENCE and correct wiring.
 //
-// Κανένα από αυτά δεν έπιανε test. Αυτό το αρχείο είναι ο φρουρός.
-// Αν πέσει, κάποια αλλαγή ξανάφερε διπλή είσοδο.
+// THE DOORS ARE NOW GONE — mechanism removed, not suppressed. Measured, not assumed:
+//   • the routing table the door produced was STATIC — all five routes and all three time
+//     descriptions were sent on every single session regardless of which door was tapped;
+//   • door-to-door the injected context shared 83.9% of its characters, time-to-time 99.8%;
+//   • "EXACT ROUTING" and "TIME THEY HAVE" appeared ZERO times in the prompt — they existed only
+//     in this code, as instructions the prompt itself never acknowledged;
+//   • a four-condition experiment run by the founder found no difference in the first reply that
+//     could be attributed to which door was tapped.
+// So the doors bought a five-way classification of the user that changed nothing downstream, at
+// the cost of two extra screens before a word is typed. The entry is now ONE open invitation.
+//
+// THIS FILE THEREFORE ASSERTS ABSENCE. That inversion is deliberate: a guard that only asserted
+// the doors were wired correctly would have passed happily while they were reintroduced somewhere
+// new, and "removed" is a claim that decays unless something holds it. The identifier sweep below
+// runs over the WHOLE source file, prompt included, so a reintroduction anywhere fails here first.
+// If these assertions fail, the doors came back — do not re-wire them, remove them again.
 
 const _p = require('path'), _f = require('fs');
 let raw = null;
@@ -49,12 +64,14 @@ assert('Ακριβώς μία οθόνη εισόδου (βρέθηκαν ' + sc
 //      και επέζησε πέντε διορθώσεις επειδή είναι σκέτο div — ο έλεγχος που μετρούσε intro-screen
 //      περνούσε ενώ το bug ήταν ζωντανό. Ο έλεγχος τώρα είναι δομικός, όχι βασισμένος σε class.)
 assert('Καμία οθόνη μετά το sessionStarted', !/messages\.length === 0 && sessionStarted/.test(CODE));
-// Μετράει ΜΟΝΟ πραγματική απόδοση UI (μέσα σε JSX element), όχι αναφορές σε σχόλια
+// ΑΝΤΙΣΤΡΟΦΗ: η ερώτηση εισόδου δεν αποδίδεται ΠΟΥΘΕΝΑ στο UI πλέον — ούτε μία φορά.
 const rendered = (CODE.match(/>\s*\n?\s*(Τι σε φέρνει εδώ;|Τι σε έφερε εδώ;)/g) || []);
-assert('Ακριβώς μία ερώτηση εισόδου στο UI (βρέθηκαν ' + rendered.length + ')', rendered.length === 1);
-// Οποιοδήποτε .map πάνω σε λίστα ελληνικών φράσεων που παράγει κουμπιά = υποψήφια λίστα πυλών
+assert('ΚΑΜΙΑ ερώτηση εισόδου στο UI (βρέθηκαν ' + rendered.length + ')', rendered.length === 0);
+// Οποιοδήποτε .map πάνω σε λίστα ελληνικών φράσεων που παράγει κουμπιά = υποψήφια λίστα πυλών.
+// Το μοτίβο μένει ως έχει και μόνο ο αναμενόμενος αριθμός γίνεται μηδέν, ώστε μια λίστα πυλών
+// που θα επέστρεφε με άλλη διατύπωση να πιάνεται από τον ίδιο ανιχνευτή.
 const doorLists = (CODE.match(/\[\s*"[^"]*(?:σκέφτομαι|απόφαση|επιστρέφει|αναβάλλ|αγχώνει|ξεκαθαρ)[^"]*"[\s\S]{0,400}?\]\.map/g) || []);
-assert('Ακριβώς μία λίστα πυλών σε όλο το UI (βρέθηκαν ' + doorLists.length + ')', doorLists.length === 1);
+assert('ΚΑΜΙΑ λίστα πυλών σε όλο το UI (βρέθηκαν ' + doorLists.length + ')', doorLists.length === 0);
 
 // 1b — ΕΝΑ ΜΟΝΟ εισαγωγικό κείμενο (5η εμφάνιση του «τρεις οθόνες»: ο έλεγχος παραπάνω
 //      μετρούσε μόνο className="intro-screen", ενώ η δεύτερη οθόνη χρησιμοποιεί inline
@@ -90,24 +107,72 @@ assert('Prompt: καμία έτοιμη διατύπωση πύλης', !asksIt(
 assert('Prompt: καμία «κάτι που σε αγχώνει»', !asksIt(PROMPT, 'κάτι που σε αγχώνει'));
 assert('Prompt: καμία «επέστρεψε στο μυαλό σου»', !asksIt(PROMPT, 'επέστρεψε στο μυαλό σου'));
 
-// 4 — Οι πύλες υπάρχουν ΜΟΝΟ στο UI, και είναι πέντε
-const doorBlock = CODE.match(/\["Κάτι που επιστρέφει[^\]]+\]/);
-assert('UI: το μπλοκ πυλών υπάρχει', !!doorBlock);
-if (doorBlock) {
-  const count = (doorBlock[0].match(/","/g) || []).length + 1;
-  assert('UI: πέντε πύλες (βρέθηκαν ' + count + ')', count === 5);
+// 4 — ΟΙ ΠΥΛΕΣ ΕΧΟΥΝ ΑΦΑΙΡΕΘΕΙ. Σάρωση ΟΛΟΚΛΗΡΟΥ του αρχείου (prompt + κώδικας + σχόλια):
+//     ένα αναγνωριστικό που δεν υπάρχει πουθενά δεν μπορεί να επανασυνδεθεί σιωπηλά. Αυτός είναι
+//     ο ισχυρότερος φρουρός του αρχείου, και είναι ο λόγος που τα σχόλια της αφαίρεσης μέσα στο
+//     App.jsx δεν αναφέρουν κανένα από αυτά τα ονόματα αυτούσιο.
+for (const ident of ['entryDoor', 'entryTime', 'setEntryDoor', 'setEntryTime',
+                     'entryDoorRef', 'entryTimeRef', 'entryDoorCtx', 'buildEntryContext']) {
+  const n = (raw.match(new RegExp(ident, 'g')) || []).length;
+  assert('ΑΦΑΙΡΕΘΗΚΕ πλήρως το «' + ident + '» (βρέθηκαν ' + n + ')', n === 0);
 }
-assert('UI: πύλες μέσα σε conditional (δεν μένουν στην οθόνη χρόνου)', CODE.includes('entryDoor === null ? (<>'));
 
-// 5 — Η ερώτηση χρόνου υπάρχει και είναι ξεχωριστό βήμα
-assert('UI: ερώτηση χρόνου υπάρχει', CODE.includes('Πόσο χρόνο έχεις'));
-assert('UI: τρεις επιλογές χρόνου', CODE.includes('"Αρκετό","Λίγο"'));
+// 4b — Οι πέντε φράσεις-πύλες δεν υπάρχουν ως ζωντανό κείμενο πουθενά (ούτε στο prompt, που
+//      είναι από όπου επέστρεψε η 3η εμφάνιση του bug).
+for (const phrase of ['επιστρέφει στο μυαλό μου', 'δεν μπορώ να αποφασίσω',
+                      'Έχω πολλά μαζί', 'συνεχίζω να αναβάλλω', 'το αποφάσισα ήδη']) {
+  assert('Καμία ζωντανή φράση-πύλη: «' + phrase + '»', !liveText(phrase));
+}
 
-// 6 — Η επιλογή φτάνει στο μοντέλο σε ΚΑΘΕ διαδρομή prompt
-assert('buildEntryContext ορίζεται μία φορά', (CODE.match(/function buildEntryContext/g) || []).length === 1);
-const calls = (CODE.match(/buildEntryContext\(/g) || []).length - 1;
-assert('Καλείται σε 2+ διαδρομές (βρέθηκαν ' + calls + ')', calls >= 2);
-assert('entryDoorCtx στο dynamicSuffix', /dynamicSuffix\s*=\s*\[[^\]]*entryDoorCtx/s.test(CODE));
+// 4c — Η στατική routing table που έστελνε το μπλοκ. Μετρήθηκε ότι ήταν ίδια σε κάθε συνεδρία
+//      ανεξάρτητα από την πύλη, και ότι το prompt δεν την αναγνώριζε ποτέ (0 εμφανίσεις εκεί).
+for (const marker of ['EXACT ROUTING', "USER'S OWN STATED ENTRY POINT", 'TIME THEY HAVE',
+                      'THE ENTRY QUESTION IS ALREADY ANSWERED']) {
+  assert('Καμία υπολειμματική οδηγία «' + marker + '»', !raw.includes(marker));
+}
+
+// 5 — Η ΕΡΩΤΗΣΗ ΧΡΟΝΟΥ ΕΧΕΙ ΑΦΑΙΡΕΘΕΙ. Ήταν το δεύτερο βήμα πριν γραφτεί λέξη, και το
+//     εισαγόμενο κείμενό της ήταν 99.8% ίδιο ανάμεσα στις τρεις απαντήσεις.
+assert('Καμία ερώτηση χρόνου', !raw.includes('Πόσο χρόνο έχεις'));
+assert('Καμία λίστα επιλογών χρόνου', !raw.includes('"Αρκετό","Λίγο"'));
+for (const phrase of ['Καθόλου — πρέπει να αποφασίσω τώρα']) {
+  assert('Καμία ζωντανή επιλογή χρόνου: «' + phrase + '»', !liveText(phrase));
+}
+
+// 6 — ΕΝΙΑΙΑ ΑΝΟΙΧΤΗ ΕΙΣΟΔΟΣ στη θέση τους: μία πρόσκληση, κανένας κατάλογος να διαλέξει.
+assert('Η ανοιχτή είσοδος υπάρχει ζωντανή', liveText('Ξεκίνα με το πρόβλημά σου'));
+const openEntry = (CODE.match(/Ξεκίνα με το πρόβλημά σου/g) || []).length;
+assert('Εμφανίζεται ακριβώς μία φορά (βρέθηκαν ' + openEntry + ')', openEntry === 1);
+assert('Η είσοδος ξεκινά τη συνεδρία κατευθείαν, χωρίς ενδιάμεσο βήμα',
+  /Ξεκίνα με το πρόβλημά σου[\s\S]{0,600}?setSessionStarted\(true\)/.test(CODE) ||
+  /setSessionStarted\(true\)[\s\S]{0,600}?Ξεκίνα με το πρόβλημά σου/.test(CODE));
+
+// 6b — Η ΓΡΑΜΜΗ 109 ΤΟΥ PROMPT δεν περιγράφει πια μηχανισμό που δεν υπάρχει. Ήταν ο ΜΟΝΟΣ
+//      λόγος που αυτή η αλλαγή ακυρώνει το prompt cache, οπότε ελέγχεται ρητά.
+assert('Prompt: δεν αναφέρεται πια σε πάτημα πύλης', !/tapping a door|tapped a door|a chosen door/i.test(PROMPT));
+assert('Prompt: εξακολουθεί να απαγορεύει ρητά την ερώτηση εισόδου',
+  PROMPT.includes('NEVER ASK WHAT BRINGS THEM HERE'));
+assert('Prompt: η απαγόρευση δεν έγινε αφηρημένη — λέει τι ΙΣΧΥΕΙ τώρα (γράφουν οι ίδιοι)',
+  /ENTRY IS HANDLED BEFORE THIS CONVERSATION BEGINS[\s\S]{0,2600}?(their own words|they typed|wrote it themselves)/i.test(PROMPT));
+
+// 6c — Η ΔΕΥΤΕΡΗ ΔΙΑΔΡΟΜΗ. buildEntryContext υπήρχε επειδή τρεις διαδρομές έχτιζαν prompt και
+//      μόνο η μία κουβαλούσε τα ticks. Τα ticks έφυγαν, αλλά το FIRST REPLY FLOOR που κουβαλούσε
+//      το ίδιο μπλοκ για τη διαδρομή First-WHY ΔΕΝ είναι μέρος της αφαίρεσης και πρέπει να ζει.
+assert('Η διαδρομή First-WHY εξακολουθεί να κουβαλά το FIRST REPLY FLOOR',
+  /getLensPrompt\(inferred\)[\s\S]{0,300}?buildFirstWhyFloor\(\)/.test(CODE));
+assert('Το FIRST REPLY FLOOR ορίζεται μία φορά',
+  (CODE.match(/function buildFirstWhyFloor/g) || []).length === 1);
+assert('Και εξακολουθεί να συγκρατεί και τις τέσσερις τεχνικές',
+  (() => {
+    const i = CODE.indexOf('function buildFirstWhyFloor');
+    const b = i >= 0 ? CODE.slice(i, CODE.indexOf('\n}', i)) : '';
+    return b.includes('Assumption Surfacing') && b.includes('Premise Inversion') &&
+           b.includes('Contradiction Detection') && b.includes('binary-choice');
+  })());
+
+// 6d — Το dynamicSuffix δεν στέλνει πια το μπλοκ πυλών, και δεν έμεινε κενή θέση πίσω του.
+assert('Το dynamicSuffix δεν περιέχει μπλοκ εισόδου',
+  !/dynamicSuffix\s*=\s*\[[^\]]*entry/is.test(CODE));
 
 // 7 — Το demo δεν μπορεί να ξανανοίξει
 assert('showDemo μόνιμα false', /const showDemo = false/.test(CODE));
