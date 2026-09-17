@@ -316,5 +316,153 @@ assert('REGRESSION: the road: trace line is still rendered unchanged',
   /road: labels=\{roadTraceLast\.current\.rawHasLabels/.test(_PANEL) &&
   _PANEL.includes('roadTraceLast.current.parseAfterStrip'));
 
+// ── FORMAT TOLERANCE DERIVED FROM THE SPECIFICATION, NOT FROM SAMPLES ────────────────────────
+// WHY THIS SECTION EXISTS, stated before the assertions so a later reader does not repeat the
+// mistake: the previous tolerance fix was derived from ONE transcript ("**ΔΡΟΜΟΣ 1: ...**") and
+// added `\d*` to the pattern. The very next live session wrote "**ΔΡΟΜΟΣ Α — ΙΕΚ/διδασκαλία
+// τώρα**" and the parser returned null again on a map that had genuinely been produced. Fitting
+// the parser to observed samples is an endless game, because the map format is PROMPT TEXT and
+// the model writes whatever it writes.
+//
+// THE RULE IS THEREFORE READ OFF THE SPECIFICATION (prompt, EXACT FORMAT WHEN THE MAP IS
+// DELIVERED): three consecutive lines — one that STARTS with ΔΡΟΜΟΣ, then ΚΕΡΔΙΖΕΙΣ:, then
+// ΚΟΣΤΙΖΕΙ:. Everything the specification never asked for — a colon after ΔΡΟΜΟΣ, arabic
+// numbering, a dash, asterisks — stops being REQUIRED. The parser does not guess formats; it
+// stops demanding what was never specified.
+//
+// THE TWO GUARANTEES, and they are deliberately different in strength:
+//   • STRUCTURAL TOLERANCE IS TOTAL — any unseen heading decoration still parses. Never null again.
+//   • NAME CLEANUP IS BEST-EFFORT — an unseen separator may leave punctuation in the name. A name
+//     with a stray character is a cosmetic flaw; a null is a map the user never sees.
+// The assertions below hold exactly that asymmetry, so a future change cannot quietly trade the
+// first guarantee for a prettier name.
+//
+// WHAT ACTUALLY MAKES THE LOOSE ΔΡΟΜΟΣ RULE SAFE, measured rather than assumed. The first
+// draft of this section claimed it was the three lines being strictly consecutive, and tightened
+// the separator to forbid a blank line between labels. That claim was wrong, and the measurement
+// is kept here because the wrong version was persuasive: every counterexample below is rejected
+// IDENTICALLY with and without blank-line tolerance, including ΔΡΟΜΟΣ → prose → labels. The
+// safety comes from the ^ anchor and from the labels having to arrive in order — whitespace
+// cannot cross prose, so tolerating it buys a format at no cost. The old parser already
+// tolerated blank lines (\s* spans newlines); removing that would have been a silent regression
+// of exactly the kind this whole change exists to prevent, so the tolerance is kept and pinned.
+
+// (1) REAL SAMPLE — the session that motivated this change. Present as VERIFICATION, never as the
+// source of the rule: the rule comes from the prompt, and this is here to prove it covers reality.
+const LIVE_ALPHA_MAP = [
+  'Άρα έχεις δύο δρόμους που τραβάνε αντίθετα:',
+  '',
+  '**ΔΡΟΜΟΣ Α — ΙΕΚ/διδασκαλία τώρα**',
+  'ΚΕΡΔΙΖΕΙΣ: έσοδα γρήγορα, κάνεις αυτό που ξέρεις',
+  'ΚΟΣΤΙΖΕΙ: χρόνος, ενέργεια, άγνωστο αν επιτρέπεται',
+  '',
+  '**ΔΡΟΜΟΣ Β — σπουδές για διευθυντής**',
+  'ΚΕΡΔΙΖΕΙΣ: σταθερή ανέλιξη, ασφάλεια',
+  'ΚΟΣΤΙΖΕΙ: 10 χρόνια, η οικονομική πίεση παραμένει τώρα',
+  '',
+  'Ποιο από τα δύο κόστη είσαι πιο διατεθειμένος να σηκώσεις;',
+].join('\n');
+const _live = parseRoadMap(LIVE_ALPHA_MAP);
+assert('LIVE Α/Β: the letter-lettered, em-dashed, bolded map parses at all (it returned null before)',
+  _live !== null);
+assert('LIVE Α/Β: both roads are recovered', _live !== null && _live.roads.length === 2);
+assert('LIVE Α/Β: the road name is clean — no letter, no dash, no asterisks left in it',
+  _live !== null && _live.roads[0].name === 'ΙΕΚ/διδασκαλία τώρα' &&
+  _live.roads[1].name === 'σπουδές για διευθυντής');
+assert('LIVE Α/Β: gain and cost are the model\'s own lines, unchanged',
+  _live !== null && _live.roads[0].gain === 'έσοδα γρήγορα, κάνεις αυτό που ξέρεις' &&
+  _live.roads[1].cost === '10 χρόνια, η οικονομική πίεση παραμένει τώρα');
+assert('LIVE Α/Β: no ΑΓΝΩΣΤΟ was written, so unknown is null rather than invented',
+  _live !== null && _live.unknown === null);
+
+// (2) THE SPECIFICATION'S OWN FORM, copied from the prompt: bare labels, no decoration at all.
+// If the loosened rule ever stopped accepting the form the prompt actually asks for, that is the
+// worst possible regression and this is the assertion that catches it.
+const _spec = parseRoadMap('ΔΡΟΜΟΣ: Να μιλήσω στον διευθυντή\nΚΕΡΔΙΖΕΙΣ: σταματάει η αβεβαιότητα\nΚΟΣΤΙΖΕΙ: μπορεί να χαλάσει η σχέση');
+assert('SPEC FORM: the exact shape the prompt asks for parses, with a clean name',
+  _spec !== null && _spec.roads.length === 1 && _spec.roads[0].name === 'Να μιλήσω στον διευθυντή');
+
+// (3–8) COUNTEREXAMPLES. Loosening a pattern is only safe if what it REFUSES is stated as
+// explicitly as what it accepts. Each of these must stay null.
+const _NEGATIVES = [
+  ['prose that merely uses the words',
+   'Υπάρχει ένας δρόμος που κερδίζεις χρόνο και ένας που σου κοστίζει την ησυχία σου.'],
+  ['a ΔΡΟΜΟΣ heading with no ΚΕΡΔΙΖΕΙΣ/ΚΟΣΤΙΖΕΙ under it',
+   'ΔΡΟΜΟΣ: Να φύγω\n\nΚαι τι θα σήμαινε αυτό για σένα;'],
+  ['a block missing its ΚΟΣΤΙΖΕΙ line',
+   'ΔΡΟΜΟΣ: Να φύγω\nΚΕΡΔΙΖΕΙΣ: χώρο'],
+  ['prose between the labels — whitespace may separate them, content may not',
+   'ΔΡΟΜΟΣ: Να φύγω\nΚάτι άσχετο εδώ.\nΚΕΡΔΙΖΕΙΣ: χώρο\nΚΟΣΤΙΖΕΙ: ασφάλεια'],
+  ['the labels in the wrong order',
+   'ΔΡΟΜΟΣ: Να φύγω\nΚΟΣΤΙΖΕΙ: ασφάλεια\nΚΕΡΔΙΖΕΙΣ: χώρο'],
+  ['the labels appearing mid-sentence rather than starting their lines',
+   'Σκέψου ότι ΔΡΟΜΟΣ: Να φύγω και ΚΕΡΔΙΖΕΙΣ: χώρο αλλά ΚΟΣΤΙΖΕΙ: ασφάλεια.'],
+];
+_NEGATIVES.forEach(([label, text]) => {
+  assert(`NOT A MAP: ${label} → null`, parseRoadMap(text) === null);
+});
+
+// BLANK LINES BETWEEN LABELS ARE TOLERATED, and this is a REGRESSION guard, not a new feature:
+// the previous parser already accepted this form, and the tolerance is free — the counterexample
+// directly above proves whitespace cannot be used to reach across prose. Pinned so no later
+// tightening drops it by accident.
+const _blank = parseRoadMap('ΔΡΟΜΟΣ: Να φύγω\n\nΚΕΡΔΙΖΕΙΣ: χώρο\nΚΟΣΤΙΖΕΙ: ασφάλεια');
+assert('BLANK LINE: a blank line between labels still parses — tolerance the old parser had, kept',
+  _blank !== null && _blank.roads.length === 1 && _blank.roads[0].name === 'Να φύγω');
+
+// (9) THE GREEK-CAPITAL TRAP. The name cleaner removes an optional short enumerator (1, Α, ΙΙ)
+// before the separator. A road whose NAME legitimately begins with a Greek capital word must not
+// have that word eaten. "ΔΡΟΜΟΣ: Ανοιχτή συζήτηση" is the case that would break silently.
+const _trap = parseRoadMap('ΔΡΟΜΟΣ: Ανοιχτή συζήτηση με τη μητέρα σου\nΚΕΡΔΙΖΕΙΣ: σταματάει το μάντεμα\nΚΟΣΤΙΖΕΙ: μπορεί να ακούσεις κάτι που δεν θες');
+assert('GREEK-CAPITAL TRAP: a name starting with a Greek capital word survives intact',
+  _trap !== null && _trap.roads[0].name === 'Ανοιχτή συζήτηση με τη μητέρα σου');
+const _trap2 = parseRoadMap('ΔΡΟΜΟΣ Α: Ανοιχτή συζήτηση\nΚΕΡΔΙΖΕΙΣ: σαφήνεια\nΚΟΣΤΙΖΕΙ: ένταση');
+assert('GREEK-CAPITAL TRAP: the enumerator «Α» goes, the name\'s own capital word stays',
+  _trap2 !== null && _trap2.roads[0].name === 'Ανοιχτή συζήτηση');
+
+// (10) THE ASYMMETRY ITSELF — an entirely unseen heading decoration. This is the assertion that
+// states the design: structure always parses; the name may keep punctuation. It would FAIL on a
+// parser that went back to requiring a known separator, which is the whole point.
+const _unseen = parseRoadMap('ΔΡΟΜΟΣ >> Να αλλάξω τμήμα\nΚΕΡΔΙΖΕΙΣ: μένεις στην εταιρεία\nΚΟΣΤΙΖΕΙ: ξαναρχίζεις από την αρχή');
+assert('UNSEEN FORMAT: a separator nobody has ever seen still parses — never null again',
+  _unseen !== null && _unseen.roads.length === 1);
+assert('UNSEEN FORMAT: the gain and cost are still exact; only the name may carry leftover punctuation',
+  _unseen !== null && _unseen.roads[0].gain === 'μένεις στην εταιρεία' &&
+  _unseen.roads[0].cost === 'ξαναρχίζεις από την αρχή' &&
+  _unseen.roads[0].name.includes('Να αλλάξω τμήμα'));
+
+// (11) LOCKSTEP, evaluated against the REAL displayContent expression in App.jsx rather than a
+// copy of it. A more tolerant parser with an untouched strip renders every road TWICE — once as a
+// styled block, once as leftover prose. That coupling is invisible in the source.
+const _dc2Start = _CODE_FOR_DISPLAY.indexOf('const displayContent = roadMap');
+const _dc2End = _CODE_FOR_DISPLAY.indexOf(': msg.content;', _dc2Start);
+assert('LOCKSTEP: display path located for evaluation', _dc2Start >= 0 && _dc2End > _dc2Start);
+if (_dc2Start >= 0 && _dc2End > _dc2Start) {
+  const _src2 = _CODE_FOR_DISPLAY.slice(_dc2Start, _dc2End + ': msg.content;'.length);
+  eval('function _stripLive(msg, roadMap) { ' + _src2 + ' return displayContent; }');
+  const _withUnknown = LIVE_ALPHA_MAP.replace(
+    '\nΠοιο από τα δύο', '\n**ΑΓΝΩΣΤΟ:** αν επιτρέπεται δεύτερη απασχόληση\n\nΠοιο από τα δύο');
+  const _shownLive = _stripLive({ content: _withUnknown }, parseRoadMap(_withUnknown));
+  for (const label of ['ΔΡΟΜΟΣ', 'ΚΕΡΔΙΖΕΙΣ', 'ΚΟΣΤΙΖΕΙ', 'ΑΓΝΩΣΤΟ']) {
+    assert(`LOCKSTEP: «${label}» is fully stripped from the Α/Β map — no double render`,
+      !_shownLive.includes(label));
+  }
+  assert('LOCKSTEP: no orphaned asterisks survive the strip of the Α/Β map',
+    !_shownLive.includes('*'));
+  assert('LOCKSTEP: the prose around the Α/Β map is preserved untouched',
+    _shownLive.includes('Άρα έχεις δύο δρόμους') && _shownLive.includes('Ποιο από τα δύο κόστη'));
+  assert('LOCKSTEP: the strip leaves a map-less reply completely alone',
+    _stripLive({ content: 'Τι σε κρατάει περισσότερο σε αυτό;' }, null) === 'Τι σε κρατάει περισσότερο σε αυτό;');
+}
+
+// (12) THE stripAra → parseRoadMap CHAIN. stripAraDeclarative runs on the reply BEFORE the map is
+// parsed. A ΚΟΣΤΙΖΕΙ line that itself begins with an "Άρα …" declarative loses that sentence, and
+// if the stripped line empties the block the map disappears. Held here because the two functions
+// are only coupled at the call site.
+const _chain = parseRoadMap(stripAraDeclarative(
+  '**ΔΡΟΜΟΣ Α — Μένω στη δουλειά**\nΚΕΡΔΙΖΕΙΣ: σταθερό εισόδημα\nΚΟΣΤΙΖΕΙ: Άρα χάνεις τον χρόνο σου κάθε μέρα. Τι μένει;\n**ΔΡΟΜΟΣ Β — Φεύγω τώρα**\nΚΕΡΔΙΖΕΙΣ: χρόνο\nΚΟΣΤΙΖΕΙ: την ασφάλεια'));
+assert('CHAIN: both roads survive stripAraDeclarative running before the parser',
+  _chain !== null && _chain.roads.length === 2);
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed > 0 ? 1 : 0);

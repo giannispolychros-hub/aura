@@ -1765,23 +1765,47 @@ function stemGreekWord(word) {
 // gives the map the same protection.)
 function parseRoadMap(text) {
   if (!text) return null;
-  // LABEL TOLERANCE (real-transcript fix): the map format lives in the prompt ("Use these exact
-  // labels"), so what arrives is whatever the model wrote. A real session produced
-  // "**ΔΡΟΜΟΣ 1: ...**" and this returned null on a map that had genuinely been built — the road
-  // rendering returned early, ΑΓΝΩΣΤΟ was never extracted, and [AURA ROAD TRACE] logged
-  // parseRaw: 0, reading as "the model never produced one". `\d*` accepts the numbering; the
-  // asterisks are cleaned off the captured values below rather than in the pattern, because they
-  // can land on either end of a field and stripping them there covers both without a wider regex.
-  const re = /ΔΡΟΜΟΣ\s*\d*\s*:\s*([^\n]+)\n\s*ΚΕΡΔΙΖΕΙΣ:\s*([^\n]+)\n\s*ΚΟΣΤΙΖΕΙ:\s*([^\n]+)/g;
+  // FORMAT TOLERANCE DERIVED FROM THE SPECIFICATION, NOT FROM SAMPLES. The map format lives in
+  // the prompt ("Use these exact labels"), so what arrives is whatever the model wrote, and the
+  // previous version of this fixed ONE observed shape: it added `\d*` after reading a transcript
+  // that wrote "**ΔΡΟΜΟΣ 1: ...**". The very next live session wrote
+  // "**ΔΡΟΜΟΣ Α — ΙΕΚ/διδασκαλία τώρα**" and this returned null again — on a map that had genuinely
+  // been produced. Measured consequences of that null, every time: the dedicated road rendering
+  // in MessageBubble returns early, ΑΓΝΩΣΤΟ is never extracted, and [AURA ROAD TRACE] logs
+  // parseRaw: 0, which reads as "the model never produced one" — the exact opposite of the truth.
+  //
+  // So the rule is now read off the SPECIFICATION (prompt: EXACT FORMAT WHEN THE MAP IS
+  // DELIVERED) instead of off transcripts: three lines — one that STARTS with ΔΡΟΜΟΣ, then
+  // ΚΕΡΔΙΖΕΙΣ:, then ΚΟΣΤΙΖΕΙ:. Everything the specification never asked for — a colon after
+  // ΔΡΟΜΟΣ, numbering, a letter, a dash, asterisks — stops being REQUIRED. This does not guess
+  // at formats; it stops demanding what was never specified.
+  //
+  // TWO GUARANTEES OF DELIBERATELY DIFFERENT STRENGTH:
+  //   • structural tolerance is TOTAL     — any unseen heading decoration still parses, never null;
+  //   • name cleanup is BEST-EFFORT       — an unseen separator may leave punctuation in the name.
+  // A name with a stray character is cosmetic. A null is a map the user never sees at all.
+  //
+  // What keeps the loose ΔΡΟΜΟΣ rule from firing inside prose is the ^ anchor plus the labels
+  // having to arrive in order — not the absence of blank lines. Whitespace cannot reach across
+  // content, so `\s*` between the lines (which the old pattern also allowed) costs nothing and is
+  // kept; test_ara_backstop pins both halves of that.
+  const re = /^[^\S\n]*\**ΔΡΟΜΟΣ(?![Α-Ωα-ωά-ώ])([^\n]*)\n\s*\**ΚΕΡΔΙΖΕΙΣ[^\S\n]*:[^\S\n]*([^\n]+)\n\s*\**ΚΟΣΤΙΖΕΙ[^\S\n]*:[^\S\n]*([^\n]+)/gm;
   // Markdown emphasis is never meaningful content in these fields — only formatting the model added.
   const clean = s => String(s).replace(/\*/g, "").trim();
+  // The heading remainder is whatever followed ΔΡΟΜΟΣ on that line. Drop an optional short
+  // enumerator (1, Α, ΙΙ) and the separator after it. Both parts are OPTIONAL on purpose: if
+  // neither is present the name is taken whole, which is what makes an unseen format degrade to
+  // an untidy name rather than to a lost map. The {1,3} cap and the required separator are what
+  // stop a road whose name legitimately begins with a Greek capital word ("Ανοιχτή συζήτηση")
+  // from having that word eaten.
+  const name = s => clean(String(s).replace(/^[^\S\n]*(?:[\dΑ-Ω]{1,3}[^\S\n]*)?[:.)\u2014\u2013-][^\S\n]*/, ""));
   const roads = [];
   let m;
   while ((m = re.exec(text)) !== null) {
-    roads.push({ name: clean(m[1]), gain: clean(m[2]), cost: clean(m[3]) });
+    roads.push({ name: name(m[1]), gain: clean(m[2]), cost: clean(m[3]) });
   }
   if (roads.length === 0) return null;
-  const unknown = /ΑΓΝΩΣΤΟ:\s*([^\n]+)/.exec(text);
+  const unknown = /ΑΓΝΩΣΤΟ[^\S\n]*:[^\S\n]*([^\n]+)/.exec(text);
   return { roads, unknown: unknown ? clean(unknown[1]) : null };
 }
 // ROAD-MAP PROVENANCE, PASSIVE MEASUREMENT ONLY (Measurement Before Modification — same standing
@@ -3174,8 +3198,8 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
     ? msg.content
         // KEPT IN LOCKSTEP WITH parseRoadMap's pattern above — whatever the parser accepts as a
         // road block, this must remove, or the user sees each road twice.
-        .replace(/\*{0,2}ΔΡΟΜΟΣ\s*\d*\s*:\s*[^\n]+\n\s*ΚΕΡΔΙΖΕΙΣ:\s*[^\n]+\n\s*ΚΟΣΤΙΖΕΙ:\s*[^\n]+/g, '')
-        .replace(/\*{0,2}ΑΓΝΩΣΤΟ:\s*[^\n]+/g, '')
+        .replace(/^[^\S\n]*\**ΔΡΟΜΟΣ(?![Α-Ωα-ωά-ώ])[^\n]*\n\s*\**ΚΕΡΔΙΖΕΙΣ[^\S\n]*:[^\n]+\n\s*\**ΚΟΣΤΙΖΕΙ[^\S\n]*:[^\n]+/gm, '')
+        .replace(/^[^\S\n]*\**ΑΓΝΩΣΤΟ[^\S\n]*:[^\n]+/gm, '')
         .trim()
     : msg.content;
 
