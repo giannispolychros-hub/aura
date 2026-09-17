@@ -244,7 +244,11 @@ assert('The extracted block is the real one — it still contains all three gate
 
 // Evaluates the real template against controlled state: the four refs the block reads, plus `msgs`
 // and `msgCount`, so every guard inside it runs exactly as it does in production.
-function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = false, anchors = false, stakes = false }) {
+// `roadPending` was added when the road-question stand-down landed inside this block. The harness
+// has to supply every ref the real code reads, exactly as it already supplies the four gate flags —
+// without it the evaluated template throws ReferenceError and this whole suite silently produces no
+// output at all, which is how it first showed up: not as a failure, as an absent count.
+function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = false, anchors = false, stakes = false, roadPending = false }) {
   const msgs = [
     { role: 'user',      content: 'Έχω ένα δίλημμα με τη δουλειά μου και δεν ξεκαθαρίζει.' },
     { role: 'assistant', content: 'Τι σε κρατάει εκεί;' },
@@ -256,6 +260,7 @@ function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = 
   const outcomeScaleAsked  = { current: scaleAsked };
   const anchorsInvited     = { current: anchors };
   const stakesAsked        = { current: stakes };
+  const roadQuestionState  = { current: roadPending ? { roads: ['Χ'], asked: 1, qa: [], mapAcknowledged: true } : null };
   return eval(gatesTemplate);
 }
 
@@ -306,6 +311,13 @@ assert('KNOWN GAP (documented): «Θα το σκεφτώ. Κλείνουμε.» 
   gatesTextWhen({ ...TWO_DUE, lastUserText: 'Θα το σκεφτώ. Κλείνουμε.' }) !== '');
 assert('KNOWN GAP (documented): «Τέλος ε;» is NOT suppressed — isExplicitClosure does not strip the trailing «ε»',
   gatesTextWhen({ ...TWO_DUE, lastUserText: 'Τέλος ε;' }) !== '');
+
+// ROAD-QUESTION STAND-DOWN, now checkable because the harness carries the ref. Two "ask this"
+// instructions in one prompt is the collision this repo already paid for once, in the same block.
+assert('STAND-DOWN: with a road question pending, gatesCtx is silent even with two gates due',
+  gatesTextWhen({ ...TWO_DUE, lastUserText: SUBSTANTIVE, roadPending: true }) === '');
+assert('STAND-DOWN: with no road question pending, gatesCtx is unaffected',
+  gatesTextWhen({ ...TWO_DUE, lastUserText: SUBSTANTIVE, roadPending: false }) !== '');
 
 console.log("\n" + passed + " invariants passed, " + failed + " failed, " + warnings + " overlap warnings");
 process.exit(failed > 0 ? 1 : 0);

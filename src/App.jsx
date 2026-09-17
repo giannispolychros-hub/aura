@@ -1833,6 +1833,32 @@ function classifyRoadProvenance(roadMap, userTexts) {
   return { lines: fields.length, supported, unsupported: mild + severe, mild, severe, novelFactLines, detail };
 }
 
+// ROAD QUESTIONS — ARTIFACT ASSEMBLY (Stage 1, textual).
+// ASSEMBLED BY CODE, NEVER BY THE MODEL, and that is the whole design rather than an implementation
+// detail. Three days of measurement in this repo established that "only what they named" cannot be
+// verified after the fact: vocabulary overlap turned out ANTI-correlated with fabrication, because a
+// model writing an invented cost reuses the user's own words by construction — that is exactly what
+// makes it read as grounded. Every string-matching provenance check produced errors in both
+// directions. Building the artifact here removes the question instead of auditing it: there is no
+// path through which synthesis could enter, so provenance is a property of construction.
+// Everything below is either a label this function owns or a string the user typed. Nothing is
+// ordered by importance, nothing is concluded, nothing is added.
+function buildRoadArtifact(state, partial) {
+  if (!state || !Array.isArray(state.qa) || state.qa.length === 0) return null;
+  const cap = Math.min(((state.roads || []).length), 3);
+  const out = ['Η ΣΚΕΨΗ ΣΟΥ, ΑΝΑ ΔΡΟΜΟ', ''];
+  state.qa.forEach(e => {
+    out.push(`ΔΡΟΜΟΣ ${e.road} — ${e.name}`);
+    out.push(String(e.q || ''));
+    out.push(`«${String(e.a || '')}»`);
+    out.push('');
+  });
+  // Unanswered roads are OMITTED, never completed from general knowledge — same discipline as the
+  // map's own QUALITY BAILOUT ("show it thinner rather than completing it").
+  if (partial) out.push(`— ημιτελές: απαντήθηκαν ${state.qa.length} από ${cap} —`);
+  return out.join('\n').trim();
+}
+
 function parseThreeBeatShift(text) {
   if (!text) return null;
   const re = /ΗΡΘΕΣ ΜΕ:\s*([\s\S]*?)\nΒΡΗΚΕΣ:\s*([\s\S]*?)\nΦΕΥΓΕΙΣ ΜΕ:\s*([\s\S]*)/;
@@ -3328,6 +3354,11 @@ export default function AURAv2() {
   const compressionCount = useRef(0);
   const violationCounts = useRef({}); // per-session tally of detectOutputViolation categories, debug-panel only
   const roadTraceLast = useRef(null); // last turn's road-map trace counters (numbers/booleans only), debug-panel only
+  // ROAD QUESTIONS — one ref for the whole mechanism, so resetSession needs one line and
+  // test_ref_reset_integrity needs no EXCEPTIONS entry. In-memory only: never written to `memory`,
+  // never persisted, so it never reaches the consent gate.
+  // { roads: string[], asked: number, qa: [{road,name,q,a}], mapAcknowledged: boolean }
+  const roadQuestionState = useRef(null);
   // Debug panel gate — read once from the URL, never re-derived on later renders/navigation.
   const debugMode = useRef(typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1');
   // RT-hardening: replaces text-based detection ("does the model's reply say 'το κρατάω'?")
@@ -3533,6 +3564,10 @@ A line missing above means only that one pattern was not matched — the absence
       // same way the bare-emoji rule did until it was moved into code. Computed here and injected
       // at the moment it matters.
       const closingDriftCtx = (() => {
+        // ROAD QUESTIONS STAND-DOWN: while a road question is pending this turn, two "ask this"
+        // instructions in one prompt is the collision this repo has already paid for once. Scoped
+        // strictly to this condition — nothing changes when no road question is pending.
+        if (roadQuestionState.current) return '';
         const userMsgs = msgs.filter(m => m.role === "user");
         if (userMsgs.length < 2) return '';
         const idx = userMsgs.findIndex(m => matchesClosingWord(m.content) || endsWithClosingSignal(m.content));
@@ -3597,7 +3632,47 @@ A line missing above means only that one pattern was not matched — the absence
       const firstReplyFloorCtx = firstReplyFloorActive
         ? `\n[FIRST REPLY OF THIS SESSION — code-enforced floor, not a suggestion: Assumption Surfacing, Premise Inversion, Contradiction Detection, and any binary-choice framing ("X, ή Y;") are not available on this specific turn, regardless of how the material seems. Respond only with open, natural material-gathering per OPEN BEFORE PROBE. These mechanisms become available starting the next reply, based on your own evidence-based judgment as already described above — this floor applies only to this one turn.]\n`
         : '';
+      // ROAD QUESTIONS — the code decides WHICH ROAD, the model composes the question. Selection is
+      // semantic and has to stay that way; what the code contributes is the road, the cap, and the
+      // bookkeeping. Every rule this ctx invokes already exists in the prompt, so it is referenced by
+      // section NAME exactly as the other ctx blocks do — which is why the mechanism needs no prompt
+      // text at all and the cached prefix stays byte-identical.
+      const roadQuestionCtx = (() => {
+        const st = roadQuestionState.current;
+        if (!st) return '';
+        // ONE TURN OF SILENCE after the map. CHECK BEFORE ADDING records a real session where AURA
+        // volunteered an extra remark right after a completion point and the user said plainly they
+        // would otherwise have left. The map IS such a point, so the user reacts to it first — and
+        // that reaction often informs the first question anyway.
+        if (!st.mapAcknowledged) { st.mapAcknowledged = true; return ''; }
+        // Capture the answer to the question asked last turn, before choosing the next road. Reading
+        // the last user message pre-API is the same pattern binaryOppositionCount and
+        // detectsMethodFailureSignal already use, so the signal reaches the model on the turn that
+        // produced it rather than one turn late.
+        if (st.qa.length < st.asked) {
+          const lastUser = [...msgs].reverse().find(m => m.role === "user");
+          const lastAura = [...msgs].reverse().find(m => m.role === "assistant");
+          if (lastUser) st.qa.push({
+            road: st.asked,
+            name: st.roads[st.asked - 1],
+            q: String((lastAura && lastAura.content) || '').trim(),
+            a: lastUser.content,
+          });
+        }
+        const cap = Math.min(st.roads.length, 3);
+        if (st.asked >= cap) return '';
+        const next = st.asked + 1;
+        st.asked = next;
+        return `\n[ROAD QUESTION — one road at a time. Ask EXACTLY ONE question about ΔΡΟΜΟΣ ${next}: "${st.roads[next - 1]}". Not two, and no summary, no preamble, no comment on the map — this reply is that one question and nothing else.
+WHAT TO ASK ABOUT, strict priority, the first that applies: (1) an unknown THIS PERSON NAMED THEMSELVES about this road — UNKNOWNS THE USER THEMSELVES NAMED above, pure extraction, no inference about what they do or do not know; (2) a thin slot of THIS road under ROAD COMPLETENESS above — what it changes, what it requires, what it gives them, what it leaves behind, what it costs — whichever one their own words left empty for THIS particular road, never a slot carried over from another; (3) the ΑΓΝΩΣΤΟ already attached to the map — only if neither (1) nor (2) exists.
+EVERY CANDIDATE PASSES BOTH GATES ABOVE BEFORE IT IS ASKED: REVERSIBILITY CHECK (remove their future answer — does the question still point at one specific explanation? then it already smuggled that explanation in) and CALIBRATION QUESTION TEST (an open slot they fill themselves, never a content domain you named). A question that names money, family, time or fear when they have not raised it themselves fails both and must be rewritten with an open slot.
+NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own material leaves no real gap here, say that plainly in one short line and ask nothing. A manufactured question is worse than none.]\n`;
+      })();
       const gatesCtx = (() => {
+        // ROAD QUESTIONS STAND-DOWN: while a road question is pending this turn, two "ask this"
+        // instructions in one prompt is the collision this repo has already paid for once. Scoped
+        // strictly to this condition — nothing changes when no road question is pending.
+        if (roadQuestionState.current) return '';
         if (msgCount < 3) return ''; // too early — matches existing 2-4 exchange timing elsewhere
         // CLOSING SUPPRESSION (forensic trace of the next-question authority map). On the turn the
         // user actually closes, this block was the ONLY code voice in the ctx zone — and what it
@@ -3704,7 +3779,10 @@ A line missing above means only that one pattern was not matched — the absence
       const selfRepetitionCtx = selfRepCheck.repeated
         ? `\n[CODE-VERIFIED: your own last 2 replies were structurally similar (${selfRepCheck.sameOpening ? "same opening phrase" : "high word overlap"}) — this is exactly the kind of "no genuine movement" evidence that should trigger the Strategy Change pillar (see STRATEGY SWITCH TIMING/WHICH FAMILY TO SWITCH TO above), not just a wording tweak. Draw from a region of INTERVENTION SPACE you have not used yet this session.]\n`
         : '';
-      const userStagnationCtx = detectUserStagnation(msgs).stagnant
+      // ROAD QUESTIONS STAND-DOWN (see gatesCtx above): this block tells the model to switch region
+      // or show the map — but the map has already been shown, and a short answer to a road question
+      // is an answer, not stagnation.
+      const userStagnationCtx = (!roadQuestionState.current && detectUserStagnation(msgs).stagnant)
         ? `\n[CODE-VERIFIED: the user's own last 2 replies introduced almost no new material AND became markedly shorter than their earlier ones. This is observed from what they actually wrote, not inferred about how they feel. It is direct evidence that the current approach has stopped producing movement FOR THEM — the strongest possible input to STRATEGY PRE-MORTEM GATE's "is this strategy failing here?" check. Do not wait for them to repeat themselves further or to say so explicitly: switch to a genuinely different region of INTERVENTION SPACE now, or if enough material already exists, stop gathering and reflect the shape of what they have already given (PROBLEM STRUCTURE MAP / VERBATIM COST COLLISION). AND IF GENUINELY DISTINCT DIRECTIONS ARE ALREADY IMPLIED BY WHAT THEY HAVE SAID, THIS IS THE MOMENT FOR ROAD DISCOVERY — THE ONE NAMED EXCEPTION's PATH TWO, with all its output tests (distinctness, consequence, level, completeness) and their QUALITY BAILOUT clauses intact. A user who has stopped producing new material is not asking for another question; they have given what they have. Showing them the actual shape of their decision space is the work. If the material genuinely does not support distinct directions, say that plainly instead — that is also a real finding, never a reason to invent one. TWO MOVES THAT BELONG SPECIFICALLY TO THIS MOMENT, available here and nowhere else (founder's framing — the product is not an AI that asks good questions, it is one that works out which question this person's thinking needs now; both of these become possible precisely because the evidence above shows the problem has stopped being understanding of the topic and has become inability to move): (a) ASK WHY IT IS STILL OPEN rather than asking more about the topic — "τι είναι αυτό που σε κάνει να το σκέφτεσαι ακόμα;" targets the stuckness itself, not its content, and it works on any subject because it presupposes nothing about what kind of problem this is. (b) QUESTION THE FRAME, but only where their own material contradicts it — when someone has described a decision at length while everything they actually said points elsewhere, "μήπως δεν προσπαθείς να αποφασίσεις αυτό, αλλά κάτι άλλο;" is legitimate. HARD CONDITION on (b): only when the evidence for the mismatch is in their own words, never as a general-purpose move, and always as a question they can reject outright — if they say no, that is the end of it and the frame stands. Offered as a question, never as an interpretation stated.]\n`
         : '';
       const entryDoorCtx = entryDoorRef.current
@@ -3720,7 +3798,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
       // (1) informational background, (2) situational signals, (3) hard constraints last.
       const dynamicSuffix = [
         memCtx, profileCtx, materialEvidenceCtx, demoCtx, informationModeCtx, explicitPauseCtx, entryDoorCtx,
-        coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx,
+        coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx, roadQuestionCtx,
         gatesCtx, closingDriftCtx, firstReplyFloorCtx,
       ].filter(Boolean).join('\n');
       // PROTOCOL COLLISION LOGGER (red-team gap: nothing recorded when two or more families fired on
@@ -3733,7 +3811,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         const fired = Object.entries({
           memCtx, profileCtx, materialEvidenceCtx, demoCtx, informationModeCtx, explicitPauseCtx, entryDoorCtx,
           coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx,
-          clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx, gatesCtx, closingDriftCtx,
+          clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx, roadQuestionCtx, gatesCtx, closingDriftCtx,
           firstReplyFloorCtx,
         }).filter(([, v]) => v).map(([k]) => k);
         if (fired.length >= 2) {
@@ -4091,6 +4169,22 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         informationModeActive.current = true;
       }
 
+      // ROAD QUESTIONS — ARM. A map has just been produced, so the per-road questions become
+      // available from the turn after next (the ctx spends one turn letting the user react to the
+      // map first). Capped at three roads here rather than in the ctx, so the cap is a property of
+      // the state itself and cannot be widened by a later edit to the emission side.
+      if (!roadQuestionState.current) {
+        const _rqMap = parseRoadMap(text);
+        if (_rqMap && _rqMap.roads.length > 0) {
+          roadQuestionState.current = {
+            roads: _rqMap.roads.slice(0, 3).map(r => r.name),
+            asked: 0,
+            qa: [],
+            mapAcknowledged: false,
+          };
+        }
+      }
+
       // Termination decision — extracted to decideTermination() for testability, same logic as before.
       const decision = decideTermination(msgs, text, {
         safetyMode,
@@ -4105,6 +4199,28 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
         duringDeclineCooldown: closureDeclineCooldown.current > 0,
       });
       if (closureDeclineCooldown.current > 0) closureDeclineCooldown.current -= 1;
+
+      // ROAD QUESTIONS — EMIT. Placed after the termination decision so an early exit is visible
+      // here, and BEFORE the branches that return, so a session ending on this turn still leaves
+      // the user their own answers. buildRoadArtifact is a pure assembler: there is deliberately no
+      // callAura between the captured answers and what is shown, which is the whole reason the
+      // verbatim contract holds without a detector.
+      if (roadQuestionState.current) {
+        const _rq = roadQuestionState.current;
+        const _rqCap = Math.min(_rq.roads.length, 3);
+        const _rqComplete = _rq.qa.length >= _rqCap;
+        const _rqEarlyExit = safetyMode || isExplicitClosure(lastUserMsg) ||
+                             decision === "confirm" || decision === "terminate";
+        if (_rqComplete || _rqEarlyExit) {
+          const _rqArtifact = buildRoadArtifact(_rq, !_rqComplete);
+          if (_rqArtifact) {
+            setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: _rqArtifact, msgMode: currentMode }]);
+          }
+          // Cleared whether or not anything was rendered: an exhausted or abandoned run must never
+          // re-fire, and a run with zero answers correctly produces nothing at all.
+          roadQuestionState.current = null;
+        }
+      }
 
       if (decision === "await_outcome_scale") {
         // Give AURA one more natural turn to ask the mandatory relief-scale question
@@ -4629,6 +4745,7 @@ EXACT ROUTING, one door to one dispatch entry, so the tap is not merely recorded
     methodFailureHint.current = false;
     violationCounts.current = {};
     roadTraceLast.current = null;
+    roadQuestionState.current = null;
     window.__auraLastCollision = null;
     setValueUnlocked(false);
     setIntroChoice(null);

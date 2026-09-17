@@ -64,7 +64,13 @@ if (dynSuffixIdx < 0) {
 const CHECKED = [
   { name: 'detectsBinaryOppositionPhrasing', needle: 'detectsBinaryOppositionPhrasing(lastUserMsgForBinary.content)' },
   { name: 'detectSelfMarkedTension',         needle: 'tensionCtx = detectSelfMarkedTension(' },
-  { name: 'detectUserStagnation',            needle: 'userStagnationCtx = detectUserStagnation(' },
+  // Needle updated when the road-question stand-down was added: the call now sits behind a
+  // short-circuit, `userStagnationCtx = (!roadQuestionState.current && detectUserStagnation(`.
+  // The invariant this file actually guards is unchanged and still checked below — the call
+  // site is pre-API, before dynamicSuffix is built. What moved was the literal text, not the
+  // timing. The detector is pure, so skipping it on a road-question turn has no side effect;
+  // it simply yields an empty ctx, which is the intent of the stand-down.
+  { name: 'detectUserStagnation',            needle: 'detectUserStagnation(msgs).stagnant' },
   { name: 'detectAssistantSelfRepetition',   needle: 'selfRepCheck = detectAssistantSelfRepetition(' },
   { name: 'detectsMethodFailureSignal',      needle: 'detectsMethodFailureSignal(lastUserMsgForMethodFailure.content)' },
   { name: 'detectsConcreteStep',             needle: 'detectsConcreteStep(lastUserMsgForConcreteStep.content)' },
