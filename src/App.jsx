@@ -1551,6 +1551,13 @@ function applyProfileDecay(mem) {
 // Returns a compact description to inject into the prompt
 // Only used when profilingMaturity > 30 (enough data to be useful)
 function getProfileSummary(mem) {
+  // CONSENT GATE — the profile is inferred, never verbatim, and the person can neither see it nor
+  // contest it, so it must not reach the model unless they said yes. This checked maturity only.
+  // Turning memory off writes {storageEnabled:false} but leaves the profile object in
+  // localStorage, so the next load read it straight back and kept injecting it: switching memory
+  // off stopped new writes and nothing else. One gate here covers both call sites — the main
+  // conversational path and the First-WHY branch.
+  if (!mem || !mem.storageEnabled) return '';
   const p = mem.profile;
   if (!p || p.profilingMaturity < 30) return '';
 
@@ -4020,15 +4027,27 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
       // Shadow Trigger: behavior deviates >30% from profile
       const shadowFired = !crisisFired && detectShadowTrigger(memory, signals);
 
-      if (!shadowFired && !crisisFired) {
-        const updatedWithProfile = updateProfile({ ...memory }, signals);
-        setMemory(updatedWithProfile);
-        if (memory.storageEnabled) saveMemory(updatedWithProfile);
-      } else if (shadowFired) {
-        // Record shadow fired — resets auto-resume counter
-        const updatedWithShadow = recordShadowFired({ ...memory });
-        setMemory(updatedWithShadow);
-        if (memory.storageEnabled) saveMemory(updatedWithShadow);
+      // CONSENT GATE — only saveMemory used to be gated here, so updateProfile and setMemory ran
+      // on every turn regardless. getProfileSummary activates at profilingMaturity >= 30, which is
+      // totalSignals >= 9 at one signal per turn, so in any session of ten turns or more the
+      // profile matured and entered the prompt WITHIN THAT SESSION with consent never given. The
+      // gate now covers production, not just persistence: no consent, no profile built at all.
+      //
+      // DELIBERATELY NOT EXTENDED to recordTrajectory further down, which runs before consent for
+      // a documented reason — the consent prompt needs a detected stable pattern to have something
+      // to ask about. Nothing outside the profiling functions reads mem.profile, so gating here
+      // cannot starve that mechanism. Do not "unify" the two.
+      if (memory.storageEnabled) {
+        if (!shadowFired && !crisisFired) {
+          const updatedWithProfile = updateProfile({ ...memory }, signals);
+          setMemory(updatedWithProfile);
+          saveMemory(updatedWithProfile);
+        } else if (shadowFired) {
+          // Record shadow fired — resets auto-resume counter
+          const updatedWithShadow = recordShadowFired({ ...memory });
+          setMemory(updatedWithShadow);
+          saveMemory(updatedWithShadow);
+        }
       }
 
       if (currentMode === "COMPRESSION") {

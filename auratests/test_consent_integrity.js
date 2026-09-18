@@ -111,5 +111,102 @@ assert('BLUEPRINT: the keystone-is-verbatim guarantee in the code comment still 
 assert('BLUEPRINT: escaping is untouched — every interpolation still goes through esc()',
   !/\$\{(?!esc\(|dateStr|keystoneHtml|beatsHtml|ankerText \?)/.test(BLUEPRINT.slice(BLUEPRINT.indexOf('<body>'))));
 
+// ── P1 — PROFILING MUST NOT RUN, OR BE USED, WITHOUT CONSENT ────────────────
+// The classification found the Silent Profile — twelve moving averages producing statements like
+// "fear-driven decisions", "frequently seeks confirmation, handle refusals carefully" — running
+// on two independent paths with no consent at all:
+//
+//   (1) PRODUCTION. updateProfile + setMemory ran unconditionally; only saveMemory was gated. And
+//       getProfileSummary activates at profilingMaturity >= 30, which is totalSignals >= 9, one
+//       signal per turn — so in ANY session of ten turns or more the profile matured and entered
+//       the prompt WITHIN THAT SESSION, with storageEnabled false throughout.
+//
+//   (2) USE. getProfileSummary checked only profilingMaturity, never storageEnabled. Turning
+//       memory off writes {storageEnabled:false} but leaves the profile object in localStorage,
+//       so the next load read it back and kept injecting it. Switching memory off did not switch
+//       profiling off — it only stopped new writes.
+//
+// This is a live compliance exposure (profiling without clear consent), not a design preference,
+// which is why it was fixed ahead of the architecture work rather than inside it.
+//
+// The gate is NOT extended to recordTrajectory: that one deliberately runs before consent, with a
+// documented reason — the consent prompt itself needs a detected stable pattern in order to have
+// something to ask about. Gating it would make the consent mechanism unable to trigger. The
+// assertions below hold that distinction so a later "consistency" pass does not collapse the two.
+
+const _gpsStart = CODE.indexOf('function getProfileSummary');
+const _gpsEnd = CODE.indexOf('\n}', _gpsStart);
+const GPS = _gpsStart >= 0 ? CODE.slice(_gpsStart, _gpsEnd) : '';
+assert('getProfileSummary located', GPS.includes('profilingMaturity'));
+
+// BEHAVIOURAL, against the real function: a matured profile plus consent OFF must produce nothing.
+let getProfileSummary = null;
+try { eval('getProfileSummary = ' + GPS + '\n}'); } catch (err) {
+  assert('getProfileSummary evaluates (it did not: ' + err.message + ')', false);
+}
+if (typeof getProfileSummary === 'function') {
+  const maturedProfile = {
+    impulsivity: 80, analyticalDepth: 20, riskAvoidance: 80, autonomyNeed: 80,
+    ruminationTendency: 80, validationSeeking: 80, preferredPace: 80, orientation: 80,
+    profilingMaturity: 95, totalSignals: 40,
+  };
+  const withConsent = getProfileSummary({ storageEnabled: true, profile: maturedProfile });
+  const without     = getProfileSummary({ storageEnabled: false, profile: maturedProfile });
+  assert('USE: a matured profile still works WITH consent (the fix is a gate, not a removal)',
+    typeof withConsent === 'string' && withConsent.includes('SILENT PROFILE'));
+  assert('USE: the SAME matured profile produces NOTHING with consent off',
+    without === '');
+  assert('USE: a profile stored before consent was withdrawn is not injected either',
+    getProfileSummary({ storageEnabled: false, profile: { ...maturedProfile, profilingMaturity: 100 } }) === '');
+  assert('USE: the maturity floor still applies independently of consent',
+    getProfileSummary({ storageEnabled: true, profile: { ...maturedProfile, profilingMaturity: 10 } }) === '');
+  assert('USE: a missing profile object is still handled without throwing',
+    getProfileSummary({ storageEnabled: true }) === '' && getProfileSummary({ storageEnabled: false }) === '');
+}
+
+// PRODUCTION: the update block itself must be consent-gated in the source.
+const _sigStart = CODE.indexOf('const crisisFired = detectCrisisMode');
+const _sigEnd = CODE.indexOf('if (currentMode === "COMPRESSION")', _sigStart);
+const SIGBLOCK = _sigStart >= 0 ? CODE.slice(_sigStart, _sigEnd) : '';
+assert('Signal-update block located', SIGBLOCK.includes('updateProfile('));
+// CONTAINMENT, by brace-matching the real gate, NOT by proximity. The first version of these
+// three looked for `memory.storageEnabled` within N characters of each call — which the gate on a
+// SIBLING branch satisfies from a distance. A mutation that moved only the shadow branch back
+// outside the gate left that assertion green. These now extract the gated block and check that
+// each call is inside it, and that nothing profiling-related survives outside.
+const GATE = (() => {
+  const open = SIGBLOCK.indexOf('if (memory.storageEnabled) {');
+  if (open < 0) return null;
+  let i = SIGBLOCK.indexOf('{', open), depth = 0;
+  for (; i < SIGBLOCK.length; i++) {
+    if (SIGBLOCK[i] === '{') depth++;
+    else if (SIGBLOCK[i] === '}' && --depth === 0) return SIGBLOCK.slice(open, i + 1);
+  }
+  return null;
+})();
+assert('PRODUCTION: a consent gate exists in the signal block', GATE !== null);
+if (GATE) {
+  assert('PRODUCTION: updateProfile is INSIDE the gate', GATE.includes('updateProfile('));
+  assert('PRODUCTION: setMemory(updatedWithProfile) is INSIDE the gate',
+    GATE.includes('setMemory(updatedWithProfile)'));
+  assert('PRODUCTION: the shadow-trigger branch is INSIDE the gate too — same system',
+    GATE.includes('recordShadowFired(') && GATE.includes('setMemory(updatedWithShadow)'));
+  const OUTSIDE = SIGBLOCK.split(GATE).join('');
+  assert('PRODUCTION: NOTHING profiling-related survives outside the gate',
+    !/updateProfile\(|recordShadowFired\(|setMemory\(updatedWith/.test(OUTSIDE));
+}
+
+// THE DISTINCTION THAT MUST SURVIVE: recordTrajectory stays ungated, on purpose.
+assert('recordTrajectory is deliberately NOT gated — the consent prompt needs it to have something to ask about',
+  /INTENTIONAL: recordTrajectory runs here regardless of storageEnabled/.test(CODE));
+assert('…and its documented reason is still recorded next to it',
+  /consent-offering mechanism itself can detect a stable pattern/.test(CODE));
+
+// REGRESSION: consent still genuinely turns things on.
+assert('REGRESSION: granting consent still sets storageEnabled true',
+  /storageEnabled: true/.test(CODE));
+assert('REGRESSION: the delete-everything action still clears local storage',
+  /removeItem\(MEMORY_KEY\)/.test(CODE));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);
