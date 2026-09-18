@@ -1941,19 +1941,34 @@ function checkAnchorCoverage(messagesAfterAnchors, anchorWords) {
 // first real-topic message ("before") are already produced every closure — they just weren't
 // persisted. Both are captured here, verbatim, alongside the already-existing Anchor word.
 // "Before" is code-extracted (never model-paraphrased) to avoid any risk of the model revising
-// how the session started. For first-time users, the real topic begins right after the identity
-// line ("ψηφιακός καθρέφτης") — their onboarding-demo answer is a different topic and must be
-// skipped. For returning users (no onboarding this session), the first user message IS the topic.
+// how the session started.
+//
+// THE ORIGINAL REASON FOR A BOUNDARY SCAN IS RECORDED HERE because it explains the bug below and
+// is now obsolete: first-time users used to answer an onboarding demo question first, so the real
+// topic began only after AURA's identity line, and that answer had to be skipped. The demo was
+// removed entirely (showDemo is hardcoded false, no button sets it), so no session has a
+// pre-topic exchange any more — on every path the first user message IS the topic. The identity
+// line the scan looked for is deliberately not repeated in this comment: test_consent_integrity
+// greps the whole file for it, and a comment quoting it would defeat its own guard.
+// ΜΠΗΚΕΣ ΜΕ — what the person arrived with, in their own words. Feeds anchor.before, which the
+// Αρχείο renders and the Blueprint's first zone is built on.
+//
+// THIS USED TO SCAN for an assistant message containing a fixed Greek phrase and return the first
+// user message AFTER it. That phrase appears ZERO times in the prompt — it never did — so the
+// boundary stayed -1, the loop started at index 0, and the function returned the first user
+// message of the session: the right answer, reached by accident. An accident is not a contract,
+// and the moment any assistant text happened to contain that phrase the return value would have
+// silently become a different message, with nothing failing anywhere.
+//
+// The contract is now what the zone actually needs, stated plainly: THE FIRST USER MESSAGE OF THE
+// SESSION. Correct on every path — the normal flow only reaches First-WHY with messages.length
+// === 0 and sets firstWhyMessage to the user's own userText, so messages[0] is their genuine
+// opening on every branch. The empty-string fallbacks matter: this runs during termination, where
+// a throw would lose the anchor the whole session was for.
 function extractBeforeMessage(messages) {
   if (!Array.isArray(messages)) return "";
-  let boundary = -1;
   for (let i = 0; i < messages.length; i++) {
-    if (messages[i].role === "assistant" && (messages[i].content || "").includes("ψηφιακός καθρέφτης")) {
-      boundary = i;
-    }
-  }
-  for (let i = boundary + 1; i < messages.length; i++) {
-    if (messages[i].role === "user") return messages[i].content;
+    if (messages[i] && messages[i].role === "user") return messages[i].content || "";
   }
   return "";
 }

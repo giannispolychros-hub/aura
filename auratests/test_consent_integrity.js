@@ -208,5 +208,58 @@ assert('REGRESSION: granting consent still sets storageEnabled true',
 assert('REGRESSION: the delete-everything action still clears local storage',
   /removeItem\(MEMORY_KEY\)/.test(CODE));
 
+// ── ΜΠΗΚΕΣ ΜΕ — extractBeforeMessage must have a real contract ──────────────
+// This feeds anchor.before, which the Αρχείο renders today and which the redesigned Blueprint's
+// first zone is built on. It scanned for an assistant message containing "ψηφιακός καθρέφτης" and
+// took the first user message AFTER it. That phrase appears ZERO times in the prompt, so the
+// boundary stayed -1, the loop started at index 0, and the function returned the first user
+// message of the session — the right answer, reached by accident. Two problems with an accident:
+// it is not a contract anyone can rely on, and the moment any assistant text happens to contain
+// that phrase the return value silently changes to a completely different message.
+//
+// The contract is now explicit: the first user message of the session. Verified correct on every
+// path — the normal path only reaches First-WHY with messages.length === 0, and firstWhyMessage is
+// set to the user's own userText, so messages[0] is always their genuine opening on every branch.
+const _ebStart = CODE.indexOf('function extractBeforeMessage');
+const _ebEnd = CODE.indexOf('\n}', _ebStart);
+const EB_SRC = _ebStart >= 0 ? CODE.slice(_ebStart, _ebEnd + 2) : '';
+assert('extractBeforeMessage located', EB_SRC.includes('function extractBeforeMessage'));
+assert('ΜΠΗΚΕΣ ΜΕ: the phantom marker is gone from the function',
+  !/ψηφιακός καθρέφτης/.test(EB_SRC));
+assert('ΜΠΗΚΕΣ ΜΕ: the marker exists nowhere in the file at all — it never did in the prompt',
+  (raw.match(/ψηφιακός καθρέφτης/g) || []).length === 0);
+
+let extractBeforeMessage = null;
+try { eval('extractBeforeMessage = ' + EB_SRC.slice(EB_SRC.indexOf('function'))); } catch (err) {
+  assert('extractBeforeMessage evaluates (it did not: ' + err.message + ')', false);
+}
+if (typeof extractBeforeMessage === 'function') {
+  const U = c => ({ role: 'user', content: c });
+  const A = c => ({ role: 'assistant', content: c });
+  const session = [U('Δεν ξέρω αν να αλλάξω δουλειά.'), A('Τι σε κρατάει;'), U('Ο μισθός.')];
+  assert('ΜΠΗΚΕΣ ΜΕ: returns the first user message of the session',
+    extractBeforeMessage(session) === 'Δεν ξέρω αν να αλλάξω δουλειά.');
+
+  // THE DISCRIMINATING CASE. With the phantom scan in place this returned "Ο μισθός." — the
+  // message AFTER the marker — instead of what they came in with. Nothing in the product produces
+  // that phrase today, which is exactly why the bug was invisible; it is held here so that
+  // reintroducing any such marker cannot silently change the first zone of the Blueprint.
+  const withMarker = [U('Δεν ξέρω αν να αλλάξω δουλειά.'), A('Είμαι ένας ψηφιακός καθρέφτης.'), U('Ο μισθός.')];
+  assert('ΜΠΗΚΕΣ ΜΕ: an assistant message containing that phrase does NOT move the boundary',
+    extractBeforeMessage(withMarker) === 'Δεν ξέρω αν να αλλάξω δουλειά.');
+  assert('ΜΠΗΚΕΣ ΜΕ: the user\'s own words are never skipped, whatever an assistant said',
+    extractBeforeMessage([A('οτιδήποτε'), U('πρώτο δικό μου'), U('δεύτερο')]) === 'πρώτο δικό μου');
+  assert('ΜΠΗΚΕΣ ΜΕ: a user message that happens to contain the phrase is returned normally',
+    extractBeforeMessage([U('είσαι ψηφιακός καθρέφτης;'), U('β')]) === 'είσαι ψηφιακός καθρέφτης;');
+
+  // Degenerate inputs — this runs at termination, where an exception would lose the anchor.
+  assert('ΜΠΗΚΕΣ ΜΕ: no user message at all returns empty string',
+    extractBeforeMessage([A('μόνο aura')]) === '');
+  assert('ΜΠΗΚΕΣ ΜΕ: empty and non-array inputs are handled',
+    extractBeforeMessage([]) === '' && extractBeforeMessage(null) === '' && extractBeforeMessage(undefined) === '');
+  assert('ΜΠΗΚΕΣ ΜΕ: a message with no content field does not throw',
+    extractBeforeMessage([{ role: 'user' }, U('β')]) !== undefined);
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);
