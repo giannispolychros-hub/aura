@@ -2108,7 +2108,13 @@ function exportBlueprint(distillationText, ankerText) {
   ${keystoneHtml}
   ${beatsHtml}
   ${ankerText ? `<div class="stamp">"${esc(ankerText)}"</div>` : ""}
-  <div class="footer">Αυτό δεν είναι σύνοψη μιας συζήτησης. Είναι δικά σου λόγια, στη σειρά που τα βρήκες.</div>
+  <!-- PROVENANCE FIX. The footer said "Είναι δικά σου λόγια" of the whole sheet. True of the
+       keystone, which the code above guarantees is the user's verbatim phrase and never
+       AI-selected. NOT true of the three beats: ΒΡΗΚΕΣ carries no sourcing requirement anywhere
+       in the prompt, unlike ΦΕΥΓΕΙΣ ΜΕ which carries the strictest one. This is a file designed
+       to be kept and shared, so it must not claim a provenance it cannot guarantee for a third
+       of its content. The two are now attributed separately. -->
+  <div class="footer">Η φράση που κρατάς είναι αυτούσια δική σου. Τα τρία βήματα τα διατύπωσε η AURA με βάση όσα είπες — διάβασέ τα σαν πρόταση, όχι σαν καταγραφή.</div>
 </div></body></html>`;
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
@@ -5217,8 +5223,13 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
               </div>
             ))}
             <div style={{fontSize:9,color:"var(--text-dim)",marginTop:8,lineHeight:1.7}}>
-              Αποθηκεύονται μόνο μοτίβα συμπεριφοράς.<br/>
-              Ποτέ κείμενο συνομιλίας. Τα πάντα στη συσκευή σου.
+              {/* Same accuracy fix as the consent card — the false absolute was printed in BOTH
+                  places, so correcting one and not the other would have left the contradiction
+                  standing in the panel a user opens precisely to check what is kept. */}
+              Αποθηκεύονται μοτίβα και μετρητές. Επίσης, για το Αρχείο: η φράση που<br/>
+              κρατάς, το πρώτο σου μήνυμα, μία ακόμη δική σου φράση και<br/>
+              η τελευταία απάντηση της AURA — αυτούσια, ανά συνεδρία.<br/>
+              Ποτέ ολόκληρη η συνομιλία. Τα πάντα στη συσκευή σου.
             </div>
             <div className="mem-panel-actions">
               <button className="toggle-btn" onClick={() => { const u = {...memory, storageEnabled: !memory.storageEnabled}; setMemory(u); saveMemory(u); }}>
@@ -5459,9 +5470,19 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
                 Παρατήρησα ένα μοτίβο που μπορεί να είναι χρήσιμο να θυμάμαι.
                 Θέλεις να το κρατήσω σε αυτή τη συσκευή;
               </div>
+              {/* ACCURACY FIX. This claimed, in absolute terms, that no conversation text is ever
+                  stored (the literal wording is deliberately not quoted here — test_consent_integrity
+                  greps this file for it, and a comment quoting it would defeat its own guard, a
+                  mistake already made once in test_dead_paths). In fact createAnchor persists the
+                  phrase they chose to keep, their first message, one further message of theirs and
+                  AURA's closing line — up to 100 entries, rendered in the Αρχείο. The absolute was
+                  false in the one dialog where consent is actually given. What WAS true in it — that
+                  the whole conversation is never stored — is kept and said plainly. */}
               <div className="mem-note">
-                Αποθηκεύονται μόνο μοτίβα — ποτέ κείμενο συνομιλίας.<br />
-                Τα πάντα παραμένουν στη συσκευή σου. Μπορείς να τα διαγράψεις οποιαδήποτε στιγμή.
+                Κρατιούνται μοτίβα και μετρητές — και, για το Αρχείο σου, λίγα αυτούσια λόγια ανά συνεδρία:
+                η φράση που διαλέγεις να κρατήσεις και δύο σημεία της κουβέντας.<br />
+                Ποτέ ολόκληρη η συνομιλία. Τα πάντα παραμένουν στη συσκευή σου και μπορείς
+                να τα διαγράψεις οποιαδήποτε στιγμή.
               </div>
               <div className="choice-btns">
                 <button className="choice-btn" onClick={() => handleMemoryChoice(false)}>Όχι</button>
