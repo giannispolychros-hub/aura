@@ -295,7 +295,7 @@ USER-VERIFIED SHIFT CHECK (architectural fix — the question below this one, "�
 Only if the cross-check above doesn't apply and shift-check hasn't happened yet: FAILURE H GUARD (red-team finding, addressed via existing evidence discipline, no new mechanism — before asking, confirm the before-material and the core-material are meaningfully different, not just worded differently; if they amount to the same thing restated, skip this question, since asking "what changed" about something unchanged produces an empty answer) — "Με τι μπήκες εδώ... και με τι φεύγεις τώρα;" Their answer becomes the direct source material for the beats below — this makes the verbatim check that follows easier to satisfy honestly, since the words are now freshly, directly theirs rather than something to reconstruct from earlier in the conversation.
 Exact output format for these three beats (parsed and rendered as three separate visual blocks by the application — this exact structure is required, not optional, whenever a real shift occurred): before finalizing it, two explicit checks (the first — architecture audit finding, turns the existing "own words" principle from a background reminder into an active pre-output step; the second — real-transcript finding, "synthesis inflation": a summary can pass the first check, using only the user's own vocabulary, while still overstating certainty, turning open hypotheses into a stated decision): (1) does every phrase here trace to something the user actually said, or is any of it my own framing dressed up as theirs? (2) does the CONFIDENCE level match what was actually confirmed — real case: "hypotheses + a possible test" was written up as "the problem is X, not Y," when the user had only voiced two open doubts, neither resolved. If the honest state is still uncertain, say so in the beat rather than manufacturing resolution — e.g. "δεν ξέρεις ακόμη αν..." is sometimes the accurate BΡΗΚΕΣ, not a confident diagnosis. If any beat would not survive either check, rewrite it in plainer, less polished, less certain language rather than let it stand. each beat on its own line, prefixed exactly like this, nothing before the first prefix and nothing after the third line:
 ΗΡΘΕΣ ΜΕ: [what they brought, their own words/framing]
-ΒΡΗΚΕΣ: [what they actually found underneath it]
+ΒΡΗΚΕΣ: [what they actually found underneath it — AND, as of this revision, this beat carries a sourcing requirement of its own. The reason is recorded on ΦΕΥΓΕΙΣ ΜΕ below: that beat got the strictest rule of the three precisely because it had been the one with NO sourcing rule, and that is where a substitution entered a real session. With it fixed, this is now the beat in that position — and it is also the most interpretive line this product ever writes, since it names what a person found underneath their own problem. THE REQUIREMENT: the finding must be one the user themselves put into words at some point in the session, in their own vocabulary. Never a diagnosis, never an interpretation, never AURA's framing of what was "really" going on underneath. If they said it roughly, use their rough version — the same rule ΦΕΥΓΕΙΣ ΜΕ already states, for the same reason: a polished sentence they did not say is worse than a clumsy one they did. IF THEY NEVER ARTICULATED A FINDING AT ALL, do not manufacture one to fill the line: either name what became visible using their own words, without claiming they concluded it, or — if not even that is traceable — do not use the three-beat format for this session, exactly as the rule above already says for a session with no real shift. An impressive ΒΡΗΚΕΣ the person never said is the same failure as "ΦΕΥΓΕΙΣ ΜΕ: το Φίατ", one beat earlier and harder to notice]
 ΦΕΥΓΕΙΣ ΜΕ: [what changes now — IN THEIR WORDS, and this beat carries the strictest sourcing of the three, for a reason that outlasts any single session: it is the line the person keeps. Real evidence of what happens without this: a session ended "ΦΕΥΓΕΙΣ ΜΕ: το Φίατ" when the user had never once said he would buy the Fiat — AURA had concluded it from his answer about what worried him more, and then handed him its own conclusion as the thing he was taking away. Note this beat was the only one of the three with no sourcing requirement while ΗΡΘΕΣ ΜΕ explicitly demanded their own words, which is exactly where the substitution entered. If they have articulated what they leave with, use their formulation even if a cleaner one is available — a polished sentence they did not say is worse than a rough one they did. If they have not articulated it, this beat says what changed in the seeing, not what they will now do; a decision never stated is not theirs to be handed back]
 If no real shift occurred, do not use this format — say so honestly in ordinary prose instead (per the principle above), since forcing the three-beat structure onto a session with no real shift would fabricate one.
 
@@ -2112,6 +2112,58 @@ function getOpenAnchors(mem) {
   return mem.anchors.filter(a => a.status === "open");
 }
 
+// DECLARATION_EVENT — generalized provenance for "this reply answers that question".
+//
+// SHIFT was deferred because nothing in the code could prove that a given user message was the
+// answer to a given question. The obvious patch is one more hidden tag for that one question.
+// ARCHITECTURE_DECISIONS.md says not to: every future signal with the same need would demand its
+// own tag, and one problem would end up with N ad-hoc mechanisms. This is the one mechanism.
+//
+// A question is ISSUED with an identity; the reply that follows is LINKED to it. The value is
+// almost entirely in what it REFUSES to link — a reply with no issued question, a reply that
+// predates the question, a second reply to an already-answered one. Those refusals are Zero
+// Inference expressed in code: without them, "the next message is the answer" is a guess, which
+// is the exact reason SHIFT was not built.
+//
+// Session-scoped, never persisted: no new stored category, consent disclosure untouched.
+// EARLY_WORD is its first consumer, and NOTHING is built on top of it here — no SHIFT, no new
+// claim about anyone. The infrastructure exists so the next signal does not need a patch.
+function issueDeclaration(ledger, id, turn) {
+  const list = Array.isArray(ledger) ? ledger : [];
+  if (typeof id !== "string" || !/^[a-z][a-z0-9_]{0,31}$/.test(id)) return list;
+  if (typeof turn !== "number" || !Number.isInteger(turn) || turn < 0) return list;
+  // Re-asking supersedes an unanswered asking: the stale one must not be able to collect a
+  // reply that was given to the later question.
+  const kept = list.filter(r => !(r && r.id === id && r.answeredAt === null));
+  const next = [...kept, { id, askedAt: turn, answeredAt: null, text: "" }];
+  return next.length > 64 ? next.slice(next.length - 64) : next;
+}
+function linkDeclarationResponse(ledger, id, text, turn) {
+  const list = Array.isArray(ledger) ? ledger : [];
+  if (typeof id !== "string" || !/^[a-z][a-z0-9_]{0,31}$/.test(id)) return list;
+  if (typeof turn !== "number" || !Number.isInteger(turn) || turn < 0) return list;
+  const body = typeof text === "string" ? text.trim() : "";
+  if (!body) return list;
+  let target = -1;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const r = list[i];
+    if (r && r.id === id && r.answeredAt === null && r.askedAt < turn) { target = i; break; }
+  }
+  if (target < 0) return list; // nothing was asked, so nothing is being answered
+  const next = list.slice();
+  next[target] = { ...list[target], answeredAt: turn, text: body };
+  return next;
+}
+function getDeclaration(ledger, id) {
+  const list = Array.isArray(ledger) ? ledger : [];
+  if (typeof id !== "string") return null;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const r = list[i];
+    if (r && r.id === id && r.answeredAt !== null) return { ...r };
+  }
+  return null;
+}
+
 // TELEMETRY — counts only, and this function is what makes that true.
 //
 // The final gap audit could not answer whether the chain CHAOS → QUESTION → EVIDENCE →
@@ -3738,6 +3790,11 @@ export default function AURAv2() {
   const friendPerspectiveCtxDelivered = useRef(0); // budget 1 — single-turn directive
   const premiseInversionCtxDelivered  = useRef(0); // budget 2 — see the note above its ctx
   const awaitingEarlyWord      = useRef(false); // set true right after [[EARLY_WORD:yes]] tag seen
+  // DECLARATION_EVENT ledger, session-scoped and never persisted. Beside awaitingEarlyWord
+  // rather than replacing it: that path has tests around it and works, and a rewrite would buy
+  // nothing. What the ledger adds is the provenance the ref cannot express — which question,
+  // asked when, answered when.
+  const declarationLedger      = useRef([]);
   const earlyCapturedWord      = useRef(null);  // the user's verbatim answer, fed into Part 1 later
   const binaryOppositionCount  = useRef(0);     // structural repetition count, feeds PREMISE INVERSION reliability
   const clarityPivotHint       = useRef(null);  // "LOOP" or "AVOIDANCE" - code-verified, feeds CLARITY PIVOT hybrid fix
@@ -3858,7 +3915,13 @@ export default function AURAv2() {
     // word question asked last turn, signaled via the [[EARLY_WORD:yes]] tag.
     if (awaitingEarlyWord.current) {
       const lastUserMsgForEarlyWord = [...msgs].reverse().find(m => m.role === "user");
-      if (lastUserMsgForEarlyWord) earlyCapturedWord.current = lastUserMsgForEarlyWord.content;
+      if (lastUserMsgForEarlyWord) {
+        earlyCapturedWord.current = lastUserMsgForEarlyWord.content;
+        // The same capture, now with provenance: linked to the asking it answers, or — if the
+        // ledger holds no unanswered asking of that identity — not linked at all.
+        declarationLedger.current = linkDeclarationResponse(declarationLedger.current,
+          "early_word", lastUserMsgForEarlyWord.content, turnCount.current || 0);
+      }
       awaitingEarlyWord.current = false;
     }
     // STRUCTURAL COUNTER for PREMISE INVERSION's own trigger condition (real gap found via
@@ -4320,7 +4383,13 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
       // to anchor on "true last thing" per its own rule below — every other hidden tag should
       // simply be detected/stripped by presence, anywhere in the text, independently of others.):
       const earlyWordTagMatch = rawTextWithTags.match(/\[\[EARLY_WORD:yes\]\]/i);
-      if (earlyWordTagMatch) awaitingEarlyWord.current = true;
+      if (earlyWordTagMatch) {
+        awaitingEarlyWord.current = true;
+        // First consumer: the question is issued WITH AN IDENTITY here, so the reply that
+        // follows can be linked rather than assumed to be the answer.
+        declarationLedger.current = issueDeclaration(declarationLedger.current, "early_word",
+          turnCount.current || 0);
+      }
       const rawText = rawTextWithTags.replace(/\s*\[\[EARLY_WORD:yes\]\]\s*/gi, "\n").trim();
       const text = stripAraDeclarative(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""));
 
@@ -5141,6 +5210,7 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
     setPivotPending(false);
     setLayerGatePending(false);
     setPendingUserMessage(null);
+    declarationLedger.current = [];
     setHeldPattern(null);
     setMemoryPromptPending(false);
     setWarningPending(false);
