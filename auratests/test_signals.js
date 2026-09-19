@@ -424,13 +424,16 @@ if (SRC_BP) {
   const _BP_HTML = SRC_BP.slice(SRC_BP.indexOf('<body>'), SRC_BP.indexOf('const blob = new Blob'));
   assert('SHEET: the HTML template was located for the escaping check', _BP_HTML.length > 200);
   assert('SHEET: every interpolation in the sheet still goes through esc() — it is downloaded and shared',
-    !/\$\{(?!esc\(|dateStr|keystoneHtml|beatsHtml|zonesHtml|ankerText \?|zones)/.test(_BP_HTML));
+    !/\$\{(?!esc\(|dateStr|keystoneHtml|zonesHtml)/.test(_BP_HTML));
 
   // THE ZONE BUILDER IS WHERE THE USER'S TEXT ACTUALLY ENTERS HTML, and the check above does not
   // reach it: the builder is declared BEFORE the template, so slicing from <body> excluded the
   // only new code that interpolates a person's own sentence into markup. A mutation that dropped
   // esc() from the evidence zone left the suite green. This block covers the builder itself.
-  const _ZB = SRC_BP.slice(SRC_BP.indexOf('const zonesHtml'), SRC_BP.indexOf('// TIMELINE REDESIGN'));
+  // End-anchored on the html template, not on a comment: the TIMELINE comment that used to follow
+// the builder was removed with the beats block, and an indexOf that misses returns -1, silently
+// producing an empty slice and a vacuous check.
+const _ZB = SRC_BP.slice(SRC_BP.indexOf('const zonesHtml'), SRC_BP.indexOf('const html = '));
   assert('SHEET: the zone builder was located', _ZB.length > 200 && _ZB.includes('zone-card'));
   assert('SHEET: EVERY interpolation inside the zone builder goes through esc()',
     [..._ZB.matchAll(/\$\{([^}]*)/g)].every(m => /^\s*(esc\(|\(z\.occurrences|o\.at \?|o\.before \?|items\b)/.test(m[1])));
@@ -440,8 +443,8 @@ if (SRC_BP) {
     /esc\(z\.word\)/.test(_ZB) && /esc\(String\(z\.count\)\)/.test(_ZB) && /esc\(o\.before\)/.test(_ZB));
   assert('SHEET: the keystone is still there and still claimed as verbatim',
     /Η φράση που κρατάς/.test(SRC_BP) && /ALWAYS the user's verbatim words/.test(SRC_BP));
-  assert('SHEET: the footer still separates what is theirs from what AURA formulated',
-    /αυτούσια δική σου/.test(SRC_BP) && /διατύπωσε η AURA/.test(SRC_BP));
+  assert('SHEET: the footer states what is true of the whole page now — nothing on it is AURA\'s',
+    /δικά σου λόγια/.test(SRC_BP) && !/διατύπωσε η AURA/.test(SRC_BP));
   assert('SHEET: the decided zone renders both halves with an arrow between them',
     /zone-arrow|→/.test(_ZB) && /esc\(z\.before\)/.test(_ZB) && /esc\(z\.after\)/.test(_ZB));
   for (const label of ['ΜΠΗΚΕΣ ΜΕ', 'ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ', 'ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ', 'ΤΙ ΑΠΟΦΑΣΙΣΕΣ']) {

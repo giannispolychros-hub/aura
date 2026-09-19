@@ -97,15 +97,21 @@ assert('BLUEPRINT: the blanket claim «Είναι δικά σου λόγια» i
   !/Είναι δικά σου λόγια, στη σειρά/.test(BLUEPRINT));
 assert('BLUEPRINT: the keystone is still correctly claimed as verbatim — that part was true',
   /Η φράση που κρατάς/.test(BLUEPRINT));
-assert('BLUEPRINT: the three beats are now attributed to AURA\'s formulation, not to the user',
-  /(διατύπωσ|διατυπώθηκ)/i.test(BLUEPRINT));
-assert('BLUEPRINT: the footer distinguishes the two — it does not attribute both alike',
+// THE ATTRIBUTION SPLIT IS GONE BECAUSE THE THING IT SPLIT IS GONE. This used to require the
+// footer to separate the person's kept phrase from the three beats AURA formulated. The beats
+// were removed from the sheet: they rendered whatever finalDistillation held, and that is the
+// LAST SENTENCE of AURA's closing reply, so the three-beat parse always failed and one
+// arbitrarily-cut sentence of AURA's prose was printed onto a file the person keeps. Nothing on
+// the sheet is now AURA's formulation, so the footer must no longer claim there is.
+assert('BLUEPRINT: no attribution to AURA\'s formulation survives — there is nothing left to attribute',
+  !/(διατύπωσε η AURA|τρία βήματα)/i.test(BLUEPRINT));
+assert('BLUEPRINT: the footer states what is true of the whole page — their words, AURA\'s headings',
   (() => {
     const f = BLUEPRINT.match(/class="footer">([^<]*)</);
-    if (!f) return false;
-    const t = f[1];
-    return /φράση/.test(t) && /(διατύπωσ|διατυπώθηκ)/i.test(t);
+    return !!f && /δικά σου λόγια/.test(f[1]) && /τίτλοι/.test(f[1]);
   })());
+assert('BLUEPRINT: the beats block and the duplicate stamp are gone from the source',
+  !/beatsHtml/.test(BLUEPRINT) && !/class="stamp"/.test(BLUEPRINT));
 assert('BLUEPRINT: the keystone-is-verbatim guarantee in the code comment still holds',
   /ALWAYS the user's verbatim words, never AI-selected/.test(BLUEPRINT));
 // zonesHtml joins the allow-list because the three Blueprint zones are assembled before the
@@ -114,7 +120,7 @@ assert('BLUEPRINT: the keystone-is-verbatim guarantee in the code comment still 
 // actually enters markup — is held by test_signals, which checks the builder block itself; a
 // mutation dropping esc() there fails that suite.
 assert('BLUEPRINT: escaping is untouched — every interpolation still goes through esc()',
-  !/\$\{(?!esc\(|dateStr|keystoneHtml|beatsHtml|zonesHtml|ankerText \?)/.test(BLUEPRINT.slice(BLUEPRINT.indexOf('<body>'))));
+  !/\$\{(?!esc\(|dateStr|keystoneHtml|zonesHtml)/.test(BLUEPRINT.slice(BLUEPRINT.indexOf('<body>'))));
 
 // ── P1 — PROFILING MUST NOT RUN, OR BE USED, WITHOUT CONSENT ────────────────
 // The classification found the Silent Profile — twelve moving averages producing statements like

@@ -2203,8 +2203,18 @@ function buildBlueprintZones(mem, recurring, roadUnknown, commitment, openingMes
   if (open) zones.push({ key: "open", label: "ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ", kind: "evidence", text: open });
   return zones;
 }
-function exportBlueprint(distillationText, ankerText, zones) {
-  const beats = parseThreeBeatShift(distillationText);
+// THE SHEET IS KEYSTONE + ZONES, NOTHING ELSE.
+//
+// It used to also render whatever finalDistillation held, through parseThreeBeatShift with a plain
+// fallback. finalDistillation is the LAST SENTENCE of AURA's closing reply — not the three-beat —
+// so the parse always returned null and the fallback printed one arbitrarily-cut sentence of
+// AURA's prose onto a file the person keeps and shares. Measured, not assumed: a proper three-beat
+// reply splits into three sentences and only the last one was ever passed here.
+//
+// That block never satisfied the verbatim contract; it was simply outside the part being checked.
+// The contract now covers the whole sheet, so it is gone, along with the stamp that repeated the
+// kept phrase a second time. distillationText is removed as a parameter rather than left unused.
+function exportBlueprint(ankerText, zones) {
   const dateStr = new Date().toLocaleDateString("el-GR", { year: "numeric", month: "long", day: "numeric" });
   // The user's own chosen phrase (Anchor), elevated to the top as the single most important line —
   // "the phrase you keep." Critical: this is ALWAYS the user's verbatim words, never AI-selected —
@@ -2240,17 +2250,7 @@ function exportBlueprint(distillationText, ankerText, zones) {
     }
     return `<div class="zone-card"><span class="zone-label">${esc(z.label)}</span><div class="zone-text">${esc(z.text)}</div></div>`;
   }).join("");
-  // TIMELINE REDESIGN (visual redesign only — same underlying beats.brought/found/changed data,
-  // now presented as a connected path with dot markers rather than isolated bordered blocks):
-  const beatsHtml = beats
-    ? `
-      <div class="path-card">
-        <div class="path-item"><span class="path-dot"></span><span class="path-label">Αφετηρία</span><div class="path-text">${esc(beats.brought)}</div></div>
-        <div class="path-item"><span class="path-dot"></span><span class="path-label">Στροφή</span><div class="path-text">${esc(beats.found)}</div></div>
-        <div class="path-item path-final"><span class="path-dot"></span><span class="path-label">Τελικό αποτύπωμα</span><div class="path-text">${esc(beats.changed)}</div></div>
-      </div>
-    `
-    : `<div class="path-card"><div class="path-item"><div class="path-text plain">${esc(distillationText)}</div></div></div>`;
+
   const html = `<!DOCTYPE html>
 <html lang="el"><head><meta charset="UTF-8"><title>AURA — Decision Blueprint</title>
 <style>
@@ -2264,17 +2264,9 @@ function exportBlueprint(distillationText, ankerText, zones) {
   .keystone-label{display:block;font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:#6b5a28;margin-bottom:20px;}
   .keystone-text{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:300;font-size:32px;line-height:1.4;color:#d9bb6a;}
   .keystone-ownership{font-family:'DM Mono',monospace;font-size:10px;color:#565250;margin-top:20px;letter-spacing:.04em;}
-  .path-card{position:relative;padding:36px 28px 36px 40px;background:#181614;border-radius:2px;box-shadow:0 4px 20px rgba(0,0,0,.25);margin-bottom:36px;}
-  .path-card::before{content:"";position:absolute;left:24px;top:44px;bottom:44px;width:1px;background:linear-gradient(180deg,#3a2f18,#6b5a28,#3a2f18);}
-  .path-item{position:relative;padding-bottom:32px;}
-  .path-item:last-child{padding-bottom:0;}
-  .path-dot{position:absolute;left:-20px;top:6px;width:7px;height:7px;border-radius:50%;background:#6b5a28;box-shadow:0 0 0 3px #181614;}
   .path-final .path-dot{background:#c9a84c;width:9px;height:9px;left:-21px;box-shadow:0 0 0 3px #181614,0 0 8px rgba(201,168,76,.4);}
-  .path-label{display:block;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#6b5a28;margin-bottom:8px;}
   .path-final .path-label{color:#c9a84c;}
-  .path-text{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:300;font-size:18px;line-height:1.55;color:#dedad2;}
   .path-final .path-text{font-size:20px;color:#f0ece2;}
-  .path-text.plain{font-size:17px;}
   .stamp{text-align:center;margin-top:44px;padding-top:28px;border-top:1px solid #252320;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:13px;color:#6b5a28;letter-spacing:.03em;}
   .zone-card{padding:22px 26px;background:#181614;border-radius:2px;box-shadow:0 4px 20px rgba(0,0,0,.25);margin-bottom:18px;}
   .zone-label{display:block;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#6b5a28;margin-bottom:10px;}
@@ -2284,21 +2276,24 @@ function exportBlueprint(distillationText, ankerText, zones) {
   .zone-date{display:block;font-size:9px;letter-spacing:.1em;color:#6b5a28;margin-bottom:4px;}
   .zone-occ-text{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;line-height:1.5;color:#b9b4ab;}
   .footer{margin-top:24px;font-size:9px;color:#454340;line-height:1.7;text-align:center;}
-  @media print{ body{background:#fff;color:#111;} .title,.keystone-text{color:#8a6d1f;} .keystone-card,.path-card,.zone-card{background:#faf8f3;box-shadow:none;border:1px solid #e5e0d5;} .path-text,.path-final .path-text,.zone-text{color:#111;} .zone-occ-text{color:#444;} .keystone-ownership{color:#666;} }
+  @media print{ body{background:#fff;color:#111;} .title,.keystone-text{color:#8a6d1f;} .keystone-card,.zone-card{background:#faf8f3;box-shadow:none;border:1px solid #e5e0d5;} .zone-text{color:#111;} .zone-occ-text{color:#444;} .keystone-ownership{color:#666;} }
 </style></head>
 <body><div class="sheet">
   <div class="header-row"><div class="title">AURA — Decision Blueprint</div><div class="date">${dateStr}</div></div>
   ${keystoneHtml}
   ${zonesHtml}
-  ${beatsHtml}
-  ${ankerText ? `<div class="stamp">"${esc(ankerText)}"</div>` : ""}
   <!-- PROVENANCE FIX. The footer said "Είναι δικά σου λόγια" of the whole sheet. True of the
        keystone, which the code above guarantees is the user's verbatim phrase and never
        AI-selected. NOT true of the three beats: ΒΡΗΚΕΣ carries no sourcing requirement anywhere
        in the prompt, unlike ΦΕΥΓΕΙΣ ΜΕ which carries the strictest one. This is a file designed
        to be kept and shared, so it must not claim a provenance it cannot guarantee for a third
        of its content. The two are now attributed separately. -->
-  <div class="footer">Η φράση που κρατάς είναι αυτούσια δική σου. Τα τρία βήματα τα διατύπωσε η AURA με βάση όσα είπες — διάβασέ τα σαν πρόταση, όχι σαν καταγραφή.</div>
+  <!-- The footer had to change with the sheet. It split the page into "your phrase" and "the three
+       steps AURA formulated" — and those steps no longer exist here. Leaving it would have left a
+       description of something that is not on the page, which is the same class of false statement
+       already corrected once in the consent copy. Nothing on the sheet is now AURA's formulation:
+       the whole page is the person's own words under fixed headings. -->
+  <div class="footer">Κάθε γραμμή εδώ είναι δικά σου λόγια, όπως τα είπες. Οι τίτλοι είναι της AURA — τίποτα άλλο.</div>
 </div></body></html>`;
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
@@ -5899,7 +5894,7 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
                     }
                     return null;
                   })();
-                  exportBlueprint(finalDistillation, _kept,
+                  exportBlueprint(_kept,
                     buildBlueprintZones(memory, _recurring, _unknown, _commitment,
                       extractBeforeMessage(messages)));
                 }}>

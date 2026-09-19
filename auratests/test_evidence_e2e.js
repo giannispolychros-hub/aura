@@ -62,7 +62,7 @@ const renderBlueprint = (() => {
   const b = CODE.indexOf('const blob = new Blob', a);
   if (a < 0 || b < 0) { assert('exportBlueprint body located', false); return null; }
   const body = CODE.slice(CODE.indexOf('{', CODE.indexOf('(', a)) + 1, b);
-  try { return eval('(function (distillationText, ankerText, zones) {' + body + ' return html; })'); }
+  try { return eval('(function (ankerText, zones) {' + body + ' return html; })'); }
   catch (err) { assert('exportBlueprint renders: ' + err.message, false); return null; }
 })();
 assert('The real Blueprint renderer was lifted from the source', typeof renderBlueprint === 'function');
@@ -168,11 +168,11 @@ assert('S5: only the opening zone, which needs no signal', keysOf(r5.zones) === 
 assert('S5: not one of the three signal-backed zones appears',
   !['recurring', 'decided', 'open'].some(k => keysOf(r5.zones).includes(k)));
 if (renderBlueprint) {
-  const html5 = renderBlueprint('Κάτι.', null, r5.zones);
+  const html5 = renderBlueprint(null, r5.zones);
   for (const label of ['ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ', 'ΤΙ ΑΠΟΦΑΣΙΣΕΣ', 'ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ']) {
     assert(`S5: the sheet contains no «${label}» frame`, !html5.includes(label));
   }
-  const htmlNone = renderBlueprint('Κάτι.', null, []);
+  const htmlNone = renderBlueprint(null, []);
   assert('S5: with truly nothing, no zone card is emitted at all', !/<div class="zone-card"/.test(htmlNone));
   // The stylesheet always declares .zone-card, so a bare substring check was testing the CSS,
   // not the output. Checked as a rendered element.
@@ -259,7 +259,7 @@ if (renderBlueprint) {
     'αν εγκριθεί η άδεια',
     { verb: 'μιλήσω', before: S1[0].content, after: S1[4].content });
   assert('S0: all four zones present for the contract check', zonesAll.length === 4);
-  const html = renderBlueprint('ΗΡΘΕΣ ΜΕ: α\nΒΡΗΚΕΣ: β\nΦΕΥΓΕΙΣ ΜΕ: γ', 'χρόνος', zonesAll);
+  const html = renderBlueprint('χρόνος', zonesAll);
   // Strip tags, styles and scripts; keep only what a reader sees.
   const visible = html
     .replace(/<style[\s\S]*?<\/style>/g, ' ')
@@ -277,8 +277,7 @@ if (renderBlueprint) {
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&[a-z]+;|&#\d+;/g, ' ');
-  const chromeSheet = renderBlueprint(
-    'ΗΡΘΕΣ ΜΕ: zzqqb\nΒΡΗΚΕΣ: zzqqc\nΦΕΥΓΕΙΣ ΜΕ: zzqqd', 'zzqqa',
+  const chromeSheet = renderBlueprint('zzqqa',
     [{ key: 'entered', label: 'ΜΠΗΚΕΣ ΜΕ', kind: 'evidence', text: 'zzqqe' },
      { key: 'recurring', label: 'ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ', kind: 'pattern', word: 'zzqqf', count: 2,
        occurrences: [{ text: 'zzqqf', at: 1, before: 'zzqqg' }] },
@@ -298,15 +297,21 @@ if (renderBlueprint) {
   // synthesis. So the fixed vocabulary is frozen here: any new word in the template breaks this
   // and a human has to look at what was added and why. Month names vary with the render date and
   // are excluded. Updating this list is a deliberate act, never a convenience.
-  const PINNED_CHROME = ('aura blueprint decision ανήκει ανοιχτο αποτύπωμα αποφασισες αυτή ' +
-    'αυτούσια αφετηρία βάση βήματα διάβασέ διατύπωσε δική είναι είπες επανεμφανιζεται ' +
-    'καταγραφή κρατάς με μπηκες παραμενει πλέον που πρόταση σαν σκέψη σου στροφή τα ' +
-    'τελικό τι τρία φορές φράση όσα όχι').split(' ');
+  const PINNED_CHROME = ('aura blueprint decision άλλο ανήκει ανοιχτο αποφασισες αυτή γραμμή ' +
+    'δικά είναι είπες εδώ επανεμφανιζεται κάθε κρατάς λόγια με μπηκες οι παραμενει ' +
+    'πλέον που σκέψη σου τίποτα τίτλοι τα της τι φορές φράση όπως').split(' ');
   const MONTHS = ['ιανουαρίου','φεβρουαρίου','μαρτίου','απριλίου','μαΐου','ιουνίου',
     'ιουλίου','αυγούστου','σεπτεμβρίου','οκτωβρίου','νοεμβρίου','δεκεμβρίου'];
-  const newChrome = [...chromeLower].filter(w => !PINNED_CHROME.includes(w) && !MONTHS.includes(w));
-  assert(`S0 PIN: the sheet's fixed text is unchanged — no new template words (found: ${newChrome.join(', ') || 'none'})`,
-    newChrome.length === 0);
+  // EXACT IN BOTH DIRECTIONS now that the contract covers the whole sheet. A new word means text
+  // was added and a human must look at it; a missing word means a block was removed and the pin
+  // must be updated deliberately. Checking only one direction let the old beats block sit outside
+  // the contract indefinitely.
+  const actual = [...chromeLower].filter(w => !MONTHS.includes(w)).sort();
+  const newChrome = actual.filter(w => !PINNED_CHROME.includes(w));
+  const goneChrome = PINNED_CHROME.filter(w => !actual.includes(w));
+  assert(`S0 PIN: no new template words (found: ${newChrome.join(', ') || 'none'})`, newChrome.length === 0);
+  assert(`S0 PIN: no template words disappeared unnoticed (missing: ${goneChrome.join(', ') || 'none'})`,
+    goneChrome.length === 0);
   const fixtureWords = new Set(
     (fixtures.join(' ') + ' αν εγκριθεί η άδεια α β γ ΗΡΘΕΣ ΒΡΗΚΕΣ ΦΕΥΓΕΙΣ')
       .toLowerCase().match(/[a-z\u03b1-\u03c9\u03ac-\u03ce0-9]+/g) || []);
@@ -321,11 +326,31 @@ if (renderBlueprint) {
     html.includes(S1[0].content) && html.includes(S1[4].content) && html.includes(S2a[0].content));
   assert('S0: the four labels are present when the four zones are',
     ['ΜΠΗΚΕΣ ΜΕ','ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ','ΤΙ ΑΠΟΦΑΣΙΣΕΣ','ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ'].every(l => html.includes(l)));
+
+  // THE SHEET IS NOW KEYSTONE + ZONES, NOTHING ELSE. The old block rendered whatever
+  // finalDistillation held, and finalDistillation is the LAST SENTENCE of AURA's closing reply —
+  // so parseThreeBeatShift on it always returned null and the plain fallback printed one
+  // arbitrarily-cut sentence of AURA's prose onto a sheet the person keeps and shares. That block
+  // never passed the verbatim contract; it was simply outside the part being checked. It is gone,
+  // and so is the stamp, which repeated the keystone phrase a second time.
+  assert('S0: no beats card survives on the sheet', !/class="path-card"/.test(html));
+  assert('S0: no duplicate stamp of the kept phrase', !/class="stamp"/.test(html));
+  // Direct, not arithmetic: the keystone card renders once and the stamp that repeated it is gone.
+  // The earlier version counted occurrences across the sheet and was fragile for no benefit.
+  assert('S0: the keystone card renders exactly once',
+    (html.match(/class="keystone-card"/g) || []).length === 1);
+  assert('S0: the footer no longer describes blocks that are not on the sheet',
+    !/τρία βήματα|διατύπωσε η AURA/.test(html));
+  assert('S0: and it states what is true of the whole page now',
+    /δικά σου λόγια/.test(html) && /τίτλοι/.test(html));
+  assert('S0: the renderer no longer takes a distillation argument at all',
+    !/distillationText/.test(CODE.slice(CODE.indexOf('function exportBlueprint'),
+                                        CODE.indexOf('const blob = new Blob'))));
   // XSS: the sheet is downloaded and shared. A person's own words must never execute.
   const evil = buildBlueprintZones(
     { anchors: [{ category: 'trajectory_word', text: 'x', createdAt: 1, before: '<img src=x onerror=alert(1)>' }], rejectedPatterns: [] },
     null, '<script>alert(2)</script>', null);
-  const evilHtml = renderBlueprint('α', '<b>β</b>', evil);
+  const evilHtml = renderBlueprint('<b>β</b>', evil);
   assert('S0 XSS: a script tag in the unknown is escaped, not executed',
     !/<script>alert\(2\)<\/script>/.test(evilHtml) && evilHtml.includes('&lt;script&gt;'));
   assert('S0 XSS: an onerror payload in their first message is escaped',
