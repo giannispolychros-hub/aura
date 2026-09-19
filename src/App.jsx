@@ -2166,12 +2166,19 @@ function recordPatternRejection(mem, key) {
 // PURE ASSEMBLER: it takes the recurring signal as an argument rather than computing it, so it
 // stays self-contained for the suites' per-function extraction and can be tested without a memory
 // fixture pretending to be a whole session.
-function buildBlueprintZones(mem, recurring, roadUnknown, commitment) {
+function buildBlueprintZones(mem, recurring, roadUnknown, commitment, openingMessage) {
   const zones = [];
   const words = (mem && Array.isArray(mem.anchors) ? mem.anchors : [])
     .filter(a => a && a.category === "trajectory_word");
   const latest = words.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0] || null;
-  const before = latest && typeof latest.before === "string" ? latest.before.trim() : "";
+  // ΜΠΗΚΕΣ ΜΕ PREFERS THE LIVE OPENING. Found by the end-to-end stress test: this read only
+  // anchor.before, so the zone existed solely when the closing ritual completed and a word was
+  // kept. A real 22-exchange session that ended with "Καλή συνέχεια" produced no anchor and
+  // therefore no zone — losing the person's own first message, which was sitting in `messages`
+  // the whole time. The opening is pure evidence and must not be gated behind a ritual that may
+  // never happen. The anchor stays as the fallback for any caller that has no message list.
+  const liveOpening = typeof openingMessage === "string" ? openingMessage.trim() : "";
+  const before = liveOpening || (latest && typeof latest.before === "string" ? latest.before.trim() : "");
   if (before) zones.push({ key: "entered", label: "ΜΠΗΚΕΣ ΜΕ", kind: "evidence", text: before });
   // Κ2 — a refused pattern produces no zone at all. Suppressed at the source, so nothing
   // downstream can rebuild a claim on it.
@@ -5893,7 +5900,8 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
                     return null;
                   })();
                   exportBlueprint(finalDistillation, _kept,
-                    buildBlueprintZones(memory, _recurring, _unknown, _commitment));
+                    buildBlueprintZones(memory, _recurring, _unknown, _commitment,
+                      extractBeforeMessage(messages)));
                 }}>
                   Κατέβασε το Blueprint
                 </button>
