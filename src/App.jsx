@@ -1720,6 +1720,46 @@ function countPriorWordEchoes(mem, word) {
     a.category === TRAJECTORY_WORD_CATEGORY && (a.text || "").trim().toLowerCase() === target
   ).length;
 }
+// RECURRING SIGNAL — the same thing, kept twice, with the evidence attached.
+//
+// countPriorWordEchoes above returns the COUNT and discards which anchors produced it, so the
+// number can be stated but never shown. This returns the occurrences themselves.
+//
+// WHY A KEPT WORD IS NOT A FREQUENT WORD, which is the entire defence of this signal type. A
+// measured stress test over real transcripts found word frequency anti-correlated with
+// information: the more central a word is to someone's problem, the more it repeats and the less
+// its repetition says. "εισόδημα appeared 3 times" to a person whose stated problem is income is
+// true and empty. A KEPT word is different in kind — they were asked what they keep and answered
+// the same thing in two separate sessions. The repetition is a decision, not a tally. That holds
+// even when the kept word is also the unavoidable topic word, which is the adversarial case
+// test_signals pins: what keeps it honest is not rarity but the schema, which lets this reach
+// PATTERN and forbids it becoming a claim about who the person is.
+//
+// TRIVIAL KEEPERS ARE NOT EVIDENCE. "ναι", "οκ", "δεν ξέρω" are what someone types to move past a
+// question, not what they chose to carry. A recurrence of those says something about the prompt.
+//
+// EXACT MATCHING, by decision: Greek inflection therefore splits one concept into separate words,
+// because the existing stemmer is measurably inconsistent (χρόνος and χρόνου both stem to χρον,
+// but χρόνο stems to χρονο). A rare but always-correct signal beats a more frequent one built on
+// that. Silence here is not evidence that nothing recurred.
+//
+// The category literal is inlined rather than referencing TRAJECTORY_WORD_CATEGORY because the
+// test suites extract and eval each function alone.
+function buildRecurringSignal(mem, word) {
+  const target = String(word == null ? "" : word).trim().toLowerCase();
+  if (!target || target.length < 3) return null;
+  if (/^(ναι|όχι|οκ|ok|okay|εντάξει|τίποτα|καλά|ίσως|δεν ξέρω|δκ)$/i.test(target)) return null;
+  const all = (mem && Array.isArray(mem.anchors)) ? mem.anchors : [];
+  const occurrences = all
+    .filter(a => a && a.category === "trajectory_word" &&
+                 String(a.text == null ? "" : a.text).trim().toLowerCase() === target)
+    .slice()
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+    .map(a => ({ text: String(a.text).trim(), at: a.createdAt || null, before: a.before || null }));
+  // Two evidence or nothing — one occurrence is a choice, not a recurrence.
+  if (occurrences.length < 2) return null;
+  return { word: occurrences[0].text, count: occurrences.length, occurrences };
+}
 // Decision Space Anchors — reliable, code-computed coverage check (Τρόπος Β, not model-judged
 // recall). Given the user-authored anchor words/phrases and the messages that followed them,
 // returns which literally (or near-literally, accent-insensitive) reappeared vs. which did not.

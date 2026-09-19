@@ -187,5 +187,119 @@ assert('PASSIVE: the prompt knows nothing about it',
 assert('PASSIVE: concreteStepStated — the existing gate — is untouched by the new capture',
   /if \(!concreteStepStated\.current && lastUserMsgForConcreteStep && detectsConcreteStep\(/.test(CODE));
 
+// ── SIGNAL 2 — RECURRING (cross-session) ───────────────────────────────────
+// The only signal type that survived the stress test on real transcripts without qualification,
+// and the reason is worth stating because it is the whole defence against vacuity:
+//
+//   A FREQUENT word is chosen by nobody. A KEPT word is chosen by the person, twice, in two
+//   different sessions, as the answer to "what do you keep from this".
+//
+// "εισόδημα appeared 3 times" in a session about income is true and empty — the measured failure
+// that stopped the word-frequency approach. "You chose εισόδημα as what you keep, in two separate
+// sessions" is a different kind of fact: the repetition is a decision, not a word count. The
+// adversarial fixtures below hold that line, including the uncomfortable case where the kept word
+// is also the unavoidable topic word.
+//
+// countPriorWordEchoes already returned the COUNT. It threw away which anchors produced it, so
+// the number could be stated but never shown. This returns the occurrences themselves, so the
+// Blueprint's ΤΙ ΕΠΑΝΗΛΘΕ zone can display evidence instead of an assertion.
+//
+// Exact matching, by decision: a rare but always-correct signal beats a more frequent one built on
+// a stemmer that is measurably inconsistent (χρόνος→χρον but χρόνο→χρονο).
+
+const SRC_RECUR = extract('buildRecurringSignal');
+assert('buildRecurringSignal exists', SRC_RECUR !== null);
+let buildRecurringSignal = null;
+load(SRC_RECUR, 'buildRecurringSignal', f => { buildRecurringSignal = f; });
+
+if (typeof buildRecurringSignal === 'function') {
+  const W = 'trajectory_word';
+  const anchor = (text, at, before) => ({ category: W, text, createdAt: at, before: before || null, status: 'resolved' });
+  const mem = list => ({ anchors: list });
+
+  // ── The signal itself ────────────────────────────────────────────────────
+  const twice = mem([
+    anchor('χρόνος', 1000, 'Δεν ξέρω αν να αλλάξω δουλειά.'),
+    anchor('χρόνος', 2000, 'Πάλι το ίδιο θέμα με τη δουλειά.'),
+  ]);
+  const sig = buildRecurringSignal(twice, 'χρόνος');
+  assert('RECURRING: the same kept word in two sessions is a signal', sig !== null);
+  assert('RECURRING: it reports the count', sig && sig.count === 2);
+  assert('RECURRING: it returns the OCCURRENCES, not just a number — this is the whole point',
+    sig && Array.isArray(sig.occurrences) && sig.occurrences.length === 2);
+  assert('RECURRING: each occurrence carries what the person came in with that time',
+    sig && sig.occurrences[0].before === 'Δεν ξέρω αν να αλλάξω δουλειά.' &&
+    sig.occurrences[1].before === 'Πάλι το ίδιο θέμα με τη δουλειά.');
+  assert('RECURRING: occurrences are in chronological order, oldest first',
+    sig && sig.occurrences[0].at === 1000 && sig.occurrences[1].at === 2000);
+  assert('RECURRING: unsorted input is still returned in order',
+    (() => { const r = buildRecurringSignal(mem([anchor('χρόνος', 2000), anchor('χρόνος', 1000)]), 'χρόνος');
+             return r && r.occurrences[0].at === 1000; })());
+
+  // ── NO-PATTERN ───────────────────────────────────────────────────────────
+  assert('NO-PATTERN: one occurrence is not a recurrence',
+    buildRecurringSignal(mem([anchor('χρόνος', 1000)]), 'χρόνος') === null);
+  assert('NO-PATTERN: no anchors at all', buildRecurringSignal(mem([]), 'χρόνος') === null);
+  assert('NO-PATTERN: missing or malformed memory does not throw',
+    buildRecurringSignal(null, 'χρόνος') === null && buildRecurringSignal({}, 'χρόνος') === null);
+  assert('NO-PATTERN: an empty or whitespace word',
+    buildRecurringSignal(twice, '') === null && buildRecurringSignal(twice, '   ') === null &&
+    buildRecurringSignal(twice, null) === null);
+  assert('NO-PATTERN: anchors of another category are not counted',
+    buildRecurringSignal(mem([{ category: 'άλλο', text: 'χρόνος', createdAt: 1 },
+                              { category: 'άλλο', text: 'χρόνος', createdAt: 2 }]), 'χρόνος') === null);
+
+  // ── ADVERSARIAL 1: the unavoidable topic word ────────────────────────────
+  // The hard case. Someone whose problem is money keeps "χρήματα" in two sessions. By frequency
+  // this is the emptiest possible finding. By CHOICE it is not: they were asked what they keep and
+  // answered the same thing twice, months apart. The signal fires, and that is correct — what
+  // keeps it honest is the schema, which lets this reach PATTERN and stops it becoming a
+  // REFLECTION about who they are (Κ5). The distinction is choice, not rarity.
+  const money = mem([anchor('χρήματα', 1000, 'Δεν βγαίνω οικονομικά.'), anchor('χρήματα', 9000, 'Πάλι τα οικονομικά.')]);
+  assert('ADVERSARIAL: an unavoidable topic word, CHOSEN twice, is still a real recurrence',
+    buildRecurringSignal(money, 'χρήματα') !== null);
+
+  // ── ADVERSARIAL 2: trivial keepers are not evidence ──────────────────────
+  // What a person types to move past a question, not what they chose to keep. A recurrence of
+  // "ναι" says something about the prompt, never about them.
+  for (const junk of ['ναι', 'όχι', 'οκ', 'ok', 'εντάξει', 'τίποτα', 'δεν ξέρω', 'καλά']) {
+    assert(`ADVERSARIAL: the trivial keeper «${junk}» never becomes a signal`,
+      buildRecurringSignal(mem([anchor(junk, 1000), anchor(junk, 2000)]), junk) === null);
+  }
+  assert('ADVERSARIAL: a one- or two-character keeper is not a word',
+    buildRecurringSignal(mem([anchor('α', 1), anchor('α', 2)]), 'α') === null &&
+    buildRecurringSignal(mem([anchor('δε', 1), anchor('δε', 2)]), 'δε') === null);
+
+  // ── ADVERSARIAL 3: matching ──────────────────────────────────────────────
+  assert('MATCHING: case and surrounding whitespace do not split one word into two',
+    (() => { const r = buildRecurringSignal(mem([anchor('Χρόνος', 1), anchor('  χρόνος ', 2)]), 'χρόνος');
+             return r !== null && r.count === 2; })());
+  assert('MATCHING: the word is reported as the person actually wrote it, not lowercased',
+    (() => { const r = buildRecurringSignal(mem([anchor('Χρόνος', 1), anchor('Χρόνος', 2)]), 'χρόνος');
+             return r && r.word === 'Χρόνος'; })());
+  // KNOWN LIMIT, PINNED. Decision (α): exact matching. Greek inflection therefore splits one
+  // concept into separate words, and the existing stemmer cannot be used because it is measurably
+  // inconsistent — χρόνος and χρόνου both stem to χρον, but χρόνο stems to χρονο. A rare but
+  // always-correct signal was chosen over a more frequent one built on that. Silence here is not
+  // evidence that nothing recurred.
+  assert('KNOWN LIMIT: «χρόνος» and «χρόνο» are two different words under exact matching',
+    buildRecurringSignal(mem([anchor('χρόνος', 1), anchor('χρόνο', 2)]), 'χρόνος') === null);
+
+  // ── ADVERSARIAL 4: a phrase, not a word ──────────────────────────────────
+  // The question asks for "λέξεις ή σύντομες φράσεις", so a kept phrase is a legitimate answer.
+  assert('ADVERSARIAL: a kept PHRASE recurs the same way a word does',
+    buildRecurringSignal(mem([anchor('ο χρόνος με τα παιδιά', 1), anchor('ο χρόνος με τα παιδιά', 2)]),
+                         'ο χρόνος με τα παιδιά') !== null);
+
+  // ── PASSIVITY ────────────────────────────────────────────────────────────
+  assert('PASSIVE: buildRecurringSignal reads memory and returns — it writes nothing',
+    !/saveMemory|setMemory|setItem/.test(SRC_RECUR));
+  assert('PASSIVE: the prompt knows nothing about it', !/buildRecurringSignal/.test(PROMPT));
+  assert('PASSIVE: it is not registered in dynamicSuffix',
+    !/dynamicSuffix\s*=\s*\[[^\]]*[Rr]ecurring/is.test(CODE));
+  assert('REGRESSION: countPriorWordEchoes and the LITERAL ECHO note are untouched',
+    /function countPriorWordEchoes/.test(CODE) && /LITERAL ECHO/.test(CODE));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);
