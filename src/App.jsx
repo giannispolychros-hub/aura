@@ -2112,6 +2112,40 @@ function getOpenAnchors(mem) {
   return mem.anchors.filter(a => a.status === "open");
 }
 
+// TELEMETRY — counts only, and this function is what makes that true.
+//
+// The final gap audit could not answer whether the chain CHAOS → QUESTION → EVIDENCE →
+// STRUCTURE → PATTERN ever completes for a real person. The hardest finding of that audit —
+// that the ROAD MAP rule lives only in the prompt, has zero code enforcement, and produced ZERO
+// maps across two real live sessions — was learned solely from two transcripts pasted by hand.
+// Four events answer it from the product itself, without anyone reading a conversation.
+//
+// "Counts only" is ENFORCED HERE, not promised at the call sites. Booleans and small
+// non-negative integers pass; strings, objects, arrays and functions are dropped by this schema.
+// A future call site that passes a whole message by mistake produces a MISSING FIELD, never a
+// leak. Keys are whitelisted too, because a key is a channel like any other.
+//
+// Nothing is persisted: window only, gone on reload, exactly like the cost counters. It is
+// wrapped so that instrumentation can never take a session down with it.
+function recordTelemetry(event, fields) {
+  try {
+    if (typeof event !== "string" || !/^[a-z_]{1,32}$/.test(event)) return null;
+    const rec = { ev: event, t: Date.now() };
+    const src = fields || {};
+    for (const k of Object.keys(src)) {
+      if (!/^[a-zA-Z]{1,24}$/.test(k)) continue;
+      const v = src[k];
+      if (typeof v === "boolean") rec[k] = v;
+      else if (typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 9999) rec[k] = v;
+    }
+    if (typeof window !== "undefined") {
+      (window.__auraTelemetry = window.__auraTelemetry || []).push(rec);
+      console.log("[AURA telemetry]", JSON.stringify(rec));
+    }
+    return rec;
+  } catch (e) { return null; }
+}
+
 // ── Export (readable, no content) ──
 // Κ4 RECOGNITION GATE — a PATTERN becomes a USER-OWNED INSIGHT only if the person confirms it.
 //
@@ -3762,6 +3796,35 @@ export default function AURAv2() {
     // FIX 4: block:"end" is more reliable than smooth on iOS Safari
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, loading, pivotPending, layerGatePending, memoryPromptPending, warningPending, closureConfirmPending, misfirePending, firstWhyPending]);
+
+  // TELEMETRY — one measurement per ending, whichever path got there.
+  //
+  // Placed in an effect keyed on sessionEnded rather than beside each setSessionEnded(true)
+  // call, so a future third ending path is measured automatically instead of silently missed.
+  //
+  // roadMap is the field the whole G1 decision rests on: it asks the real parser, on every
+  // assistant message of the session, whether a ROAD MAP was ever actually produced — not
+  // whether the prompt asked for one. Two real sessions produced zero, and nothing in the
+  // product noticed. explicitClosure records whether the person declared the end themselves.
+  // Three integers and two booleans leave this effect; recordTelemetry drops anything else.
+  useEffect(() => {
+    if (!sessionEnded) return;
+    try {
+      let _roadMap = false;
+      for (let i = 0; i < messages.length; i++) {
+        if (messages[i].role === "assistant" && parseRoadMap(messages[i].content)) { _roadMap = true; break; }
+      }
+      let _declared = false;
+      for (let i = 0; i < messages.length; i++) {
+        if (messages[i].role === "user" && isExplicitClosure(messages[i].content || "")) { _declared = true; break; }
+      }
+      recordTelemetry("session_completed", {
+        turns: turnCount.current || 0,
+        roadMap: _roadMap,
+        explicitClosure: _declared,
+      });
+    } catch (e) { /* instrumentation must never affect a session */ }
+  }, [sessionEnded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -5476,7 +5539,7 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
               <div style={{fontSize:"13px",color:"#8a8680",lineHeight:1.6,marginBottom:"18px",textAlign:"left"}}>
                 Δεν χρειάζεται να το έχεις καθαρό. Γράψ' το όπως είναι.
               </div>
-              <button onClick={()=>{setIntroChoice("direct");setSessionStarted(true);setTimeout(()=>textareaRef.current?.focus(),50);}}
+              <button onClick={()=>{setIntroChoice("direct");setSessionStarted(true);recordTelemetry("session_started");setTimeout(()=>textareaRef.current?.focus(),50);}}
                 style={{display:"block",width:"100%",background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.35)",color:"rgba(201,168,76,0.85)",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",cursor:"pointer",borderRadius:"4px"}}>
                 Ξεκίνα με το πρόβλημά σου
               </button>
@@ -5788,10 +5851,17 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
                     patternKey({ kind: "recurring", word: recognitionPending.word }));
                   setMemory(_rejected);
                   if (memory.storageEnabled) saveMemory(_rejected, true);
+                  recordTelemetry("ownership_confirmed", { answer: 0 });
                   setRecognitionPending(false);
                 }}>Όχι</button>
-                <button className="choice-btn" onClick={() => setRecognitionPending(false)}>Μερικώς</button>
-                <button className="choice-btn prim" onClick={() => setRecognitionPending(false)}>Ναι</button>
+                <button className="choice-btn" onClick={() => {
+                  recordTelemetry("ownership_confirmed", { answer: 1 });
+                  setRecognitionPending(false);
+                }}>Μερικώς</button>
+                <button className="choice-btn prim" onClick={() => {
+                  recordTelemetry("ownership_confirmed", { answer: 2 });
+                  setRecognitionPending(false);
+                }}>Ναι</button>
               </div>
             </div>
           )}
@@ -5918,9 +5988,14 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
                     }
                     return null;
                   })();
-                  exportBlueprint(_kept,
-                    buildBlueprintZones(memory, _recurring, _unknown, _commitment,
-                      extractBeforeMessage(messages)));
+                  const _zones = buildBlueprintZones(memory, _recurring, _unknown, _commitment,
+                    extractBeforeMessage(messages));
+                  exportBlueprint(_kept, _zones);
+                  recordTelemetry("blueprint_generated", {
+                    zones: _zones.length,
+                    commitment: !!_commitment,
+                    recurring: !!_recurring,
+                  });
                 }}>
                   Κατέβασε το Blueprint
                 </button>
