@@ -204,4 +204,89 @@ explicitClosureNoisePositives.forEach(msg => check("EXPLICIT-NOISE-POS-" + msg, 
 const explicitClosureNoiseOnlyNegatives = ["Ναι εντάξει", "Οκ κατάλαβα"];
 explicitClosureNoiseOnlyNegatives.forEach(msg => check("EXPLICIT-NOISE-NEG-" + msg, `isExplicitClosure('${msg}') is false (acknowledgements only, no genuine termination word)`, isExplicitClosure(msg) === false));
 
+// ══ LIVE-SESSION REGRESSION — three explicit closures ignored, stopped on the fourth ══════════
+//
+// Real session, reported the same day. The person wrote, in order:
+//   1. "Κλείνουμε εδώ"
+//   2. "Όχι κλείνουμε"
+//   3. "Σε ευχαριστώ. Τέλος εδώ"
+// and AURA kept going each time, stopping only on a fourth attempt. Three declarations, three
+// misses — for THREE DIFFERENT REASONS, which is why narrowing one detector would not have fixed
+// it.
+//
+// ROOT CAUSE, from the source itself. decideTermination's own comment says "Only naturalExitReady
+// reads the user's messages directly", and naturalExitReady gates on matchesClosingWord — the
+// NARROW detector, which requires the whole message to reduce to closing words. isExplicitClosure
+// exists precisely for this case, is noise-tolerant by design, and is used in decideTermination
+// ONLY as a suppressor (don't cancel a decision when the reply asks a question). It was never
+// wired as a trigger. The right detector was already in the file and was not consulted.
+//
+// Measured on the real phrases before the fix:
+//   "Κλείνουμε εδώ"            matchesClosingWord false | isExplicitClosure TRUE  → detector fine, not consulted
+//   "Όχι κλείνουμε"            matchesClosingWord false | isExplicitClosure false → "όχι" not in the noise list
+//   "Σε ευχαριστώ. Τέλος εδώ"  matchesClosingWord false | isExplicitClosure false → thanks not in the noise list
+//
+// A declared exit is not an inferred one: it must not have to satisfy naturalExitReady's
+// conditions (four prior messages, ANSWER mode, no warning issued) before it is honoured.
+
+// isExplicitClosure is already extracted by this suite's loader at the top of the file.
+
+// ── The three real phrases must each close, at the FIRST attempt ──
+for (const [phrase, why] of [
+  ['Κλείνουμε εδώ', 'live session, attempt 1'],
+  ['Όχι κλείνουμε', 'live session, attempt 2 — a negation next to a declaration'],
+  ['Σε ευχαριστώ. Τέλος εδώ', 'live session, attempt 3 — thanks next to a declaration'],
+]) {
+  check('LIVE-1', `«${phrase}» is recognised as an explicit closure (${why})`,
+    isExplicitClosure(phrase) === true);
+  check('LIVE-2', `«${phrase}» actually closes the session`, fires(phrase) === true);
+}
+
+// ── A declared exit does not need naturalExitReady's preconditions ──
+check('LIVE-3', 'an explicit closure closes even on the very first user message',
+  decideTermination([{ role: 'user', content: 'Κλείνουμε εδώ' }],
+    'μια απλή απάντηση χωρίς ερωτηματικό',
+    { safetyMode: false, currentMode: 'ANSWER', warningIssued: false, compressionCount: 0, modelJudgesEnd: false }) === 'confirm');
+check('LIVE-4', 'an explicit closure closes even when a warning was already issued',
+  fires('Κλείνουμε εδώ', { }) === true &&
+  decideTermination(buildMsgs('Κλείνουμε εδώ'), 'μια απλή απάντηση χωρίς ερωτηματικό',
+    { safetyMode: false, currentMode: 'ANSWER', warningIssued: true, compressionCount: 0, modelJudgesEnd: false }) !== 'none');
+
+// ── SAFETY STILL OUTRANKS EVERYTHING ──
+check('LIVE-5', 'safety mode still blocks closing, declaration or not',
+  decideTermination(buildMsgs('Κλείνουμε εδώ'), 'μια απλή απάντηση χωρίς ερωτηματικό',
+    { safetyMode: true, currentMode: 'ANSWER', warningIssued: false, compressionCount: 0, modelJudgesEnd: false }) === 'none');
+
+// ── THE NOISE LIST MUST NOT BECOME A BACK DOOR ──
+// Step one of isExplicitClosure requires a genuine termination declaration to be present. Noise
+// alone must never be enough, or "όχι" and "ευχαριστώ" — both extremely common mid-session — would
+// end sessions people wanted to continue. This is the assertion that keeps the widening safe.
+// "ευχαριστώ" is deliberately absent from this list: it is already a termination DECLARATION
+// in the existing wordlist, not noise, and has been since before this fix. Asserting otherwise
+// would be changing a pre-existing design decision that nothing in the live session calls into
+// question. What the session did show is that "σε" in front of it left a residue and killed the
+// whole match — that is the gap being closed, not the meaning of the word.
+for (const noise of ['όχι', 'Όχι', 'εντάξει', 'ναι', 'εδώ', 'σε', 'πολύ', 'όχι εδώ']) {
+  check('LIVE-6', `«${noise}» alone is NOT an explicit closure`, isExplicitClosure(noise) === false);
+}
+// The one-turn Clarity+Ownership delay is left alone on purpose: it is self-limiting by design
+// (outcomeScaleBlockUsed) and can postpone a closing by at most one turn, so it cannot account for
+// three ignored declarations. Pinned so the fix is not blamed for it later.
+check('LIVE-10', 'the outcome-scale gate can still delay a declared exit by exactly one turn',
+  decideTermination(buildMsgs('Κλείνουμε εδώ'), 'μια απλή απάντηση χωρίς ερωτηματικό',
+    { safetyMode: false, currentMode: 'ANSWER', warningIssued: false, compressionCount: 0,
+      modelJudgesEnd: false, concreteStepStated: true, outcomeScaleAsked: false,
+      outcomeScaleBlockUsed: false }) === 'await_outcome_scale');
+check('LIVE-11', '…and once used, the declared exit goes through',
+  decideTermination(buildMsgs('Κλείνουμε εδώ'), 'μια απλή απάντηση χωρίς ερωτηματικό',
+    { safetyMode: false, currentMode: 'ANSWER', warningIssued: false, compressionCount: 0,
+      modelJudgesEnd: false, concreteStepStated: true, outcomeScaleAsked: false,
+      outcomeScaleBlockUsed: true }) === 'confirm');
+check('LIVE-7', 'a refusal that is not a closing is still not a closing',
+  isExplicitClosure('Όχι, δεν συμφωνώ με αυτό') === false);
+check('LIVE-8', 'a declaration inside a longer continuing sentence is still not a closing',
+  isExplicitClosure('Νομίζω τελειώσαμε με αυτό το κομμάτι, αλλά θέλω να πω κάτι ακόμα') === false);
+check('LIVE-9', 'thanking mid-session does not end it',
+  isExplicitClosure('Σε ευχαριστώ, αυτό βοήθησε πολύ, πάμε παρακάτω') === false);
+
 console.log(`\n${pass} passed, ${fail} failed (out of ${pass + fail} scenarios)`);

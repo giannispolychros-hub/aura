@@ -2467,6 +2467,13 @@ function isModelPreClosing(text) {
 // acknowledgement/filler words (ναι/οκ/κατάλαβα/εντάξει/σωστό/ακριβώς/νομίζω ναι/πιστεύω ναι/φτάσαμε/
 // ωραία/καλά/εδώ) and punctuation may surround it as noise and are stripped too — but noise
 // alone, with no termination declaration anywhere, still fails at step (1), exactly as before.
+//
+// LIVE-SESSION WIDENING (όχι / σε / πολύ). A real session had three explicit closings ignored in a
+// row. Two of them died here: "Όχι κλείνουμε" and "Σε ευχαριστώ. Τέλος εδώ" both carry a
+// genuine declaration, and both failed because one ordinary word beside it — a negation, or the
+// "σε" in front of "ευχαριστώ" — left a residue and killed the whole match. Step (1) is untouched,
+// so this cannot open a back door: "όχι" or "σε" alone still has no declaration anywhere and still
+// returns false. What changed is only that such a word can now stand NEXT TO one.
 function isExplicitClosure(text) {
   const t = String(text == null ? "" : text).trim();
   if (!t) return false;
@@ -2480,7 +2487,7 @@ function isExplicitClosure(text) {
   }
   const stripped = normalized
     .replace(/αρκετα για σημερα|ας το αφησουμε εδω|αυτο ηταν|τα λεμε|καλη συνεχεια|καλο βραδυ|εληξε|κλεινουμε|κλεινω|τελειωσαμε|τελος|σταματαμε|φευγω|παω|φτανει|αντιο|γεια|καληνυχτα|μπαι|bye|ευχαριστω|επισης|παρομοιως/gi, "")
-    .replace(/νομιζω ναι|πιστευω ναι|καταλαβα|ενταξει|ακριβως|φτασαμε|σωστο|ωραια|καλα|εδω|ναι|οκ/gi, "")
+    .replace(/νομιζω ναι|πιστευω ναι|καταλαβα|ενταξει|ακριβως|φτασαμε|σωστο|ωραια|καλα|εδω|ναι|οχι|σε|πολυ|οκ/gi, "")
     .replace(/[.,!?;\s]/g, "");
   return stripped.length === 0;
 }
@@ -2564,7 +2571,24 @@ function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued,
   // instead of needing to be duplicated at each individual return point.
   let decision = "none";
 
-  if (naturalExitReady || thirdTriggerJustAnswered) {
+  // DECLARED EXIT — the user said so, in their own words.
+  //
+  // This is the fix for a real session where three explicit closings in a row were ignored and the
+  // app only stopped on a fourth. The detector was never the problem: isExplicitClosure already
+  // returned true for "Κλείνουμε εδώ" on the FIRST attempt. It was simply not wired to this
+  // decision — it appeared in this function only as a SUPPRESSOR further down, never as a trigger.
+  // The comment a few lines above said it outright: "Only naturalExitReady reads the user's
+  // messages directly", and naturalExitReady gates on matchesClosingWord, the narrow detector that
+  // needs the whole message to reduce to closing words.
+  //
+  // A DECLARED EXIT IS NOT AN INFERRED ONE. naturalExitReady's preconditions — four prior user
+  // messages, ANSWER mode, no warning issued — exist to keep AURA from guessing that someone is
+  // finished. None of them should stand between a person saying "we're done" and the session
+  // ending. Safety, onboarding and the decline cooldown still return "none" above this line and
+  // are unaffected.
+  const userDeclaredExit = !!lastUserMsg && lastUserMsg.role === "user" &&
+    isExplicitClosure(lastUserMsg.content || "");
+  if (userDeclaredExit || naturalExitReady || thirdTriggerJustAnswered) {
     decision = "confirm";
   } else if (currentMode === "ANSWER" && userMsgsAll.length >= 2 && !warningIssued && isModelPreClosing(text)) {
     // Structural pre-closing move detected in the model's own output — do not let it keep
