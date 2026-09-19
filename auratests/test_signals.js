@@ -458,5 +458,138 @@ if (SRC_BP) {
     /parseRoadMap\([\s\S]{0,200}unknown/.test(CODE) || /unknown[\s\S]{0,200}parseRoadMap\(/.test(CODE));
 }
 
+// ── Κ4 — RECOGNITION GATE ──────────────────────────────────────────────────
+// The gate that turns a PATTERN into a USER-OWNED INSIGHT, or removes it. AURA may notice that
+// something recurred; only the person can say it means anything. Κ5 still holds underneath: the
+// question is "do you recognise this?", never "does this show you are someone who…".
+//
+// WHERE IT FIRES. Exactly one PATTERN reaches the person interactively today — the recurring kept
+// word at session end. COMMITMENT reaches them only inside a downloaded file, which cannot ask
+// anything. So the gate has one home, and pretending otherwise would be inventing surfaces.
+//
+// WHY THE REFUSAL IS PERSISTED, decided rather than assumed. If "Όχι" lived only in a session ref,
+// the same pattern would be put to them again next session — which is precisely the entry-door
+// failure this codebase logged three times: asking again after someone answered reads as not
+// having listened. So a refusal is stored. It stores NO NEW CATEGORY of content: the key is
+// derived from a word already in mem.anchors, and it is written behind the same consent gate as
+// everything else, covered by the existing "μοτίβα και μετρητές" disclosure.
+//
+// Κ2 — deletion propagates upward — is honoured by suppression at the source: a rejected pattern
+// produces no zone, so no REFLECTION can be built on it.
+
+const SRC_PKEY = extract('patternKey');
+const SRC_ISREJ = extract('isPatternRejected');
+const SRC_REC = extract('recordPatternRejection');
+assert('patternKey exists', SRC_PKEY !== null);
+assert('isPatternRejected exists', SRC_ISREJ !== null);
+assert('recordPatternRejection exists', SRC_REC !== null);
+let patternKey = null, isPatternRejected = null, recordPatternRejection = null;
+load(SRC_PKEY, 'patternKey', f => { patternKey = f; });
+load(SRC_ISREJ, 'isPatternRejected', f => { isPatternRejected = f; });
+load(SRC_REC, 'recordPatternRejection', f => { recordPatternRejection = f; });
+
+if (typeof patternKey === 'function') {
+  assert('KEY: a recurring signal has a stable key',
+    patternKey({ kind: 'recurring', word: 'χρόνος' }) === patternKey({ kind: 'recurring', word: 'χρόνος' }));
+  assert('KEY: it is case- and whitespace-insensitive, like the matching it comes from',
+    patternKey({ kind: 'recurring', word: ' Χρόνος ' }) === patternKey({ kind: 'recurring', word: 'χρόνος' }));
+  assert('KEY: different words are different patterns',
+    patternKey({ kind: 'recurring', word: 'χρόνος' }) !== patternKey({ kind: 'recurring', word: 'εισόδημα' }));
+  assert('KEY: the kind is part of it, so two signal types never collide on one word',
+    patternKey({ kind: 'recurring', word: 'χρόνος' }) !== patternKey({ kind: 'commitment', word: 'χρόνος' }));
+  assert('KEY: a missing or malformed signal has no key',
+    patternKey(null) === null && patternKey({}) === null && patternKey({ kind: 'recurring' }) === null);
+}
+
+if (typeof isPatternRejected === 'function' && typeof recordPatternRejection === 'function') {
+  const key = 'recurring:χρόνος';
+  assert('REJECT: nothing is rejected by default',
+    isPatternRejected({ rejectedPatterns: [] }, key) === false &&
+    isPatternRejected({}, key) === false && isPatternRejected(null, key) === false);
+  const after = recordPatternRejection({ anchors: [], rejectedPatterns: [] }, key);
+  assert('REJECT: recording a refusal makes it rejected', isPatternRejected(after, key) === true);
+  assert('REJECT: it returns a NEW memory object, it does not mutate in place',
+    (() => { const m = { anchors: [], rejectedPatterns: [] };
+             const r = recordPatternRejection(m, key);
+             return r !== m && m.rejectedPatterns.length === 0; })());
+  assert('REJECT: recording twice does not duplicate',
+    recordPatternRejection(after, key).rejectedPatterns.length === 1);
+  assert('REJECT: an unrelated pattern stays un-rejected',
+    isPatternRejected(after, 'recurring:εισόδημα') === false);
+  assert('REJECT: a missing key is a no-op, never a blanket rejection',
+    recordPatternRejection({ rejectedPatterns: [] }, null).rejectedPatterns.length === 0 &&
+    isPatternRejected(after, null) === false);
+  // Defensive: if an earlier guard is broken the list may be empty, and an uncaught throw here
+  // would abort the whole suite — which my runner reports as a SILENT SUITE, strictly worse than
+  // a failure. A broken mutation must fail loudly, not disappear.
+  assert('REJECT: it stores a key and a timestamp — NOT the sentence, NOT a reason',
+    (() => { const e = (after.rejectedPatterns || [])[0];
+             return !!e && typeof e.key === 'string' && typeof e.at === 'number' &&
+                    Object.keys(e).sort().join(',') === 'at,key'; })());
+  assert('REJECT: the existing memory is carried through untouched',
+    recordPatternRejection({ anchors: [{ id: 'a1' }], rejectedPatterns: [] }, key).anchors.length === 1);
+}
+
+// ── Κ2 — a rejected pattern produces no zone ───────────────────────────────
+if (typeof buildBlueprintZones === 'function') {
+  const W = 'trajectory_word';
+  const rec = { kind: 'recurring', word: 'χρόνος', count: 2,
+    occurrences: [{ text: 'χρόνος', at: 1, before: 'α' }, { text: 'χρόνος', at: 2, before: 'β' }] };
+  const memRejected = { anchors: [{ category: W, text: 'χρόνος', createdAt: 2, before: 'πρώτο' }],
+                        rejectedPatterns: [{ key: 'recurring:χρόνος', at: 1 }] };
+  const keys = z => z.map(x => x.key).join(',');
+  assert('Κ2: a rejected pattern produces NO zone — deletion propagates upward',
+    keys(buildBlueprintZones(memRejected, rec, null, null)) === 'entered');
+  assert('Κ2: an un-rejected pattern still renders',
+    keys(buildBlueprintZones({ anchors: memRejected.anchors, rejectedPatterns: [] }, rec, null, null))
+      === 'entered,recurring');
+  assert('Κ2: rejecting one pattern does not suppress another',
+    keys(buildBlueprintZones({ anchors: memRejected.anchors, rejectedPatterns: [{ key: 'recurring:άλλο', at: 1 }] },
+      rec, null, null)) === 'entered,recurring');
+}
+
+// ── THE GATE ITSELF ────────────────────────────────────────────────────────
+assert('GATE: it exists as its own pending state', /recognitionPending/.test(CODE));
+assert('GATE: it is cleared by resetSession', /recognitionPending[\s\S]{0,4000}?setRecognitionPending\(false\)/.test(CODE));
+// Order-independent: the primary action sits last in this codebase's choice cards, so an ordered
+// regex asserted a layout convention rather than the contract. What matters is that all three
+// answers exist inside the gate, and that none of them is missing.
+const _GATE = (() => {
+  const i = CODE.indexOf('{recognitionPending && !memoryPromptPending && (');
+  return i < 0 ? '' : CODE.slice(i, CODE.indexOf('{memoryPromptPending && (', i));
+})();
+assert('GATE: the card was located', _GATE.length > 400);
+for (const answer of ['Ναι', 'Μερικώς', 'Όχι']) {
+  assert(`GATE: it offers the answer «${answer}»`, new RegExp('>' + answer + '<').test(_GATE));
+}
+// Anchored on the closing quote: the wrapper is className="choice-btns", so a bare prefix match
+// counts the container as a fourth button. Same substring collision already hit once today on
+// the dynamicSuffix registration list.
+assert('GATE: exactly three answers, no fourth',
+  (_GATE.match(/className="choice-btn(?:"| prim")/g) || []).length === 3);
+assert('GATE: the question asks for RECOGNITION, never for a trait — Κ5',
+  /Το αναγνωρίζεις;/.test(CODE));
+assert('GATE: Όχι records a persisted refusal',
+  /recordPatternRejection\(/.test(CODE));
+assert('GATE: the refusal is written behind the same consent gate as everything else',
+  /storageEnabled[\s\S]{0,200}saveMemory\(_rejected/.test(CODE) ||
+  /_rejected[\s\S]{0,200}memory\.storageEnabled/.test(CODE));
+assert('GATE: it only appears when there is a pattern to confirm',
+  /buildRecurringSignal\([\s\S]{0,400}setRecognitionPending\(\{/.test(CODE));
+assert('GATE: the count it shows is the real one from the signal, not recomputed in the view',
+  /setRecognitionPending\(\{[^}]*count: _sig\.count/.test(CODE));
+// Checked AT THE ARMING SITE, not anywhere in the file. The first version of this just looked
+// for the identifier, which the function's own definition satisfies — so removing the guard from
+// the arming condition left the suite green. Same vacuous-guard mistake as the commitment
+// half-pair check earlier in this file; found the same way, by mutation.
+const _ARM = (() => {
+  const i = CODE.indexOf('const _sig = _kw ? buildRecurringSignal');
+  return i < 0 ? '' : CODE.slice(i, CODE.indexOf('applyTerminationIllumination', i));
+})();
+assert('GATE: the arming site was located', _ARM.length > 100);
+assert('GATE: it never re-asks something already refused — checked in the arming condition itself',
+  /if \(_sig && !isPatternRejected\(/.test(_ARM));
+assert('PASSIVE: the gate is not wired into the prompt', !/recognitionPending|patternKey/.test(PROMPT));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);

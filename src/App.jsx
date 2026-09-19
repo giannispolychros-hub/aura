@@ -1368,6 +1368,12 @@ const EMPTY_MEMORY = () => ({
   // reads this defensively with `|| []` fallbacks so existing stored objects without this field
   // still work correctly.
   stylePreferences: [],
+  // Κ4 RECOGNITION GATE — patterns the person was shown and said "Όχι" to. Stored, not
+  // session-scoped, because re-asking after someone already answered reads as not having
+  // listened — the entry-door failure this codebase logged three times. Adds NO new category of
+  // content: each entry is a key derived from a word already in anchors, plus a timestamp.
+  // No sentence, no reason, nothing about the person.
+  rejectedPatterns: [],
   misfires: [],
   sessionCount: 0,
 
@@ -1412,6 +1418,7 @@ function loadMemory() {
     merged.obstacles    = Array.isArray(merged.obstacles)    ? merged.obstacles    : [];
     merged.anchors      = Array.isArray(merged.anchors)      ? merged.anchors      : [];
     merged.qualityLog   = Array.isArray(merged.qualityLog)   ? merged.qualityLog   : [];
+    merged.rejectedPatterns = Array.isArray(merged.rejectedPatterns) ? merged.rejectedPatterns : [];
     // Ensure profile exists with all keys
     merged.profile = { ...EMPTY_MEMORY().profile, ...(merged.profile || {}) };
     // RT-fix: sanitize numeric profile fields — a single non-finite value (NaN, string, corrupted
@@ -2106,6 +2113,34 @@ function getOpenAnchors(mem) {
 }
 
 // ── Export (readable, no content) ──
+// Κ4 RECOGNITION GATE — a PATTERN becomes a USER-OWNED INSIGHT only if the person confirms it.
+//
+// AURA may notice that something recurred; only they can say it means anything. Κ5 holds
+// underneath: the question is "do you recognise this?", never "does this show you are someone
+// who…". A refusal removes the pattern at the source, so no reflection can be built on it — that
+// is Κ2, deletion propagating upward, enforced by suppression rather than by a second rule.
+//
+// The key is derived from content already stored in anchors, so persisting a refusal introduces
+// no new category of stored data and is covered by the existing consent disclosure.
+function patternKey(signal) {
+  if (!signal || typeof signal.kind !== "string" || typeof signal.word !== "string") return null;
+  const w = signal.word.trim().toLowerCase();
+  if (!w) return null;
+  return signal.kind + ":" + w;
+}
+function isPatternRejected(mem, key) {
+  if (!key || !mem || !Array.isArray(mem.rejectedPatterns)) return false;
+  return mem.rejectedPatterns.some(r => r && r.key === key);
+}
+function recordPatternRejection(mem, key) {
+  const base = mem || {};
+  const list = Array.isArray(base.rejectedPatterns) ? base.rejectedPatterns : [];
+  if (!key || list.some(r => r && r.key === key)) return { ...base, rejectedPatterns: list };
+  // Key and timestamp only. Never the sentence they refused, never a reason: a refusal is a
+  // boundary, and recording why someone set it would be the inference this whole layer exists
+  // to avoid.
+  return { ...base, rejectedPatterns: [...list, { key, at: Date.now() }] };
+}
 // BLUEPRINT ZONES — the first place the Evidence Architecture reaches the user.
 //
 // Three zones, EVERY ONE OPTIONAL. A zone with no evidence behind it is ABSENT, never an empty
@@ -2138,7 +2173,13 @@ function buildBlueprintZones(mem, recurring, roadUnknown, commitment) {
   const latest = words.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0] || null;
   const before = latest && typeof latest.before === "string" ? latest.before.trim() : "";
   if (before) zones.push({ key: "entered", label: "ΜΠΗΚΕΣ ΜΕ", kind: "evidence", text: before });
-  if (recurring && recurring.count >= 2 && Array.isArray(recurring.occurrences)) {
+  // Κ2 — a refused pattern produces no zone at all. Suppressed at the source, so nothing
+  // downstream can rebuild a claim on it.
+  const rejected = Array.isArray(mem && mem.rejectedPatterns) ? mem.rejectedPatterns : [];
+  const recurKey = recurring && typeof recurring.word === "string"
+    ? "recurring:" + recurring.word.trim().toLowerCase() : null;
+  const recurRefused = !!recurKey && rejected.some(r => r && r.key === recurKey);
+  if (!recurRefused && recurring && recurring.count >= 2 && Array.isArray(recurring.occurrences)) {
     zones.push({ key: "recurring", label: "ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ", kind: "pattern",
                  word: recurring.word, count: recurring.count, occurrences: recurring.occurrences });
   }
@@ -3570,6 +3611,7 @@ export default function AURAv2() {
   // Memory
   const [memory, setMemory]                       = useState(() => loadMemory());
   const [memoryPromptPending, setMemoryPromptPending] = useState(false);
+  const [recognitionPending, setRecognitionPending] = useState(null); // Κ4 — the signal awaiting confirmation
   const [showMemoryPanel, setShowMemoryPanel]     = useState(false);
   const [showArchivePanel, setShowArchivePanel]   = useState(false);
 
@@ -4584,6 +4626,17 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
       const text = stripAraDeclarative(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""));
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
+      // Κ4 — arm the recognition gate. Only when a real pattern exists AND the person has not
+      // already refused it in a previous session: re-asking after someone answered reads as not
+      // having listened, which is the entry-door failure logged three times in this codebase.
+      // memory here already carries this session's anchor, so the count includes today.
+      try {
+        const _kw = getMostRecentWordAnchor(memory)?.text;
+        const _sig = _kw ? buildRecurringSignal(memory, _kw) : null;
+        if (_sig && !isPatternRejected(memory, patternKey({ kind: "recurring", word: _sig.word }))) {
+          setRecognitionPending({ kind: "recurring", word: _sig.word, count: _sig.count });
+        }
+      } catch (e) { /* the gate must never block a closing */ }
       applyTerminationIllumination();
       const sentences = text.split(/(?<=[.!;])\s+/).map(s => s.trim()).filter(Boolean);
       if (sentences.length > 0) setFinalDistillation(sentences[sentences.length - 1]);
@@ -4591,6 +4644,17 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
       const fallback = "Η σκέψη σου παραμένει δική σου.";
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: fallback, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
+      // Κ4 — arm the recognition gate. Only when a real pattern exists AND the person has not
+      // already refused it in a previous session: re-asking after someone answered reads as not
+      // having listened, which is the entry-door failure logged three times in this codebase.
+      // memory here already carries this session's anchor, so the count includes today.
+      try {
+        const _kw = getMostRecentWordAnchor(memory)?.text;
+        const _sig = _kw ? buildRecurringSignal(memory, _kw) : null;
+        if (_sig && !isPatternRejected(memory, patternKey({ kind: "recurring", word: _sig.word }))) {
+          setRecognitionPending({ kind: "recurring", word: _sig.word, count: _sig.count });
+        }
+      } catch (e) { /* the gate must never block a closing */ }
       applyTerminationIllumination();
       setFinalDistillation("Η σκέψη σου παραμένει δική σου.");
     } finally {
@@ -5000,6 +5064,7 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
     warningIssued.current = false;
     concreteStepStated.current = false;
     commitmentPair.current = null;
+    setRecognitionPending(false);
     outcomeScaleAsked.current = false;
     coreReadinessAsked.current = false;
     coreReadinessConfirmed.current = false;
@@ -5678,6 +5743,33 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
           )}
 
           {/* Memory consent — earned, not requested */}
+          {/* Κ4 RECOGNITION GATE. The one place a PATTERN is put to the person for confirmation.
+              Κ5 is load-bearing in the wording: it states WHAT RECURRED and asks whether they
+              recognise it — never what it shows about them. "Όχι" removes the pattern for good. */}
+          {recognitionPending && !memoryPromptPending && (
+            <div className="mem-card">
+              <div className="mem-label">μοτίβο</div>
+              <div className="mem-text">
+                Διάλεξες «{recognitionPending.word}» ως αυτό που κρατάς, σε {recognitionPending.count} ξεχωριστές συνεδρίες.
+                <br />Το αναγνωρίζεις;
+              </div>
+              <div className="mem-note">
+                Αν πεις όχι, φεύγει και δεν ξαναεμφανίζεται.
+              </div>
+              <div className="choice-btns">
+                <button className="choice-btn" onClick={() => {
+                  const _rejected = recordPatternRejection({ ...memory },
+                    patternKey({ kind: "recurring", word: recognitionPending.word }));
+                  setMemory(_rejected);
+                  if (memory.storageEnabled) saveMemory(_rejected, true);
+                  setRecognitionPending(false);
+                }}>Όχι</button>
+                <button className="choice-btn" onClick={() => setRecognitionPending(false)}>Μερικώς</button>
+                <button className="choice-btn prim" onClick={() => setRecognitionPending(false)}>Ναι</button>
+              </div>
+            </div>
+          )}
+
           {memoryPromptPending && (
             <div className="mem-card">
               <div className="mem-label">μνήμη</div>
