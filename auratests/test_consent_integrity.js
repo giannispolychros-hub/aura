@@ -108,8 +108,13 @@ assert('BLUEPRINT: the footer distinguishes the two — it does not attribute bo
   })());
 assert('BLUEPRINT: the keystone-is-verbatim guarantee in the code comment still holds',
   /ALWAYS the user's verbatim words, never AI-selected/.test(BLUEPRINT));
+// zonesHtml joins the allow-list because the three Blueprint zones are assembled before the
+// template, exactly like keystoneHtml and beatsHtml. This guard fired correctly when it appeared,
+// which is the point of it. The escaping INSIDE that builder — where the person's own sentence
+// actually enters markup — is held by test_signals, which checks the builder block itself; a
+// mutation dropping esc() there fails that suite.
 assert('BLUEPRINT: escaping is untouched — every interpolation still goes through esc()',
-  !/\$\{(?!esc\(|dateStr|keystoneHtml|beatsHtml|ankerText \?)/.test(BLUEPRINT.slice(BLUEPRINT.indexOf('<body>'))));
+  !/\$\{(?!esc\(|dateStr|keystoneHtml|beatsHtml|zonesHtml|ankerText \?)/.test(BLUEPRINT.slice(BLUEPRINT.indexOf('<body>'))));
 
 // ── P1 — PROFILING MUST NOT RUN, OR BE USED, WITHOUT CONSENT ────────────────
 // The classification found the Silent Profile — twelve moving averages producing statements like

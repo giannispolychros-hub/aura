@@ -301,5 +301,127 @@ if (typeof buildRecurringSignal === 'function') {
     /function countPriorWordEchoes/.test(CODE) && /LITERAL ECHO/.test(CODE));
 }
 
+// ── BLUEPRINT ZONES — the first place the Evidence Architecture reaches the user ───────────────
+// Three zones, every one of them OPTIONAL. A zone with no evidence behind it is ABSENT, never an
+// empty frame with a dash in it: the sheet must never imply that nothing recurred when the truth
+// is that the signal cannot see it. Both signals shipped so far are narrow by construction and
+// their silence is not evidence of absence — that is pinned in this file twice already.
+//
+// ΜΠΗΚΕΣ ΜΕ        EVIDENCE  — the person's first message, verbatim (anchor.before)
+// ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ  PATTERN   — the RECURRING signal, with its occurrences attached
+// ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ EVIDENCE — the ΑΓΝΩΣΤΟ the person named themselves, from the road map
+//
+// SHIFT is deliberately absent: its Declaration A has no provenance chain, which is recorded in
+// ARCHITECTURE_DECISIONS.md rather than worked around here.
+//
+// buildBlueprintZones is a PURE ASSEMBLER. It takes the recurring signal as an argument instead
+// of computing it, so it stays self-contained for the suite's per-function extraction, and so the
+// zones can be tested without a memory fixture pretending to be a whole session.
+
+const SRC_ZONES = extract('buildBlueprintZones');
+assert('buildBlueprintZones exists', SRC_ZONES !== null);
+let buildBlueprintZones = null;
+load(SRC_ZONES, 'buildBlueprintZones', f => { buildBlueprintZones = f; });
+
+if (typeof buildBlueprintZones === 'function') {
+  const W = 'trajectory_word';
+  const mem = list => ({ anchors: list });
+  const anch = (text, at, before) => ({ category: W, text, createdAt: at, before: before || null, status: 'resolved' });
+  const recurring = { word: 'χρόνος', count: 2, occurrences: [
+    { text: 'χρόνος', at: 1000, before: 'Δεν ξέρω αν να αλλάξω δουλειά.' },
+    { text: 'χρόνος', at: 2000, before: 'Πάλι το ίδιο με τη δουλειά.' },
+  ] };
+  const keyOf = z => z.map(x => x.key).join(',');
+
+  // ── All three present ────────────────────────────────────────────────────
+  const full = buildBlueprintZones(mem([anch('χρόνος', 2000, 'Δεν ξέρω αν να αλλάξω δουλειά.')]),
+                                   recurring, 'Αν επιτρέπεται δεύτερη απασχόληση');
+  assert('ZONES: all three render, in order', keyOf(full) === 'entered,recurring,open');
+  assert('ZONES: ΜΠΗΚΕΣ ΜΕ carries the first message verbatim',
+    full[0].text === 'Δεν ξέρω αν να αλλάξω δουλειά.' && full[0].kind === 'evidence');
+  assert('ZONES: ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ is a PATTERN and carries its occurrences, not just a count',
+    full[1].kind === 'pattern' && full[1].count === 2 && full[1].occurrences.length === 2);
+  assert('ZONES: ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ carries the unknown the person named',
+    full[2].text === 'Αν επιτρέπεται δεύτερη απασχόληση' && full[2].kind === 'evidence');
+  assert('ZONES: every zone carries a Greek label for the sheet',
+    full.every(z => typeof z.label === 'string' && z.label.length > 3));
+
+  // ── ABSENCE IS ABSENCE — the rule the whole redesign turns on ────────────
+  assert('ABSENT: no recurring signal → the zone does not exist at all',
+    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), null, 'κάτι')) === 'entered,open');
+  assert('ABSENT: no unknown from the road map → the zone does not exist',
+    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), recurring, null)) === 'entered,recurring');
+  assert('ABSENT: no stored first message → the zone does not exist',
+    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, null)]), recurring, 'κάτι')) === 'recurring,open');
+  assert('ABSENT: an empty-string unknown is absence, not an empty zone',
+    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), recurring, '   ')) === 'entered,recurring');
+  // The floor is a guard against a CALLER handing over a weak signal: buildRecurringSignal can
+  // never produce count 1, but buildBlueprintZones takes the signal as an argument and must not
+  // trust it. Without this the >= 2 could be lowered with nothing failing.
+  assert('FLOOR: a single occurrence handed in from outside is NOT a pattern zone',
+    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]),
+      { word: 'χρόνος', count: 1, occurrences: [{ text: 'χρόνος', at: 1, before: 'πρώτο' }] },
+      null)) === 'entered');
+  assert('FLOOR: a signal with a count but no occurrences array is not a pattern zone',
+    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]),
+      { word: 'χρόνος', count: 5 }, null)) === 'entered');
+  assert('ABSENT: the typical first session renders ONE zone, and that is a valid sheet',
+    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), null, null)) === 'entered');
+  assert('ABSENT: nothing at all returns an empty list, never a placeholder',
+    JSON.stringify(buildBlueprintZones(mem([]), null, null)) === '[]');
+  assert('ABSENT: malformed memory does not throw',
+    Array.isArray(buildBlueprintZones(null, null, null)) &&
+    Array.isArray(buildBlueprintZones({}, null, null)));
+  assert('NO PLACEHOLDER: no zone is ever emitted with empty content',
+    full.every(z => z.kind !== 'evidence' || (typeof z.text === 'string' && z.text.trim().length > 0)));
+
+  // ── ΜΠΗΚΕΣ ΜΕ takes the LATEST session's opening, not the oldest ─────────
+  assert('ZONES: with several stored sessions, ΜΠΗΚΕΣ ΜΕ is this session\'s opening',
+    buildBlueprintZones(mem([anch('χρόνος', 1000, 'παλιό'), anch('χρόνος', 5000, 'πρόσφατο')]),
+                        null, null)[0].text === 'πρόσφατο');
+}
+
+// ── RENDERING — the zones must actually reach the sheet ────────────────────
+const SRC_BP = extract('exportBlueprint');
+assert('exportBlueprint located', SRC_BP !== null);
+if (SRC_BP) {
+  assert('SHEET: the zones are rendered', /zonesHtml/.test(SRC_BP));
+  // Scoped to the HTML TEMPLATE, which ends where the Blob is built. Beyond that point the only
+  // interpolation is the download filename, which is not markup and not attacker-reachable;
+  // including it made this assertion fail on pre-existing, harmless code rather than on anything
+  // this commit introduced. test_consent_integrity bounds the same check the same way.
+  const _BP_HTML = SRC_BP.slice(SRC_BP.indexOf('<body>'), SRC_BP.indexOf('const blob = new Blob'));
+  assert('SHEET: the HTML template was located for the escaping check', _BP_HTML.length > 200);
+  assert('SHEET: every interpolation in the sheet still goes through esc() — it is downloaded and shared',
+    !/\$\{(?!esc\(|dateStr|keystoneHtml|beatsHtml|zonesHtml|ankerText \?|zones)/.test(_BP_HTML));
+
+  // THE ZONE BUILDER IS WHERE THE USER'S TEXT ACTUALLY ENTERS HTML, and the check above does not
+  // reach it: the builder is declared BEFORE the template, so slicing from <body> excluded the
+  // only new code that interpolates a person's own sentence into markup. A mutation that dropped
+  // esc() from the evidence zone left the suite green. This block covers the builder itself.
+  const _ZB = SRC_BP.slice(SRC_BP.indexOf('const zonesHtml'), SRC_BP.indexOf('// TIMELINE REDESIGN'));
+  assert('SHEET: the zone builder was located', _ZB.length > 200 && _ZB.includes('zone-card'));
+  assert('SHEET: EVERY interpolation inside the zone builder goes through esc()',
+    [..._ZB.matchAll(/\$\{([^}]*)/g)].every(m => /^\s*(esc\(|\(z\.occurrences|o\.at \?|o\.before \?|items\b)/.test(m[1])));
+  assert('SHEET: the evidence zone escapes the person\'s own sentence',
+    /zone-text">\$\{esc\(z\.text\)\}/.test(_ZB));
+  assert('SHEET: the recurring zone escapes the word, the count and every quoted opening',
+    /esc\(z\.word\)/.test(_ZB) && /esc\(String\(z\.count\)\)/.test(_ZB) && /esc\(o\.before\)/.test(_ZB));
+  assert('SHEET: the keystone is still there and still claimed as verbatim',
+    /Η φράση που κρατάς/.test(SRC_BP) && /ALWAYS the user's verbatim words/.test(SRC_BP));
+  assert('SHEET: the footer still separates what is theirs from what AURA formulated',
+    /αυτούσια δική σου/.test(SRC_BP) && /διατύπωσε η AURA/.test(SRC_BP));
+  for (const label of ['ΜΠΗΚΕΣ ΜΕ', 'ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ', 'ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ']) {
+    assert(`SHEET: the label «${label}» exists in the source`, CODE.includes(label));
+  }
+  assert('SHEET: the recurring zone shows the occurrences, not only the number',
+    /occurrences/.test(SRC_BP));
+  assert('CALL SITE: the export is given the zones', /exportBlueprint\([^)]*zones/i.test(CODE));
+  assert('CALL SITE: the recurring signal is computed from the kept word',
+    /buildRecurringSignal\(\s*memory/.test(CODE));
+  assert('CALL SITE: the unknown comes from a parsed road map, never from prose',
+    /parseRoadMap\([\s\S]{0,200}unknown/.test(CODE) || /unknown[\s\S]{0,200}parseRoadMap\(/.test(CODE));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);

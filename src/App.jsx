@@ -2106,7 +2106,43 @@ function getOpenAnchors(mem) {
 }
 
 // ── Export (readable, no content) ──
-function exportBlueprint(distillationText, ankerText) {
+// BLUEPRINT ZONES — the first place the Evidence Architecture reaches the user.
+//
+// Three zones, EVERY ONE OPTIONAL. A zone with no evidence behind it is ABSENT, never an empty
+// frame with a dash in it. That is the rule the whole redesign turns on: both signals shipped so
+// far are narrow by construction — COMMITMENT cannot see a hesitation phrased without θα, RECURRING
+// uses exact matching and so treats χρόνος and χρόνο as different words — so their silence is not
+// evidence of absence, and a rendered-but-empty zone would quietly claim the opposite.
+//
+//   ΜΠΗΚΕΣ ΜΕ         EVIDENCE  — their first message, verbatim
+//   ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ   PATTERN   — the RECURRING signal, occurrences attached
+//   ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ EVIDENCE  — the ΑΓΝΩΣΤΟ they named themselves
+//
+// The typical first session renders ONE zone, and that is a valid sheet, not a degraded one.
+//
+// SHIFT is deliberately absent. Its first declaration has no provenance chain — the code cannot
+// prove that a given reply answers the focus question, because unlike the kept-word question that
+// one carries no hidden tag. Recorded in ARCHITECTURE_DECISIONS.md rather than worked around.
+//
+// PURE ASSEMBLER: it takes the recurring signal as an argument rather than computing it, so it
+// stays self-contained for the suites' per-function extraction and can be tested without a memory
+// fixture pretending to be a whole session.
+function buildBlueprintZones(mem, recurring, roadUnknown) {
+  const zones = [];
+  const words = (mem && Array.isArray(mem.anchors) ? mem.anchors : [])
+    .filter(a => a && a.category === "trajectory_word");
+  const latest = words.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0] || null;
+  const before = latest && typeof latest.before === "string" ? latest.before.trim() : "";
+  if (before) zones.push({ key: "entered", label: "ΜΠΗΚΕΣ ΜΕ", kind: "evidence", text: before });
+  if (recurring && recurring.count >= 2 && Array.isArray(recurring.occurrences)) {
+    zones.push({ key: "recurring", label: "ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ", kind: "pattern",
+                 word: recurring.word, count: recurring.count, occurrences: recurring.occurrences });
+  }
+  const open = typeof roadUnknown === "string" ? roadUnknown.trim() : "";
+  if (open) zones.push({ key: "open", label: "ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ", kind: "evidence", text: open });
+  return zones;
+}
+function exportBlueprint(distillationText, ankerText, zones) {
   const beats = parseThreeBeatShift(distillationText);
   const dateStr = new Date().toLocaleDateString("el-GR", { year: "numeric", month: "long", day: "numeric" });
   // The user's own chosen phrase (Anchor), elevated to the top as the single most important line —
@@ -2126,6 +2162,18 @@ function exportBlueprint(distillationText, ankerText) {
   const keystoneHtml = ankerText
     ? `<div class="keystone-card"><span class="keystone-label">Η φράση που κρατάς</span><div class="keystone-text">${esc(ankerText)}</div><div class="keystone-ownership">Αυτή η σκέψη πλέον σου ανήκει.</div></div>`
     : "";
+  // ZONE RENDERING. Evidence zones print the person's own sentence. The pattern zone prints the
+  // count AND the openings it is made of, because a number with nothing behind it is an assertion
+  // — the same reason countPriorWordEchoes' bare count was not enough on its own.
+  const zonesHtml = (Array.isArray(zones) ? zones : []).map(z => {
+    if (z.kind === "pattern") {
+      const items = (z.occurrences || []).map(o =>
+        `<div class="zone-occ">${o.at ? `<span class="zone-date">${esc(new Date(o.at).toLocaleDateString("el-GR", { year: "numeric", month: "long", day: "numeric" }))}</span>` : ""}${o.before ? `<div class="zone-occ-text">«${esc(o.before)}»</div>` : ""}</div>`
+      ).join("");
+      return `<div class="zone-card"><span class="zone-label">${esc(z.label)}</span><div class="zone-text">«${esc(z.word)}» — ${esc(String(z.count))} φορές</div>${items}</div>`;
+    }
+    return `<div class="zone-card"><span class="zone-label">${esc(z.label)}</span><div class="zone-text">${esc(z.text)}</div></div>`;
+  }).join("");
   // TIMELINE REDESIGN (visual redesign only — same underlying beats.brought/found/changed data,
   // now presented as a connected path with dot markers rather than isolated bordered blocks):
   const beatsHtml = beats
@@ -2162,12 +2210,19 @@ function exportBlueprint(distillationText, ankerText) {
   .path-final .path-text{font-size:20px;color:#f0ece2;}
   .path-text.plain{font-size:17px;}
   .stamp{text-align:center;margin-top:44px;padding-top:28px;border-top:1px solid #252320;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:13px;color:#6b5a28;letter-spacing:.03em;}
+  .zone-card{padding:22px 26px;background:#181614;border-radius:2px;box-shadow:0 4px 20px rgba(0,0,0,.25);margin-bottom:18px;}
+  .zone-label{display:block;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#6b5a28;margin-bottom:10px;}
+  .zone-text{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:300;font-size:17px;line-height:1.55;color:#dedad2;}
+  .zone-occ{margin-top:12px;padding-left:12px;border-left:1px solid #3a2f18;}
+  .zone-date{display:block;font-size:9px;letter-spacing:.1em;color:#6b5a28;margin-bottom:4px;}
+  .zone-occ-text{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;line-height:1.5;color:#b9b4ab;}
   .footer{margin-top:24px;font-size:9px;color:#454340;line-height:1.7;text-align:center;}
-  @media print{ body{background:#fff;color:#111;} .title,.keystone-text{color:#8a6d1f;} .keystone-card,.path-card{background:#faf8f3;box-shadow:none;border:1px solid #e5e0d5;} .path-text,.path-final .path-text{color:#111;} .keystone-ownership{color:#666;} }
+  @media print{ body{background:#fff;color:#111;} .title,.keystone-text{color:#8a6d1f;} .keystone-card,.path-card,.zone-card{background:#faf8f3;box-shadow:none;border:1px solid #e5e0d5;} .path-text,.path-final .path-text,.zone-text{color:#111;} .zone-occ-text{color:#444;} .keystone-ownership{color:#666;} }
 </style></head>
 <body><div class="sheet">
   <div class="header-row"><div class="title">AURA — Decision Blueprint</div><div class="date">${dateStr}</div></div>
   ${keystoneHtml}
+  ${zonesHtml}
   ${beatsHtml}
   ${ankerText ? `<div class="stamp">"${esc(ankerText)}"</div>` : ""}
   <!-- PROVENANCE FIX. The footer said "Είναι δικά σου λόγια" of the whole sheet. True of the
@@ -5711,7 +5766,22 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
               <div className="end-note">Επίστρεψε όταν υπάρχει κάτι νέο να δούμε.</div>
               {(!finalDistillation || valueUnlocked) && <button className="new-btn" onClick={resetSession}>Νέα συνεδρία</button>}
               {valueUnlocked && finalDistillation && (
-                <button className="new-btn" style={{marginLeft:"8px"}} onClick={() => exportBlueprint(finalDistillation, getMostRecentWordAnchor(memory)?.text)}>
+                <button className="new-btn" style={{marginLeft:"8px"}} onClick={() => {
+                  // The kept word drives the recurring lookup; the unknown comes from the most
+                  // recent PARSED road map, never from prose, so the zone can only ever carry
+                  // something the person named themselves.
+                  const _kept = getMostRecentWordAnchor(memory)?.text;
+                  const _recurring = _kept ? buildRecurringSignal(memory, _kept) : null;
+                  const _unknown = (() => {
+                    for (let i = messages.length - 1; i >= 0; i--) {
+                      if (messages[i].role !== "assistant") continue;
+                      const _m = parseRoadMap(messages[i].content);
+                      if (_m && _m.unknown) return _m.unknown;
+                    }
+                    return null;
+                  })();
+                  exportBlueprint(finalDistillation, _kept, buildBlueprintZones(memory, _recurring, _unknown));
+                }}>
                   Κατέβασε το Blueprint
                 </button>
               )}
