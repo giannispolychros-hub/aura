@@ -3672,6 +3672,10 @@ export default function AURAv2() {
   const [memory, setMemory]                       = useState(() => loadMemory());
   const [memoryPromptPending, setMemoryPromptPending] = useState(false);
   const [recognitionPending, setRecognitionPending] = useState(null); // Κ4 — the signal awaiting confirmation
+  // Κ4 «Μερικώς» — the pattern key withheld from THIS session's sheet. Session-scoped on
+  // purpose: "partly" is an unfinished answer, not a boundary, so nothing is persisted and a
+  // later session is free to ask again. Όχι remains the only answer that writes anything.
+  const [heldPattern, setHeldPattern] = useState(null);
   const [showMemoryPanel, setShowMemoryPanel]     = useState(false);
   const [showArchivePanel, setShowArchivePanel]   = useState(false);
 
@@ -5137,6 +5141,7 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
     setPivotPending(false);
     setLayerGatePending(false);
     setPendingUserMessage(null);
+    setHeldPattern(null);
     setMemoryPromptPending(false);
     setWarningPending(false);
     setMisfirePending(false);
@@ -5844,6 +5849,7 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
               </div>
               <div className="mem-note">
                 Αν πεις όχι, φεύγει και δεν ξαναεμφανίζεται.
+                Αν πεις μερικώς, δεν μπαίνει στο Blueprint σήμερα — και δεν χάνεται.
               </div>
               <div className="choice-btns">
                 <button className="choice-btn" onClick={() => {
@@ -5855,6 +5861,11 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
                   setRecognitionPending(false);
                 }}>Όχι</button>
                 <button className="choice-btn" onClick={() => {
+                  // NOT a yes. The card offered three answers while the code ran two: «Μερικώς»
+                  // and «Ναι» dismissed it identically, so "partly" printed the pattern in the
+                  // Blueprint exactly as if it had been claimed outright — User Ownership failing at
+                  // the one place it is explicitly asked about. It now withholds, without recording.
+                  setHeldPattern(patternKey({ kind: "recurring", word: recognitionPending.word }));
                   recordTelemetry("ownership_confirmed", { answer: 1 });
                   setRecognitionPending(false);
                 }}>Μερικώς</button>
@@ -5988,7 +5999,12 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
                     }
                     return null;
                   })();
-                  const _zones = buildBlueprintZones(memory, _recurring, _unknown, _commitment,
+                  // Κ4 «Μερικώς» lands here, through the SAME suppression path a refusal uses —
+                  // on a throwaway copy. Nothing is saved, so the withholding ends with the session.
+                  const _memForSheet = heldPattern
+                    ? recordPatternRejection({ ...memory }, heldPattern)
+                    : memory;
+                  const _zones = buildBlueprintZones(_memForSheet, _recurring, _unknown, _commitment,
                     extractBeforeMessage(messages));
                   exportBlueprint(_kept, _zones);
                   recordTelemetry("blueprint_generated", {

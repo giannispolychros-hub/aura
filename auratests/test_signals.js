@@ -594,5 +594,97 @@ assert('GATE: it never re-asks something already refused — checked in the armi
   /if \(_sig && !isPatternRejected\(/.test(_ARM));
 assert('PASSIVE: the gate is not wired into the prompt', !/recognitionPending|patternKey/.test(PROMPT));
 
+// ── Κ4 «Μερικώς» IS NOT «Ναι» ──────────────────────────────────────────────
+//
+// The gap audit found the three-answer card was a promise the code did not keep: «Μερικώς» and
+// «Ναι» ran the SAME handler — setRecognitionPending(false) — so someone answering "partly"
+// had the pattern printed in their Blueprint exactly as if they had claimed it outright. That is
+// the User Ownership rule failing at the one place it is explicitly asked about.
+//
+// The three answers now mean three different things:
+//   Όχι      — refused for good. Persisted, suppressed at source, never asked again. (Κ2)
+//   Μερικώς — NOT claimed. Withheld from this session's sheet, NOTHING persisted, so a
+//              later session may ask again. "Partly" is not a boundary; it is an unfinished answer.
+//   Ναι      — theirs. The zone renders.
+const _BTN = (() => {
+  const i = _GATE.indexOf('\u039c\u03b5\u03c1\u03b9\u03ba\u03ce\u03c2</button>');
+  if (i < 0) return '';
+  const j = _GATE.lastIndexOf('<button', i);
+  return j < 0 ? '' : _GATE.slice(j, i);
+})();
+assert('ΜΕΡΙΚΩΣ: its own button handler was located', _BTN.length > 20);
+// Stripped of telemetry first: both buttons already log a different answer code, so a raw
+// comparison would report a behavioural difference where there is none. Measured — this
+// assertion passed on the unfixed handler until the strip was added.
+// Comments are stripped too. Measured: deleting the setHeldPattern call left the explanatory
+// comment behind, and the "does more than dismiss" check passed on the comment text alone —
+// a guard satisfied by prose is no guard.
+const _noLog = t => t.replace(/\/\/[^\n]*/g, '').replace(/recordTelemetry\([^)]*\);?/g, '').replace(/\s+/g, '');
+const _handler = t => { const i = t.indexOf('onClick='); return i < 0 ? '' : _noLog(t.slice(i)); };
+assert('ΜΕΡΙΚΩΣ: its handler does more than dismiss the card',
+  _handler(_BTN).length > 0 &&
+  _handler(_BTN).replace(/onClick=\{\(\)=>\{?/, '').replace(/setRecognitionPending\(false\);?/, '')
+                .replace(/[}\s;>]/g, '').length > 0);
+assert('ΜΕΡΙΚΩΣ: it holds the pattern back by key',
+  /setHeldPattern\(/.test(_BTN) && /patternKey\(/.test(_BTN));
+assert('ΜΕΡΙΚΩΣ: it does NOT persist a refusal — "partly" is not "never again"',
+  !/recordPatternRejection\(/.test(_BTN) && !/saveMemory\(/.test(_BTN));
+
+// «Ναι» must stay the plain path: nothing held, nothing written.
+const _YES = (() => {
+  const i = _GATE.indexOf('\u039d\u03b1\u03b9</button>');
+  if (i < 0) return '';
+  const j = _GATE.lastIndexOf('<button', i);
+  return j < 0 ? '' : _GATE.slice(j, i);
+})();
+assert('ΝΑΙ: its own button handler was located', _YES.length > 20);
+assert('ΝΑΙ: it holds nothing back — the pattern is theirs',
+  !/setHeldPattern\(/.test(_YES) || /setHeldPattern\(null\)/.test(_YES));
+// Handler bodies only: className differs already ("prim" on ΝΑΙ), so comparing the whole
+// button reported a difference that was pure styling. Measured on the unfixed source.
+assert('ΜΕΡΙΚΩΣ and ΝΑΙ differ in BEHAVIOUR, not in class or in what they log',
+  _handler(_BTN).length > 0 && _handler(_BTN) !== _handler(_YES));
+
+// The sheet is where the difference has to actually land.
+const _SHEET = (() => {
+  const i = CODE.indexOf('const _kept = getMostRecentWordAnchor(memory)?.text;');
+  return i < 0 ? '' : CODE.slice(i, CODE.indexOf('\u039a\u03b1\u03c4\u03ad\u03b2\u03b1\u03c3\u03b5 \u03c4\u03bf Blueprint', i));
+})();
+assert('SHEET: the Blueprint export site was located', _SHEET.length > 300);
+assert('SHEET: it consults the held pattern before building the zones',
+  /heldPattern/.test(_SHEET));
+assert('SHEET: a held pattern is suppressed through the SAME mechanism as a refusal',
+  /recordPatternRejection\(\s*\{\s*\.\.\.memory\s*\}\s*,\s*heldPattern\s*\)/.test(_SHEET));
+assert('SHEET: the held suppression is transient — it is never written to storage',
+  !/saveMemory\(/.test(_SHEET));
+assert('SHEET: buildBlueprintZones is called with the suppressed memory, not the raw one',
+  /buildBlueprintZones\(\s*_memForSheet/.test(_SHEET));
+
+assert('RESET: the held pattern does not survive into the next session',
+  /setHeldPattern\(null\)/.test(CODE) &&
+  /const resetSession[\s\S]{0,3000}?setHeldPattern\(null\)/.test(CODE));
+assert('CARD: the card says what «Μερικώς» will do, so the answer is informed',
+  /\u03bc\u03b5\u03c1\u03b9\u03ba\u03ce\u03c2/i.test(_GATE.replace(/>\u039c\u03b5\u03c1\u03b9\u03ba\u03ce\u03c2</, '')));
+
+// BEHAVIOURAL: holding a pattern must remove the zone, and must not touch any other zone.
+if (typeof buildBlueprintZones === 'function' && typeof recordPatternRejection === 'function') {
+  const _anchors = [
+    { category: 'trajectory_word', text: '\u03c7\u03c1\u03cc\u03bd\u03bf\u03c2', at: 1, before: '\u03a0\u03c1\u03ce\u03c4\u03b7 \u03c6\u03bf\u03c1\u03ac.' },
+    { category: 'trajectory_word', text: '\u03c7\u03c1\u03cc\u03bd\u03bf\u03c2', at: 2, before: '\u0394\u03b5\u03cd\u03c4\u03b5\u03c1\u03b7 \u03c6\u03bf\u03c1\u03ac.' },
+  ];
+  const _mem = { anchors: _anchors, rejectedPatterns: [] };
+  const _rec = buildRecurringSignal(_mem, '\u03c7\u03c1\u03cc\u03bd\u03bf\u03c2');
+  const _held = recordPatternRejection({ ..._mem }, patternKey({ kind: 'recurring', word: '\u03c7\u03c1\u03cc\u03bd\u03bf\u03c2' }));
+  const _k = z => z.map(x => x.key).join(',');
+  assert('HELD: with nothing held the recurring zone renders',
+    _k(buildBlueprintZones(_mem, _rec, null, null, '\u0391\u03c1\u03c7\u03ae.')).includes('recurring'));
+  assert('HELD: with the pattern held it does not',
+    !_k(buildBlueprintZones(_held, _rec, null, null, '\u0391\u03c1\u03c7\u03ae.')).includes('recurring'));
+  assert('HELD: the other zones are untouched',
+    _k(buildBlueprintZones(_held, _rec, null, null, '\u0391\u03c1\u03c7\u03ae.')).includes('entered'));
+  assert('HELD: holding does not mutate the real memory — next session can ask again',
+    Array.isArray(_mem.rejectedPatterns) && _mem.rejectedPatterns.length === 0);
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);
