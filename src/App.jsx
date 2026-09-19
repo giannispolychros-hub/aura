@@ -2116,7 +2116,11 @@ function getOpenAnchors(mem) {
 //
 //   ΜΠΗΚΕΣ ΜΕ         EVIDENCE  — their first message, verbatim
 //   ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ   PATTERN   — the RECURRING signal, occurrences attached
+//   ΤΙ ΑΠΟΦΑΣΙΣΕΣ     PATTERN   — the COMMITMENT signal, both halves verbatim
 //   ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ EVIDENCE  — the ΑΓΝΩΣΤΟ they named themselves
+//
+// Order is chronological and ends on what is still open, so the sheet does not close on a
+// decision the person has not actually finished making.
 //
 // The typical first session renders ONE zone, and that is a valid sheet, not a degraded one.
 //
@@ -2127,7 +2131,7 @@ function getOpenAnchors(mem) {
 // PURE ASSEMBLER: it takes the recurring signal as an argument rather than computing it, so it
 // stays self-contained for the suites' per-function extraction and can be tested without a memory
 // fixture pretending to be a whole session.
-function buildBlueprintZones(mem, recurring, roadUnknown) {
+function buildBlueprintZones(mem, recurring, roadUnknown, commitment) {
   const zones = [];
   const words = (mem && Array.isArray(mem.anchors) ? mem.anchors : [])
     .filter(a => a && a.category === "trajectory_word");
@@ -2137,6 +2141,15 @@ function buildBlueprintZones(mem, recurring, roadUnknown) {
   if (recurring && recurring.count >= 2 && Array.isArray(recurring.occurrences)) {
     zones.push({ key: "recurring", label: "ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ", kind: "pattern",
                  word: recurring.word, count: recurring.count, occurrences: recurring.occurrences });
+  }
+  // ΤΙ ΑΠΟΦΑΣΙΣΕΣ — the COMMITMENT signal. buildCommitmentSignal already refuses a half-pair, but
+  // this takes the signal as an argument like the recurring one does, so it must not trust its
+  // caller: both halves are re-checked here before a zone exists.
+  const cBefore = commitment && typeof commitment.before === "string" ? commitment.before.trim() : "";
+  const cAfter = commitment && typeof commitment.after === "string" ? commitment.after.trim() : "";
+  if (cBefore && cAfter) {
+    zones.push({ key: "decided", label: "ΤΙ ΑΠΟΦΑΣΙΣΕΣ", kind: "pattern",
+                 verb: commitment.verb || "", before: cBefore, after: cAfter });
   }
   const open = typeof roadUnknown === "string" ? roadUnknown.trim() : "";
   if (open) zones.push({ key: "open", label: "ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ", kind: "evidence", text: open });
@@ -2166,6 +2179,11 @@ function exportBlueprint(distillationText, ankerText, zones) {
   // count AND the openings it is made of, because a number with nothing behind it is an assertion
   // — the same reason countPriorWordEchoes' bare count was not enough on its own.
   const zonesHtml = (Array.isArray(zones) ? zones : []).map(z => {
+    if (z.key === "decided") {
+      // Both halves, in the person's own words, with nothing between them but an arrow. No
+      // sentence is written about the transition — the two quotes ARE the finding.
+      return `<div class="zone-card"><span class="zone-label">${esc(z.label)}</span><div class="zone-text">«${esc(z.before)}»</div><div class="zone-arrow">↓</div><div class="zone-text">«${esc(z.after)}»</div></div>`;
+    }
     if (z.kind === "pattern") {
       const items = (z.occurrences || []).map(o =>
         `<div class="zone-occ">${o.at ? `<span class="zone-date">${esc(new Date(o.at).toLocaleDateString("el-GR", { year: "numeric", month: "long", day: "numeric" }))}</span>` : ""}${o.before ? `<div class="zone-occ-text">«${esc(o.before)}»</div>` : ""}</div>`
@@ -2213,6 +2231,7 @@ function exportBlueprint(distillationText, ankerText, zones) {
   .zone-card{padding:22px 26px;background:#181614;border-radius:2px;box-shadow:0 4px 20px rgba(0,0,0,.25);margin-bottom:18px;}
   .zone-label{display:block;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#6b5a28;margin-bottom:10px;}
   .zone-text{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:300;font-size:17px;line-height:1.55;color:#dedad2;}
+  .zone-arrow{font-size:14px;color:#6b5a28;margin:8px 0 8px 2px;line-height:1;}
   .zone-occ{margin-top:12px;padding-left:12px;border-left:1px solid #3a2f18;}
   .zone-date{display:block;font-size:9px;letter-spacing:.1em;color:#6b5a28;margin-bottom:4px;}
   .zone-occ-text{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;line-height:1.5;color:#b9b4ab;}
@@ -5772,6 +5791,7 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
                   // something the person named themselves.
                   const _kept = getMostRecentWordAnchor(memory)?.text;
                   const _recurring = _kept ? buildRecurringSignal(memory, _kept) : null;
+                  const _commitment = buildCommitmentSignal(commitmentPair.current);
                   const _unknown = (() => {
                     for (let i = messages.length - 1; i >= 0; i--) {
                       if (messages[i].role !== "assistant") continue;
@@ -5780,7 +5800,8 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
                     }
                     return null;
                   })();
-                  exportBlueprint(finalDistillation, _kept, buildBlueprintZones(memory, _recurring, _unknown));
+                  exportBlueprint(finalDistillation, _kept,
+                    buildBlueprintZones(memory, _recurring, _unknown, _commitment));
                 }}>
                   Κατέβασε το Blueprint
                 </button>

@@ -333,22 +333,53 @@ if (typeof buildBlueprintZones === 'function') {
   ] };
   const keyOf = z => z.map(x => x.key).join(',');
 
-  // ── All three present ────────────────────────────────────────────────────
+  const commitment = { verb: 'μιλήσω',
+    before: 'Ίσως θα μιλήσω στον διευθυντή',
+    after:  'Θα μιλήσω στον διευθυντή τη Δευτέρα' };
+
+  // ── All four present ─────────────────────────────────────────────────────
   const full = buildBlueprintZones(mem([anch('χρόνος', 2000, 'Δεν ξέρω αν να αλλάξω δουλειά.')]),
-                                   recurring, 'Αν επιτρέπεται δεύτερη απασχόληση');
-  assert('ZONES: all three render, in order', keyOf(full) === 'entered,recurring,open');
+                                   recurring, 'Αν επιτρέπεται δεύτερη απασχόληση', commitment);
+  // Chronological, ending on what is still open.
+  assert('ZONES: all four render, in order', keyOf(full) === 'entered,recurring,decided,open');
+
+  // ── ΤΙ ΑΠΟΦΑΣΙΣΕΣ — the COMMITMENT signal, both halves verbatim ──────────
+  // A signal with tests that never reaches the person is the dormant-code pattern found four
+  // times in this codebase already. This is the zone that keeps COMMITMENT from becoming a fifth.
+  const decided = full.find(z => z.key === 'decided');
+  assert('DECIDED: it is a PATTERN zone, not loose evidence', decided && decided.kind === 'pattern');
+  assert('DECIDED: it carries BOTH halves, verbatim and unedited',
+    decided && decided.before === 'Ίσως θα μιλήσω στον διευθυντή' &&
+    decided.after === 'Θα μιλήσω στον διευθυντή τη Δευτέρα');
+  assert('DECIDED: it is labelled for the sheet', decided && decided.label === 'ΤΙ ΑΠΟΦΑΣΙΣΕΣ');
+
+  // SAME RULE AS EVERY OTHER ZONE: no evidence, no frame.
+  assert('DECIDED ABSENT: no commitment signal → the zone does not exist',
+    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), recurring, 'κάτι', null)) === 'entered,recurring,open');
+  assert('DECIDED ABSENT: a half-pair handed in from outside is not a zone',
+    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), null, null,
+      { verb: 'μιλήσω', before: 'Ίσως θα μιλήσω' })) === 'entered');
+  assert('DECIDED ABSENT: empty halves are absence, not an empty zone',
+    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), null, null,
+      { verb: 'μ', before: '  ', after: '  ' })) === 'entered');
+  assert('DECIDED: omitting the argument entirely is safe — older callers still work',
+    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), null, null)) === 'entered');
+  // Keyed, not positional: adding a zone must not silently repoint an assertion at its neighbour,
+  // which is exactly what happened when the fourth zone landed between these two.
+  const zoneOf = k => full.find(z => z.key === k) || {};
   assert('ZONES: ΜΠΗΚΕΣ ΜΕ carries the first message verbatim',
-    full[0].text === 'Δεν ξέρω αν να αλλάξω δουλειά.' && full[0].kind === 'evidence');
+    zoneOf('entered').text === 'Δεν ξέρω αν να αλλάξω δουλειά.' && zoneOf('entered').kind === 'evidence');
   assert('ZONES: ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ is a PATTERN and carries its occurrences, not just a count',
-    full[1].kind === 'pattern' && full[1].count === 2 && full[1].occurrences.length === 2);
+    zoneOf('recurring').kind === 'pattern' && zoneOf('recurring').count === 2 &&
+    zoneOf('recurring').occurrences.length === 2);
   assert('ZONES: ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ carries the unknown the person named',
-    full[2].text === 'Αν επιτρέπεται δεύτερη απασχόληση' && full[2].kind === 'evidence');
+    zoneOf('open').text === 'Αν επιτρέπεται δεύτερη απασχόληση' && zoneOf('open').kind === 'evidence');
   assert('ZONES: every zone carries a Greek label for the sheet',
     full.every(z => typeof z.label === 'string' && z.label.length > 3));
 
   // ── ABSENCE IS ABSENCE — the rule the whole redesign turns on ────────────
   assert('ABSENT: no recurring signal → the zone does not exist at all',
-    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), null, 'κάτι')) === 'entered,open');
+    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), null, 'κάτι', null)) === 'entered,open');
   assert('ABSENT: no unknown from the road map → the zone does not exist',
     keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), recurring, null)) === 'entered,recurring');
   assert('ABSENT: no stored first message → the zone does not exist',
@@ -411,12 +442,16 @@ if (SRC_BP) {
     /Η φράση που κρατάς/.test(SRC_BP) && /ALWAYS the user's verbatim words/.test(SRC_BP));
   assert('SHEET: the footer still separates what is theirs from what AURA formulated',
     /αυτούσια δική σου/.test(SRC_BP) && /διατύπωσε η AURA/.test(SRC_BP));
-  for (const label of ['ΜΠΗΚΕΣ ΜΕ', 'ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ', 'ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ']) {
+  assert('SHEET: the decided zone renders both halves with an arrow between them',
+    /zone-arrow|→/.test(_ZB) && /esc\(z\.before\)/.test(_ZB) && /esc\(z\.after\)/.test(_ZB));
+  for (const label of ['ΜΠΗΚΕΣ ΜΕ', 'ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ', 'ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ', 'ΤΙ ΑΠΟΦΑΣΙΣΕΣ']) {
     assert(`SHEET: the label «${label}» exists in the source`, CODE.includes(label));
   }
   assert('SHEET: the recurring zone shows the occurrences, not only the number',
     /occurrences/.test(SRC_BP));
   assert('CALL SITE: the export is given the zones', /exportBlueprint\([^)]*zones/i.test(CODE));
+  assert('CALL SITE: the commitment signal is built from the session pair',
+    /buildCommitmentSignal\(\s*commitmentPair\.current/.test(CODE));
   assert('CALL SITE: the recurring signal is computed from the kept word',
     /buildRecurringSignal\(\s*memory/.test(CODE));
   assert('CALL SITE: the unknown comes from a parsed road map, never from prose',
