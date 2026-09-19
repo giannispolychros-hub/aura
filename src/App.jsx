@@ -2506,6 +2506,54 @@ function detectsConcreteStep(text) {
   const isConditional = /(?:^|\s)(αν|εάν|μήπως|ίσως|μπορεί)(?:\s|$)|σκέφτομαι\s|λέω\s+να\s|\bif\b|\bmaybe\b/i.test(before);
   return !isNegated && !isConditional;
 }
+// COMMITMENT SIGNAL — the BEFORE half, which detectsConcreteStep above computes and throws away.
+//
+// That function answers one question: is this a committed step? It gets there by recognising an
+// action phrase and then REJECTING it when the surrounding words mark it as still being weighed
+// ("ίσως θα μιλήσω", "μήπως θα του πω"). That rejection is not noise — it is precisely the
+// earlier half of a transition, identified correctly and then discarded on the same line. The
+// fourth instance of that exact pattern found in this codebase, after detectPattern's repeated
+// words, checkAnchorCoverage's covered/uncovered, and detectUserStagnation's new vocabulary.
+//
+// NARROW BY CONSTRUCTION, and measured rather than assumed: the shared `base` pattern requires
+// "θα", so a hesitation phrased with να and no θα — "σκέφτομαι να μιλήσω", the most natural form
+// in Greek — never reaches the conditional branch and is invisible to both functions alike. So the
+// absence of a commitment signal is NOT evidence that no transition happened. Widening `base`
+// would break lockstep and would change which steps gate the Clarity + Ownership Scale, so it is
+// a separate decision to be made from a specification, not by adding examples one at a time.
+//
+// A SIGNAL needs two pieces of evidence. "Θα μιλήσω" on its own is a statement. "Σκέφτομαι να
+// μιλήσω" at turn 2 followed by "Θα μιλήσω" at turn 5 is a transition, in the person's own words,
+// provable without a single inference. That is the whole point of the type.
+//
+// detectsConcreteStep is deliberately NOT refactored to call this: the test suites extract and
+// eval each function on its own, so a function that called a sibling would break extraction. The
+// duplicated `base` pattern is held in lockstep by test_signals instead, which asserts the two
+// are character-identical — the same coupling discipline as parseRoadMap and its display strip.
+function classifyStepIntent(text) {
+  const t = typeof text === "string" ? text : "";
+  if (!t) return null;
+  const base = /(θα (?:(?:του|της|τους|τον|την|το|τα|μου|σου|σε|με)\s+){0,2}(πάρω|κάνω|ξεκινήσω|μιλήσω|πω|πούμε|δοκιμάσω|αλλάξω|σταματήσω|φύγω|μείνω|γράψω|στείλω|ζητήσω|προτείνω)|θα το (κάνω|πω|δοκιμάσω)|i('| a)?ll |i will |i'm going to |i am going to |going to (start|try|talk|do|stop|leave|change))/i;
+  const match = base.exec(t);
+  if (!match) return null;
+  const before = t.slice(0, match.index);
+  // A negation is neither stage. "Δεν θα μιλήσω" is not a quieter commitment, it is the absence
+  // of one, and pairing it with anything would invent a transition that never happened.
+  if (/(δεν|όχι|won'?t|will not|not going to)\s*$/i.test(before.trim())) return null;
+  const isConditional = /(?:^|\s)(αν|εάν|μήπως|ίσως|μπορεί)(?:\s|$)|σκέφτομαι\s|λέω\s+να\s|\bif\b|\bmaybe\b/i.test(before);
+  // The verb is what lets a pair be matched on the SAME action. Without it, "I was thinking of
+  // talking to him" plus "I'll leave the job" would read as one transition about neither.
+  const verb = (match[2] || match[3] || match[4] || match[0]).trim().toLowerCase();
+  return { stage: isConditional ? "considered" : "committed", verb, text: t };
+}
+// Two evidence or nothing. Every rejection below is a real half-signal that must not become a
+// finding — NO-PATTERN is a valid, explicit outcome of this layer, not a failure of it.
+function buildCommitmentSignal(pair) {
+  if (!pair || !pair.considered || !pair.committed) return null;
+  if (pair.considered.verb !== pair.committed.verb) return null;
+  if (!(pair.committed.turn > pair.considered.turn)) return null;
+  return { verb: pair.considered.verb, before: pair.considered.text, after: pair.committed.text };
+}
 // State-machine fix (real-transcript evidence, severe): the user explicitly asked "μπορείς να
 // βοηθήσεις χωρίς να ρωτάς;" — AURA complied briefly, then drifted back into Socratic questions
 // a few exchanges later, because nothing held that mode active except the model's own attention
@@ -3454,6 +3502,10 @@ export default function AURAv2() {
   const warningIssued    = useRef(false);
   // Clarity + Ownership Scale gate state (per session) — see decideTermination().
   const concreteStepStated   = useRef(false);
+  // COMMITMENT pair — { considered, committed }, each the user's own sentence plus its turn index.
+  // Session-scoped on purpose: a transition belongs to the session it happened in, and keeping it
+  // in a ref rather than in memory means it adds nothing to what consent has to cover.
+  const commitmentPair       = useRef(null);
   const outcomeScaleAsked    = useRef(false);
   const coreReadinessAsked     = useRef(false); // ROOT RE-FOCUS step-one question just posed
   const coreReadinessConfirmed = useRef(false);
@@ -3592,6 +3644,20 @@ export default function AURAv2() {
       const lastUserMsgForConcreteStep = [...msgs].reverse().find(m => m.role === "user");
       if (!concreteStepStated.current && lastUserMsgForConcreteStep && detectsConcreteStep(lastUserMsgForConcreteStep.content)) {
         concreteStepStated.current = true;
+      }
+      // COMMITMENT capture — passive, beside the gate above and deliberately separate from it, so
+      // the gate's behaviour is untouched. Pre-API like every other user-side detector, per the
+      // ordering test_detector_timing holds. First of each stage wins: the earliest hesitation and
+      // the first commitment are what make the cleanest pair.
+      if (lastUserMsgForConcreteStep) {
+        const _intent = classifyStepIntent(lastUserMsgForConcreteStep.content);
+        if (_intent) {
+          const _pair = commitmentPair.current || { considered: null, committed: null };
+          const _entry = { verb: _intent.verb, text: _intent.text, turn: msgs.filter(m => m.role === "user").length };
+          if (_intent.stage === "considered" && !_pair.considered) _pair.considered = _entry;
+          if (_intent.stage === "committed" && !_pair.committed) _pair.committed = _entry;
+          commitmentPair.current = _pair;
+        }
       }
     }
     // Context Refresh: reinject core identity reminder every 10 messages
@@ -4819,6 +4885,7 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
     compressionCount.current = 0;
     warningIssued.current = false;
     concreteStepStated.current = false;
+    commitmentPair.current = null;
     outcomeScaleAsked.current = false;
     coreReadinessAsked.current = false;
     coreReadinessConfirmed.current = false;
