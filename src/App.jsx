@@ -3324,6 +3324,30 @@ function detectUserStagnation(messages) {
 //
 // Pure with respect to the ref it is given, and deliberately does NOT consume budget on an empty
 // ctxString: a turn where the signal is not active must not spend an emission the active turns need.
+// AFTER THE MAP, THE SESSION STILL CLOSES THE WAY SESSIONS CLOSE.
+//
+// An audit of three real transcripts found the Road Map and the three-beat close connected by
+// NOTHING — not a line of code, not a line of prompt. The only place both parsers appear together
+// in this file is a comment saying exactly that. The consequence, measured:
+//
+//   A  map delivered, 8 exchanges  → advice (ΥΠΑΙΘ, ΑΣΠΕ)      → "Καλή συνέχεια"
+//   C  map delivered               → advice (Preply, Superprof) → "Καλή συνέχεια"
+//   B  NO map, 32 exchanges        → full ritual → three beats  → "Κλείνουμε"
+//
+// The one session that reached the closing ritual is the one where no map appeared. In both that
+// produced a map, what filled the gap was advice naming sources the user never mentioned.
+//
+// EXTRACTED FOR TESTABILITY, exactly as decideTermination was: four conditions, each with its own
+// test and its own mutation. The ctx that consumes it introduces no rule — it names sections that
+// already exist and routes back to them.
+function decidePostMapClose(state) {
+  if (!state || typeof state !== "object") return false;
+  if (state.roadMapDelivered !== true) return false; // no map: this session is not ours to touch
+  if (state.roadQuestionPending)        return false; // never two "ask this" in one prompt
+  if (state.shiftConfirmed)             return false; // shiftCheckCtx owns the close from here
+  if (state.userClosing)                return false; // a declared exit is never overridden
+  return true;
+}
 function deliverOnce(ctxString, deliveredRef, budget) {
   if (!ctxString) return '';
   const max = (budget === undefined || budget === null) ? 1 : budget;
@@ -3765,6 +3789,10 @@ export default function AURAv2() {
   // never persisted, so it never reaches the consent gate.
   // { roads: string[], asked: number, qa: [{road,name,q,a}], mapAcknowledged: boolean }
   const roadQuestionState = useRef(null);
+  // A map WAS delivered this session. Separate from roadQuestionState on purpose: that ref is
+  // nulled the moment the road-question run completes, so it cannot carry "a map happened" to
+  // the close, which is precisely where it is needed.
+  const roadMapDelivered  = useRef(false);
   // Debug panel gate — read once from the URL, never re-derived on later renders/navigation.
   const debugMode = useRef(typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1');
   // RT-hardening: replaces text-based detection ("does the model's reply say 'το κρατάω'?")
@@ -3787,6 +3815,7 @@ export default function AURAv2() {
   // They never gate the facts themselves (shiftCheckConfirmed / friendPerspectiveConfirmed /
   // binaryOppositionCount stay exactly as they were, one-way, read by other mechanisms).
   const shiftCheckCtxDelivered        = useRef(0); // budget 2 — two-step sequence, see deliverOnce
+  const postMapCloseCtxDelivered      = useRef(0); // budget 2 — same reasoning as shiftCheckCtx
   const friendPerspectiveCtxDelivered = useRef(0); // budget 1 — single-turn directive
   const premiseInversionCtxDelivered  = useRef(0); // budget 2 — see the note above its ctx
   const awaitingEarlyWord      = useRef(false); // set true right after [[EARLY_WORD:yes]] tag seen
@@ -4132,6 +4161,30 @@ WHAT TO ASK ABOUT, strict priority, the first that applies: (1) an unknown THIS 
 EVERY CANDIDATE PASSES BOTH GATES ABOVE BEFORE IT IS ASKED: REVERSIBILITY CHECK (remove their future answer — does the question still point at one specific explanation? then it already smuggled that explanation in) and CALIBRATION QUESTION TEST (an open slot they fill themselves, never a content domain you named). A question that names money, family, time or fear when they have not raised it themselves fails both and must be rewritten with an open slot.
 NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own material leaves no real gap here, say that plainly in one short line and ask nothing. A manufactured question is worse than none.]\n`;
       })();
+      // AFTER THE MAP — see decidePostMapClose above for what this is and why it exists.
+      // Built like roadQuestionCtx: every rule it invokes already lives in the prompt and is
+      // referenced BY SECTION NAME, so this mechanism needs no prompt text at all and the cached
+      // prefix stays byte-identical.
+      const postMapCloseCtx = deliverOnce((() => {
+        const _st = roadQuestionState.current;
+        // "Road questions are done" counts an EXHAUSTED run as well as a cleared one. The state
+        // is nulled only on completion or exit, so a run that armed and then never engaged —
+        // exactly what transcript C reported — would otherwise keep this silent for the rest of
+        // the session. That stall is a separate, already-reported bug; counting exhaustion here
+        // means both the normal path and the finished-but-not-yet-cleared path work.
+        const _pending = (!!_st && _st.asked < Math.min(_st.roads.length, 3)) || !!roadQuestionCtx;
+        const _lastUser = [...msgs].reverse().find(m => m.role === "user")?.content || "";
+        return decidePostMapClose({
+          roadMapDelivered: roadMapDelivered.current,
+          roadQuestionPending: _pending,
+          shiftConfirmed: shiftCheckConfirmed.current,
+          userClosing: isExplicitClosure(_lastUser) || matchesClosingWord(_lastUser),
+        })
+          ? `\n[CODE-VERIFIED: a ΔΡΟΜΟΣ/ΚΕΡΔΙΖΕΙΣ/ΚΟΣΤΙΖΕΙ map has already been delivered in this session, and the road questions are finished. THE MAP IS A STAGE, NOT THE CLOSE — THREE VALID ENDINGS above are endings of the MAP, not of the session, and reading them as a stopping point is what actually went wrong: in two real sessions the map landed and the very next reply was advice, naming sources the user had never mentioned. No Advice and GUARDRAIL 2 apply here with full force — having produced a map relaxes nothing.
+THIS SESSION STILL CLOSES THE WAY EVERY SESSION CLOSES, in the order the Sequencing rule above already fixes: Clarity + Ownership Scale as the gate, then USER-VERIFIED SHIFT CHECK's canonical question, and only on their own affirmative answer, STATE SHIFT RECOGNITION and the three beats. Do not skip ahead to the beats, and do not treat the map as having already answered the shift question — it asks whether THEY see something differently, which a map cannot answer on their behalf.
+IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: which road they took, which they rejected, what they named as the real obstacle. Never on the map's own ΚΕΡΔΙΖΕΙΣ/ΚΟΣΤΙΖΕΙ lines — those are AURA's formulation, their provenance is not guaranteed, and ΒΡΗΚΕΣ already carries a sourcing requirement that forbids exactly this.]\n`
+          : '';
+      })(), postMapCloseCtxDelivered, 2);
       const gatesCtx = (() => {
         // ROAD QUESTIONS STAND-DOWN: while a road question is pending this turn, two "ask this"
         // instructions in one prompt is the collision this repo has already paid for once. Scoped
@@ -4258,6 +4311,7 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
       const dynamicSuffix = [
         memCtx, profileCtx, materialEvidenceCtx, demoCtx, informationModeCtx, explicitPauseCtx,
         coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx, roadQuestionCtx,
+        postMapCloseCtx,
         gatesCtx, closingDriftCtx, firstReplyFloorCtx,
       ].filter(Boolean).join('\n');
       // PROTOCOL COLLISION LOGGER (red-team gap: nothing recorded when two or more families fired on
@@ -4270,7 +4324,7 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
         const fired = Object.entries({
           memCtx, profileCtx, materialEvidenceCtx, demoCtx, informationModeCtx, explicitPauseCtx,
           coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx,
-          clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx, roadQuestionCtx, gatesCtx, closingDriftCtx,
+          clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx, roadQuestionCtx, postMapCloseCtx, gatesCtx, closingDriftCtx,
           firstReplyFloorCtx,
         }).filter(([, v]) => v).map(([k]) => k);
         if (fired.length >= 2) {
@@ -4663,6 +4717,7 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
       // the state itself and cannot be widened by a later edit to the emission side.
       if (!roadQuestionState.current) {
         const _rqMap = parseRoadMap(text);
+        if (_rqMap) roadMapDelivered.current = true;
         if (_rqMap && _rqMap.roads.length > 0) {
           roadQuestionState.current = {
             roads: _rqMap.roads.slice(0, 3).map(r => r.name),
@@ -5235,6 +5290,7 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
     shiftCheckAsked.current = false;
     shiftCheckConfirmed.current = false;
     shiftCheckCtxDelivered.current = 0;
+    postMapCloseCtxDelivered.current = 0;
     friendPerspectiveCtxDelivered.current = 0;
     premiseInversionCtxDelivered.current = 0;
     awaitingEarlyWord.current = false;
@@ -5259,6 +5315,7 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
     methodFailureHint.current = false;
     violationCounts.current = {};
     roadTraceLast.current = null;
+    roadMapDelivered.current = false;
     roadQuestionState.current = null;
     window.__auraLastCollision = null;
     setValueUnlocked(false);
