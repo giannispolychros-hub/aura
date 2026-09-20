@@ -212,8 +212,15 @@ assert('USAGE: COUNTS ONLY — no message, prompt or reply content is ever logge
   _ulBlock.length > 0 && !/(systemPrompt|messages|data\.content|\btext\b|\.content\b)/.test(_ulBlock));
 assert('USAGE: the logged values are reachable without a console (mobile has none)',
   /window\.__auraLastUsage/.test(CODE));
-assert('USAGE: the return value is unchanged — logging is not in the data path',
-  /return data\.content\?\.map/.test(CODE));
+// RESTATED, NOT RELAXED (2026-09-20). This pinned the literal expression `return data.content?.map`,
+// and broke when a deliberate and unrelated guard was added between the extraction and the return —
+// an empty reply must never enter history, because the API then rejects every later request this
+// session makes (see test_failure_recovery.js). The INTENT here is that the COST LOGGER is not in
+// the data path, so it is now stated that way rather than by pinning one line of syntax.
+assert('USAGE: the reply is still extracted from data.content, unchanged',
+  /data\.content\?\.map\(b => b\.text \|\| ""\)\.join\(""\)/.test(CODE));
+assert('USAGE: the usage block neither produces nor touches the returned reply — not in the data path',
+  _ulBlock.length > 0 && !/_reply|return\s/.test(_ulBlock));
 
 // ── 6. REGRESSION: nothing about the prompt itself moved ────────────────────
 assert('AURA_CORE_PERSONALITY contains no interpolation — the cached prefix stays byte-stable',

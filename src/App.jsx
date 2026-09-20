@@ -3388,6 +3388,53 @@ function detectAssistantSelfRepetition(messages) {
 // API
 // ─────────────────────────────────────────────
 
+// ONE FAILED TURN MUST NOT END THE SESSION.
+//
+// PRODUCTION EVIDENCE, 2026-09-20, Vercel logs, one real session on the founder's phone:
+// 11:07:21 POST 200, then 11:07:54 / 11:08:20 / 11:10:17 all POST 400, and it never recovered.
+//
+// handleSubmit commits the user's message to state and only then awaits the call. When the call
+// failed, generateResponse caught the error, showed it, and LEFT THE MESSAGE IN HISTORY with no
+// reply under it — so the next send carried two consecutive user messages, which the Anthropic
+// Messages API rejects. For the rest of the session. Only a new session cleared it. Two of those
+// three 400s were guaranteed by this alone; a single network hiccup costs a person their session.
+//
+// ONE message is removed, never a run: a run of user messages means the damage already happened,
+// and removing it would silently delete things the person actually wrote.
+function rollbackFailedTurn(messages) {
+  const list = Array.isArray(messages) ? messages : [];
+  const last = list[list.length - 1];
+  if (!last || last.role !== "user") return { messages: list.slice(), restored: null };
+  const text = typeof last.content === "string" ? last.content.trim() : "";
+  return { messages: list.slice(0, -1), restored: text ? last.content : null };
+}
+// An empty reply poisons history exactly the way a stranded user message does: the API rejects a
+// message whose content is empty, permanently. callAura used to return "" for an empty response
+// and eleven separate call sites appended it without checking.
+function isEmptyModelResponse(text) {
+  return typeof text !== "string" || text.trim() === "";
+}
+// KEEP THE REASON, AS A NUMBER. api/aura.js passes Anthropic's error body straight through to the
+// browser but never logs it, and callAura looked only at the status number — so the cause of the
+// real 11:07:54 failure was delivered to the device and thrown away.
+//
+// This function sits between an upstream error body and the telemetry log. If it could return
+// text, conversation content could ride out on it. It returns a small integer and nothing else.
+//   1 roles do not alternate   2 empty content block   3 other invalid request
+//   4 authentication / permission   5 anything else
+function apiErrorReasonCode(status, body) {
+  try {
+    const err = (body && typeof body === "object" && body.error) || null;
+    const type = err && typeof err.type === "string" ? err.type : "";
+    const msg = err && typeof err.message === "string" ? err.message.toLowerCase() : "";
+    if (/role/.test(msg) && /alternat/.test(msg)) return 1;
+    if (/empty/.test(msg) && /(content|text)/.test(msg)) return 2;
+    if (type === "invalid_request_error") return 3;
+    if (type === "authentication_error" || type === "permission_error" ||
+        status === 401 || status === 403) return 4;
+    return 5;
+  } catch (e) { return 5; }
+}
 // A5: friendly, tone-consistent error messages — no raw status codes shown to user
 function friendlyApiError(status) {
   if (status === 429 || status === 529) return "Κάτι δεν λειτούργησε. Δοκίμασε ξανά σε λίγο.";
@@ -3518,6 +3565,12 @@ async function callAura(messages, systemPrompt, retries = 1, onChunk = null) {
         await new Promise(r => setTimeout(r, 600));
         return callAura(messages, systemPrompt, retries - 1, onChunk);
       }
+      // Read the body before discarding it — see apiErrorReasonCode. The person still sees the
+      // same friendly wording; only a status number and a reason code are recorded.
+      try {
+        const _raw = await res.json().catch(() => null);
+        recordTelemetry("api_error", { status: res.status, reason: apiErrorReasonCode(res.status, _raw) });
+      } catch (e) { /* diagnostics must never replace the user's error */ }
       throw new Error(friendlyApiError(res.status));
     }
     // STREAMING PATH — only taken when a caller explicitly opts in via onChunk. Every one of
@@ -3569,7 +3622,14 @@ async function callAura(messages, systemPrompt, retries = 1, onChunk = null) {
       console.log('[AURA usage] in', _counts.in, '| cacheRead', _counts.cacheRead,
                   '| cacheWrite', _counts.cacheWrite, '| out', _counts.out);
     } catch (e) { /* instrumentation must never affect a session */ }
-    return data.content?.map(b => b.text || "").join("") || "";
+    const _reply = data.content?.map(b => b.text || "").join("") || "";
+    if (isEmptyModelResponse(_reply)) {
+      // Never hand an empty reply back: every one of the eleven append sites would put it in
+      // history, and from then on the API rejects every request this session makes.
+      recordTelemetry("api_error", { status: 0, reason: 2 });
+      throw new Error(friendlyApiError(0));
+    }
+    return _reply;
   } catch (err) {
     if (err.name === "AbortError") {
       throw new Error("Η σύνδεση έληξε. Έλεγξε το δίκτυό σου και δοκίμασε ξανά.");
@@ -4794,6 +4854,13 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       }
     } catch(e) {
       setError(e.message);
+      // ROLLBACK — see rollbackFailedTurn above for the production evidence. Without this, the
+      // failed message stays in history with no reply under it and every later send this session
+      // is rejected. msgs is exactly what every caller committed to state before awaiting, so
+      // setting the rolled-back array directly keeps one source of truth.
+      const _rb = rollbackFailedTurn(msgs);
+      setMessages(_rb.messages);
+      if (_rb.restored) setInput(cur => cur || _rb.restored);
     } finally {
       clearTimeout(_loadingGuard);
       setLoading(false); // guaranteed cleanup — without this, callAura throw left loading=true permanently
