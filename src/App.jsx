@@ -2252,7 +2252,7 @@ function recordPatternRejection(mem, key) {
 // PURE ASSEMBLER: it takes the recurring signal as an argument rather than computing it, so it
 // stays self-contained for the suites' per-function extraction and can be tested without a memory
 // fixture pretending to be a whole session.
-function buildBlueprintZones(mem, recurring, roadUnknown, commitment, openingMessage) {
+function buildBlueprintZones(mem, recurring, roadUnknown, commitment, openingMessage, road) {
   const zones = [];
   const words = (mem && Array.isArray(mem.anchors) ? mem.anchors : [])
     .filter(a => a && a.category === "trajectory_word");
@@ -2266,6 +2266,50 @@ function buildBlueprintZones(mem, recurring, roadUnknown, commitment, openingMes
   const liveOpening = typeof openingMessage === "string" ? openingMessage.trim() : "";
   const before = liveOpening || (latest && typeof latest.before === "string" ? latest.before.trim() : "");
   if (before) zones.push({ key: "entered", label: "ΜΠΗΚΕΣ ΜΕ", kind: "evidence", text: before });
+  // ΜΟΔΕΛΟ 2 — WHAT BLOCKS YOU COMES BEFORE THE ROADS. The prompt's own rule says a missing
+  // fact is a prerequisite and not an option: "δεν μπορείς να διαλέξεις ακόμα, γιατί λείπει αυτό".
+  // Printing the roads first and the blocker last inverts that, so it moved up.
+  const open = typeof roadUnknown === "string" ? roadUnknown.trim() : "";
+  if (open) zones.push({ key: "open", label: "ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ", kind: "evidence", text: open });
+  // ΟΙ ΔΡΟΜΟΙ ΣΟΥ — already parsed and, until now, thrown away. parseRoadMap returns every road
+  // with its gain and its cost; the sheet used only the unknown and discarded the decision space
+  // itself. Nothing is computed here: the parser's output is carried through unchanged.
+  //
+  // EVERY LINE CARRIES ITS ORIGIN, and that is the point rather than a decoration. A road NAME is
+  // the person's own direction by the map's own rule, but ΚΕΡΔΙΖΕΙΣ / ΚΟΣΤΙΖΕΙ are not
+  // reliably their words — classifyRoadProvenance exists precisely because unsupported lines were
+  // measured there. Its verdict travels with each line instead of being averaged away, and when
+  // no classification is available the mark says UNVERIFIED rather than defaulting to SUPPORTED.
+  const roadMap = road && typeof road === "object" ? road.map : null;
+  const roadList = roadMap && Array.isArray(roadMap.roads) ? roadMap.roads : [];
+  if (roadList.length > 0) {
+    const detail = road && road.provenance && Array.isArray(road.provenance.detail)
+      ? road.provenance.detail : null;
+    const verdictOf = (field, i) => {
+      if (!detail) return "UNVERIFIED";
+      const hit = detail.find(d => d && d.label === field + "#" + (i + 1));
+      return hit && typeof hit.verdict === "string" ? hit.verdict : "UNVERIFIED";
+    };
+    const rows = roadList.map((r, i) => ({
+      name: String((r && r.name) || "").trim(),
+      gain: String((r && r.gain) || "").trim(),
+      cost: String((r && r.cost) || "").trim(),
+      gainSource: verdictOf("ΚΕΡΔΙΖΕΙΣ", i),
+      costSource: verdictOf("ΚΟΣΤΙΖΕΙ", i),
+    })).filter(r => r.name);
+    if (rows.length > 0) zones.push({ key: "roads", label: "ΟΙ ΔΡΟΜΟΙ ΣΟΥ", kind: "roads", roads: rows });
+  }
+  // Η ΣΚΕΨΗ ΣΟΥ, ΑΝΑ ΔΡΟΜΟ — the road-question answers, assembled by code and, until now,
+  // shown only in the chat. This is the most structured verbatim material the product owns: there
+  // is no path through which synthesis could enter it, which is why buildRoadArtifact was built
+  // this way in the first place. A blank answer is dropped rather than rendered as an empty quote.
+  const answerList = road && typeof road === "object" && Array.isArray(road.answers) ? road.answers : [];
+  const answerRows = answerList
+    .filter(a => a && typeof a.a === "string" && a.a.trim())
+    .map(a => ({ name: String(a.name || "").trim(), q: String(a.q || "").trim(), a: a.a.trim() }));
+  if (answerRows.length > 0) {
+    zones.push({ key: "roadthoughts", label: "Η ΣΚΕΨΗ ΣΟΥ, ΑΝΑ ΔΡΟΜΟ", kind: "answers", items: answerRows });
+  }
   // Κ2 — a refused pattern produces no zone at all. Suppressed at the source, so nothing
   // downstream can rebuild a claim on it.
   const rejected = Array.isArray(mem && mem.rejectedPatterns) ? mem.rejectedPatterns : [];
@@ -2285,8 +2329,6 @@ function buildBlueprintZones(mem, recurring, roadUnknown, commitment, openingMes
     zones.push({ key: "decided", label: "ΤΙ ΑΠΟΦΑΣΙΣΕΣ", kind: "pattern",
                  verb: commitment.verb || "", before: cBefore, after: cAfter });
   }
-  const open = typeof roadUnknown === "string" ? roadUnknown.trim() : "";
-  if (open) zones.push({ key: "open", label: "ΠΑΡΑΜΕΝΕΙ ΑΝΟΙΧΤΟ", kind: "evidence", text: open });
   return zones;
 }
 // THE SHEET IS KEYSTONE + ZONES, NOTHING ELSE.
@@ -2334,6 +2376,29 @@ function exportBlueprint(ankerText, zones) {
       ).join("");
       return `<div class="zone-card"><span class="zone-label">${esc(z.label)}</span><div class="zone-text">«${esc(z.word)}» — ${esc(String(z.count))} φορές</div>${items}</div>`;
     }
+    if (z.kind === "roads") {
+      // ORIGIN IS PRINTED BESIDE EACH LINE, in words a person can act on. The whole premium claim
+      // of this sheet is that it says which parts are theirs and which are AURA's formulation —
+      // a generic summary never does, because admitting it is commercially counter-intuitive.
+      const mark = v => v === "SUPPORTED" ? "από τα λόγια σου"
+        : v === "SEVERE" ? "διατύπωση AURA — περιέχει στοιχείο που δεν είπες"
+        : v === "MILD" ? "διατύπωση AURA"
+        : "μη ελεγμένο";
+      const cls = v => v === "SUPPORTED" ? "src-own" : v === "SEVERE" ? "src-severe" : "src-aura";
+      const line = (label, text, verdict) => text
+        ? `<div class="road-line"><span class="road-line-label">${esc(label)}</span><span class="road-line-text">${esc(text)}</span><span class="road-src ${cls(verdict)}">${esc(mark(verdict))}</span></div>`
+        : "";
+      const cards = (z.roads || []).map(r =>
+        `<div class="road-card"><div class="road-name">${esc(r.name)}</div>${line("ΚΕΡΔΙΖΕΙΣ", r.gain, r.gainSource)}${line("ΚΟΣΤΙΖΕΙ", r.cost, r.costSource)}</div>`
+      ).join("");
+      return `<div class="zone-card"><span class="zone-label">${esc(z.label)}</span>${cards}</div>`;
+    }
+    if (z.kind === "answers") {
+      const items = (z.items || []).map(it =>
+        `<div class="zone-occ">${it.name ? `<span class="zone-date">${esc(it.name)}</span>` : ""}${it.q ? `<div class="road-q">${esc(it.q)}</div>` : ""}<div class="zone-occ-text">«${esc(it.a)}»</div></div>`
+      ).join("");
+      return `<div class="zone-card"><span class="zone-label">${esc(z.label)}</span>${items}</div>`;
+    }
     return `<div class="zone-card"><span class="zone-label">${esc(z.label)}</span><div class="zone-text">${esc(z.text)}</div></div>`;
   }).join("");
 
@@ -2361,6 +2426,14 @@ function exportBlueprint(ankerText, zones) {
   .zone-occ{margin-top:12px;padding-left:12px;border-left:1px solid #3a2f18;}
   .zone-date{display:block;font-size:9px;letter-spacing:.1em;color:#6b5a28;margin-bottom:4px;}
   .zone-occ-text{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;line-height:1.5;color:#b9b4ab;}
+  .road-card{border-left:1px solid rgba(201,168,76,0.28);padding:0 0 0 12px;margin:0 0 14px 0;}
+  .road-name{font-family:'Cormorant Garamond',serif;font-size:16px;color:#c9c5bc;margin-bottom:6px;}
+  .road-line{display:block;margin-bottom:5px;}
+  .road-line-label{display:inline-block;font-size:8px;letter-spacing:.16em;color:#6b5a28;margin-right:6px;}
+  .road-line-text{font-size:13px;color:#b9b4ab;}
+  .road-src{display:block;font-size:8px;letter-spacing:.06em;margin-top:2px;}
+  .src-own{color:#7a8a7a;} .src-aura{color:#6b6660;} .src-severe{color:#8a6a4a;}
+  .road-q{font-size:10px;color:#6b6660;margin-bottom:2px;}
   .footer{margin-top:24px;font-size:9px;color:#454340;line-height:1.7;text-align:center;}
   @media print{ body{background:#fff;color:#111;} .title,.keystone-text{color:#8a6d1f;} .keystone-card,.zone-card{background:#faf8f3;box-shadow:none;border:1px solid #e5e0d5;} .zone-text{color:#111;} .zone-occ-text{color:#444;} .keystone-ownership{color:#666;} }
 </style></head>
@@ -2379,7 +2452,13 @@ function exportBlueprint(ankerText, zones) {
        description of something that is not on the page, which is the same class of false statement
        already corrected once in the consent copy. Nothing on the sheet is now AURA's formulation:
        the whole page is the person's own words under fixed headings. -->
-  <div class="footer">Κάθε γραμμή εδώ είναι δικά σου λόγια, όπως τα είπες. Οι τίτλοι είναι της AURA — τίποτα άλλο.</div>
+  <!-- THE FOOTER HAD TO CHANGE WITH THE SHEET, for the third time and for the same reason both
+       earlier times: it stated something about the page that stopped being true. It said every
+       line here is the person's own words. That held while the sheet carried only verbatim zones.
+       Road ΚΕΡΔΙΖΕΙΣ / ΚΟΣΤΙΖΕΙ lines are AURA's formulation — which is the entire reason
+       classifyRoadProvenance exists — so the blanket claim would now be false for part of the page.
+       Each of those lines carries its own origin instead, and the footer says exactly that. -->
+  <div class="footer">Τα αποσπάσματα σε «» είναι δικά σου λόγια, όπως τα είπες. Στους δρόμους, κάθε γραμμή δείχνει η ίδια από πού ήρθε. Οι τίτλοι είναι της AURA.</div>
 </div></body></html>`;
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
@@ -3853,6 +3932,8 @@ export default function AURAv2() {
   // nulled the moment the road-question run completes, so it cannot carry "a map happened" to
   // the close, which is precisely where it is needed.
   const roadMapDelivered  = useRef(false);
+  // The road-question answers, kept past the run that produced them so the sheet can show them.
+  const roadAnswersFinal  = useRef([]);
   // Debug panel gate — read once from the URL, never re-derived on later renders/navigation.
   const debugMode = useRef(typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1');
   // RT-hardening: replaces text-based detection ("does the model's reply say 'το κρατάω'?")
@@ -4819,6 +4900,11 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           if (_rqArtifact) {
             setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: _rqArtifact, msgMode: currentMode }]);
           }
+          // KEPT FOR THE SHEET before the state goes. These answers are the most structured
+          // verbatim material the product owns — assembled by code, no model call between the
+          // person's words and what is shown — and until now they existed only in the chat and
+          // died with this ref one line later.
+          roadAnswersFinal.current = Array.isArray(_rq.qa) ? _rq.qa.slice() : [];
           // Cleared whether or not anything was rendered: an exhausted or abandoned run must never
           // re-fire, and a run with zero answers correctly produces nothing at all.
           roadQuestionState.current = null;
@@ -5382,6 +5468,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     methodFailureHint.current = false;
     violationCounts.current = {};
     roadTraceLast.current = null;
+    roadAnswersFinal.current = [];
     roadMapDelivered.current = false;
     roadQuestionState.current = null;
     window.__auraLastCollision = null;
@@ -6185,26 +6272,41 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                   const _kept = getMostRecentWordAnchor(memory)?.text;
                   const _recurring = _kept ? buildRecurringSignal(memory, _kept) : null;
                   const _commitment = buildCommitmentSignal(commitmentPair.current);
-                  const _unknown = (() => {
+                  // THE WHOLE MAP, not just its unknown. The roads and their costs were parsed
+                  // on every one of these turns and thrown away here. Deliberate change of
+                  // semantics: this now takes the MOST RECENT map and reads the unknown off it,
+                  // where before it searched back for the most recent map that HAPPENED to carry
+                  // one — so a superseded unknown could outlive the map that replaced it.
+                  const _map = (() => {
                     for (let i = messages.length - 1; i >= 0; i--) {
                       if (messages[i].role !== "assistant") continue;
                       const _m = parseRoadMap(messages[i].content);
-                      if (_m && _m.unknown) return _m.unknown;
+                      if (_m) return _m;
                     }
                     return null;
                   })();
+                  const _unknown = _map && _map.unknown ? _map.unknown : null;
+                  // Provenance per line, against what the person actually wrote. Already computed
+                  // for the debug panel and never shown to the one person it is about.
+                  const _userTexts = messages.filter(m => m.role === "user").map(m => m.content || "");
+                  const _road = {
+                    map: _map,
+                    provenance: _map ? classifyRoadProvenance(_map, _userTexts) : null,
+                    answers: roadAnswersFinal.current,
+                  };
                   // Κ4 «Μερικώς» lands here, through the SAME suppression path a refusal uses —
                   // on a throwaway copy. Nothing is saved, so the withholding ends with the session.
                   const _memForSheet = heldPattern
                     ? recordPatternRejection({ ...memory }, heldPattern)
                     : memory;
                   const _zones = buildBlueprintZones(_memForSheet, _recurring, _unknown, _commitment,
-                    extractBeforeMessage(messages));
+                    extractBeforeMessage(messages), _road);
                   exportBlueprint(_kept, _zones);
                   recordTelemetry("blueprint_generated", {
                     zones: _zones.length,
                     commitment: !!_commitment,
                     recurring: !!_recurring,
+                    roads: !!_map,
                   });
                 }}>
                   Κατέβασε το Blueprint

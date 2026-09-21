@@ -340,8 +340,11 @@ if (typeof buildBlueprintZones === 'function') {
   // ── All four present ─────────────────────────────────────────────────────
   const full = buildBlueprintZones(mem([anch('χρόνος', 2000, 'Δεν ξέρω αν να αλλάξω δουλειά.')]),
                                    recurring, 'Αν επιτρέπεται δεύτερη απασχόληση', commitment);
-  // Chronological, ending on what is still open.
-  assert('ZONES: all four render, in order', keyOf(full) === 'entered,recurring,decided,open');
+  // ORDER CHANGED DELIBERATELY (Model 2). The unknown moved from LAST to second, above the
+  // roads: the prompt's own rule calls a missing fact a prerequisite rather than an option
+  // ("δεν μπορείς να διαλέξεις ακόμα, γιατί λείπει αυτό"), and printing it after the options inverted that.
+  // The zones themselves and their presence rules are unchanged; only the column order is.
+  assert('ZONES: all four render, in Model 2 order', keyOf(full) === 'entered,open,recurring,decided');
 
   // ── ΤΙ ΑΠΟΦΑΣΙΣΕΣ — the COMMITMENT signal, both halves verbatim ──────────
   // A signal with tests that never reaches the person is the dormant-code pattern found four
@@ -355,7 +358,7 @@ if (typeof buildBlueprintZones === 'function') {
 
   // SAME RULE AS EVERY OTHER ZONE: no evidence, no frame.
   assert('DECIDED ABSENT: no commitment signal → the zone does not exist',
-    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), recurring, 'κάτι', null)) === 'entered,recurring,open');
+    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), recurring, 'κάτι', null)) === 'entered,open,recurring');
   assert('DECIDED ABSENT: a half-pair handed in from outside is not a zone',
     keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), null, null,
       { verb: 'μιλήσω', before: 'Ίσως θα μιλήσω' })) === 'entered');
@@ -383,7 +386,7 @@ if (typeof buildBlueprintZones === 'function') {
   assert('ABSENT: no unknown from the road map → the zone does not exist',
     keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), recurring, null)) === 'entered,recurring');
   assert('ABSENT: no stored first message → the zone does not exist',
-    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, null)]), recurring, 'κάτι')) === 'recurring,open');
+    keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, null)]), recurring, 'κάτι')) === 'open,recurring');
   assert('ABSENT: an empty-string unknown is absence, not an empty zone',
     keyOf(buildBlueprintZones(mem([anch('χρόνος', 1, 'πρώτο')]), recurring, '   ')) === 'entered,recurring');
   // The floor is a guard against a CALLER handing over a weak signal: buildRecurringSignal can
@@ -435,8 +438,15 @@ if (SRC_BP) {
 // producing an empty slice and a vacuous check.
 const _ZB = SRC_BP.slice(SRC_BP.indexOf('const zonesHtml'), SRC_BP.indexOf('const html = '));
   assert('SHEET: the zone builder was located', _ZB.length > 200 && _ZB.includes('zone-card'));
+  // WHITELIST EXTENDED, NOT RELAXED. The road and answer zones compose sub-fragments before
+  // interpolating them, so the scan now also sees `cards`, `line(...)`, `cls(verdict)` and the
+  // two conditional wrappers. Each of those is code-owned: `cls` returns one of three literal
+  // class names and holds no person-supplied text, and `line`'s own interpolations appear in
+  // this same scan as separate matches, so they are still checked individually. Everything that
+  // carries a person's words still has to start with esc(. Verified by mutation: dropping esc()
+  // from the new road zone fails this assertion.
   assert('SHEET: EVERY interpolation inside the zone builder goes through esc()',
-    [..._ZB.matchAll(/\$\{([^}]*)/g)].every(m => /^\s*(esc\(|\(z\.occurrences|o\.at \?|o\.before \?|items\b)/.test(m[1])));
+    [..._ZB.matchAll(/\$\{([^}]*)/g)].every(m => /^\s*(esc\(|\(z\.occurrences|o\.at \?|o\.before \?|items\b|cards\b|cls\(|line\(|it\.name \?|it\.q \?)/.test(m[1])));
   assert('SHEET: the evidence zone escapes the person\'s own sentence',
     /zone-text">\$\{esc\(z\.text\)\}/.test(_ZB));
   assert('SHEET: the recurring zone escapes the word, the count and every quoted opening',

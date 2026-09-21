@@ -297,9 +297,16 @@ if (renderBlueprint) {
   // synthesis. So the fixed vocabulary is frozen here: any new word in the template breaks this
   // and a human has to look at what was added and why. Month names vary with the render date and
   // are excluded. Updating this list is a deliberate act, never a convenience.
-  const PINNED_CHROME = ('aura blueprint decision άλλο ανήκει ανοιχτο αποφασισες αυτή γραμμή ' +
-    'δικά είναι είπες εδώ επανεμφανιζεται κάθε κρατάς λόγια με μπηκες οι παραμενει ' +
-    'πλέον που σκέψη σου τίποτα τίτλοι τα της τι φορές φράση όπως').split(' ');
+  // PIN UPDATED DELIBERATELY, for the footer only. The old footer claimed every line on the
+  // sheet is the person's own words — true while the sheet carried only verbatim zones, false
+  // the moment road ΚΕΡΔΙΖΕΙΣ / ΚΟΣΤΙΖΕΙ lines appear, since those are AURA's formulation.
+  // Leaving it would have repeated, a third time, the exact mistake already corrected in the
+  // consent copy and in this same footer. Removed: άλλο, εδώ, τίποτα. Added: the wording
+  // that says which parts ARE theirs and that each road line carries its own origin.
+  // The new zones' own vocabulary is pinned in test_decision_sheet.js, where fixtures produce it.
+  const PINNED_CHROME = ('aura blueprint decision ανήκει ανοιχτο αποφασισες αποσπάσματα από αυτή γραμμή ' +
+    'δείχνει δικά δρόμους είναι είπες επανεμφανιζεται κάθε κρατάς λόγια με μπηκες οι παραμενει ' +
+    'πλέον που πού σε σκέψη σου στους τίτλοι τα της τι φορές φράση ήρθε ίδια όπως').split(' ');
   const MONTHS = ['ιανουαρίου','φεβρουαρίου','μαρτίου','απριλίου','μαΐου','ιουνίου',
     'ιουλίου','αυγούστου','σεπτεμβρίου','οκτωβρίου','νοεμβρίου','δεκεμβρίου'];
   // EXACT IN BOTH DIRECTIONS now that the contract covers the whole sheet. A new word means text
