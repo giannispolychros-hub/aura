@@ -2112,6 +2112,33 @@ function getOpenAnchors(mem) {
   return mem.anchors.filter(a => a.status === "open");
 }
 
+// DID THE MODEL USE THE FORMAT AT ALL?
+//
+// The G1 decision rule reads its number from session_completed.roadMap, which is parseRoadMap
+// succeeding. A live session on 2026-09-21 produced two road maps in free prose — "Τρεις δρόμοι,
+// διαφορετικός ορίζοντας ο καθένας" followed by three directions with their costs — and no
+// ΔΡΟΜΟΣ/ΚΕΡΔΙΖΕΙΣ/ΚΟΣΤΙΖΕΙ anywhere, so it counts as roadMap:false exactly like a session that
+// never discussed roads. Acting on that number could delete a prompt rule that works.
+//
+// The same session showed it is not only the road map: the three-beat came out as "Ήρθες με…
+// Βρήκες… Φεύγεις με…", the structure in prose, without its labels.
+//
+// ASYMMETRY, deliberate. The ROAD pattern is case-insensitive because the shadow trace already
+// spelled it that way, and changing it mid-measurement would move the G1 number for reasons that
+// have nothing to do with the model. The BEAT pattern is case-SENSITIVE and colon-anchored,
+// because "Βρήκες" is an ordinary Greek word — a case-insensitive version would report that
+// prose three-beat as correctly labelled, which is the opposite of the truth.
+//
+// WHAT IT CANNOT DO: it separates "labels written, parser missed them" from "labels never
+// written". It does NOT detect structure expressed in prose. "No labels" therefore covers both
+// "nothing was produced" and "produced in prose", and whoever reads these numbers must know that.
+function structuralLabelsIn(text) {
+  const t = typeof text === "string" ? text.replace(/\*/g, "") : "";
+  return {
+    road: /ΔΡ[ΟΌ]ΜΟΣ|ΚΕΡΔ[ΙΊ]ΖΕΙΣ|ΚΟΣΤ[ΙΊ]ΖΕΙ/i.test(t),
+    beat: /^[^\S\n]*(ΗΡΘΕΣ ΜΕ|ΒΡΗΚΕΣ|ΦΕΥΓΕΙΣ ΜΕ)[^\S\n]*:/m.test(t),
+  };
+}
 // DECLARATION_EVENT — generalized provenance for "this reply answers that question".
 //
 // SHIFT was deferred because nothing in the code could prove that a given user message was the
@@ -4040,9 +4067,20 @@ export default function AURAv2() {
   useEffect(() => {
     if (!sessionEnded) return;
     try {
-      let _roadMap = false;
+      // FOUR BOOLEANS, not one. roadMap alone cannot tell "the model never produced a map" from
+      // "it produced one in prose", and the G1 rule would read the second as the first. The
+      // label readings rule the parser in or out; see structuralLabelsIn for what they cannot do.
+      let _roadMap = false, _roadLabels = false, _beatParsed = false, _beatLabels = false;
       for (let i = 0; i < messages.length; i++) {
-        if (messages[i].role === "assistant" && parseRoadMap(messages[i].content)) { _roadMap = true; break; }
+        if (messages[i].role !== "assistant") continue;
+        const _c = messages[i].content;
+        if (!_roadMap && parseRoadMap(_c)) _roadMap = true;
+        if (!_beatParsed && parseThreeBeatShift(_c)) _beatParsed = true;
+        if (!_roadLabels || !_beatLabels) {
+          const _l = structuralLabelsIn(_c);
+          if (_l.road) _roadLabels = true;
+          if (_l.beat) _beatLabels = true;
+        }
       }
       let _declared = false;
       for (let i = 0; i < messages.length; i++) {
@@ -4051,6 +4089,9 @@ export default function AURAv2() {
       recordTelemetry("session_completed", {
         turns: turnCount.current || 0,
         roadMap: _roadMap,
+        roadLabels: _roadLabels,
+        beatParsed: _beatParsed,
+        beatLabels: _beatLabels,
         explicitClosure: _declared,
       });
     } catch (e) { /* instrumentation must never affect a session */ }
@@ -4521,8 +4562,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // numbers and booleans only, never a word the user or AURA wrote.
         if (debugMode.current) console.log('[AURA RAW]', rawTextWithTags);
         const _traceRoads = t => { const p = parseRoadMap(t); return p ? p.roads.length : 0; };
-        // Labels in ANY form: asterisks removed first, accented capitals and lowercase both allowed.
-        const _traceHasLabels = /ΔΡ[ΟΌ]ΜΟΣ|ΚΕΡΔ[ΙΊ]ΖΕΙΣ|ΚΟΣΤ[ΙΊ]ΖΕΙ/i.test(String(rawTextWithTags || '').replace(/\*/g, ''));
+        // ONE SOURCE OF TRUTH for the label patterns — see structuralLabelsIn. This used to spell
+        // the road regex out a second time, and two patterns for one question drift.
+        const _traceHasLabels = structuralLabelsIn(String(rawTextWithTags || '')).road;
         // Mirrors the real chain at rawText/text below, on a throwaway copy. Deliberately uses the
         // GENERIC hidden-tag pattern already used by [AURA outcome] and detectOutputViolation just
         // below, not copies of the two specific tag regexes: a diagnostic must not register as a
