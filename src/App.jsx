@@ -3998,7 +3998,6 @@ export default function AURAv2() {
   const sessionStartTime   = useRef(Date.now());
 
   // First "To the point of mind" ever shown — slightly slower fade, no other change
-  const [isFirstDistillation, setIsFirstDistillation] = useState(false);
 
   const bottomRef        = useRef(null);
   const textareaRef      = useRef(null);
@@ -4963,10 +4962,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     try { seen = !!localStorage.getItem("aura_first_distillation_seen"); } catch {}
     if (seen) {
       setIllumLevel(11);
-      setIsFirstDistillation(false);
       return;
     }
-    setIsFirstDistillation(true);
     try { localStorage.setItem("aura_first_distillation_seen", "1"); } catch {}
     // Animate 0 -> 11 over ~1.5s (11 steps, ~135ms apart)
     // illuminAnimCancelled.current is reset to false here and set to true on resetSession
@@ -5044,7 +5041,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         const capturedWord = earlyCapturedWord.current;
         const termMsgsEarly = [...msgs, {
           role: "user",
-          content: `[Deliver Part 1 now: the Reflection Summary. The user already gave their word/phrase to keep, before this summary — do NOT ask for it again, do not repeat a word-question. Simply close the summary naturally, referencing what they already chose if it fits naturally: "${capturedWord}". Do not continue to Ownership Statement.]`
+          content: `[Deliver Part 1 now. DO NOT write a reflection summary: the three-beat shift has already told this session's story once, and a second prose retelling of the same material is what this replaces. The user has ALSO already given their word/phrase to keep — do NOT ask for it again, do not repeat a word-question. So this reply is at most ONE short line handing the moment over, referencing what they already chose only if it fits naturally: "${capturedWord}". Do not continue to Ownership Statement.]`
         }];
         const rawText = await callAura(termMsgsEarly, SYSTEM_TERMINATION);
         const text = stripAraDeclarative(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""));
@@ -5067,14 +5064,14 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         : '';
       const termMsgs = [...msgs, {
         role: "user",
-        content: `[Deliver Part 1 now: the Reflection Summary, ending exactly with the word-to-remember question.${wordContextNote} Do not continue to Ownership Statement — wait for the user's word.]`
+        content: `[Deliver Part 1 now. DO NOT write a reflection summary: the three-beat shift has already told this session's story once, and a second prose retelling of the same material is what this replaces. This reply is the word-to-remember question and essentially nothing else — at most one short line before it if something genuinely needs handing over, never a recap of what was said.${wordContextNote} Then STOP. Do not continue to Ownership Statement — wait for the user's word.]`
       }];
       const rawText = await callAura(termMsgs, SYSTEM_TERMINATION);
       const text = stripAraDeclarative(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""));
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
       setAwaitingRememberedWord(true);
     } catch {
-      const fallback = "Έχουμε αρκετή καθαρότητα για τώρα.\n\nΣου έδειξα την πορεία της σκέψης σου. Από όσα είδες σήμερα, τι θα ήθελες να μη ξεχάσεις; Μία λέξη, ή μια φράση που θέλεις να θυμάσαι όταν ξαναβρεθείς εδώ.";
+      const fallback = "Πριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις. Όχι για εδώ. Για σένα, όταν ξαναβρεθείς σε αυτή τη σκέψη.";
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: fallback, msgMode: "TERMINATION", isTermination: true }]);
       setAwaitingRememberedWord(true);
     } finally {
@@ -5413,7 +5410,6 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setInput("");
     setMode("ANSWER");
     setSessionEnded(false);
-    setIsFirstDistillation(false);
     setSafetyMode(false);
     setPivotPending(false);
     setLayerGatePending(false);
@@ -5477,7 +5473,6 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setError(null);
     setClaritySurge(false);
     setIllumLevel(0);
-    setIsFirstDistillation(false);
     setFinalDistillation(null);
     recentSurges.current = [];
     illuminAnimCancelled.current = true;
@@ -5583,49 +5578,6 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         }
         .light-field.clear::after{ opacity:0.7; }
         .light-field.surge::after{ opacity:1; transition:opacity .35s ease; }
-
-        /* ── CLOSING SYSTEM: To the point of mind ── */
-        .distillation{
-          padding:28px 0 8px; margin-top:4px;
-          border-top:1px solid var(--border);
-          animation:fadeUp 1s ease;
-        }
-        /* First time only — same fade, slightly slower. No new content, no new register. */
-        .distillation.first-time{
-          animation:fadeUp 1.8s ease;
-        }
-        .distillation-label{
-          font-size:8px; letter-spacing:.22em; text-transform:uppercase;
-          color:var(--text-dim); margin-bottom:10px;
-        }
-        .distillation-text{
-          font-family:'Cormorant Garamond',serif; font-size:21px; font-weight:300;
-          font-style:italic; color:#d8d3c8; line-height:1.6;
-        }
-        .shift-beat{
-          display:block; padding:10px 0 10px 16px; margin-bottom:2px;
-          border-left:1px solid var(--gold-dim);
-        }
-        .shift-beat-feeling{
-          /* CSS audit: this class was used in JSX with no definition, so the "Πώς νιώθεις τώρα;"
-             line inherited .shift-beat and looked identical to the beats around it — when it is a
-             question to the reader, not a statement about them. */
-          border-left-style:dashed; opacity:.85; padding-top:14px; padding-bottom:14px;
-        }
-        .shift-beat-label{
-          display:block; font-family:'DM Mono',monospace; font-size:9px;
-          letter-spacing:.18em; text-transform:uppercase; color:var(--gold-dim);
-          margin-bottom:6px;
-        }
-        .shift-beat-text{
-          display:block; font-family:'Cormorant Garamond',serif; font-size:19px;
-          font-weight:300; font-style:italic; color:#d8d3c8; line-height:1.5;
-        }
-        .shift-beat-final{
-          border-left:1px solid var(--gold);
-        }
-        .shift-beat-final .shift-beat-label{ color:var(--gold); }
-        .shift-beat-final .shift-beat-text{ color:#e8e4da; font-size:21px; }
 
         .root{height:100vh;height:100dvh;max-width:650px;margin:0 auto;padding:0 18px 0 90px;display:flex;flex-direction:column;position:relative;overflow:hidden}
 
@@ -6192,30 +6144,14 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           {/* Typing */}
           {loading && <div className="typing"><div className="t-dot"/><div className="t-dot"/><div className="t-dot"/></div>}
 
-          {/* Closing System: "To the point of mind" — only on natural session end */}
-          {sessionEnded && !loading && finalDistillation && (
-            <div className={`distillation ${isFirstDistillation ? "first-time" : ""}`}>
-              <div className="distillation-label">to the point of mind</div>
-              {(() => {
-                const beats = parseThreeBeatShift(finalDistillation);
-                if (!beats) return <div className="distillation-text">{finalDistillation}</div>;
-                return (
-                  <>
-                    <div className="shift-beat"><span className="shift-beat-label">Ήρθες με</span><span className="shift-beat-text">{beats.brought}</span></div>
-                    <div className="shift-beat"><span className="shift-beat-label">Βρήκες</span><span className="shift-beat-text">{beats.found}</span></div>
-                    {/* Pure UI layer (founder's directive) — zero changes to parseThreeBeatShift or its
-                        regex; this renders only from the already-existing `beats` object, which itself
-                        only exists when the model already confirmed a real shift, so no new gating logic
-                        was needed. Static question, not a new conversational state, not mandatory beyond
-                        what the existing flow already requires — the answer is whatever the user types
-                        next in the chat; AURA never infers, pre-fills, or names a feeling here. */}
-                    <div className="shift-beat shift-beat-feeling"><span className="shift-beat-label">Πώς νιώθεις τώρα;</span></div>
-                    <div className="shift-beat shift-beat-final"><span className="shift-beat-label">Φεύγεις με</span><span className="shift-beat-text">{beats.changed}</span></div>
-                  </>
-                );
-              })()}
-            </div>
-          )}
+          {/* THE SECOND TELLING IS GONE. finalDistillation is the LAST SENTENCE of Part 2 — a
+              sentence the reader has just read, directly above — and this block reprinted it
+              underneath, every session. Live evidence 2026-09-21: "Απλά δεν είχε μπει στη
+              σειρά ακόμα." appeared twice in a row. The three-beat branch under it was dead on
+              arrival besides: parseThreeBeatShift needs three labelled lines and was handed one
+              sentence, so it always returned null. THE STATE STAYS — it gates the paywall block,
+              the Blueprint button and the Νέα συνεδρία button, and removing it would have quietly
+              taken the Blueprint away. What is removed is the rendering, not the flag. */}
 
           {/* Price updated to 6€ — real decision made live, testing the product-strategy question
               with AURA itself (2026-07-25 session): the founder concluded 29€ felt too high to pay
