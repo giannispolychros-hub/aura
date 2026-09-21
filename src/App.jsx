@@ -5611,6 +5611,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         .gallery-date{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.15em;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;display:block}
         .gallery-before{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:8px}
         .gallery-peak{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;color:var(--text-secondary);line-height:1.6;margin-bottom:8px}
+        .gallery-aura-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.15em;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;display:block}
+        .gallery-aura{font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:10px}
         .gallery-kept-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.15em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:5px;display:block}
         .gallery-kept{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:300;font-size:19px;color:var(--text-primary);line-height:1.45}
 
@@ -5946,7 +5948,18 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                   <span className="gallery-date">{a.createdAt ? new Date(a.createdAt).toLocaleDateString('el-GR', {year:'numeric', month:'long', day:'numeric'}) : ""}</span>
                   {a.before && <div className="gallery-before">«{a.before}»</div>}
                   {a.peak && <div className="gallery-peak">«{a.peak}»</div>}
-                  {a.shift && <div className="gallery-before" style={{color:"var(--text-secondary)",fontStyle:"normal"}}>{a.shift}</div>}
+                  {/* WHOSE WORDS. The three lines around this one are the person's — their
+                      opening, their reply at the moment a question tested them, the phrase they
+                      chose to keep. This one is extractShiftSentence: the LAST ASSISTANT
+                      MESSAGE, AURA's own sentence. It was rendered among theirs with no label,
+                      borrowing the class meant for their opening line, distinguished only by
+                      colour. Same class of error as the consent copy and the Blueprint footer,
+                      and it survived longer because it claimed nothing in words at all — the
+                      page simply presented AURA's sentence as if it were one of theirs.
+                      Labelled rather than removed: the sentence is the end of that session and
+                      worth keeping. What was wrong was the silence about its author. */}
+                  {a.shift && <span className="gallery-aura-label">η AURA έκλεισε με</span>}
+                  {a.shift && <div className="gallery-aura">{a.shift}</div>}
                   <span className="gallery-kept-label">{a.shift ? "κρατάς" : "λέξη"}</span>
                   <div className="gallery-kept">{a.text}</div>
                 </div>
