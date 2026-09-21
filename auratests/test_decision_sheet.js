@@ -64,7 +64,10 @@ const renderSheet = (() => {
   const b = CODE.indexOf('const blob = new Blob', a);
   if (a < 0 || b < 0) return null;
   const body = CODE.slice(CODE.indexOf('{', CODE.indexOf('(', a)) + 1, b);
-  try { return eval('(function (ankerText, zones) {' + body + ' return html; })'); }
+  // THREE parameters: the real exportBlueprint takes `meta`. Lifting it with two left `meta`
+  // undeclared inside the wrapper, so the renderer threw ReferenceError and this whole suite went
+  // SILENT — which the runner reports separately, and which is strictly worse than a failure.
+  try { return eval('(function (ankerText, zones, meta) {' + body + ' return html; })'); }
   catch (err) { console.log('FAIL — renderer lift: ' + err.message); failed++; return null; }
 })();
 assert('The real sheet renderer was lifted from the source', typeof renderSheet === 'function');
@@ -234,7 +237,10 @@ if (renderSheet && typeof buildBlueprintZones === 'function' && MAP) {
   const ROAD_CHROME = ('ανήκει ανοιχτο ανα αποσπάσματα από αυτή aura blueprint decision γραμμή ' +
     'δείχνει δεν διατύπωση δικά δρομο δρομοι δρόμους είναι είπες ' +
     'κάθε κερδιζεις κοστιζει κρατάς λόγια μπηκες οι παραμενει περιέχει ' +
-    'πλέον που πού σε σκεψη σκέψη σου στοιχείο στους τα της τίτλοι φράση ήρθε ίδια όπως').split(' ');
+    'πλέον που πού σε σκεψη σκέψη σου στοιχείο στους τα της τίτλοι φράση ήρθε ίδια όπως ' +
+    // Added deliberately: the provenance legend. Unexplained origin marks are decoration; the
+    // legend is what turns them into the differentiator, so its words are chrome now.
+    'αυτά δίπλα δρόμου εντοπίσαμε σημαίνει την ότι').split(' ');
   const zones = Z({ map: MAP, provenance: PROV, answers: ANSWERS });
   const visible = renderSheet('χρόνος', zones)
     .replace(/<style>[\s\S]*?<\/style>/g, ' ').replace(/<[^>]*>/g, ' ')
@@ -254,8 +260,14 @@ if (renderSheet && typeof buildBlueprintZones === 'function' && MAP) {
   const unver = renderSheet(null, Z({ map: MAP, provenance: null, answers: null }));
   assert('CONTRACT: with no classification the sheet SAYS so, in words the reader can see',
     /\u03bc\u03b7 \u03b5\u03bb\u03b5\u03b3\u03bc\u03ad\u03bd\u03bf/.test(unver));
-  assert('CONTRACT: and it never silently claims those lines are the person\'s words',
-    unver.indexOf('\u03b1\u03c0\u03cc \u03c4\u03b1 \u03bb\u03cc\u03b3\u03b9\u03b1 \u03c3\u03bf\u03c5') === -1);
+  // SCOPED TO THE MARKS, NOT THE PAGE. The legend defines the vocabulary and necessarily
+  // contains the phrase «από τα λόγια σου» in order to explain it. What must never happen is a
+  // LINE being marked that way without classification — which is what this now checks.
+  assert('CONTRACT: and no individual line is marked as theirs without classification',
+    (unver.match(/class="road-src[^"]*">[^<]*</g) || [])
+      .every(m => m.indexOf('\u03b1\u03c0\u03cc \u03c4\u03b1 \u03bb\u03cc\u03b3\u03b9\u03b1 \u03c3\u03bf\u03c5') === -1));
+  assert('CONTRACT: …and there really are marks to inspect, so that check is not vacuous',
+    (unver.match(/class="road-src/g) || []).length >= 2);
   const gone = ROAD_CHROME.filter(w => words.indexOf(w) === -1 && !mine.has(w));
   assert(`CONTRACT: no pinned word vanished unnoticed (missing: ${gone.join(', ') || 'none'})`,
     gone.length === 0);

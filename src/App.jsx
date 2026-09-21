@@ -1762,7 +1762,13 @@ function buildRecurringSignal(mem, word) {
                  String(a.text == null ? "" : a.text).trim().toLowerCase() === target)
     .slice()
     .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
-    .map(a => ({ text: String(a.text).trim(), at: a.createdAt || null, before: a.before || null }));
+    // peak IS CARRIED, shift IS NOT, and the difference is provenance rather than taste:
+    // extractPeakMoment returns the USER's own reply to a Socratic Doubt or First Insight Mirror
+    // question, identified by a literal string from the prompt. extractShiftSentence returns the
+    // last ASSISTANT message — AURA's words. One belongs on a sheet of the person's own evidence;
+    // the other does not. This mapping used to drop both.
+    .map(a => ({ text: String(a.text).trim(), at: a.createdAt || null, before: a.before || null,
+                 peak: a.peak || null }));
   // Two evidence or nothing — one occurrence is a choice, not a recurrence.
   if (occurrences.length < 2) return null;
   return { word: occurrences[0].text, count: occurrences.length, occurrences };
@@ -2279,7 +2285,7 @@ function recordPatternRejection(mem, key) {
 // PURE ASSEMBLER: it takes the recurring signal as an argument rather than computing it, so it
 // stays self-contained for the suites' per-function extraction and can be tested without a memory
 // fixture pretending to be a whole session.
-function buildBlueprintZones(mem, recurring, roadUnknown, commitment, openingMessage, road) {
+function buildBlueprintZones(mem, recurring, roadUnknown, commitment, openingMessage, road, confirmedKey) {
   const zones = [];
   const words = (mem && Array.isArray(mem.anchors) ? mem.anchors : [])
     .filter(a => a && a.category === "trajectory_word");
@@ -2344,7 +2350,12 @@ function buildBlueprintZones(mem, recurring, roadUnknown, commitment, openingMes
     ? "recurring:" + recurring.word.trim().toLowerCase() : null;
   const recurRefused = !!recurKey && rejected.some(r => r && r.key === recurKey);
   if (!recurRefused && recurring && recurring.count >= 2 && Array.isArray(recurring.occurrences)) {
-    zones.push({ key: "recurring", label: "ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ", kind: "pattern",
+    // Κ4 CONFIRMATION, printed as a FACT ABOUT AN ACTION THEY TOOK — never a claim about them.
+    // Compared against the key this function derives itself rather than trusting the caller's
+    // word for it, the same discipline the refusal check above already follows. Silence is not
+    // consent: with no recorded «Ναι» this is false, and nothing is printed.
+    const confirmed = !!recurKey && typeof confirmedKey === "string" && confirmedKey === recurKey;
+    zones.push({ key: "recurring", label: "ΕΠΑΝΕΜΦΑΝΙΖΕΤΑΙ", kind: "pattern", confirmed,
                  word: recurring.word, count: recurring.count, occurrences: recurring.occurrences });
   }
   // ΤΙ ΑΠΟΦΑΣΙΣΕΣ — the COMMITMENT signal. buildCommitmentSignal already refuses a half-pair, but
@@ -2369,7 +2380,7 @@ function buildBlueprintZones(mem, recurring, roadUnknown, commitment, openingMes
 // That block never satisfied the verbatim contract; it was simply outside the part being checked.
 // The contract now covers the whole sheet, so it is gone, along with the stamp that repeated the
 // kept phrase a second time. distillationText is removed as a parameter rather than left unused.
-function exportBlueprint(ankerText, zones) {
+function exportBlueprint(ankerText, zones, meta) {
   const dateStr = new Date().toLocaleDateString("el-GR", { year: "numeric", month: "long", day: "numeric" });
   // The user's own chosen phrase (Anchor), elevated to the top as the single most important line —
   // "the phrase you keep." Critical: this is ALWAYS the user's verbatim words, never AI-selected —
@@ -2398,10 +2409,21 @@ function exportBlueprint(ankerText, zones) {
       return `<div class="zone-card"><span class="zone-label">${esc(z.label)}</span><div class="zone-text">«${esc(z.before)}»</div><div class="zone-arrow">↓</div><div class="zone-text">«${esc(z.after)}»</div></div>`;
     }
     if (z.kind === "pattern") {
+      // Each occurrence now carries TWO of the person's own lines where they exist: what they
+      // came in with that time, and what they said at the moment a question tested the
+      // assumption. The second was stored on every anchor and shown only in the free Αρχείο.
       const items = (z.occurrences || []).map(o =>
-        `<div class="zone-occ">${o.at ? `<span class="zone-date">${esc(new Date(o.at).toLocaleDateString("el-GR", { year: "numeric", month: "long", day: "numeric" }))}</span>` : ""}${o.before ? `<div class="zone-occ-text">«${esc(o.before)}»</div>` : ""}</div>`
+        `<div class="zone-occ">${o.at ? `<span class="zone-date">${esc(new Date(o.at).toLocaleDateString("el-GR", { year: "numeric", month: "long", day: "numeric" }))}</span>` : ""}${o.before ? `<div class="zone-occ-text">«${esc(o.before)}»</div>` : ""}${o.peak ? `<div class="zone-occ-peak">«${esc(o.peak)}»</div>` : ""}</div>`
       ).join("");
-      return `<div class="zone-card"><span class="zone-label">${esc(z.label)}</span><div class="zone-text">«${esc(z.word)}» — ${esc(String(z.count))} φορές</div>${items}</div>`;
+      // A FACT ABOUT WHAT THEY DID, not about who they are.
+      const conf = z.confirmed ? `<div class="zone-confirmed">Το αναγνώρισες εσύ</div>` : "";
+      return `<div class="zone-card"><span class="zone-label">${esc(z.label)}</span><div class="zone-text">«${esc(z.word)}» — ${esc(String(z.count))} φορές</div>${conf}${items}</div>`;
+    }
+    if (z.key === "open") {
+      // ΜΟΝΤΕΛΟ 2, το οπτικό μέρος. The unknown already moved above the roads; here it
+      // stops being one more equal card. A generic summary never opens on what you do not know,
+      // because it reads as failure — the prompt's own rule calls it a prerequisite instead.
+      return `<div class="unknown-lead"><span class="zone-label">${esc(z.label)}</span><div class="unknown-text">${esc(z.text)}</div></div>`;
     }
     if (z.kind === "roads") {
       // ORIGIN IS PRINTED BESIDE EACH LINE, in words a person can act on. The whole premium claim
@@ -2461,13 +2483,21 @@ function exportBlueprint(ankerText, zones) {
   .road-src{display:block;font-size:8px;letter-spacing:.06em;margin-top:2px;}
   .src-own{color:#7a8a7a;} .src-aura{color:#6b6660;} .src-severe{color:#8a6a4a;}
   .road-q{font-size:10px;color:#6b6660;margin-bottom:2px;}
+  .unknown-lead{border-left:2px solid var(--gold, #c9a84c);padding:2px 0 2px 16px;margin:0 0 22px 0;}
+  .unknown-text{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;font-style:italic;color:#e8e4da;line-height:1.45;margin-top:6px;}
+  .zone-confirmed{font-size:9px;letter-spacing:.1em;color:#7a8a7a;margin:4px 0 8px 0;}
+  .zone-occ-peak{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;line-height:1.5;color:#cfc9be;margin-top:3px;}
+  .legend{margin-top:18px;font-size:9px;color:#6b6660;line-height:1.7;}
   .footer{margin-top:24px;font-size:9px;color:#454340;line-height:1.7;text-align:center;}
   @media print{ body{background:#fff;color:#111;} .title,.keystone-text{color:#8a6d1f;} .keystone-card,.zone-card{background:#faf8f3;box-shadow:none;border:1px solid #e5e0d5;} .zone-text{color:#111;} .zone-occ-text{color:#444;} .keystone-ownership{color:#666;} }
 </style></head>
 <body><div class="sheet">
-  <div class="header-row"><div class="title">AURA — Decision Blueprint</div><div class="date">${dateStr}</div></div>
+  <div class="header-row"><div class="title">AURA — Decision Blueprint</div><div class="date">${(meta && Number.isInteger(meta.session) && meta.session >= 2) ? esc(meta.session + "η συνεδρία · ") : ""}${dateStr}</div></div>
   ${keystoneHtml}
   ${zonesHtml}
+  ${(Array.isArray(zones) ? zones : []).some(z => z && z.key === "roads")
+    ? `<div class="legend">Δίπλα σε κάθε γραμμή δρόμου: «από τα λόγια σου» σημαίνει ότι την εντοπίσαμε σε αυτά που είπες. «διατύπωση AURA» σημαίνει ότι δεν την εντοπίσαμε.</div>`
+    : ""}
   <!-- PROVENANCE FIX. The footer said "Είναι δικά σου λόγια" of the whole sheet. True of the
        keystone, which the code above guarantees is the user's verbatim phrase and never
        AI-selected. NOT true of the three beats: ΒΡΗΚΕΣ carries no sourcing requirement anywhere
@@ -3918,6 +3948,8 @@ export default function AURAv2() {
   // purpose: "partly" is an unfinished answer, not a boundary, so nothing is persisted and a
   // later session is free to ask again. Όχι remains the only answer that writes anything.
   const [heldPattern, setHeldPattern] = useState(null);
+  // The pattern the person answered «Ναι» to, for this session's sheet. Not persisted.
+  const confirmedPattern = useRef(null);
   const [showMemoryPanel, setShowMemoryPanel]     = useState(false);
   const [showArchivePanel, setShowArchivePanel]   = useState(false);
 
@@ -5457,6 +5489,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setLayerGatePending(false);
     setPendingUserMessage(null);
     declarationLedger.current = [];
+    confirmedPattern.current = null;
     setHeldPattern(null);
     setMemoryPromptPending(false);
     setWarningPending(false);
@@ -6145,6 +6178,12 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                   setRecognitionPending(false);
                 }}>Μερικώς</button>
                 <button className="choice-btn prim" onClick={() => {
+                  // Nothing recorded the affirmative until now: «Όχι» persisted a refusal and
+                  // «Μερικώς» held the pattern back, while «Ναι» only dismissed the card — so the
+                  // sheet could not say that the person had confirmed anything. Session-scoped,
+                  // like heldPattern: the sheet is downloaded in this same session, and a
+                  // confirmation is not a new category of stored data.
+                  confirmedPattern.current = patternKey({ kind: "recurring", word: recognitionPending.word });
                   recordTelemetry("ownership_confirmed", { answer: 2 });
                   setRecognitionPending(false);
                 }}>Ναι</button>
@@ -6278,8 +6317,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                     ? recordPatternRejection({ ...memory }, heldPattern)
                     : memory;
                   const _zones = buildBlueprintZones(_memForSheet, _recurring, _unknown, _commitment,
-                    extractBeforeMessage(messages), _road);
-                  exportBlueprint(_kept, _zones);
+                    extractBeforeMessage(messages), _road, confirmedPattern.current);
+                  exportBlueprint(_kept, _zones, { session: (memory.sessionCount || 0) + 1 });
                   recordTelemetry("blueprint_generated", {
                     zones: _zones.length,
                     commitment: !!_commitment,

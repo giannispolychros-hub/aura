@@ -62,7 +62,10 @@ const renderBlueprint = (() => {
   const b = CODE.indexOf('const blob = new Blob', a);
   if (a < 0 || b < 0) { assert('exportBlueprint body located', false); return null; }
   const body = CODE.slice(CODE.indexOf('{', CODE.indexOf('(', a)) + 1, b);
-  try { return eval('(function (ankerText, zones) {' + body + ' return html; })'); }
+  // THREE parameters: the real exportBlueprint takes `meta`. Lifting it with two left `meta`
+  // undeclared inside the wrapper, so the renderer threw ReferenceError and this whole suite went
+  // SILENT — which the runner reports separately, and which is strictly worse than a failure.
+  try { return eval('(function (ankerText, zones, meta) {' + body + ' return html; })'); }
   catch (err) { assert('exportBlueprint renders: ' + err.message, false); return null; }
 })();
 assert('The real Blueprint renderer was lifted from the source', typeof renderBlueprint === 'function');

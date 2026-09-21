@@ -119,8 +119,12 @@ assert('BLUEPRINT: the keystone-is-verbatim guarantee in the code comment still 
 // which is the point of it. The escaping INSIDE that builder — where the person's own sentence
 // actually enters markup — is held by test_signals, which checks the builder block itself; a
 // mutation dropping esc() there fails that suite.
+// EXTENDED, NOT RELAXED. The body template now also interpolates two code-owned
+// fragments: the provenance legend, which is a fixed sentence chosen by `.some(...)` over the
+// zone list and holds no person-supplied text, and the session line, whose only variable goes
+// through esc(). Everything carrying a person's words still has to start with esc(.
 assert('BLUEPRINT: escaping is untouched — every interpolation still goes through esc()',
-  !/\$\{(?!esc\(|dateStr|keystoneHtml|zonesHtml)/.test(BLUEPRINT.slice(BLUEPRINT.indexOf('<body>'))));
+  !/\$\{(?!esc\(|dateStr|keystoneHtml|zonesHtml|\(Array\.isArray\(zones\)|\(meta &&)/.test(BLUEPRINT.slice(BLUEPRINT.indexOf('<body>'))));
 
 // ── P1 — PROFILING MUST NOT RUN, OR BE USED, WITHOUT CONSENT ────────────────
 // The classification found the Silent Profile — twelve moving averages producing statements like

@@ -426,8 +426,12 @@ if (SRC_BP) {
   // this commit introduced. test_consent_integrity bounds the same check the same way.
   const _BP_HTML = SRC_BP.slice(SRC_BP.indexOf('<body>'), SRC_BP.indexOf('const blob = new Blob'));
   assert('SHEET: the HTML template was located for the escaping check', _BP_HTML.length > 200);
+  // EXTENDED, NOT RELAXED. The body template now also interpolates two code-owned
+  // fragments: the provenance legend, which is a fixed sentence chosen by `.some(...)` over the
+  // zone list and holds no person-supplied text, and the session line, whose only variable goes
+  // through esc(). Everything carrying a person's words still has to start with esc(.
   assert('SHEET: every interpolation in the sheet still goes through esc() — it is downloaded and shared',
-    !/\$\{(?!esc\(|dateStr|keystoneHtml|zonesHtml)/.test(_BP_HTML));
+    !/\$\{(?!esc\(|dateStr|keystoneHtml|zonesHtml|\(Array\.isArray\(zones\)|\(meta &&)/.test(_BP_HTML));
 
   // THE ZONE BUILDER IS WHERE THE USER'S TEXT ACTUALLY ENTERS HTML, and the check above does not
   // reach it: the builder is declared BEFORE the template, so slicing from <body> excluded the
@@ -446,7 +450,20 @@ const _ZB = SRC_BP.slice(SRC_BP.indexOf('const zonesHtml'), SRC_BP.indexOf('cons
   // carries a person's words still has to start with esc(. Verified by mutation: dropping esc()
   // from the new road zone fails this assertion.
   assert('SHEET: EVERY interpolation inside the zone builder goes through esc()',
-    [..._ZB.matchAll(/\$\{([^}]*)/g)].every(m => /^\s*(esc\(|\(z\.occurrences|o\.at \?|o\.before \?|items\b|cards\b|cls\(|line\(|it\.name \?|it\.q \?)/.test(m[1])));
+    [..._ZB.matchAll(/\$\{([^}]*)/g)].every(m => /^\s*(esc\(|\(z\.occurrences|o\.at \?|o\.before \?|o\.peak \?|items\b|cards\b|conf\b|cls\(|line\(|it\.name \?|it\.q \?)/.test(m[1])));
+  // THE PREFIX CHECK ABOVE HAS A HOLE, found by mutation and pre-existing: `[^}]*` stops at the
+  // FIRST closing brace, so in `${o.peak ? \`…${esc(o.peak)}…\` : ""}` the inner interpolation is
+  // swallowed into the outer capture and never examined on its own. Dropping esc() from inside
+  // any conditional branch — o.before and o.at included, long before peak existed — left the
+  // assertion green. This closes it directly: every field that can carry a person's words must
+  // appear escaped, and must never appear raw.
+  const PERSON_FIELDS = ['o.before', 'o.peak', 'z.text', 'z.word', 'z.before', 'z.after',
+                         'it.a', 'it.name', 'it.q', 'r.name', 'text'];
+  const rawUses = PERSON_FIELDS.filter(f => _ZB.includes('${' + f + '}'));
+  assert(`SHEET: no person-supplied field is interpolated raw (raw: ${rawUses.join(', ') || 'none'})`,
+    rawUses.length === 0);
+  assert('SHEET: and each one that is used at all is used through esc()',
+    PERSON_FIELDS.filter(f => _ZB.includes(f)).every(f => _ZB.includes('esc(' + f + ')')));
   assert('SHEET: the evidence zone escapes the person\'s own sentence',
     /zone-text">\$\{esc\(z\.text\)\}/.test(_ZB));
   assert('SHEET: the recurring zone escapes the word, the count and every quoted opening',
