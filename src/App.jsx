@@ -2268,8 +2268,19 @@ function structuralLabelsIn(text) {
 // out. That also keeps the function liftable by the suites, which eval each one on its own.
 function buildCoverageReport(messages, families, structural) {
   const list = Array.isArray(messages) ? messages : [];
+  // CLOSING-SEQUENCE REPLIES ARE EXCLUDED, not merely uncounted. Part 1's returning-user
+  // variant ends in a question mark — "…ποια λέξη ή ποια σύντομη φράση θα ήθελες να
+  // κρατήσεις;" — and that is the word request, not a probing question: counting it would
+  // inflate the streak with the reply least like the thing being measured. They are dropped
+  // from the list entirely rather than merely skipped, so they neither add to a streak nor
+  // break one, and they do not count towards the activation floor.
+  // Narrow by measurement, corrected anyway: appendClosingMessage does not set sessionEnded,
+  // so a TERMINATION message can sit in `messages` while the session is still live, but
+  // reaching this function from there needs the word-answer to trip detectSafetySignal. Rare
+  // — and wrong every time it happens, at no cost to exclude.
   const replies = list
     .filter(m => m && m.role === "assistant" && typeof m.content === "string")
+    .filter(m => m.msgMode !== "TERMINATION" && m.isTermination !== true)
     .map(m => m.content);
   // Nothing worth reporting before a rhythm exists; a count of one is noise, not a fact.
   if (replies.length < 3) return "";

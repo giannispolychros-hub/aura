@@ -62,6 +62,41 @@ assert("a streak of zero is still reported honestly, not hidden",
 assert("the Greek question mark ano teleia counts as a question",
   /ending in a question[^\n]*: 3\b/.test(buildCoverageReport(weave(S("ποιο;"), S("γιατί;"), S("πώς;")), [], STRUCT)));
 
+// ── 2b. CLOSING-SEQUENCE REPLIES ARE NOT INTERROGATION ────────────────────
+// Part 1 can end in a question mark — the returning-user variant closes with
+// "…ποια λέξη ή ποια σύντομη φράση θα ήθελες να κρατήσεις;" — and it is not a
+// probing question, it is the word request. Counting it inflates the streak with
+// the one reply that is least like the thing being measured.
+//
+// MEASURED SCOPE, so the fix is not oversold: appendClosingMessage (App.jsx:5346)
+// does NOT set sessionEnded — only Part 2 and its fallback do — so a TERMINATION
+// message does sit in `messages` while the session is still live. Reaching
+// generateResponse from there needs the word-answer to trip detectSafetySignal,
+// which is rare. The count is wrong whenever it happens, and the exclusion costs
+// nothing, so it is corrected rather than left as a known distortion.
+const T = t => ({ role: "assistant", content: t, msgMode: "TERMINATION", isTermination: true });
+const PART1_RETURNING = "Την προηγούμενη φορά, αυτό που επέλεξες να κρατήσεις ήταν: «φόβος». Σήμερα, ποια λέξη ή ποια σύντομη φράση θα ήθελες να κρατήσεις;";
+// Three ordinary replies plus a closing one. Counted, the streak would be 4 — Part 1's
+// returning-user variant ends in a question mark. Excluded, it stays 3.
+assert("a closing-sequence reply does not count towards the question streak",
+  /ending in a question[^\n]*: 3\b/.test(buildCoverageReport(weave(Q("α"), Q("β"), Q("γ"), T(PART1_RETURNING)), [], STRUCT)));
+assert("closing-sequence replies do not break a streak either — they are not counted at all",
+  /ending in a question[^\n]*: 3\b/.test(buildCoverageReport(weave(Q("α"), T("Καλή συνέχεια."), Q("β"), Q("γ")), [], STRUCT)));
+// Mirror of the fixture below — found by mutation: with only the isTermination case
+// covered, dropping the msgMode half of the check left the suite green. Both flags are
+// set together at every closing site today, so either alone would silently half-work.
+assert("a reply flagged only by msgMode is excluded too",
+  /ending in a question[^\n]*: 3\b/.test(buildCoverageReport(
+    weave(Q("α"), Q("β"), Q("γ"), { role: "assistant", content: PART1_RETURNING, msgMode: "TERMINATION" }), [], STRUCT)));
+assert("a reply flagged only by isTermination is excluded too",
+  /ending in a question[^\n]*: 3\b/.test(buildCoverageReport(
+    weave(Q("α"), Q("β"), Q("γ"), { role: "assistant", content: PART1_RETURNING, isTermination: true }), [], STRUCT)));
+assert("ordinary replies are still counted — the exclusion is not a blanket one",
+  /ending in a question[^\n]*: 3\b/.test(buildCoverageReport(weave(Q("α"), Q("β"), Q("γ")), [], STRUCT)));
+// The activation floor counts the replies that are actually reportable.
+assert("closing-sequence replies do not count towards the three-reply activation floor",
+  buildCoverageReport(weave(Q("α"), Q("β"), T("τέλος;")), [], STRUCT) === "");
+
 // ── 3. FIELD B — distance from the last structural output ─────────────────
 assert("a session with no structural output at all says so",
   /no structural output|: none/i.test(buildCoverageReport(weave(Q("α"), Q("β"), Q("γ")), [], STRUCT)));
