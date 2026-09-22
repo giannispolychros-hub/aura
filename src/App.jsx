@@ -3025,7 +3025,25 @@ function detectsOutcomeScaleAsked(text) {
   // Renamed conceptually to CLARITY, kept function name for minimal churn across the codebase —
   // detects the LATE clarity question (post-solution) across all three work-type variants
   // (decide/solve/understand), sibling to detectsEarlyReliefAsked below.
-  return /τώρα, πόσο ξεκάθαρο είναι/i.test(text || "");
+  const t = String(text == null ? "" : text);
+  // Canonical wording — the three work-type variants and the hardcoded override in handleSubmit
+  // all open with this exact prefix. Unchanged, and checked first so it always wins.
+  if (/τώρα, πόσο ξεκάθαρο είναι/i.test(t)) return true;
+  // PARAPHRASE PATH (live session 2026-09-22). The model asked "Πόσο ξεκάθαρο νιώθεις τι θέλεις
+  // να κάνεις τώρα, από το 1 έως το 10;" — the canonical words, reordered, with «νιώθεις» for
+  // «είναι». The prefix above missed it, and that single false is the whole chain: outcomeScaleAsked
+  // never flips, lateReliefJustAsked never arms, extractTwoNumbers is never reached, and the user's
+  // own two numbers are lost — the paywall card then falls back to the copy that shows none. The
+  // failure is silent end to end. EXPRESSIVE VARIATION instructs the model to vary its wording, so
+  // pinning one word order asks it not to follow the prompt it was given.
+  // THE EARLY/LATE COLLISION IS WHAT CONSTRAINS THIS, not tidiness: EARLY CLARITY BASELINE asks
+  // almost the same sentence and only the time-marker separates the two. Its own opening therefore
+  // disqualifies outright — losing a race would not be enough, since a baseline recorded as the
+  // closing number would collapse the before/after pair into one.
+  if (/αυτή τη στιγμή/i.test(t)) return false;
+  // Three conditions, all required, so this cannot degrade into a catch-all: the clarity phrase,
+  // an explicit 1-10 scale, and the late time-marker. Any two of them alone are ordinary AURA.
+  return /πόσο ξεκάθαρο/i.test(t) && /από το 1 έως το 10/i.test(t) && /τώρα/i.test(t);
 }
 
 // USER-CONTROLLED CORE-READINESS CHECK (architectural fix, structurally different from the
