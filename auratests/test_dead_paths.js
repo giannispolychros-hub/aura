@@ -138,7 +138,33 @@ assert('The unreachability comments survive (removing them re-hides the problem)
   (CODE_WITH_COMMENTS.match(/UNREACHABLE/g) || []).length >= 3 &&
   /THE compressionCount >= 2 HALF OF THIS BRANCH IS DEAD/.test(CODE_WITH_COMMENTS));
 
+// ── REMOVED 2026-09-22: the two EXPLORATION render branches ───────────────
+// This file's rule is that removal is a founder decision, not a test's. That decision was
+// made for these two, so the fact being locked flips: they are gone, and bringing either
+// back silently is now the loud event.
+//
+// WHY THEY WERE DEAD, measured: "EXPLORATION" was never written to msgMode by any of the
+// eight write sites (ANSWER, AUDIT, COMPRESSION, TERMINATION x3, currentMode x2 — and
+// currentMode is only ever ANSWER, COMPRESSION or SUPPORTIVE), so isExplo was permanently
+// false. `isExploration` was never set on a message at all: zero writes.
+assert('EXPLORATION is no longer compared against msgMode anywhere',
+  !/msgMode\s*===\s*"EXPLORATION"/.test(CODE));
+assert('the isExplo binding is gone', !/\bisExplo\b/.test(CODE));
+assert('the .expl style rules only it could reach are gone', !/msg-aura\.expl\b/.test(CODE));
+assert('the isExploration badge is gone', !/isExploration/.test(CODE));
+// SURGICAL: every live sibling in the same two expressions must survive untouched.
+assert('the live className branches are all still there',
+  ['isObs','isInsight','isTermination','isSafe','isSnapshot'].every(n =>
+    CODE.includes('${' + n + ' ? ')));
+// Found by mutation: checking only that the identifier appears somewhere after a brace
+// let a live badge be replaced with `false` while the suite stayed green. Each one is now
+// pinned to its own render, so removing a live sibling is as loud as reviving a dead one.
+assert('the live badges are all still there, each still driven by its own flag',
+  ['isInsight','isSnapshot','isSafe'].every(n =>
+    new RegExp('\\b' + n + '\\s+&& <div className="msg-badge').test(CODE)) && /\.msg-badge\{/.test(CODE));
+
 console.log(`\n${passed} passed, ${failed} failed`);
+
 if (failed > 0) {
   console.log('\n⚠ Αν αυτό αποτύχει, κάποιος ζωντάνεψε μια απρόσιτη διαδρομή.');
   console.log('  Δεν είναι bug — σημαίνει ότι η αρχιτεκτονική άλλαξε και το ADR-003 πρέπει να ενημερωθεί.');

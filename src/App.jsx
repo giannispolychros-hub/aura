@@ -4064,7 +4064,6 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
     /αυτό που (φαίνεται πιο )?ξεκάθαρ\w*/i.test(msg.content) &&
     /παραμένει (ανοιχτό|αναπάντητο|ασαφές)/i.test(msg.content)
   );
-  const isExplo       = msg.msgMode === "EXPLORATION";
   // NEW (low-friction alternative to typing "όχι, τίποτα" — same established "Δείξε μου"
   // convention already used by closureConfirmPending, reused here rather than inventing a new
   // one, right where the three-beat shift itself just appeared, per founder's request):
@@ -4107,7 +4106,7 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
         );
       })()}
       {displayContent && (
-        <div className={isUser ? "msg-user" : `msg-aura ${isObs ? "obs" : ""} ${isInsight ? "ins" : ""} ${isTermination ? "term" : ""} ${isSafe ? "safe" : ""} ${isExplo ? "expl" : ""} ${isSnapshot ? "snapshot-msg" : ""}`}>
+        <div className={isUser ? "msg-user" : `msg-aura ${isObs ? "obs" : ""} ${isInsight ? "ins" : ""} ${isTermination ? "term" : ""} ${isSafe ? "safe" : ""} ${isSnapshot ? "snapshot-msg" : ""}`}>
           {displayContent.split("\n").map((line, j, arr) => (
             <span key={j}>
               {isTermination
@@ -4124,7 +4123,6 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
       )}
       {isInsight           && <div className="msg-badge compress"><span style={{width:3,height:3,borderRadius:"50%",background:"var(--gold)",display:"inline-block"}}/>συμπίεση</div>}
       {isSnapshot          && <div className="msg-badge snapshot"><span style={{width:3,height:3,borderRadius:"50%",background:"#7a8a7a",display:"inline-block"}}/>διαύγεια</div>}
-      {msg.isExploration   && <div className="msg-badge" style={{color:"#5a5a7a"}}><span style={{width:3,height:3,borderRadius:"50%",background:"#7a7aaa",display:"inline-block"}}/>εξερεύνηση μοτίβου</div>}
       {/* REMOVED (confirmed real issue): "τέλος ανάλυσης" badge exposed internal system stage
           language to the user, unlike the other badges above which describe a property of the
           content itself (συμπίεση, διαύγεια). The isTermination styling already visually
@@ -6091,8 +6089,6 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         .msg-aura.term::before{background:#333;opacity:.4}
         .msg-aura.safe{color:#b8a8a8}
         .msg-aura.safe::before{background:var(--red);opacity:.35}
-        .msg-aura.expl{color:#b8b8d0}
-        .msg-aura.expl::before{background:#7a7aaa;opacity:.4}
 
         .msg-badge{display:inline-flex;align-items:center;gap:5px;font-size:7px;letter-spacing:.18em;text-transform:uppercase;margin-top:7px}
         .msg-badge.compress{color:var(--gold-dim)}
