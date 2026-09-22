@@ -484,8 +484,19 @@ const _ZB = SRC_BP.slice(SRC_BP.indexOf('const zonesHtml'), SRC_BP.indexOf('cons
     /buildCommitmentSignal\(\s*commitmentPair\.current/.test(CODE));
   assert('CALL SITE: the recurring signal is computed from the kept word',
     /buildRecurringSignal\(\s*memory/.test(CODE));
-  assert('CALL SITE: the unknown comes from a parsed road map, never from prose',
-    /parseRoadMap\([\s\S]{0,200}unknown/.test(CODE) || /unknown[\s\S]{0,200}parseRoadMap\(/.test(CODE));
+  // RESTATED 2026-09-22. This was a proximity regex — parseRoadMap within 200 characters
+  // of `unknown` — and it broke on a change that never touched what it protects: the road-map
+  // exit contract put a comment block between the two. Restated to test the intent instead,
+  // the same repair test_api_cost's logging assertion already needed.
+  // THE INTENT ITSELF WIDENED, and that is deliberate rather than a relaxation to make a test
+  // pass: the unknown may now also come from a RECOVERED map. Recovery reads ΑΓΝΩΣΤΟ off its
+  // own label, exactly as the native parser does, so the guarantee is unchanged in substance —
+  // the zone still cannot carry anything the person did not name under that label.
+  assert('CALL SITE: the unknown is read off a map object, never assembled from message text',
+    /_unknown\s*=\s*_map\s*&&\s*_map\.unknown/.test(CODE));
+  assert('CALL SITE: the map object comes only from the two label-anchored readers',
+    /const _mapNative\s*=\s*\(\(\)\s*=>\s*\{[\s\S]{0,400}parseRoadMap\(/.test(CODE) &&
+    /const _mapRecovered\s*=\s*_mapNative\s*\?\s*null\s*:\s*extractRoadMapFromProse\(/.test(CODE));
 }
 
 // ── Κ4 — RECOGNITION GATE ──────────────────────────────────────────────────

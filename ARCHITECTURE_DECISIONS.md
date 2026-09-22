@@ -457,3 +457,74 @@ run until `:4964`. The farewell is removed at the only moment the answer is know
 for certain — as the closing sequence delivers its own first message, in the same
 atomic state update. A viewer watching that exact turn may see the farewell briefly
 before it is removed.
+
+---
+
+## Road map exit contract (shipped 2026-09-22)
+
+**The measured problem.** A live session produced roads three separate times and
+`parseRoadMap` returned null on all three, so the sheet carried no decision space at
+all. The only watchdog, `detectOutputViolation`'s `ROAD_MAP_MISSING`, fired **zero**
+times on that session: it requires 3+ bulleted lines and user stagnation, the real
+failure had neither, and it only ever increments a debug-panel counter.
+
+**What the contract does.** `extractRoadMapFromProse` re-reads accumulated assistant
+history for the same three labels the specification names — ΔΡΟΜΟΣ, ΚΕΡΔΙΖΕΙΣ,
+ΚΟΣΤΙΖΕΙ — in layouts `parseRoadMap` refuses: inline, lowercase, accented, bulleted,
+separated by `·` or `—` instead of `:`. Pure code over text already written; no model
+call. Native parsing always wins; recovery only ever sees what produced nothing.
+
+**The rule is derived from the specification, not from the transcript.** That is the
+standing lesson from `parseRoadMap`, which was widened twice by reading one session
+each time and broke on the next. The prompt's EXACT FORMAT block names three slots;
+what it never asked for — three consecutive lines, capitals, a colon — stops being
+required. Nothing else was inferred.
+
+### What it deliberately cannot do
+
+It does **not** recover roads written as plain prose with no label words. The live
+session wrote «Διδακτορικό για διεύθυνση — 10+ χρόνια, χωρίς άμεσο εισόδημα.»
+Deciding that "10+ χρόνια" is a cost and "διεύθυνση" a gain is semantic judgment,
+which the contract forbids, and guessing it would manufacture a decision space the
+person never saw. **This contract would not have rescued the session that motivated
+it.** It closes the "labels written, layout wrong" door; the "labels never written"
+door stays open, and `roadsRecovered` exists to keep the two rates apart.
+
+Those prose lines are pinned in `test_road_recovery.js` as **refusals**, not targets.
+
+### Conservative thresholds, each pinned by a mutation
+
+- all three labels, in the specified order, within one paragraph
+- each followed by a separator and non-empty content — a road without its cost is not
+  a road, per the prompt's own DELIVERY rule
+- a field over 240 characters means a paragraph was swallowed, not a field read
+- ΔΡΟΜΟΣ must not head a longer word; the guard is narrow by construction and matters
+  for ΚΟΣΤΙΖΕΙ alone, since the other two labels end in a final sigma, which is
+  word-final by definition
+- dedupe by normalised name, hard cap of five — a run that finds more has stopped
+  reading a map and started collecting label words
+
+### Downstream
+
+A recovered map sets the same `roadMapDelivered` a native one would, so Road
+Questions, Κ4 and the Blueprint zones behave identically. Every recovered line goes
+through `classifyRoadProvenance` on the same path as a native line, so UNVERIFIED
+content carries the existing «μη ελεγμένο» mark rather than passing silently as
+ordinary. `roadMapRecovered` is kept separate from `roadMapDelivered` so the recovery
+can never mask the compliance failure it survives.
+
+Telemetry key is `roadsRecovered`, not `roadMapRecoveredViaExtraction`: the schema
+caps a key at 24 characters. Meaning unchanged.
+
+### Restated invariant
+
+`test_signals`' "the unknown comes from a parsed road map, never from prose" was a
+proximity regex and broke on a comment placed between the two tokens. Restated to
+test the intent. The intent itself widened deliberately: the unknown may now come
+from a recovered map too, because recovery reads ΑΓΝΩΣΤΟ off its own label exactly
+as the native parser does. The zone still cannot carry anything the person did not
+name under that label.
+
+### Explicitly out of scope
+
+No generalisation to stakes, thresholds or assumptions. The map only.

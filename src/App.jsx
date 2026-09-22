@@ -1869,6 +1869,100 @@ function parseRoadMap(text) {
   const unknown = /ΑΓΝΩΣΤΟ[^\S\n]*:[^\S\n]*([^\n]+)/.exec(text);
   return { roads, unknown: unknown ? clean(unknown[1]) : null };
 }
+// ── ROAD MAP EXIT CONTRACT — post-hoc recovery from non-compliant output ───
+// Measured 2026-09-22: a real session produced roads three separate times and
+// parseRoadMap returned null on all three, so the sheet carried no decision space
+// at all. The one watchdog for this, detectOutputViolation's ROAD_MAP_MISSING,
+// fired zero times — it requires 3+ bulleted lines and stagnation, and the real
+// failure had neither; and it only ever increments a debug counter.
+//
+// THE RULE COMES FROM THE SPECIFICATION, NOT FROM THAT TRANSCRIPT. parseRoadMap was
+// already widened twice by reading one session each time and broke on the next; the
+// comment above it records that lesson. So this reads the prompt's EXACT FORMAT
+// block: three named slots, ΔΡΟΜΟΣ then ΚΕΡΔΙΖΕΙΣ then ΚΟΣΤΙΖΕΙ, each introducing
+// its content. What the specification asks for is those three labels in that order.
+// parseRoadMap additionally demands three consecutive LINES, capitals and a colon —
+// none of which the specification ever required. Recovery accepts the same three
+// labels wherever they sit, and nothing else.
+//
+// WHAT IT DELIBERATELY CANNOT DO, stated so nobody later mistakes it for a gap:
+// it does not recover roads written as plain prose with no label words. Deciding
+// that "10+ χρόνια" is a cost and "διεύθυνση" a gain is semantic judgment, and
+// guessing it would manufacture a decision space the person never saw. That door
+// stays shut; the telemetry boolean exists to measure how often it is the one that
+// was used. A road without its cost is not a road — the prompt's own DELIVERY rule
+// — so all three fields must carry content or the block is refused whole.
+//
+// NEVER COMPETES WITH THE NATIVE PARSER: any message parseRoadMap can already read
+// is skipped outright, so a compliant map can never be re-read by a looser rule.
+function extractRoadMapFromProse(messages) {
+  if (!Array.isArray(messages)) return null;
+  // Length-preserving fold: lowercase plus a 1:1 accent map, so an index found in
+  // the folded string points at the same character in the original. NFD would shift
+  // every index after the first accent and silently corrupt every extraction.
+  const FOLD = { "ά":"α","έ":"ε","ή":"η","ί":"ι","ό":"ο","ύ":"υ","ώ":"ω","ϊ":"ι","ϋ":"υ","ΐ":"ι","ΰ":"υ","ς":"σ" };
+  const fold = str => str.toLowerCase().replace(/[άέήίόύώϊϋΐΰς]/g, c => FOLD[c]);
+  const LABELS = ["δρομοσ", "κερδιζεισ", "κοστιζει"];
+  const clean = v => String(v).replace(/\*/g, "").replace(/^[\s:·—–-]+/, "").replace(/[\s.·—–-]+$/, "").trim();
+  const roads = [];
+  const seen = new Set();
+  let unknown = null;
+  for (const m of messages) {
+    if (!m || m.role !== "assistant" || typeof m.content !== "string") continue;
+    const text = m.content;
+    // The native parser owns whatever it can read; recovery only sees what it could
+    // not. Held in lockstep with parseRoadMap's own pattern by test_road_recovery,
+    // and inlined rather than called for the same reason detectsConcreteStep does not
+    // call classifyStepIntent: the suites lift and eval each function on its own, so a
+    // function that called a sibling could not be extracted at all.
+    if (/^[^\S\n]*\**ΔΡΟΜΟΣ(?![Α-Ωα-ωά-ώ])([^\n]*)\n\s*\**ΚΕΡΔΙΖΕΙΣ[^\S\n]*:[^\S\n]*([^\n]+)\n\s*\**ΚΟΣΤΙΖΕΙ[^\S\n]*:[^\S\n]*([^\n]+)/m.test(text)) continue;
+    const folded = fold(text);
+    const u = /αγνωστο[^\S\n]*[:·—–-][^\S\n]*([^\n]+)/.exec(folded);
+    if (u) unknown = clean(text.slice(u.index + u[0].length - u[1].length, u.index + u[0].length));
+    // Paragraph is the block boundary: labels scattered across a blank line are not
+    // one road, they are three unrelated lines that happen to share a page.
+    let offset = 0;
+    for (const para of text.split(/\n\s*\n/)) {
+      const start = offset; offset += para.length + 2;
+      const fp = folded.slice(start, start + para.length);
+      // Labels must appear in the specified order. A bare label with no separator is
+      // prose using the word, not a field introducing content, so each one must be
+      // followed by an optional short enumerator, a separator, then something.
+      const at = [];
+      let from = 0, ok = true;
+      for (const label of LABELS) {
+        const i = fp.indexOf(label, from);
+        if (i === -1) { ok = false; break; }
+        // ΔΡΟΜΟΣ must not be the head of a longer word — "δρόμοι" is not the label.
+        if (/[α-ω]/.test(fp.charAt(i + label.length))) { ok = false; break; }
+        at.push(i); from = i + label.length;
+      }
+      if (!ok) continue;
+      const fields = [];
+      for (let k = 0; k < 3; k++) {
+        const bodyStart = at[k] + LABELS[k].length;
+        const bodyEnd = k < 2 ? at[k + 1] : para.length;
+        const rest = para.slice(bodyStart, bodyEnd);
+        const mm = /^[^\S\n]*(?:[\dα-ωΑ-Ω]{1,3}[^\S\n]*)?[:·—–-][^\S\n]*([\s\S]*)$/.exec(rest);
+        if (!mm) { ok = false; break; }
+        const v = clean(mm[1]);
+        // Empty means the model wrote the label and no content. A field over 240
+        // characters means a whole paragraph was swallowed, not a field read.
+        if (!v || v.length > 240) { ok = false; break; }
+        fields.push(v);
+      }
+      if (!ok) continue;
+      const key = fold(fields[0]).replace(/[^a-zα-ω0-9]+/g, "");
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      roads.push({ name: fields[0], gain: fields[1], cost: fields[2] });
+    }
+  }
+  // Five is a cap, not a target. A run that finds more has stopped reading a map and
+  // started collecting label words, and the instruction is to prefer no map.
+  if (roads.length === 0) return null;
+  return { roads: roads.slice(0, 5), unknown: unknown || null };
+}
 // ROAD-MAP PROVENANCE, PASSIVE MEASUREMENT ONLY (Measurement Before Modification — same standing
 // principle as the collision logger and the ΑΡΑ log). The prompt requires each ΚΕΡΔΙΖΕΙΣ/ΚΟΣΤΙΖΕΙ
 // to carry "only what they named", and nothing verifies that today. This counts; it decides
@@ -4080,6 +4174,10 @@ export default function AURAv2() {
   // nulled the moment the road-question run completes, so it cannot carry "a map happened" to
   // the close, which is precisely where it is needed.
   const roadMapDelivered  = useRef(false);
+  // Separate from roadMapDelivered on purpose: that one says a map exists, this one
+  // says it only exists because the exit contract rebuilt it. Kept apart so the
+  // compliance signal is never masked by the recovery that hides its symptom.
+  const roadMapRecovered  = useRef(false);
   // The road-question answers, kept past the run that produced them so the sheet can show them.
   const roadAnswersFinal  = useRef([]);
   // Debug panel gate — read once from the URL, never re-derived on later renders/navigation.
@@ -5024,7 +5122,18 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // map first). Capped at three roads here rather than in the ctx, so the cap is a property of
       // the state itself and cannot be widened by a later edit to the emission side.
       if (!roadQuestionState.current) {
-        const _rqMap = parseRoadMap(text);
+        // EXIT CONTRACT. A map the native parser cannot read is, downstream, identical
+        // to no map at all: no road questions, no Κ4, no roads zone on the sheet. So
+        // when parsing fails, the accumulated assistant history is re-read for the same
+        // three labels in a layout the parser does not accept. Guarded on
+        // roadMapDelivered so it runs while no map has been seen and stops the moment
+        // one has — it is a fallback, never a second parser running in parallel.
+        const _rqNative = parseRoadMap(text);
+        const _rqRecovered = _rqNative || roadMapDelivered.current
+          ? null
+          : extractRoadMapFromProse([...msgs, { role: "assistant", content: text }]);
+        const _rqMap = _rqNative || _rqRecovered;
+        if (_rqRecovered) roadMapRecovered.current = true;
         if (_rqMap) roadMapDelivered.current = true;
         if (_rqMap && _rqMap.roads.length > 0) {
           roadQuestionState.current = {
@@ -5674,6 +5783,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     roadTraceLast.current = null;
     roadAnswersFinal.current = [];
     roadMapDelivered.current = false;
+    roadMapRecovered.current = false;
     roadQuestionState.current = null;
     window.__auraLastCollision = null;
     setValueUnlocked(false);
@@ -6440,7 +6550,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                   // semantics: this now takes the MOST RECENT map and reads the unknown off it,
                   // where before it searched back for the most recent map that HAPPENED to carry
                   // one — so a superseded unknown could outlive the map that replaced it.
-                  const _map = (() => {
+                  const _mapNative = (() => {
                     for (let i = messages.length - 1; i >= 0; i--) {
                       if (messages[i].role !== "assistant") continue;
                       const _m = parseRoadMap(messages[i].content);
@@ -6448,6 +6558,15 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                     }
                     return null;
                   })();
+                  // EXIT CONTRACT, second and last reader. The sheet is where a lost map
+                  // actually costs the person something, so if nothing parsed natively the
+                  // accumulated assistant history is re-read for the same three labels in a
+                  // layout the parser does not accept. Native always wins; recovery only ever
+                  // sees what produced nothing. No model call — pure code over text already
+                  // written. A run that finds nothing leaves the zone absent, which is the
+                  // honest outcome and the one the instruction prefers over a built map.
+                  const _mapRecovered = _mapNative ? null : extractRoadMapFromProse(messages);
+                  const _map = _mapNative || _mapRecovered;
                   const _unknown = _map && _map.unknown ? _map.unknown : null;
                   // Provenance per line, against what the person actually wrote. Already computed
                   // for the debug panel and never shown to the one person it is about.
@@ -6470,6 +6589,13 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                     commitment: !!_commitment,
                     recurring: !!_recurring,
                     roads: !!_map,
+                    // SEPARATE FROM `roads` ON PURPOSE. `roads` says the sheet carried a
+                    // decision space; this says it only did because the exit contract rebuilt
+                    // it. Folded together, the recovery would hide the very compliance failure
+                    // it exists to survive, and the rate we are collecting would read as fixed.
+                    // Schema caps a key at 24 characters, so the name is shortened from
+                    // roadMapRecoveredViaExtraction; the meaning is unchanged.
+                    roadsRecovered: !!_mapRecovered,
                   });
                 }}>
                   Κατέβασε το Blueprint
