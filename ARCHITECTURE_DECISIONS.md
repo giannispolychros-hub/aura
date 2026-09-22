@@ -528,3 +528,71 @@ name under that label.
 ### Explicitly out of scope
 
 No generalisation to stakes, thresholds or assumptions. The map only.
+
+---
+
+## Session coverage report (shipped 2026-09-22)
+
+**The asymmetry it addresses.** `dynamicSuffix` sends the model twenty ctx signals a
+turn and almost all are INSTRUCTIONS — *"use that specific response"*, *"these take
+priority"*, *"switch now"*. Exactly one, `materialEvidenceCtx`, is framed as an
+observation: counted from the user's own messages, *"surfaced here so they do not have
+to be recalled"*, headed OBSERVATION ONLY, NOT A SUFFICIENCY JUDGMENT.
+
+An instruction tells the model what to do this turn. A report tells it where it is.
+Only the second lets it choose to go deeper, to reflect, or to move past something.
+`buildCoverageReport` is a sibling of that one report.
+
+### The two facts it carries, both already computed and discarded
+
+**(A) Which signal families have already fired.** `EXPLORATION COVERAGE PRINCIPLE`
+asks for exactly this — *"prefer whichever of these you have not yet used this
+session"* — and no variable ever remembered it. The PROTOCOL COLLISION LOGGER already
+computes the list every single turn and drops it on `window`. Accumulating it is
+transport, not new logic. Fourth instance of that pattern in this codebase, after
+`peak`, `roadAnswersFinal` and `classifyRoadProvenance`.
+
+**(B) Question density.** Consecutive replies ending in a question, and replies since
+the last structural output. A live session produced eleven replies, **all eleven**
+ending in a question, with no structural output at all. `PROBLEM STRUCTURE MAP`
+already says what to do — *"once 1-2 detecting questions have surfaced enough… reflect
+that shape back"* — so the rule existed and only its trigger was blind.
+
+### It reports and never directs
+
+Not a stylistic preference. A twenty-first order in a prompt already carrying twenty
+would compete with the rules rather than feed them. It sits in **tier 1** of
+`dynamicSuffix` (informational background), beside `materialEvidenceCtx` — the
+position of lowest attention, which is the right place for a report and is
+deliberately not the hard-constraint tier at the end. Pinned by a mutation that
+appends a second copy there.
+
+Every line it adds is a counted number. No new rule, no new detector, no semantic
+judgment, and nothing it emits decides anything.
+
+### The structural predicate is injected, not copied
+
+A first version spelled the label patterns out inside the function, and
+`test_format_compliance`'s *"only one place still spells out the road label pattern"*
+caught it on the full-suite run. `structuralLabelsIn` is the single source of truth;
+two patterns for one question drift, and this repo has paid for that before. The
+caller injects `t => { const l = structuralLabelsIn(t); return l.road || l.beat; }`.
+Stronger than lockstep — there is nothing to keep in step. A missing or non-function
+predicate reports "none", never a guess.
+
+### Independent of the road-map exit contract
+
+By construction: it counts labels present in the text and reads no state from that
+work — no `roadMapDelivered`, no `roadMapRecovered`, no `extractRoadMapFromProse`.
+Pinned by an assertion and by a mutation that introduces such a read. Either can be
+reverted without touching the other.
+
+### What it does not do
+
+It does not enforce. Measured on the same live session: `firstReplyFloorCtx` declares
+itself *"code-enforced floor, not a suggestion"* and forbids binary-choice framing on
+the first reply; that reply was *"…δεν έρχεται κόσμος, **ή** κάτι άλλο…"*. Anything
+delivered as prompt text is a suggestion. This raises the probability of a
+better-aimed next question; it cannot compel one. Enforcement needs a hard override —
+the product has two — and that is a separate decision with the reverted Anchors/Stakes
+gates behind it.

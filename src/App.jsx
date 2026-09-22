@@ -2239,6 +2239,67 @@ function structuralLabelsIn(text) {
     beat: /^[^\S\n]*(ΗΡΘΕΣ ΜΕ|ΒΡΗΚΕΣ|ΦΕΥΓΕΙΣ ΜΕ)[^\S\n]*:/m.test(t),
   };
 }
+// ── SESSION COVERAGE REPORT ────────────────────────────────────────────────
+// The product sends the model twenty ctx signals a turn and almost all of them are
+// INSTRUCTIONS — "use that specific response", "these take priority", "switch now".
+// Exactly one, materialEvidenceCtx, is framed as an observation. An instruction tells
+// the model what to do this turn; a report tells it where it is, and only the second
+// lets it choose to go deeper, to reflect, or to move past something.
+//
+// This is a sibling of that one report, carrying the two facts the model has never had.
+// (A) WHICH FAMILIES HAVE ALREADY FIRED. EXPLORATION COVERAGE PRINCIPLE asks for exactly
+// this — "prefer whichever of these you have not yet used this session" — and no variable
+// has ever remembered it, while the collision logger computes the list every single turn
+// and drops it on `window`. (B) HOW DENSELY IT HAS BEEN ASKING. A live session produced
+// eleven replies, all eleven ending in a question, with no structural output at all;
+// PROBLEM STRUCTURE MAP already says what to do about that, so the rule exists and only
+// its trigger was blind.
+//
+// IT REPORTS AND NEVER DIRECTS, and that is not a stylistic preference. A twenty-first
+// order in a prompt already carrying twenty would compete with the rules rather than feed
+// them. Both fields are arithmetic over data that already exists: no new detector, no new
+// rule, no semantic judgment, and nothing here decides anything.
+//
+// INDEPENDENT OF THE ROAD-MAP EXIT CONTRACT BY CONSTRUCTION: it counts labels present in
+// the text and reads no state from that work, so either can be reverted without the other.
+//
+// It owns no knowledge of what "structural" looks like: the caller injects that predicate,
+// built from structuralLabelsIn, which stays the single place the label patterns are spelled
+// out. That also keeps the function liftable by the suites, which eval each one on its own.
+function buildCoverageReport(messages, families, structural) {
+  const list = Array.isArray(messages) ? messages : [];
+  const replies = list
+    .filter(m => m && m.role === "assistant" && typeof m.content === "string")
+    .map(m => m.content);
+  // Nothing worth reporting before a rhythm exists; a count of one is noise, not a fact.
+  if (replies.length < 3) return "";
+  let streak = 0;
+  for (let i = replies.length - 1; i >= 0; i--) {
+    if (/[;?]\s*$/.test(replies[i].trim())) streak += 1; else break;
+  }
+  // THE PREDICATE IS INJECTED, NOT COPIED. A first version spelled the label patterns out
+  // here and test_format_compliance caught it: structuralLabelsIn is the single source of
+  // truth for them, and two patterns for one question drift — this repo has paid for that
+  // before. Passing the caller's predicate keeps that guarantee and removes the lockstep
+  // burden entirely. A missing or non-function predicate reports "none", never a guess.
+  const isStructural = typeof structural === "function" ? structural : () => false;
+  let since = -1;
+  for (let i = replies.length - 1; i >= 0; i--) {
+    if (isStructural(replies[i])) { since = replies.length - 1 - i; break; }
+  }
+  const used = [];
+  (Array.isArray(families) ? families : []).forEach(f => {
+    if (typeof f === "string" && f && used.indexOf(f) === -1) used.push(f);
+  });
+  const lines = [
+    `\n· Consecutive replies of yours ending in a question, counting back from the last one: ${streak}.`,
+    since === -1
+      ? `\n· Replies since your last structural output (road map or three-beat): none this session.`
+      : `\n· Replies since your last structural output (road map or three-beat): ${since}.`,
+  ];
+  if (used.length) lines.push(`\n· Signal families already used this session: ${used.join(", ")}.`);
+  return `\n[SESSION COVERAGE — COUNTED, NOT JUDGED, AND NOT AN INSTRUCTION. The numbers below are counted mechanically from this session's own replies and surfaced so they do not have to be recalled from a long history. They describe what has already happened, never what should happen next: the rules that act on them — COGNITIVE PROPORTIONALITY, PROBLEM STRUCTURE MAP, EXPLORATION COVERAGE PRINCIPLE — are stated above and unchanged by this block. A high number here is not a verdict that anything went wrong, and a low one is not permission.${lines.join("")}]\n`;
+}
 // DECLARATION_EVENT — generalized provenance for "this reply answers that question".
 //
 // SHIFT was deferred because nothing in the code could prove that a given user message was the
@@ -4178,6 +4239,10 @@ export default function AURAv2() {
   // says it only exists because the exit contract rebuilt it. Kept apart so the
   // compliance signal is never masked by the recovery that hides its symptom.
   const roadMapRecovered  = useRef(false);
+  // Field A of the coverage report. The collision logger already computes exactly this list
+  // on every turn and drops it on `window`; accumulating it is transport, not new logic.
+  // EXPLORATION COVERAGE PRINCIPLE has asked for this memory since it was written.
+  const familiesUsed = useRef([]);
   // The road-question answers, kept past the run that produced them so the sheet can show them.
   const roadAnswersFinal  = useRef([]);
   // Debug panel gate — read once from the URL, never re-derived on later renders/navigation.
@@ -4480,6 +4545,11 @@ A line missing above means only that one pattern was not matched — the absence
       )
         ? `\n[CODE-VERIFIED: the user placed an opposition marker ("αλλά"/"όμως") with first-person stance on BOTH sides of it. They marked the tension themselves — this is not AURA inferring one. CHECK whether the two sides are genuinely pulling against each other; often they are not, and if not, ignore this entirely and continue normally. If they are, naming it is available now rather than after some other approach has failed: reflect both halves in their own words and ask which one holds more. Both poles must be quoted or near-quoted — supplying the second pole yourself is construction wearing the shape of reflection, which the dispatch entry above forbids by name.]\n`
         : '';
+      // Reads familiesUsed as it stood at the END of the previous turn — this turn's own
+      // families are accumulated after the reply exists, which is the correct meaning of
+      // "already used". Deliberately reads no state from the road-map exit contract.
+      const coverageReportCtx = buildCoverageReport(msgs, familiesUsed.current,
+        t => { const l = structuralLabelsIn(t); return l.road || l.beat; });
       const explicitPauseCtx = canUseExplicitPause(memory) && currentMode === "ANSWER" &&
         msgs.filter(m => m.role === "user").length >= 3 ?
         `\n[EXPLICIT PAUSE AVAILABLE — optional, use at most once this session if conversation has reached a natural reflection point: briefly pause topic, ask one question about HOW the user prefers to search for clarity (e.g. "Έχω μια απορία για τον τρόπο που ψάχνεις — όχι για το θέμα σου. Προτιμάς να φτάσουμε σε μια απόφαση ή να καταλάβεις γιατί κολλάς;"), then return naturally to session. Never announce it as a special feature.]\n` : '';
@@ -4714,7 +4784,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // weakest-to-strongest, so hard constraints occupy the final, highest-attention position:
       // (1) informational background, (2) situational signals, (3) hard constraints last.
       const dynamicSuffix = [
-        memCtx, profileCtx, materialEvidenceCtx, demoCtx, informationModeCtx, explicitPauseCtx,
+        memCtx, profileCtx, materialEvidenceCtx, coverageReportCtx, demoCtx, informationModeCtx, explicitPauseCtx,
         coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx, roadQuestionCtx,
         postMapCloseCtx,
         gatesCtx, closingDriftCtx, firstReplyFloorCtx,
@@ -4732,6 +4802,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx, roadQuestionCtx, postMapCloseCtx, gatesCtx, closingDriftCtx,
           firstReplyFloorCtx,
         }).filter(([, v]) => v).map(([k]) => k);
+        // ACCUMULATED BEFORE THE >= 2 GATE, deliberately: a family that fired alone still
+        // fired, and EXPLORATION COVERAGE asks what has been USED, not what collided.
+        fired.forEach(f => { if (familiesUsed.current.indexOf(f) === -1) familiesUsed.current.push(f); });
         if (fired.length >= 2) {
           // Winner = last in the array, since attention-order places the strongest last.
           // Κ13 "WHY THIS MOVE" — answered by observation rather than by another rule. The signals
@@ -5784,6 +5857,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     roadAnswersFinal.current = [];
     roadMapDelivered.current = false;
     roadMapRecovered.current = false;
+    familiesUsed.current = [];
     roadQuestionState.current = null;
     window.__auraLastCollision = null;
     setValueUnlocked(false);
