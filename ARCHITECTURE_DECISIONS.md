@@ -596,3 +596,56 @@ delivered as prompt text is a suggestion. This raises the probability of a
 better-aimed next question; it cannot compel one. Enforcement needs a hard override —
 the product has two — and that is a separate decision with the reverted Anchors/Stakes
 gates behind it.
+
+---
+
+## Phase 1: the lens selector actually selects (shipped 2026-09-22)
+
+**Measured before the change.** AURA has four system prompts — SIMPLIFY, CHALLENGE,
+PERSPECTIVE, EXPLORE — and a working chooser, `inferLensFallback`. It was reached from
+**one** place: the First-WHY branch, which requires an opening of 60 words or fewer
+(RT-08's threshold, added so a long first message would not have its context discarded).
+
+On the two real sessions we have:
+
+| session | needsFirstWhy | lens it would get | lens it got |
+|---|---|---|---|
+| nurse/teacher | false (74 words) | **EXPLORE** | SIMPLIFY |
+| gaming | false (74 words) | **PERSPECTIVE** | SIMPLIFY |
+
+Both ran end to end on SIMPLIFY, and three of the four prompts were unreachable for
+anyone arriving with something substantial to say. Not dead code — a strategy selector
+that does not select, and when it does not run every session gets the same strategy.
+
+`decideOpeningLens` is now called on the main path for the session's first user message.
+
+### Chosen once, from the opening
+
+Re-deciding every turn would let the lens thrash on a single stray word. The existing
+switch points — after a compression pass, and on distress — remain the only other places
+it moves. Anything outside the four known lenses is refused rather than folded into the
+default: a wrong lens chosen confidently is worse than the default chosen honestly.
+
+### The async trap, and why a ref exists
+
+`setActiveLens` is React state. Calling it and then awaiting `generateResponse` in the
+same tick leaves the callback reading the OLD value, so the lens would apply from the
+NEXT turn — on the very turn it matters most. **The distress path at the time of writing
+already had exactly this defect**, silently: it set PERSPECTIVE and then immediately
+called `generateResponse`, which used whatever lens was there before.
+
+`activeLensRef` mirrors the state and is written synchronously at every change site;
+`getLensPrompt` now reads the ref at both call sites. Same mirror pattern as
+`introChoiceRef`, but set directly rather than through an effect, because an effect is
+also too late.
+
+### Telemetry
+
+`lens` travels as a code (0–3 in fixed order, **4 for unknown — deliberately not 0**, so
+a mapping failure can never read as a session that ran on SIMPLIFY) and `lensSwitches`
+counts the moves. **Zero is the finding**, not a blank: it means the selector never ran,
+which is the state every session was in until now.
+
+### Scope
+
+No cached block touched. Twelve mutations, none survived.

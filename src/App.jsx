@@ -1303,6 +1303,38 @@ function inferLensFallback(firstMessage, whyWord) {
 function buildFirstWhyFloor() {
   return `\n[FIRST REPLY FLOOR (this branch generates the session's first substantive reply, and the code-level floor that guards it was only wired to the main path): Assumption Surfacing, Premise Inversion, Contradiction Detection and any binary-choice framing are all held back for this one turn regardless of how the material looks. Respond only with open, natural material-gathering per OPEN BEFORE PROBE. These become available from the next reply onward.]\n`;
 }
+// THE LENS SELECTOR, REACHED FOR EVERY SESSION. inferLensFallback has always worked; it was
+// only ever called from the First-WHY branch, which requires an opening of 60 words or fewer
+// (RT-08's threshold, added so a long first message would not have its context discarded).
+// Measured on the two real sessions we have: the nurse opening scores EXPLORE and the gaming
+// opening scores PERSPECTIVE, and both ran end to end on SIMPLIFY because both openings are
+// longer than 60 words. Three of the four prompts were unreachable for anyone who arrives with
+// something substantial to say.
+//
+// CHOSEN ONCE, FROM THE OPENING. Re-deciding every turn would let the lens thrash on a single
+// stray word; the existing switch points — after a compression pass, and on distress — stay the
+// only other places it moves.
+//
+// The inferrer is injected rather than called, because the suites lift and eval each function on
+// its own. Anything outside the four known lenses is refused rather than folded into the default:
+// a wrong lens chosen confidently is worse than the default chosen honestly.
+function decideOpeningLens(messages, userText, infer) {
+  if (typeof infer !== "function") return null;
+  const list = Array.isArray(messages) ? messages : [];
+  if (list.some(m => m && m.role === "user")) return null;
+  const t = typeof userText === "string" ? userText.trim() : "";
+  if (!t) return null;
+  let chosen = null;
+  try { chosen = infer(t, ""); } catch (e) { return null; }
+  return ["SIMPLIFY", "CHALLENGE", "PERSPECTIVE", "EXPLORE"].indexOf(chosen) === -1 ? null : chosen;
+}
+// Telemetry takes booleans and small non-negative integers only, so the lens travels as a code.
+// 4 means "not one of the four" and is deliberately NOT 0: a mapping failure must never read as
+// a session that ran on SIMPLIFY.
+function lensCode(lens) {
+  const i = ["SIMPLIFY", "CHALLENGE", "PERSPECTIVE", "EXPLORE"].indexOf(lens);
+  return i === -1 ? 4 : i;
+}
 function getLensPrompt(lens) {
   switch(lens) {
     case 'CHALLENGE':   return SYSTEM_LENS_CHALLENGE;
@@ -4176,6 +4208,16 @@ export default function AURAv2() {
   const [firstWhyPending, setFirstWhyPending] = useState(false);
   const [firstWhyMessage, setFirstWhyMessage] = useState("");
   const [activeLens, setActiveLens]           = useState("SIMPLIFY"); // SIMPLIFY | CHALLENGE | PERSPECTIVE | EXPLORE — never revealed
+  // SYNCHRONOUS MIRROR, and the reason is a real bug rather than style. setActiveLens is React
+  // state: calling it and then awaiting generateResponse in the same tick leaves the callback
+  // reading the OLD value, so the lens would apply from the NEXT turn — on the very turn it
+  // matters most. The distress path already had exactly that defect. Same mirror pattern as
+  // introChoiceRef, but set directly at each change site rather than through an effect, because
+  // an effect is also too late.
+  const activeLensRef = useRef("SIMPLIFY");
+  // How many times the lens moved this session. Zero is the finding: it means the selector never
+  // ran, which is the state every session was in until now.
+  const lensSwitches = useRef(0);
   const [sessionEnded, setSessionEnded] = useState(false);
   // Value Settlement (User-Defined Value model): the user unlocks their Blueprint by naming
   // their own amount, after they've already experienced the value (Clarity + Ownership Scale),
@@ -4417,6 +4459,10 @@ export default function AURAv2() {
         beatParsed: _beatParsed,
         beatLabels: _beatLabels,
         explicitClosure: _declared,
+        // Which of the four prompts actually ran, and how often it moved. lensSwitches at 0
+        // is the finding, not a blank: it means the selector never ran this session.
+        lens: lensCode(activeLensRef.current),
+        lensSwitches: lensSwitches.current,
         // Measured on the RAW model output and on each stage of our own chain, unlike the
         // two booleans above which only ever see the text that survived it. rawMap greater
         // than strippedMap means the map was destroyed by tag-stripping or the ΑΡΑ backstop.
@@ -4598,7 +4644,7 @@ A line missing above means only that one pattern was not matched — the absence
       const basePrompt =
         currentMode === "COMPRESSION" ? SYSTEM_COMPRESSION :
         currentMode === "SUPPORTIVE"  ? SYSTEM_SUPPORTIVE :
-        getLensPrompt(activeLens);
+        getLensPrompt(activeLensRef.current);
       const isBrandNewUser = onboardingStepRef.current < 14 &&
         (memory.anchors||[]).length === 0 && (memory.trajectories||[]).length === 0;
       // BUG FIX: the demo must be suppressed when the user explicitly chose "start directly" on the
@@ -5033,6 +5079,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         if (msgs.length > 0) {
           const allUserText = msgs.filter(m => m.role === "user").map(m => m.content).join(" ");
           const freshLens = inferLensFallback(allUserText, "");
+          activeLensRef.current = freshLens; lensSwitches.current += 1;
           setActiveLens(freshLens);
         }
       }
@@ -5525,7 +5572,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       ...messages,
       { role: "user", content: userCorrection || "[User indicated the observation was inaccurate. Apply misfire recovery protocol.]" }
     ];
-    const recoveryPrompt = getLensPrompt(activeLens) + `\n\nMISFIRE RECOVERY: The user has indicated your previous observation was inaccurate or incomplete. Your response must begin with: "Understood. My interpretation appears incomplete." Then ask: "What am I missing that changes the picture?" Do not repeat the original observation.`;
+    const recoveryPrompt = getLensPrompt(activeLensRef.current) + `\n\nMISFIRE RECOVERY: The user has indicated your previous observation was inaccurate or incomplete. Your response must begin with: "Understood. My interpretation appears incomplete." Then ask: "What am I missing that changes the picture?" Do not repeat the original observation.`;
     setLoading(true);
     try {
       const text = stripAraDeclarative(await callAura(correctionMsgs, recoveryPrompt));
@@ -5707,6 +5754,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       setMessages(distressMsgs);
       setCurrentDomain(detectDomain(userText));  // BUG 9: set domain in distress path
       // Inject distress context into normal flow — lens defaults to SIMPLIFY/PERSPECTIVE
+      activeLensRef.current = "PERSPECTIVE"; lensSwitches.current += 1;
       setActiveLens("PERSPECTIVE");
       await generateResponse(distressMsgs, mode);
       turnCount.current += 1; // RT-fix #5: moved after the call
@@ -5733,6 +5781,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       
       
       const inferred = inferLensFallback(firstWhyMessage, firstWhyRefusal ? firstWhyMessage : userText);
+      activeLensRef.current = inferred; lensSwitches.current += 1;
       setActiveLens(inferred);
       const initMsgs = [
         { id: nextMsgId(), role: "user", content: firstWhyMessage },
@@ -5762,6 +5811,18 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       return;
     }
 
+    // THE SELECTOR, ON THE MAIN PATH. Until now inferLensFallback was reached only from the
+    // First-WHY branch, so any session whose opening ran past 60 words kept SIMPLIFY for its
+    // whole life. Decided once, from the opening, and written to the ref synchronously so the
+    // very first reply already uses the chosen prompt.
+    {
+      const _openingLens = decideOpeningLens(messages, userText, inferLensFallback);
+      if (_openingLens && _openingLens !== activeLensRef.current) {
+        activeLensRef.current = _openingLens;
+        lensSwitches.current += 1;
+        setActiveLens(_openingLens);
+      }
+    }
     const nextMsgs  = [...messages, { id: nextMsgId(), role: "user", content: userText }];
     const pattern   = detectPattern(nextMsgs);
     const domain    = detectDomain(userText);
@@ -5855,6 +5916,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setCurrentDomain("άλλο");
     setFirstWhyPending(false);
     setFirstWhyMessage("");
+    activeLensRef.current = "SIMPLIFY"; lensSwitches.current = 0;
     setActiveLens("SIMPLIFY");
     turnCount.current = 0;
     currentSessionId.current = Date.now().toString(36);

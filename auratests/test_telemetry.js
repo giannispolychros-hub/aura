@@ -237,7 +237,11 @@ const TRACE_START = CODE.indexOf('DIAGNOSTIC SHADOW TRACE');
 const TRACE = CODE.slice(TRACE_START, CODE.indexOf('diagnostics must never affect the session', TRACE_START));
 assert('the trace slice is non-empty — a reversed range would make the next assertion vacuous',
   TRACE.length > 500);
-const EFFECT2 = CODE.slice(CODE.indexOf('recordTelemetry("session_completed"'), CODE.indexOf('recordTelemetry("session_completed"') + 700);
+// Sliced to the END OF THE CALL, not a fixed window. A 700-character window was enough
+// when it was written and stopped being enough the moment two more fields were added
+// above these — the assertions then read past nothing and failed on a correct file.
+const EFFECT2_AT = CODE.indexOf('recordTelemetry("session_completed"');
+const EFFECT2 = CODE.slice(EFFECT2_AT, CODE.indexOf('});', EFFECT2_AT) + 3);
 assert('a per-session accumulator exists for the road chain',
   /roadTraceTotals\s*=\s*useRef\(/.test(CODE));
 assert('the accumulator is filled from the trace that already computes these values',
