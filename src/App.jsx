@@ -2714,6 +2714,77 @@ function isExplicitClosure(text) {
   return stripped.length === 0;
 }
 
+// ── CLOSING DUPLICATION FILTER ─────────────────────────────────────────────
+// Live evidence 2026-09-22: the word-to-remember question was delivered twice, in
+// two separate turns, with the user's own word in between. Part 2 re-delivered a
+// complete Part 1 — reflection summary, then the exact prescribed last line — and
+// only then its own closure.
+//
+// The cause sits in the cached prompt and is deliberately not fixed there. 419ea67
+// removed the narrative from Part 1's per-turn trigger but left SYSTEM_TERMINATION
+// alone to protect the cache, so it still reads "PART 1 (first reply — REFLECTION
+// SUMMARY + word request)". On the Part 2 call the model reads a system prompt
+// saying Part 1 holds a summary, a history where it does not, and a trigger saying
+// "do not REPEAT" — a word that presupposes it already happened. It filled the gap.
+// Aligning the cached definition is the real repair and is queued as a prompt
+// change; this filter stays afterwards regardless, because 419ea67 already proved
+// that a single sentence of instruction does not hold.
+//
+// WHAT MAY BE CUT, and why it is only this. Part 2's own STEP 2 spec prescribes
+// "Ξεκίνησες προσπαθώντας να Χ. Στην πορεία η ερώτηση έγινε Υ." — narrative prose is
+// LEGITIMATE Part 2 output, so a reflection-summary detector would cut exactly the
+// text Part 2 exists to write. The word-question has fixed, prescribed wording and
+// is forbidden in Part 2 without exception, so it is the only safe anchor. Its own
+// spec places it last in Part 1: everything up to and including it is therefore
+// misplaced Part 1, and whatever follows is the real Part 2. The summary goes with
+// it by position, never by matching its prose.
+function stripRepeatedClosing(text) {
+  const t = typeof text === "string" ? text : "";
+  if (!t.trim()) return t;
+  // Rules and bullets left orphaned once the block above them is gone.
+  const isSeparator = p => /^[\s\-–—_*=·.]+$/.test(p);
+  // The three shapes the prompt offers for one question: the plain word request
+  // (including the offline fallback's "μία σύντομη φράση"), the returning-user
+  // variant built by wordContextNote, and the carry-forward fill-in-the-blank.
+  const isWordQuestion = p =>
+    /Πριν φύγεις[\s—–-]*μία\s+(λέξη|σύντομη)/i.test(p) ||
+    /ποια λέξη ή ποια σύντομη φράση θα ήθελες να κρατήσεις/i.test(p) ||
+    /Συμπλήρωσέ το με τα δικά σου λόγια/i.test(p) ||
+    /θα θυμηθώ ότι\s*_{3,}/.test(p);
+  const paras = t.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+  // LAST occurrence, not first: the carry-forward form spans two paragraphs and the
+  // invitation to complete it is the second one.
+  let last = -1;
+  for (let i = 0; i < paras.length; i++) if (isWordQuestion(paras[i])) last = i;
+  if (last === -1) return t;
+  const after = paras.slice(last + 1).filter(p => !isSeparator(p));
+  // Empty means the whole reply was misplaced Part 1. Reported as empty rather than
+  // patched here: choosing what to show instead is the caller's decision, not a
+  // filter's, and a filter that invents closing text would be writing the product.
+  return after.join("\n\n");
+}
+// SAME TRANSCRIPT, SAME FAMILY: "Καλή συνέχεια." was said in an ORDINARY turn, before
+// the closing sequence had run at all — the session said goodbye, then asked for a
+// word, then closed again. It cannot be stopped where it is written: that reply is
+// committed to state ~138 lines before decideTermination knows a closure is coming.
+// It is removed at the one moment the answer is known for certain — as the closing
+// sequence delivers its own first message, in the same atomic state update.
+// Never empties a reply: a turn that is nothing but a farewell is left exactly as it
+// is, since removing it would leave a blank message where AURA spoke.
+function stripPrematureFarewell(text) {
+  const t = typeof text === "string" ? text : "";
+  if (!t.trim()) return t;
+  const lines = t.split("\n");
+  let end = lines.length;
+  while (end > 0 && !lines[end - 1].trim()) end -= 1;
+  if (end === 0) return t;
+  const lastLine = lines[end - 1].trim();
+  // Anchored whole-line: "θέλεις καλή συνέχεια στη δουλειά σου" is a sentence about a
+  // farewell, not a farewell, and must survive untouched.
+  if (!/^(καλή συνέχεια|καλή τύχη|καλή δύναμη|καλό βράδυ|καληνύχτα|τα λέμε|αντίο)[.!…]?$/i.test(lastLine)) return t;
+  const rest = lines.slice(0, end - 1).join("\n").trim();
+  return rest || t;
+}
 function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued, compressionCount, modelJudgesEnd, concreteStepStated = false, outcomeScaleAsked = false, outcomeScaleBlockUsed = false, duringOnboarding = false, duringDeclineCooldown = false }) {
   if (safetyMode) return "none";
   // Real-user evidence (2026-07): a plain "οκ" mid-onboarding satisfied the natural-exit
@@ -4060,6 +4131,11 @@ export default function AURAv2() {
   // Post-decline cooldown: counts down after the user dismisses a closure prompt, so the
   // same short-reply heuristics can't immediately re-trigger it turn after turn.
   const closureDeclineCooldown = useRef(0);
+  // Deliberately NOT reflectionDelivered: that one is set at the START of
+  // triggerTermination and was measured never to reach Part 2. This tracks the one
+  // fact Part 2 needs — the word-to-remember question has already been put to the
+  // user this session, so any word-question in Part 2's own output is a repeat.
+  const wordQuestionDelivered = useRef(false);
   const reflectionDelivered = useRef(false); // CODE-LEVEL FIX (real bug, confirmed via transcript):
   // tracks whether the Reflection Summary sequence has actually fired this session — needed to
   // distinguish "this is the first closing signal, let it through" from "already closed once,
@@ -5070,6 +5146,26 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setTimeout(step, 135);
   }, []);
 
+  // Appends a closing-sequence message AND, in the same atomic update, removes a
+  // farewell the previous ordinary turn had already said. At this exact point the
+  // answer is finally known — the closing sequence is running, so that goodbye was
+  // premature. Stops at the first assistant turn found, and never touches a turn
+  // that is itself part of the closing sequence.
+  const appendClosingMessage = useCallback((content) => {
+    setMessages(prev => {
+      const next = prev.slice();
+      for (let i = next.length - 1; i >= 0; i--) {
+        if (next[i].role !== "assistant") continue;
+        if (next[i].isTermination) break;
+        const cleaned = stripPrematureFarewell(next[i].content);
+        if (cleaned !== next[i].content) next[i] = { ...next[i], content: cleaned };
+        break;
+      }
+      next.push({ id: nextMsgId(), role: "assistant", content, msgMode: "TERMINATION", isTermination: true });
+      return next;
+    });
+  }, []);
+
   // Part 2 — delivered after the user gives their word, which is saved as a real anchor first (in handleSubmit)
   const deliverFinalClosure = useCallback(async (msgs, echoInfo) => {
     setLoading(true);
@@ -5083,7 +5179,15 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       }];
       const rawText = await callAura(finalMsgs, SYSTEM_TERMINATION);
       const text = stripAraDeclarative(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""));
-      setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
+      // THE FILTER RUNS HERE, before anything is rendered — the trigger message above
+      // already forbids repeating the word-question and the model did it anyway, which
+      // is the whole reason this exists as code rather than as another sentence.
+      const stripped = wordQuestionDelivered.current ? stripRepeatedClosing(text) : text;
+      // If the strip leaves nothing, Part 2 was misplaced Part 1 from end to end. The
+      // app's own existing closing line is used rather than an empty message; it is the
+      // same sentence the offline path already falls back to, not new content.
+      const shownText = stripped.trim() ? stripped : "Η σκέψη σου παραμένει δική σου.";
+      setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: shownText, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
       // Κ4 — arm the recognition gate. Only when a real pattern exists AND the person has not
       // already refused it in a previous session: re-asking after someone answered reads as not
@@ -5097,7 +5201,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         }
       } catch (e) { /* the gate must never block a closing */ }
       applyTerminationIllumination();
-      const sentences = text.split(/(?<=[.!;])\s+/).map(s => s.trim()).filter(Boolean);
+      // READS shownText, NOT text: finalDistillation is the last sentence of Part 2 and
+      // it gates the paywall block, the Blueprint download and the Νέα συνεδρία button.
+      // Taking it from the unfiltered reply could pin it to the word-question just cut.
+      const sentences = shownText.split(/(?<=[.!;])\s+/).map(s => s.trim()).filter(Boolean);
       if (sentences.length > 0) setFinalDistillation(sentences[sentences.length - 1]);
     } catch {
       const fallback = "Η σκέψη σου παραμένει δική σου.";
@@ -5137,7 +5244,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         }];
         const rawText = await callAura(termMsgsEarly, SYSTEM_TERMINATION);
         const text = stripAraDeclarative(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""));
-        setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
+        // The word was already asked and answered earlier in this session, so Part 2
+        // must not produce one either — this branch arms the same flag as Part 1.
+        wordQuestionDelivered.current = true;
+        appendClosingMessage(text);
         const priorEchoCount = countPriorWordEchoes(memory, capturedWord);
         const beforeText = extractBeforeMessage(msgs);
         const shiftText = extractShiftSentence(msgs);
@@ -5160,16 +5270,20 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       }];
       const rawText = await callAura(termMsgs, SYSTEM_TERMINATION);
       const text = stripAraDeclarative(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""));
-      setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "TERMINATION", isTermination: true }]);
+      wordQuestionDelivered.current = true;
+      appendClosingMessage(text);
       setAwaitingRememberedWord(true);
     } catch {
       const fallback = "Πριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις. Όχι για εδώ. Για σένα, όταν ξαναβρεθείς σε αυτή τη σκέψη.";
-      setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: fallback, msgMode: "TERMINATION", isTermination: true }]);
+      // The offline path asks the same question, so it arms the same flag — otherwise a
+      // session that fell back here would leave Part 2 free to ask it a second time.
+      wordQuestionDelivered.current = true;
+      appendClosingMessage(fallback);
       setAwaitingRememberedWord(true);
     } finally {
       setLoading(false);
     }
-  }, [safetyMode, memory, deliverFinalClosure]);
+  }, [safetyMode, memory, deliverFinalClosure, appendClosingMessage]);
 
   // ── Misfire recovery — user rejected observation ──
   const handleMisfireResponse = useCallback(async (userCorrection) => {
@@ -5553,6 +5667,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     outcomeScaleBlockUsed.current = false;
     closureDeclineCooldown.current = 0;
     reflectionDelivered.current = false;
+    wordQuestionDelivered.current = false;
     informationModeActive.current = false;
     methodFailureHint.current = false;
     violationCounts.current = {};

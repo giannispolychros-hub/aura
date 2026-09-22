@@ -377,3 +377,83 @@ ctx) και `detectsBinaryOppositionPhrasing` (1 κλήση, μετρητής). 
 — και χειρότερη, γιατί εκεί η συλλογή ήταν σιωπηλή, ενώ εδώ θα ήταν ενεργή. Σημείωση:
 ο κώδικας του Silent Profile **υπάρχει ακόμη** πίσω από consent gate (`0a937d2`) — μια
 «παιχνιδιάρικη» ερώτηση θα του έδινε ακριβώς το είδος εισόδου που δεν έχει σήμερα.
+
+---
+
+## Queued cache-invalidating change: align the cached Part 1 definition
+
+**Recorded 2026-09-22. Not done yet — deliberately queued.**
+
+### The issue
+
+`SYSTEM_TERMINATION` line 1119 still reads:
+
+> `── PART 1 (first reply — REFLECTION SUMMARY + word request) ──`
+
+`419ea67` removed the narrative from Part 1 by rewriting the **per-turn trigger
+message** only, and left the cached block untouched on purpose, to protect the
+prompt cache. Verified: `git show 419ea67 | grep -c "PART 1 (first reply"` → `0`.
+
+On the Part 2 call the model therefore reads three things that cannot all be true:
+
+1. a system prompt saying Part 1 contains a reflection summary,
+2. a conversation history in which Part 1 contained no such summary,
+3. a trigger saying *"Do not **repeat** the Reflection Summary or the
+   word-question"* — a word that presupposes it already happened.
+
+It reconciles them by delivering the missing Part 1 in full, then Part 2. Measured
+on the live 2026-09-22 transcript: the Part 2 turn matched the cached Part 1 spec
+on every countable dimension — 8 sentences against "4-8", a 7-word opening against
+"≤15", ending on the exact prescribed last line, carrying the spec's own
+«παραμένει» steady-anchor formulation.
+
+`419ea67`'s own commit message predicted this under OUT OF SCOPE: *"Part 2 can
+still retell. Its own instruction already forbids that and the model ignored it
+once."* It did, and it took the word-question with it.
+
+### The correct repair
+
+Align the cached Part 1 definition with what the per-turn trigger already dictates:
+the word-to-remember question and essentially nothing else, no reflection summary.
+Once the cached text and the trigger agree, the contradiction disappears at its
+source.
+
+### Why it is not done now
+
+It invalidates the prompt cache. It joins the queue for a single future
+cache-invalidating commit, together with:
+
+- **the disconnected 1-10 question** (`CLARITY + OWNERSHIP SCALE`, line 407): its
+  trigger is model-judged — *"The moment a concrete, specific next step has
+  emerged"* — and on the live transcript no code gate armed it at all
+  (`detectsConcreteStep` matched nothing all session). Prompt-level by nature.
+- **the ΒΡΗΚΕΣ / DECLARATION_EVENT rewrite.**
+
+### Precondition, binding
+
+The code-level filter shipped today (`stripRepeatedClosing`,
+`stripPrematureFarewell`, `wordQuestionDelivered`) **stays in place after the
+prompt is fixed.** It is not scaffolding to be removed once the cached text is
+aligned. `419ea67` already demonstrated that a single sentence of instruction to
+the model does not hold: the Part 2 trigger forbade exactly this and was ignored.
+A second line of defence that costs nothing at runtime is kept.
+
+### What was deliberately NOT filtered, and why
+
+The reflection summary is **not** pattern-matched. Part 2's own `STEP 2` spec
+prescribes, verbatim, *"Ξεκίνησες προσπαθώντας να Χ. Στην πορεία η ερώτηση έγινε
+Υ."* — narrative prose is legitimate Part 2 output, so a summary detector would cut
+the very text Part 2 exists to write. The word-question is the only safe anchor: it
+has fixed prescribed wording, is forbidden in Part 2 without exception, and its own
+spec places it last in Part 1. Everything up to and including it is therefore
+misplaced Part 1 **by position**, and the summary is removed with it — never by
+matching its prose.
+
+### Known residual limit
+
+`stripPrematureFarewell` cannot stop the premature farewell where it is written.
+That reply is committed to state at `App.jsx:4826` and `decideTermination` does not
+run until `:4964`. The farewell is removed at the only moment the answer is known
+for certain — as the closing sequence delivers its own first message, in the same
+atomic state update. A viewer watching that exact turn may see the farewell briefly
+before it is removed.
