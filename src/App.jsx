@@ -2239,6 +2239,24 @@ function structuralLabelsIn(text) {
     beat: /^[^\S\n]*(ΗΡΘΕΣ ΜΕ|ΒΡΗΚΕΣ|ΦΕΥΓΕΙΣ ΜΕ)[^\S\n]*:/m.test(t),
   };
 }
+// Summing the shadow trace for the session, as a pure function so the arithmetic is
+// testable rather than asserted by the presence of three lines inside a callback —
+// mutation showed that presence check surviving the counters being disabled outright.
+// THE THREE STAGES ARE COUNTED SEPARATELY ON PURPOSE. rawLabels says the model wrote
+// the labels; rawMap says they parsed on the untouched output; strippedMap says they
+// still parsed after hidden-tag removal and the ΑΡΑ backstop. rawMap above strippedMap
+// means OUR OWN pipeline destroyed a map the model did produce — a failure the existing
+// session_completed booleans cannot see, because they only ever read the surviving text.
+function tallyRoadTrace(totals, trace) {
+  const t = totals && typeof totals === "object" ? totals : {};
+  const x = trace && typeof trace === "object" ? trace : {};
+  const n = v => (typeof v === "number" && isFinite(v) ? v : 0);
+  return {
+    rawLabels: n(t.rawLabels) + (x.rawHasLabels === true ? 1 : 0),
+    rawMap: n(t.rawMap) + (n(x.parseRaw) > 0 ? 1 : 0),
+    strippedMap: n(t.strippedMap) + (n(x.parseAfterStrip) > 0 ? 1 : 0),
+  };
+}
 // ── SESSION COVERAGE REPORT ────────────────────────────────────────────────
 // The product sends the model twenty ctx signals a turn and almost all of them are
 // INSTRUCTIONS — "use that specific response", "these take priority", "switch now".
@@ -4237,6 +4255,14 @@ export default function AURAv2() {
   const compressionCount = useRef(0);
   const violationCounts = useRef({}); // per-session tally of detectOutputViolation categories, debug-panel only
   const roadTraceLast = useRef(null); // last turn's road-map trace counters (numbers/booleans only), debug-panel only
+  // THE SAME VALUES, ACCUMULATED AND PROMOTED. roadTraceLast holds only the last turn and
+  // only reaches the ?debug=1 panel, which is unreachable on the phones these sessions run
+  // on. session_completed already carries roadMap/roadLabels, but both are measured on
+  // `messages` — AFTER hidden-tag removal and stripAraDeclarative. These count the RAW
+  // output and each stage of the same chain, so a map that parses raw and not after
+  // stripping becomes visible: that would be our own pipeline destroying it, a failure the
+  // surviving-text booleans structurally cannot see. Counts only, cleared per session.
+  const roadTraceTotals = useRef({ rawLabels: 0, rawMap: 0, strippedMap: 0 });
   // ROAD QUESTIONS — one ref for the whole mechanism, so resetSession needs one line and
   // test_ref_reset_integrity needs no EXCEPTIONS entry. In-memory only: never written to `memory`,
   // never persisted, so it never reaches the consent gate.
@@ -4393,6 +4419,12 @@ export default function AURAv2() {
         beatParsed: _beatParsed,
         beatLabels: _beatLabels,
         explicitClosure: _declared,
+        // Measured on the RAW model output and on each stage of our own chain, unlike the
+        // two booleans above which only ever see the text that survived it. rawMap greater
+        // than strippedMap means the map was destroyed by tag-stripping or the ΑΡΑ backstop.
+        roadRawLabelTurns: roadTraceTotals.current.rawLabels,
+        roadRawMapTurns: roadTraceTotals.current.rawMap,
+        roadStrippedMapTurns: roadTraceTotals.current.strippedMap,
       });
     } catch (e) { /* instrumentation must never affect a session */ }
   }, [sessionEnded]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -4905,6 +4937,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         console.log('[AURA ROAD TRACE]', _traceOut);
         if (_traceProv) console.log('[AURA PROVENANCE]', _traceProv);
         roadTraceLast.current = _traceOut;
+        // Promotion: the per-turn values above, summed for the session so session_completed
+        // can carry them. Nothing new is computed here.
+        roadTraceTotals.current = tallyRoadTrace(roadTraceTotals.current, _traceOut);
       } catch (e) { /* diagnostics must never affect the session */ }
       try {
         if (window.__auraLastCollision && window.__auraLastCollision.turn === msgCount) {
@@ -5865,6 +5900,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     methodFailureHint.current = false;
     violationCounts.current = {};
     roadTraceLast.current = null;
+    roadTraceTotals.current = { rawLabels: 0, rawMap: 0, strippedMap: 0 };
     roadAnswersFinal.current = [];
     roadMapDelivered.current = false;
     roadMapRecovered.current = false;

@@ -215,6 +215,76 @@ assert('The effect emits only counts — no content-bearing field reaches the re
 assert('The effect is guarded so it does not fire on reset (sessionEnded going false)',
   /if\s*\(!sessionEnded\)\s*return/.test(EFFECT));
 
+// ── 6b. THE ROAD-CHAIN COUNTERS ──────────────────────────────────────────
+// session_completed already carries roadMap and roadLabels, but both are measured on
+// `messages` — the text AFTER hidden-tag removal and stripAraDeclarative. The shadow
+// trace measures the RAW model output and then each stage of that same chain
+// (parseRaw → parseAfterTags → parseAfterStrip), and until now all of it went only to
+// the ?debug=1 panel, which is unreachable on the phones these sessions run on.
+//
+// The difference is the point. If a map parses on the raw text and not after stripping,
+// OUR OWN pipeline destroyed it — a failure class nothing has ever measured, and one the
+// existing booleans cannot see because they only ever look at the surviving text.
+// This is the signal the queued G1 compliance decision is waiting on.
+//
+// Counts only, per session, same schema as everything else here: small non-negative
+// integers, keys within the 24-character limit, no text ever.
+// The end marker must be searched FORWARD from the start: the collision logger sits
+// BEFORE the trace in this file, so slicing to its first occurrence gave a reversed,
+// empty range and the assertion below proved nothing. Second time this exact slice bug
+// has appeared in a test written today — the marker is now the trace's own catch.
+const TRACE_START = CODE.indexOf('DIAGNOSTIC SHADOW TRACE');
+const TRACE = CODE.slice(TRACE_START, CODE.indexOf('diagnostics must never affect the session', TRACE_START));
+assert('the trace slice is non-empty — a reversed range would make the next assertion vacuous',
+  TRACE.length > 500);
+const EFFECT2 = CODE.slice(CODE.indexOf('recordTelemetry("session_completed"'), CODE.indexOf('recordTelemetry("session_completed"') + 700);
+assert('a per-session accumulator exists for the road chain',
+  /roadTraceTotals\s*=\s*useRef\(/.test(CODE));
+assert('the accumulator is filled from the trace that already computes these values',
+  /roadTraceTotals\.current\s*=\s*tallyRoadTrace\(/.test(TRACE));
+// BEHAVIOUR, not presence. Found by mutation: asserting the three lines exist survived
+// each counter being disabled, inverted, or pointed at the wrong stage.
+eval((() => { const i = CODE.indexOf('function tallyRoadTrace('); return CODE.slice(i, CODE.indexOf('\n}', i) + 2); })());
+const Z = { rawLabels: 0, rawMap: 0, strippedMap: 0 };
+assert('a reply with labels that parses cleanly counts in all three stages',
+  JSON.stringify(tallyRoadTrace(Z, { rawHasLabels: true, parseRaw: 2, parseAfterStrip: 2 }))
+    === JSON.stringify({ rawLabels: 1, rawMap: 1, strippedMap: 1 }));
+assert('labels written but never parsed counts ONLY as labels',
+  JSON.stringify(tallyRoadTrace(Z, { rawHasLabels: true, parseRaw: 0, parseAfterStrip: 0 }))
+    === JSON.stringify({ rawLabels: 1, rawMap: 1 - 1, strippedMap: 0 }));
+// THE CASE THE WHOLE COUNTER EXISTS FOR: it parsed on the raw output and not after our
+// own stripping. rawMap must move and strippedMap must not.
+assert('a map destroyed by our own stripping is visible — rawMap moves, strippedMap does not',
+  JSON.stringify(tallyRoadTrace(Z, { rawHasLabels: true, parseRaw: 3, parseAfterStrip: 0 }))
+    === JSON.stringify({ rawLabels: 1, rawMap: 1, strippedMap: 0 }));
+assert('a reply with nothing counts nothing',
+  JSON.stringify(tallyRoadTrace(Z, { rawHasLabels: false, parseRaw: 0, parseAfterStrip: 0 })) === JSON.stringify(Z));
+assert('totals accumulate across turns rather than being replaced',
+  tallyRoadTrace(tallyRoadTrace(Z, { rawHasLabels: true, parseRaw: 1, parseAfterStrip: 1 }),
+                 { rawHasLabels: true, parseRaw: 1, parseAfterStrip: 0 }).rawLabels === 2);
+assert('malformed input never throws and never invents a count',
+  JSON.stringify(tallyRoadTrace(null, null)) === JSON.stringify(Z) &&
+  JSON.stringify(tallyRoadTrace(Z, { rawHasLabels: "yes", parseRaw: "3" })) === JSON.stringify(Z));
+assert('session_completed reports how many replies carried labels in the RAW output',
+  /roadRawLabelTurns:/.test(EFFECT2));
+assert('session_completed reports how many parsed on the RAW output',
+  /roadRawMapTurns:/.test(EFFECT2));
+assert('session_completed reports how many still parsed AFTER our own stripping',
+  /roadStrippedMapTurns:/.test(EFFECT2));
+assert('all three keys are inside the 24-character schema limit',
+  ['roadRawLabelTurns','roadRawMapTurns','roadStrippedMapTurns'].every(k => /^[a-zA-Z]{1,24}$/.test(k)));
+assert('the counters survive the recorder as integers, and text in their place is dropped',
+  (() => {
+    const ok = recordTelemetry('session_completed', { turns: 5, roadRawLabelTurns: 3, roadRawMapTurns: 1, roadStrippedMapTurns: 0 });
+    const bad = recordTelemetry('session_completed', { roadRawLabelTurns: 'ΔΡΟΜΟΣ: μετανάστευση' });
+    return ok.roadRawLabelTurns === 3 && ok.roadRawMapTurns === 1 && ok.roadStrippedMapTurns === 0
+        && !('roadRawLabelTurns' in bad);
+  })());
+assert('the accumulator is reset per session',
+  /roadTraceTotals\.current\s*=\s*\{/.test(CODE.slice(CODE.indexOf('roadTraceLast.current = null'))));
+assert('the existing displayed-text booleans are kept, not replaced — the two measure different things',
+  /roadMap: _roadMap/.test(EFFECT2) && /roadLabels: _roadLabels/.test(EFFECT2));
+
 // ── 7. The existing cost instrumentation is untouched ───────────────────────
 assert('__auraUsageLog still exists (cost instrumentation not disturbed)',
   CODE.includes('__auraUsageLog'));

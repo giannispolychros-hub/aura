@@ -155,11 +155,18 @@ assert('TELEMETRY: the label readings come from the shared function, not a secon
   /structuralLabelsIn\(/.test(EFFECT));
 assert('TELEMETRY: the parse readings come from the real parsers',
   /parseRoadMap\(/.test(EFFECT) && /parseThreeBeatShift\(/.test(EFFECT));
+// COMMENTS ARE STRIPPED BEFORE THIS IS JUDGED. The invariant is about what reaches the
+// recorder, and a comment reaches nothing. Without the strip, a line of prose explaining
+// that the counters do NOT carry text was enough to fail it — the third time in this repo
+// an assertion has been decided by a comment rather than by code. The check itself is
+// unchanged and a mutation that passes real content still fails it.
 assert('TELEMETRY: still counts only — no message text is handed to the recorder',
   (() => {
     const i = EFFECT.indexOf('recordTelemetry(');
     if (i < 0) return false;
-    const args = EFFECT.slice(i, EFFECT.indexOf('});', i));
+    const args = EFFECT.slice(i, EFFECT.indexOf('});', i))
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
     return !/\.content|\btext\b|messages\[/.test(args);
   })());
 
