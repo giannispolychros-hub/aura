@@ -5862,7 +5862,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       setActiveLens(inferred);
       const initMsgs = [
         { id: nextMsgId(), role: "user", content: firstWhyMessage },
-        { id: nextMsgId(), role: "assistant", content: "Γιατί έχει σημασία αυτό για σένα;" },
+        { id: nextMsgId(), role: "assistant", content: "Γιατί έχει σημασία αυτό για σένα τώρα;" },
         { id: nextMsgId(), role: "user", content: userText },
       ];
       setMessages(initMsgs);
@@ -6536,7 +6536,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           {firstWhyPending && (
             <div className="first-why-card">
               <div className="first-why-q">
-                Γιατί έχει σημασία αυτό για σένα;
+                Γιατί έχει σημασία αυτό για σένα τώρα;
               </div>
             </div>
           )}
