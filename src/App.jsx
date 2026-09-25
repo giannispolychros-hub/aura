@@ -3574,6 +3574,78 @@ function looksLikeAdviceCascade(text) {
   const hasImperative = /(^|\s)(πήγαινε|δες|ρώτα|κάνε|επικοινώνησε|διάβασε|ψάξε|στείλε)(\s|[.,!;]|$)/i.test(t);
   return hasList || hasImperative;
 }
+// UNSOURCED OPTION OFFER — the guard that was missing when a real user was handed three careers
+// he never raised. Every output-side guard we owned returned nothing on that reply, because all of
+// them key on GRAMMATICAL FORM: detectOutputViolation's ADVICE needs an imperative verb, its
+// ROAD_MAP_MISSING needs three list lines, looksLikeAdviceCascade needs a list or an imperative.
+// The violation was a declarative sentence with comma-separated options — the most natural way for
+// a fluent Greek model to offer them — and it walked through all three.
+//
+// PROVENANCE IS THE ONLY DISCRIMINATOR, and that is forced by the data rather than chosen. Two
+// replies from one session, three turns apart, share the exact grammar of a category noun plus an
+// enumeration: mirroring the user's own list back ("νοσηλευτική, ειδική αγωγή, σπουδές,
+// κομμωτική") is the Mirror Rule working, while "Υπάρχουν μερικές κατευθύνσεις …:" followed by six
+// invented ones is a No-Advice violation. Nothing lexical separates them. Only whose words they are.
+//
+// THE ORDER OF THE GATES IS MEASURED, NOT STYLISTIC. A whole-reply word-overlap ratio does not
+// separate: the violations sit at 0.0% and 3.8%, but a legitimate road map sits at 4.8% and a
+// legitimate "Πριν δώσω ιδέες — …" refusal at 7.1%, against legitimate mirrors at 33%. So the
+// frame and the enumeration must qualify a reply BEFORE provenance is consulted at all.
+//
+// THE MATCH IS EXACT, AND THE BAR IS ZERO. Prefix matching for Greek inflection looks mandatory —
+// "ειδικής" and "ειδική" are the same word — and destroys the detector: measured per item, exact
+// tokens give 0/6, 0/3 and 2/5 (clean separation) while a 5-character prefix gives 5/6, 2/3 and
+// 3/5 (none), because "Εκπαίδευση φροντιστών" reads as sourced from his "εκπαιδευτικός". So one
+// traceable item is enough to withhold the flag: the rule is not a tuned threshold but "not a
+// single one of these options came from the user".
+//
+// The parser is injected because the suites lift each function alone, and a thrown parser is
+// treated as "no map" — never as a flag. OBSERVATION ONLY: the caller counts this and nothing else.
+function detectsUnsourcedOptionOffer(text, userTexts, parse) {
+  const t = typeof text === "string" ? text : "";
+  if (!t.trim()) return false;
+  const hist = Array.isArray(userTexts) ? userTexts.filter(x => typeof x === "string" && x.trim()) : [];
+  if (!hist.length) return false;
+  // GATE 1 — a road map is audited by classifyRoadProvenance already, so it is never ours.
+  if (typeof parse === "function") {
+    let map = null;
+    try { map = parse(t); } catch (e) { map = null; }
+    // parseRoadMap returns {roads, unknown}, NOT an array. Reading .length off it was undefined,
+    // so this gate silently never fired — found by a surviving mutation, not by reading the code.
+    const roads = map ? (Array.isArray(map) ? map : (Array.isArray(map.roads) ? map.roads : null)) : null;
+    if (roads && roads.length) return false;
+  }
+  const fold = x => String(x == null ? "" : x).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\u03c2/g, "\u03c3");
+  const toks = x => (fold(x).match(/[a-z\u03b1-\u03c90-9]{4,}/g) || []);
+  // GATE 2 — a frame that presents a SET OF THINGS THE USER COULD DO. Without one, an enumeration
+  // is just a sentence with commas, which is most of natural Greek.
+  if (!/(κατευθυνσ|επιλογ|λυσ|δρομο|τροπο|δυνατοτητ|εναλλακτικ|κατηγορι|σεναρι|ιδεε)/.test(fold(t))) return false;
+  // GATE 3 — the enumeration itself. Bulleted or numbered lines first; failing that, a span
+  // introduced by a colon or a dash and split on commas or ή. Two items minimum.
+  let items = (t.match(/^[ \t]*(?:[-\u2022\u00b7]|\d+[.)])\s+(.+)$/gm) || [])
+    .map(x => x.replace(/^[ \t]*(?:[-\u2022\u00b7]|\d+[.)])\s+/, "").trim());
+  if (items.length < 2) {
+    // [ \t]* and NOT \s* — \s crosses a newline, which let this inline path reach into the
+    // bulleted lines below a colon and claim items that start with "- ". The two paths were then
+    // not independent: deleting the list path entirely left the suite green. Found by mutation.
+    const re = /[:\u2014\u2013][ \t]*([^\n:\u2014\u2013]{6,400})/g;
+    let m = null;
+    while ((m = re.exec(t)) !== null) {
+      const parts = m[1].split(/,|\s+\u03ae\s+/).map(x => x.trim()).filter(x => x.length >= 3);
+      if (parts.length >= 2) { items = parts; break; }
+    }
+  }
+  if (items.length < 2) return false;
+  // GATE 4 — provenance, last. Flag only when not one item is traceable to the user's own words.
+  const said = toks(hist.join(" "));
+  const bag = {};
+  for (let i = 0; i < said.length; i++) bag[said[i]] = true;
+  for (let i = 0; i < items.length; i++) {
+    const w = toks(items[i]);
+    for (let j = 0; j < w.length; j++) if (bag[w[j]] === true) return false;
+  }
+  return true;
+}
 function detectOutputViolation(text, ctx) {
   const n = String(text == null ? "" : text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   if (!n) return null;
@@ -4285,6 +4357,9 @@ export default function AURAv2() {
   const clarificationRound = useRef(0); // tracks clarification depth — max 3
   const lastChallengeAt  = useRef(-99);
   const compressionCount = useRef(0);
+  // Counts replies where AURA presented a set of options and not one of them came from the user.
+  // Observation only, per the staged plan: telemetry decides whether this ever gates a reply.
+  const unsourcedOptionOffers = useRef(0);
   const violationCounts = useRef({}); // per-session tally of detectOutputViolation categories, debug-panel only
   const roadTraceLast = useRef(null); // last turn's road-map trace counters (numbers/booleans only), debug-panel only
   // THE SAME VALUES, ACCUMULATED AND PROMOTED. roadTraceLast holds only the last turn and
@@ -4454,6 +4529,10 @@ export default function AURAv2() {
         // Which of the four prompts actually ran, and how often it moved. With the opening
         // selector reverted, 0 is the expected reading for most sessions — it means the lens
         // stayed SIMPLIFY, and anything above 0 is a compression pass, distress, or First-WHY.
+        // How many replies presented a set of options of which NOT ONE came from the user. The
+        // guard that was missing when a real user was handed three careers he never raised; every
+        // form-based guard we had returned nothing on that reply. Count only, never the text.
+        unsourcedOptions: Math.min(9999, unsourcedOptionOffers.current),
         lens: lensCode(activeLensRef.current),
         lensSwitches: lensSwitches.current,
         // Measured on the RAW model output and on each stage of our own chain, unlike the
@@ -4989,6 +5068,11 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                        String(rawTextWithTags || '').trim().slice(0, 130));
         }
         if (viol) violationCounts.current[viol] = (violationCounts.current[viol] || 0) + 1;
+        const _clean = String(rawTextWithTags || '').replace(/\[\[[^\]]*\]\]/g, '');
+        if (detectsUnsourcedOptionOffer(_clean, msgs.filter(m => m && m.role === "user").map(m => m.content), parseRoadMap)) {
+          unsourcedOptionOffers.current += 1;
+          console.warn('[AURA VIOLATION] UNSOURCED_OPTIONS | turn', msgCount, '|', _clean.trim().slice(0, 130));
+        }
       } catch (e) { /* observation must never affect the session */ }
       const exitTagMatch = rawTextWithTags.match(/\[\[EXIT:(yes|no)\]\]\s*$/i);
       const modelJudgesEnd = exitTagMatch ? exitTagMatch[1].toLowerCase() === "yes" : false;
@@ -5939,6 +6023,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     wordQuestionDelivered.current = false;
     informationModeActive.current = false;
     methodFailureHint.current = false;
+    unsourcedOptionOffers.current = 0;
     violationCounts.current = {};
     roadTraceLast.current = null;
     roadTraceTotals.current = { rawLabels: 0, rawMap: 0, strippedMap: 0 };
