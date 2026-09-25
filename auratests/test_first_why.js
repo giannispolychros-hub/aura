@@ -70,18 +70,55 @@ assert("grief wording does not trigger it (RT-21)",
 assert("the teacher's opening does not trigger it — no signal pattern matches, which is why the "
   + "session that broke never saw it", needsFirstWhy(TEACHER) === false);
 
-// ── 3. THE FAST-PATH SKIP THE PROMPT PRESCRIBES IS NOT IMPLEMENTED ────────
+// ── 3. THE FAST-PATH SKIP THE PROMPT PRESCRIBES IS NOW IMPLEMENTED ────────
 // γρ. 377 names it explicitly: skip when the first message already carries a structurally
 // detectable signal, "e.g. binary phrasing already caught by binaryOppositionCount". Session 3's
-// real opening IS binary phrasing, the detector says so, and needsFirstWhy fires anyway. Pinned as
-// a known divergence between spec and code, not as correct behaviour, so that opening the
-// reachability gate cannot quietly ship a First-WHY that fires where the prompt says skip.
+// real opening IS binary phrasing and needsFirstWhy used to fire on it anyway — measured as 1 of 9
+// real openings firing where the specification says skip. The skip is a SAFE fast-path in the
+// founder's own words: it is recognised purely from what the user structurally said, never from
+// AURA guessing why they came, so it adds no inference.
 assert("the prompt still prescribes the binary-phrasing fast-path skip",
   /Skip First-WHY if[^\n]*binaryOppositionCount/.test(raw));
 assert("the detector the prompt names does fire on that real opening",
   detectsBinaryOppositionPhrasing(S3) === true);
-assert("KNOWN DIVERGENCE: needsFirstWhy never consults it, so it fires where the prompt says skip",
-  needsFirstWhy(S3) === true && !/binary|Opposition/i.test(extract('needsFirstWhy')));
+assert("needsFirstWhy now consults that detector",
+  /detectsBinaryOppositionPhrasing\s*\(/.test(extract('needsFirstWhy')));
+assert("FIXED: the real binary opening no longer triggers First-WHY",
+  needsFirstWhy(S3) === false);
+assert("the skip is narrow — session 5, which is not binary, still triggers",
+  detectsBinaryOppositionPhrasing(S5) === false && needsFirstWhy(S5) === true);
+// The skip must come from the detector, not from the signal patterns failing to match. Strip the
+// binary check and this opening must start firing again, or the assertion above proves nothing.
+assert("the skip is what stops it — the signal patterns DO otherwise match this opening",
+  /δεν ξέρω (αν|τι|πώς)/i.test(S3) || /θέλω να (αλλάξω|ξεκινήσω|φύγω|μείνω|κάνω)/i.test(S3));
+assert("a plain double-ή dilemma is skipped too, not just this one transcript",
+  needsFirstWhy("δεν ξέρω αν να μείνω ή να φύγω") === false);
+assert("the same sentence without the opposition still triggers",
+  needsFirstWhy("δεν ξέρω αν πρέπει να μείνω άλλο") === true);
+
+// EVERY BRANCH OF THE DETECTOR, because this change made it gate the entry pillar. A mutation that
+// disabled the "μπρος γκρεμός" branch survived all 62 suites — that branch, and others, had no
+// coverage anywhere. A silent regression in any of them now silently re-opens the wrong-firing this
+// fix closed, so each alternative gets its own case and names itself on failure.
+const BINARY_FORMS = [
+  ["double ή",            "δεν ξέρω αν θέλω αυτό ή εκείνο"],
+  ["μπρος γκρεμός",       "νιώθω μπρος γκρεμός και δεν ξέρω τι να κάνω"],
+  ["πίσω ρέμα",           "είμαι πίσω ρέμα σε αυτό, δεν ξέρω"],
+  ["είτε … είτε",         "δεν ξέρω, είτε μένω εδώ είτε φεύγω τελείως"],
+  ["single ή dilemma",    "δεν ξέρω αν να μείνω ή να φύγω"],
+  ["whether … or",        "I don't know whether to stay or leave"],
+  ["or should I",         "I want to change, or should I stay"],
+  ["δύο επιλογές",        "δεν ξέρω, έχω δύο επιλογές μπροστά μου"],
+  ["δύο δρόμους",         "δεν ξέρω, βλέπω δύο δρόμους μόνο"],
+  ["από τη μία / άλλη",   "από τη μία θέλω να προχωρήσω, από την άλλη φοβάμαι"],
+];
+for (const [label, text] of BINARY_FORMS) {
+  assert("the detector still recognises " + label, detectsBinaryOppositionPhrasing(text) === true);
+  assert("First-WHY skips " + label + " — the γρ. 377 fast-path holds for it",
+    needsFirstWhy(text) === false);
+}
+assert("and it does not fire on a sentence with no opposition at all",
+  detectsBinaryOppositionPhrasing("δεν ξέρω τι θέλω να κάνω με τη ζωή μου") === false);
 
 // ── 4. REACHABILITY — LOCKED, NOT ENDORSED ────────────────────────────────
 assert("the returning-user gate is still in the trigger condition",

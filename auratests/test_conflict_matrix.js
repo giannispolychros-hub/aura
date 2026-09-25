@@ -112,6 +112,9 @@ console.log("\n=== CTX CONFLICT: first-reply floor × method-failure ===");
 eval(extract('detectsMethodFailureSignal'));
 eval(extract('classifyQuestion'));
 eval(extract('isFactQuestion'));
+// needsFirstWhy now consults the binary fast-path the prompt prescribes at γρ. 377, so its
+// dependency has to be lifted alongside it — a sibling call cannot be evaluated on its own.
+eval(extract('detectsBinaryOppositionPhrasing'));
 eval(extract('needsFirstWhy'));
 
 const CODE_SPLIT = (() => {

@@ -1246,6 +1246,15 @@ function needsFirstWhy(text) {
   // RT-08: long first messages already provide substantial context (C10) —
   // First-WHY would discard it. 60 words is a conservative "substantial" threshold.
   if (text.trim().split(/\s+/).length > 60) return false;
+  // THE FAST-PATH THE PROMPT ALREADY SPECIFIES, γρ. 377: "Skip First-WHY if … substantial context
+  // already given — INCLUDING when the first message already contains a structurally-detectable
+  // signal (e.g. binary phrasing already caught by binaryOppositionCount)". It was prescribed and
+  // never implemented, and the gap was measured: of 9 real openings, one fired here where the
+  // specification says skip — a 44-word message naming both sides of its own dilemma ("…περισσότερα
+  // χρήματα ή … θέλω να φύγω"). Asking such a person why it matters spends the entry turn on
+  // something they have already said. This adds no inference: it reads only structure the user
+  // themselves produced, which is exactly the safe fast-path the rule describes.
+  if (detectsBinaryOppositionPhrasing(text)) return false;
   // RT-21: high emotional weight (C9) — skip First-WHY's "one word, why does this
   // matter" framing, which is tone-deaf for grief/loss/burnout/breakdown messages.
   if (/(grief|πένθος|θάνατος|έχασα|απώλεια|burnout|εξάντληση|breakdown|κατάρρευση|χωρισμός|χωρίζω)/i.test(text)) return false;
