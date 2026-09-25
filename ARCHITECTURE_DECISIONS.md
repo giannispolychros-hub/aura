@@ -878,3 +878,112 @@ detectors, what AURA actually wrote at the moments they should have fired — wh
 "never triggered" from "triggered but invisible". A cap on something that never happens costs
 maintenance and buys nothing.
 
+---
+
+## First-WHY: the full profile, and the circular trap at the entry (2026-09-25)
+
+The prompt names four pillars and calls them "the essence of the application" (γρ. 197).
+**First-WHY is the ENTRY pillar** (γρ. 198). This is its measured profile.
+
+### What it is
+
+A **client-side intercept**, not a prompt rule. On the first message of a session it renders a
+fixed card and returns **without calling the model** (γρ. 5844-5849), so the model never gets the
+chance to guess why the user came. Zero Inference enforced structurally rather than by instruction
+— the opposite of the fifteen prompt-only rules mapped in item 3.
+
+Specification, γρ. 376: `First-WHY (1st message + low emotion + minimal context): "Γιατί έχει
+σημασία αυτό για σένα τώρα;"`
+
+### The trigger, in full
+
+Four conditions at the call site, all required: `messages.length === 0`, not already pending,
+**`!isBrandNewUserMsg`**, and `needsFirstWhy(userText)`. And four more inside `needsFirstWhy`:
+not FACT/ANALYSIS · **≤ 60 words** (RT-08) · no grief/burnout/separation wording (RT-21) · one of
+four signal patterns matches (dilemma · goal of change · recurring frustration · uncertainty).
+
+It does **not** depend on GOAL/OBSTACLE. It depends on length and vocabulary.
+
+**Correction to an earlier belief:** `needsFirstWhy` is **not** part of the `firstReplyFloorCtx`
+condition. That floor is gated on `msgCount === 1 && !showDemo`, and `showDemo` is dead. The real
+relationship is that the First-WHY branch bypasses the main path and therefore carries its **own
+copy** of the floor, `buildFirstWhyFloor()` — two copies for two paths, not one condition nested
+in the other.
+
+### The circular trap
+
+1. First-WHY requires a **returning** user.
+2. "Returning" means a stored anchor or trajectory.
+3. Anchors are written at only three sites, all the closing word-capture; both anchors and
+   trajectories are written only when `memory.storageEnabled`.
+4. `storageEnabled` defaults to **false** (`EMPTY_MEMORY`, γρ. 1377) and is opt-in.
+
+So on default settings `isBrandNewUserMsg` is always true and **the entry pillar cannot fire for
+anyone**. The comment at γρ. 5842 says a brand-new user "gets the demo-opening question instead —
+see demoCtx"; `demoCtx` is `''`, hardcoded, the demo path having been removed. The brand-new user
+gets neither.
+
+The prompt's own evidence, γρ. 109: *"0 of 20 real users returned after first use, and the entry
+point is the leading suspect."* The entry mechanism is gated behind session completion in a product
+where nobody completes and returns. This is a circular trap, not a rare edge case.
+
+**The founder's reading is adopted:** the upgrade is to make it *reachable*, not faster. It is
+already the fastest possible shape — client-side, zero model calls, zero latency.
+
+### The turn is unguarded — and this reorders the decision
+
+The branch calls `callAura` directly rather than `generateResponse`. Measured: **17 live context
+families** are absent from the prompt it assembles, and **22 post-processing steps** that run on
+every other turn do not run on this one — every latch-setting detector, the road-map parse and
+provenance audit, and **the No-Advice guard added earlier the same day**.
+
+Consequence for sequencing: if the reachability gate is opened, this turn becomes a **common** path
+for every new user, and it currently has no output guards whatsoever. **Wiring the guards is a
+precondition of opening the gate, not a follow-up.**
+
+### The three open decisions
+
+**1. The returning-user gate — the critical one.** The founder's "leftover" hypothesis is
+strengthened by something the code confirms: condition 2 of `needsFirstWhy` ("substantial context
+already given") **already** covers the "the user said enough, do not ask" case, so the returning
+gate adds no protection that does not exist elsewhere — it only excludes a whole population.
+
+The requested measurement, read-only, on the 9 real sessions: **without** the gate, First-WHY fires
+in **2 of 9**. With the gate, on default settings, **0 of 9**. And the two are not equal:
+
+| session | opening | verdict |
+|---|---|---|
+| 3 (44 words) | *"…αν αυτό που ψάχνω είναι πραγματικά περισσότερα χρήματα **ή** αν απλώς θέλω να φύγω…"* | **should NOT fire.** This is binary phrasing; γρ. 377 prescribes skipping exactly this, naming `binaryOppositionCount`. `detectsBinaryOppositionPhrasing` returns true. `needsFirstWhy` never consults it. |
+| 5 (30 words) | *"Θέλω να κάνω μια αλλαγή… στόχος 4000 ευρώ… θέλω να βρω λύση για το έξτρα εισόδημα"* | **should fire, and the card is apt.** Goal and number stated, stake not. What AURA asked instead was about attempts; the user answered *"Όλα υπό σκέψη ..."* — a non-answer. |
+
+So the honest count is **1 of 9 genuine, 1 of 9 wrong-firing**, and the prompt already specifies how
+to prevent the wrong one. **Implementing the γρ. 377 binary fast-path is therefore the second
+precondition** of opening the gate, alongside wiring the guards.
+
+**2. The 60-word threshold — not tonight.** 6 of 9 real openings exceed it, because real users
+dictate by voice. Needs its own measurement first: do those 6 actually contain a stated *why*, or
+are they merely long? If the latter, length is the wrong proxy and the mechanism is lost for the
+wrong reason. Separate, non-urgent.
+
+**3. The missing "τώρα" — approved and shipped** in `f98c931`. Both code copies now match γρ. 376.
+The injected assistant message mattered more than the card: it is what the model reads back as its
+own previous turn.
+
+### Answers to two questions left open in earlier instructions
+
+- **How many mechanisms are bypassed on that turn:** 17 live context families and 22
+  post-processing steps, enumerated and locked in `test_first_why`.
+- **Is `firstWhyMessage` cleared correctly on safety override and reset:** **yes.** Both CRISIS
+  (γρ. 5819) and DISTRESS (γρ. 5829) clear the flag *and* the message, and `resetSession` clears
+  both. The answer branch clears only the flag, which is safe because `firstWhyMessage` is read
+  only under `firstWhyPending`, and the only path that empties the message list — the sole way to
+  re-arm the trigger — is `resetSession`, which clears it.
+
+### Consequence for item 4 of the sequence
+
+`inferLensFallback(firstWhyMessage, firstWhyRefusal ? firstWhyMessage : userText)` — the
+**why-answer is the second argument**. The reverted `decideOpeningLens` passed `""` there. The lens
+selector was designed to decide from *opening + reason* and was wired to decide from the opening
+alone, on half its input. **Item 4 is on hold until the reachability decision is taken**, because
+the selector's reliability depends on First-WHY reaching real users.
+
