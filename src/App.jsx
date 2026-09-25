@@ -1303,31 +1303,22 @@ function inferLensFallback(firstMessage, whyWord) {
 function buildFirstWhyFloor() {
   return `\n[FIRST REPLY FLOOR (this branch generates the session's first substantive reply, and the code-level floor that guards it was only wired to the main path): Assumption Surfacing, Premise Inversion, Contradiction Detection and any binary-choice framing are all held back for this one turn regardless of how the material looks. Respond only with open, natural material-gathering per OPEN BEFORE PROBE. These become available from the next reply onward.]\n`;
 }
-// THE LENS SELECTOR, REACHED FOR EVERY SESSION. inferLensFallback has always worked; it was
-// only ever called from the First-WHY branch, which requires an opening of 60 words or fewer
-// (RT-08's threshold, added so a long first message would not have its context discarded).
-// Measured on the two real sessions we have: the nurse opening scores EXPLORE and the gaming
-// opening scores PERSPECTIVE, and both ran end to end on SIMPLIFY because both openings are
-// longer than 60 words. Three of the four prompts were unreachable for anyone who arrives with
-// something substantial to say.
+// THE LENS SELECTOR WAS WIRED HERE AND IS DELIBERATELY GONE. b5db808 called inferLensFallback
+// from the main path, because three of the four lens prompts were unreachable for anyone whose
+// opening ran past 60 words. Within a day it produced a No-Advice violation in a real session: a
+// teacher on 1300€ with four children scores EXPLORE, and SYSTEM_LENS_EXPLORE instructs the model
+// to "surface options the user has not considered", capped at "2-3 directions maximum". AURA
+// offered three careers he never asked about and a second public-sector post it could not say was
+// legal. He answered: "Άρα μου προτείνεις κάτι που δεν ξέρεις αν επιτρέπεται".
 //
-// CHOSEN ONCE, FROM THE OPENING. Re-deciding every turn would let the lens thrash on a single
-// stray word; the existing switch points — after a compression pass, and on distress — stay the
-// only other places it moves.
+// THE BUG WAS NOT THE CHOICE, IT WAS THE DURATION. Every lens prompt ends with "USE THIS LENS
+// ONCE. Ask one question. Then stop and wait." — but activeLens is session-level. That was
+// harmless while the lens was always SIMPLIFY, whose instruction only ever removes. Wiring the
+// selector turned a single-use instrument into a standing posture.
 //
-// The inferrer is injected rather than called, because the suites lift and eval each function on
-// its own. Anything outside the four known lenses is refused rather than folded into the default:
-// a wrong lens chosen confidently is worse than the default chosen honestly.
-function decideOpeningLens(messages, userText, infer) {
-  if (typeof infer !== "function") return null;
-  const list = Array.isArray(messages) ? messages : [];
-  if (list.some(m => m && m.role === "user")) return null;
-  const t = typeof userText === "string" ? userText.trim() : "";
-  if (!t) return null;
-  let chosen = null;
-  try { chosen = infer(t, ""); } catch (e) { return null; }
-  return ["SIMPLIFY", "CHALLENGE", "PERSPECTIVE", "EXPLORE"].indexOf(chosen) === -1 ? null : chosen;
-}
+// The function is deleted rather than left uncalled, so nothing reads as merely unwired. Reviving
+// it means scoping the lens to one turn, or rewriting the prompts to survive standing use — both
+// touch prompt text. test_lens_selection.js keeps the measurements and locks the absence.
 // Telemetry takes booleans and small non-negative integers only, so the lens travels as a code.
 // 4 means "not one of the four" and is deliberately NOT 0: a mapping failure must never read as
 // a session that ran on SIMPLIFY.
@@ -4215,8 +4206,9 @@ export default function AURAv2() {
   // introChoiceRef, but set directly at each change site rather than through an effect, because
   // an effect is also too late.
   const activeLensRef = useRef("SIMPLIFY");
-  // How many times the lens moved this session. Zero is the finding: it means the selector never
-  // ran, which is the state every session was in until now.
+  // How many times the lens moved this session. Only three sites can move it now: a compression
+  // pass, the distress path, and the First-WHY branch. Kept after the selector was reverted,
+  // because how often the lens actually moves is the number we had no way to see before.
   const lensSwitches = useRef(0);
   const [sessionEnded, setSessionEnded] = useState(false);
   // Value Settlement (User-Defined Value model): the user unlocks their Blueprint by naming
@@ -4459,8 +4451,9 @@ export default function AURAv2() {
         beatParsed: _beatParsed,
         beatLabels: _beatLabels,
         explicitClosure: _declared,
-        // Which of the four prompts actually ran, and how often it moved. lensSwitches at 0
-        // is the finding, not a blank: it means the selector never ran this session.
+        // Which of the four prompts actually ran, and how often it moved. With the opening
+        // selector reverted, 0 is the expected reading for most sessions — it means the lens
+        // stayed SIMPLIFY, and anything above 0 is a compression pass, distress, or First-WHY.
         lens: lensCode(activeLensRef.current),
         lensSwitches: lensSwitches.current,
         // Measured on the RAW model output and on each stage of our own chain, unlike the
@@ -5811,18 +5804,6 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       return;
     }
 
-    // THE SELECTOR, ON THE MAIN PATH. Until now inferLensFallback was reached only from the
-    // First-WHY branch, so any session whose opening ran past 60 words kept SIMPLIFY for its
-    // whole life. Decided once, from the opening, and written to the ref synchronously so the
-    // very first reply already uses the chosen prompt.
-    {
-      const _openingLens = decideOpeningLens(messages, userText, inferLensFallback);
-      if (_openingLens && _openingLens !== activeLensRef.current) {
-        activeLensRef.current = _openingLens;
-        lensSwitches.current += 1;
-        setActiveLens(_openingLens);
-      }
-    }
     const nextMsgs  = [...messages, { id: nextMsgId(), role: "user", content: userText }];
     const pattern   = detectPattern(nextMsgs);
     const domain    = detectDomain(userText);

@@ -599,7 +599,11 @@ gates behind it.
 
 ---
 
-## Phase 1: the lens selector actually selects (shipped 2026-09-22)
+## Phase 1: the lens selector actually selects (shipped 2026-09-22, REVERTED 2026-09-25)
+
+> **This entry is history, not current behaviour.** The selector was reverted after it caused
+> a No-Advice violation in a real session. See *Phase 1 reverted*, below. What survived the
+> revert: `activeLensRef` and the `lens`/`lensSwitches` telemetry.
 
 **Measured before the change.** AURA has four system prompts — SIMPLIFY, CHALLENGE,
 PERSPECTIVE, EXPLORE — and a working chooser, `inferLensFallback`. It was reached from
@@ -649,3 +653,77 @@ which is the state every session was in until now.
 ### Scope
 
 No cached block touched. Twelve mutations, none survived.
+
+---
+
+## Phase 1 reverted: a lens is a single-use instrument, and session state cannot hold one (2026-09-25)
+
+**A real user paid for the change above, within three days.** A 41-year-old nursing teacher,
+four children, 1300€, opened a session with a 39-word message. `needsFirstWhy` was false, so it
+took the main path — where the new selector ran and chose **EXPLORE**.
+
+`SYSTEM_LENS_EXPLORE` says, verbatim:
+
+> "Surface options the user has not considered or has dismissed too quickly."
+> "2–3 directions maximum."
+> "What are you ruling out before examining it?"
+
+AURA produced exactly three directions he had never raised — φροντιστήριο/ιδιαίτερα, online
+διδασκαλία, σύνταξη εκπαιδευτικού υλικού — then proposed a second public-sector post, then
+conceded it did not know whether that was legal for a civil servant. He answered:
+
+> "Άρα μου προτείνεις κάτι που δεν ξέρεις αν επιτρέπεται και με βάζεις να το ψάξω?"
+
+That is **No Advice**, the first non-negotiable, broken. The lens did not malfunction — it did
+exactly what its prompt instructs.
+
+### The real defect was duration, not choice
+
+Every one of the four lens prompts ends with:
+
+> "USE THIS LENS ONCE. Ask one question. Then stop and wait."
+
+But `activeLens` is **session-level**. That contradiction sat harmless in the codebase for as
+long as the lens was always SIMPLIFY, whose instruction is purely subtractive — *"Never add
+complexity. Never introduce new considerations. Remove."* A standing instruction to remove
+degrades into no instruction. A standing instruction to **surface options** becomes a generator,
+and it was aimed at a man who had just said he has none.
+
+The Phase 1 entry argued the selector should decide **once, from the opening**, to stop the lens
+thrashing. That reasoning was sound about *when to choose* and silent about *how long the choice
+lasts* — and the prompts had already answered the second question. I did not read them against
+the state they were being wired into.
+
+### What was removed, and what was kept
+
+| | |
+|---|---|
+| `decideOpeningLens` — function **and** call site | **removed** — deleted outright, not left uncalled, so nothing reads as merely unwired |
+| `activeLensRef` + writes at all four change sites | **kept** — it fixes a real pre-existing bug: the distress path set PERSPECTIVE and immediately awaited `generateResponse`, which read the old state, so the lens applied a turn late |
+| `getLensPrompt(activeLensRef.current)` at both call sites | **kept** — same reason |
+| `lens` / `lensSwitches` telemetry | **kept** — how often the lens actually moves is a number we had no way to see before. With the selector gone, `lensSwitches` of 0 is now the *expected* reading, and anything above 0 is a compression pass, distress, or First-WHY |
+
+The lens returns to SIMPLIFY for every session: known-good behaviour, and the state every
+session was already in before Phase 1.
+
+### The precondition for ever re-landing this
+
+Not "add a test". The one-shot contract has to be resolved first, one of two ways:
+
+1. **Scope the lens to a single turn** — it applies to one reply and reverts, matching what the
+   prompts already claim, or
+2. **Rewrite the four lens prompts to survive standing use** — drop "USE THIS LENS ONCE" and
+   make each safe as a persistent posture.
+
+Both touch prompt text, so both are cache-invalidating and belong in the queued batch. Until one
+is done, wiring any chooser to the main path re-creates this exact failure.
+
+### Scope
+
+No cached block touched — all nine prompt blocks verified byte-identical, cache prefix intact.
+Seven mutations, none survived. Full suite 57 suites / 1765 passed / 0 failed / 0 silent.
+
+**Process note.** One mutation in this round first read as a survivor and was not: the source
+line carries alignment padding, so a `replace` written with single spaces silently matched
+nothing. A mutation that fails to apply is indistinguishable from a test that fails to catch.
+Mutation scripts now assert the file actually changed before running the suite.
