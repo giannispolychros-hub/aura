@@ -782,3 +782,99 @@ The GOAL / OBSTACLE / STAKES gap the teacher session exposed (time pressure, psy
 pressure, what was tried and rejected) touches neither cache nor lens. It runs whenever convenient
 and must not delay 1→6.
 
+---
+
+## Item 3 of the sequence: the one-shot rules, mapped — and the question it inverted (2026-09-25)
+
+Read-only audit. No code changed. The task was to map the prompt's "once per session" rules
+against the code that enforces them. The map is below, but the measurement that matters turned out
+to be a different one.
+
+### The map
+
+Of 44 sites in the prompt matching a one-shot phrase, 29 are genuine behavioural caps; the rest are
+prose that happens to contain the word. Of those 29:
+
+**Enforced in code (14)** — a latch plus, in most cases, a transcript-derived detector so the latch
+survives a reload: the three-beat shift (`wasThirdTriggerAsked`), Early Clarity Baseline
+(`earlyReliefAsked`), State Shift Recognition (`shiftCheckAsked`), Mid-Session Anchor
+(`anchorsInvited`), Stakes Question (`stakesAsked`), Stakes Callback
+(`stakesCallbackDelivered`), the Outcome Scale (`outcomeScaleAsked` + `outcomeScaleBlockUsed`),
+ROOT RE-FOCUS readiness (`coreReadinessAsked`/`Confirmed`), Friend Perspective
+(`friendPerspectiveAsked` + `friendPerspectiveCtxDelivered`, budget 1), Premise Inversion
+(`premiseInversionCtxDelivered`, budget 2), Post-Map Close (`postMapCloseCtxDelivered`, budget 2),
+the termination word question and reflection (`wordQuestionDelivered`, `reflectionDelivered`), the
+road map (`roadMapDelivered`, `roadMapRecovered`), and the Solution Development Offer (partially —
+`concreteStepStated` marks the step, not the offer).
+
+**No code at all (15), model judgement only** — PROACTIVE RESOURCE POINTER's one-category-per-
+intervention cap, VOICE INVITATION (γρ. 76), WORK-TYPE SHORTCUT (143), BURN PAPER (148),
+FIRST-RESPONSE SAFEGUARD (152), EXIT / DEPARTURE SIGNAL's "no further exploratory question, ever"
+(209), TESTING A PREMISE (319), ANALYSIS WITH PERSONAL IMPACT (355), REALITY SHIFT MOMENT (397),
+WORK CONTEXT RULE (418), RESISTANCE MOMENT (463), CLARITY PIVOT (526 — `clarityPivotHint` is a
+hint, not a latch), SELF-DEFENSE EFFICIENCY (560), FIRST INSIGHT MIRROR (564), the "Πες το δυνατά"
+pre-check (566), SOCRATIC DOUBT (572), PRIVACY QUESTION (606), IDENTITY ANCHOR (610),
+HIGH-STAKES PRE-MORTEM (782), COGNITIVE LOAD MIRROR PROTOCOL (801), COGNITIVE ENTANGLEMENT
+DETECTION (852).
+
+Plus the four lens prompts' "USE THIS LENS ONCE", whose contradiction with session-level state is
+what caused the incident and is queued for item 6.
+
+### The inversion
+
+The obvious next step was to add latches to the unenforced rules. Measuring first showed that would
+have been largely wasted work. Running **the application's own detectors** over 166 real AURA
+replies from 9 real sessions:
+
+| detector | sessions where it ever fired | replies matched |
+|---|---|---|
+| `detectsBinaryOppositionPhrasing` | 9/9 | 70 |
+| `detectsConcreteStep` | 3/9 | 3 |
+| `detectsOutcomeScaleAsked` | 1/9 | 1 |
+| `detectsShiftCheckAsked` | 1/9 | 1 |
+| `detectsCoreReadinessAsked` | 0/9 | 0 |
+| `detectsFriendPerspectiveAsked` | 0/9 | 0 |
+| `detectsEarlyReliefAsked` | 0/9 | 0 |
+| `detectsStakesAsked` | 0/9 | 0 |
+| `detectsStakesCallbackDelivered` | 0/9 | 0 |
+| `detectsAnchorsInvited` | 0/9 | 0 |
+| `detectsContinuationPromiseAsked` | 0/9 | 0 |
+
+**Seven of eleven have never fired once.** Each has a latch and a cap built around it. We are
+enforcing "at most once" on mechanisms that have happened zero times, and the caps hold for the
+least interesting possible reason.
+
+Independently: the prompt prescribes **181 exact sentences**; **3** appear in 9 real sessions.
+Among the 178 unused is `"Αν ένας φίλος σου είχε ακριβώς αυτή τη σκέψη, τι θα του έλεγες;"` — which
+has three code identifiers devoted to it, including a `deliverOnce` budget of 1.
+
+The lens incident was not a one-off. It was the first instance we happened to diagnose of the
+general condition: elaborate named mechanisms that are never reached. There the cause was a
+threshold (60 words) making three of four prompts unreachable. Here the cause is unknown, and the
+distinction matters because the two possibilities need opposite fixes:
+
+  · the **trigger conditions in the prompt are never met**, in which case the mechanism is
+    effectively unwritten and the code around it is dead weight; or
+  · the **detectors do not match what AURA actually writes**, in which case the mechanism may be
+    firing while the code stays blind — and then `shiftCheckConfirmed` never sets, the value never
+    feeds forward into the Reflection Summary, and telemetry reports it as never having happened.
+
+### Why the zeros are conservative, and where the sample is weak
+
+Two reconstruction errors push in the direction of MORE detector firing, not less: AURA reply
+boundaries are heuristic, so a segment can carry the following user turn along with it, and
+production applies `stripAraDeclarative` before these detectors while this audit fed them raw text.
+A zero survives both.
+
+The sample is the honest weakness: 9 transcripts, pasted into these conversations because they were
+worth discussing, which biases toward sessions that went wrong. It is evidence about those sessions,
+not a random sample of use. The verbatim-sentence count is a lower bound for the same reason the
+prompt gives — it repeatedly asks for natural variation.
+
+### What this means for the sequence
+
+Do not add latches to the 15 unenforced rules. The next measurement is to find, for the seven dead
+detectors, what AURA actually wrote at the moments they should have fired — which distinguishes
+"never triggered" from "triggered but invisible". A cap on something that never happens costs
+maintenance and buys nothing.
+
