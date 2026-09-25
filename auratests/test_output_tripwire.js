@@ -93,13 +93,21 @@ assert('ADVICE_CASCADE is checked AFTER ROAD_MAP_MISSING (otherwise the road-map
 // being an observer.
 const violIdx = CODE.indexOf('const viol = detectOutputViolation(');
 assert('The tripwire result is captured in `viol`', violIdx >= 0);
-const violWindow = violIdx >= 0 ? CODE.slice(violIdx, violIdx + 700) : '';
+// THE WINDOW ENDS WHERE THE BLOCK ENDS, never at a character count. This was `violIdx + 700`
+// and broke the moment a second observer was added beside the first: the catch moved past 700 and
+// the invariant reported the observation was no longer wrapped, which was false. Third fixed-width
+// window in this repo to expire that way — a window that has to be re-tuned whenever the code
+// grows is not measuring the code, it is measuring its own length.
+const catchAt = CODE.indexOf('catch (e) { /* observation must never affect the session */ }', violIdx);
+const violWindow = (violIdx >= 0 && catchAt > violIdx) ? CODE.slice(violIdx, catchAt) : '';
 assert('PASSIVE: `viol` only reaches a console warning and the counter',
   /violationCounts\.current\[viol\]/.test(violWindow) && /console\.warn\('\[AURA VIOLATION\]'/.test(violWindow));
 assert('PASSIVE: `viol` never touches displayText, never returns, never sets state',
   !/viol[\s\S]{0,400}?(displayText\s*=|return;|setMessages|setLoading)/.test(violWindow.replace(/console\.warn[\s\S]*?\);/g, '')));
 assert('PASSIVE: the whole observation block is wrapped in try/catch so it can never break a turn',
-  violWindow.includes('catch (e) { /* observation must never affect the session */ }'));
+  violIdx >= 0 && catchAt > violIdx);
+assert('PASSIVE: the window is non-empty, so the assertions above cannot pass by measuring nothing',
+  violWindow.length > 100);
 
 // ── 5. BEHAVIOUR — only what it uniquely adds, and the limit that remains ──
 function extract(name) { const s = raw.indexOf('function ' + name + '('); return raw.slice(s, raw.indexOf('\n}', s) + 2); }
