@@ -1,9 +1,20 @@
 @echo off
-echo === AURA REGRESSION — 43 suites ===
+setlocal enabledelayedexpansion
+echo === AURA REGRESSION - every suite in this folder, discovered not listed ===
 echo.
-for %%f in (test_entry_flow test_adversarial_topicjump stress_test_closing test_carry_forward test_anchor_coverage test_no_questions test_shift_parser test_bare_emoji test_farewell_closing test_conflict_matrix test_outcome_gate test_gates_dispatch test_showdemo_matrix test_dual_gates test_style_preference test_20_personas test_extreme_topics test_clarity_ownership test_core_readiness test_shift_check test_gate_proof test_early_word test_10_session_stress test_clarity_pivot_hybrid test_ara_backstop test_self_repetition test_english_ara test_tag_injection test_prompt_injection test_exhaustion test_xss test_user_stagnation test_ref_reset_integrity test_tag_contract_integrity test_detector_timing test_output_tripwire test_dead_paths test_material_evidence test_road_questions test_api_cost test_consent_integrity test_signals test_evidence_e2e test_telemetry test_declaration_event test_post_map_close test_failure_recovery test_decision_sheet test_minimal_closing test_format_compliance test_sheet_weight test_archive_provenance test_scale_capture test_closing_duplication test_road_recovery test_coverage_report test_lens_selection test_unsourced_options) do (
-  echo|set /p="%%f: "
-  node %%f.js 2>&1 | findstr /C:"passed"
+set N=0
+set SILENT=0
+for %%f in (test_*.js stress_test_*.js) do (
+  set /a N+=1
+  echo|set /p="%%~nf: "
+  node "%%f" 2>&1 | findstr /C:"passed"
+  if errorlevel 1 (
+    echo NO RESULT LINE - this suite reported nothing
+    set /a SILENT+=1
+  )
 )
+echo.
+echo suites run: !N!     suites that reported nothing: !SILENT!
+if not "!SILENT!"=="0" echo *** A SILENT SUITE IS WORSE THAN A FAILING ONE - fix before trusting this run ***
 echo.
 pause

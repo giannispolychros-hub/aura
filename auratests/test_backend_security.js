@@ -1,7 +1,13 @@
 // SECURITY REGRESSION TEST — backend cost-attack defenses
 let passed = 0, failed = 0;
 function assert(l, c) { if (c) { passed++; console.log("PASS —", l); } else { failed++; console.log("FAIL —", l); } }
-const src = require('fs').readFileSync('aura.js', 'utf8');
+// Resolved against this file, not against whatever directory the runner happens to be in.
+// It read 'aura.js' from the cwd while the backend lives at api/aura.js, so this suite threw
+// ENOENT on every invocation - and no runner listed it, so nobody ever saw the throw.
+const src = (() => { const _p = require('path'), _f = require('fs');
+  for (const c of ['/../api/aura.js', '/../aura.js', '/aura.js', '/../../api/aura.js']) {
+    const x = _p.join(__dirname, c); if (_f.existsSync(x)) return _f.readFileSync(x, 'utf8');
+  } throw new Error('api/aura.js not found from ' + __dirname); })();
 
 assert("Model pinned server-side (δεν περνάει body.model)", /model: ALLOWED_MODEL/.test(src) && !/model: body\.model/.test(src));
 assert("max_tokens παραμένει capped", /Math\.min\(body\.max_tokens \|\| 1000, 1000\)/.test(src));

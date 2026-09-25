@@ -15,38 +15,52 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install parser (needed by test_scope_integrity)
-        run: npm install @babel/parser @babel/traverse
-
-      - name: Run all suites
+      # THE SUITE LIST IS DISCOVERED, NEVER WRITTEN DOWN. A hand-written list ran 33 of the 61
+      # files here while RUN_ALL.bat ran a different 58 under a header claiming 43. Two suites,
+      # one of them a security suite, were in neither list and had never executed. A third name in
+      # the list, test_scope_integrity, had NEVER EXISTED in this repository - the old loop's
+      # `if [ -f ]` guard skipped it in silence from the day the workflow was written, and an
+      # @babel install step ran on every CI run to satisfy it. The guard that hid one missing
+      # suite hid the rest just as well. test_runner_coverage fails if a list returns.
+      - name: Run every suite in auratests
         run: |
           cd auratests
+          shopt -s nullglob
+          SUITES=(test_*.js stress_test_*.js)
+          COUNT=${#SUITES[@]}
+          echo "discovered $COUNT suites"
+          if [ "$COUNT" -lt 55 ]; then
+            echo "only $COUNT suites discovered - the glob is broken, refusing to report success"
+            exit 1
+          fi
           FAILED=0
-          for f in \
-            test_scope_integrity test_entry_flow test_adversarial_topicjump \
-            stress_test_closing test_carry_forward test_anchor_coverage \
-            test_no_questions test_shift_parser test_bare_emoji \
-            test_farewell_closing test_conflict_matrix test_outcome_gate \
-            test_gates_dispatch test_showdemo_matrix test_dual_gates \
-            test_style_preference test_20_personas test_extreme_topics \
-            test_clarity_ownership test_core_readiness test_shift_check \
-            test_gate_proof test_early_word test_10_session_stress \
-            test_clarity_pivot_hybrid test_ara_backstop test_self_repetition \
-            test_english_ara test_tag_injection test_prompt_injection \
-            test_exhaustion test_xss test_user_stagnation ; do
-            if [ -f "$f.js" ]; then
-              if node "$f.js" > /tmp/out.txt 2>&1; then
-                echo "PASS  $f"
+          SILENT=0
+          for f in "${SUITES[@]}"; do
+            if out=$(node "$f" 2>&1); then
+              if echo "$out" | grep -qiE "[0-9]+ (invariants )?passed"; then
+                echo "PASS    $f"
               else
-                echo "FAIL  $f"
-                cat /tmp/out.txt
-                FAILED=$((FAILED+1))
+                # Exited 0 and reported nothing. Previously this was invisible; it is now fatal,
+                # because a suite you believe is protecting you while it protects nothing is
+                # worse than one that fails out loud.
+                echo "SILENT  $f - exited 0 but printed no result line"
+                echo "$out" | tail -20
+                SILENT=$((SILENT+1))
               fi
+            else
+              echo "FAIL    $f"
+              echo "$out"
+              FAILED=$((FAILED+1))
             fi
           done
           echo ""
-          if [ "$FAILED" -gt 0 ]; then
-            echo "$FAILED suites failed — do not trust this deploy"
+          echo "suites: $COUNT   failed: $FAILED   silent: $SILENT"
+          if [ "$SILENT" -gt 0 ]; then
+            echo "a silent suite is worse than a failing one - do not trust this deploy"
             exit 1
           fi
-          echo "All suites passed"
+          if [ "$FAILED" -gt 0 ]; then
+            echo "$FAILED suites failed - do not trust this deploy"
+            exit 1
+          fi
+          echo "all $COUNT suites passed"
