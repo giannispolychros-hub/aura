@@ -727,3 +727,58 @@ Seven mutations, none survived. Full suite 57 suites / 1765 passed / 0 failed / 
 line carries alignment padding, so a `replace` written with single spaces silently matched
 nothing. A mutation that fails to apply is indistinguishable from a test that fails to catch.
 Mutation scripts now assert the file actually changed before running the suite.
+
+---
+
+## The approved order after the lens incident, and what the single cache write contains (2026-09-25)
+
+Founder-approved. The governing principle is **build the net before you climb again**: the lens
+incident was caused by a change, but it went undetected because every output-side guard we own
+keys on grammatical form. Order 1→5 ships first; 6 is one cache write at the end.
+
+| # | work | cache |
+|---|---|---|
+| 1 | Unsourced-option detector — catches advice delivered as a declarative sentence | none |
+| 2 | CI runs 33 suites while 57 exist — 24 never run | none |
+| 3 | Map the 35 one-shot prompt rules against the ~19 code latches (read-only) | none |
+| 4 | Re-land the lens via `deliverOnce(..., budget 1)` — one turn, as its prompt says | none |
+| 5 | Phase 0 — `test_tag_contract_integrity` per block, catching the `[[EXIT]]` class | none |
+| 6 | **One cache write, four changes together** — below | one write |
+
+### Why the lens fix is cache-neutral (measured, not assumed)
+
+`callAura` puts the breakpoint at the END of `AURA_CORE_PERSONALITY` and nowhere else. Every lens
+prompt is `CORE + suffix`, so the suffix already lands in the uncached second block. Moving that
+suffix text into a `deliverOnce` ctx therefore costs **no cache write at all**. This is why item 4
+does not have to wait for item 6.
+
+### Item 6 — the single cache write, four changes in it
+
+1. **EXPLORE stops having its own authority to generate roads.** Founder's decision, with the
+   reason that makes it structural rather than cosmetic: PATH GENERATION already has a legitimate
+   gate (explicit repeated request, or directions genuinely implied by the user's own material)
+   **and** a code-level provenance audit via `classifyRoadProvenance`. EXPLORE bypassed both
+   through a second, unconnected authority. Routing EXPLORE *through* PATH GENERATION's gate makes
+   the self-contradiction disappear structurally — rather than softening the wording, which would
+   leave the second authority in place.
+2. **The EXPLORE self-contradiction itself**: "You are not generating options for the user"
+   sitting six lines above "Surface options the user has not considered… 2–3 directions maximum."
+   The model resolved it toward the operative instruction, correctly. The first line is decoration.
+3. **Epistemic-status tagging** — USER STATED / AURA INFERENCE / UNKNOWN. Founder's framing, and
+   it is the *structural* counterpart to item 1 of the sequence, not an alternative to it: the
+   detector catches the harm **after** it is produced and counts it; the tags force the model to
+   declare what is UNKNOWN **before** it writes it as a road. Both are wanted.
+4. **Three-way categorization of excluded roads** — ruled out by-you / unavailable-by-constraints /
+   not-yet-examined. Collapsing these three into one "excluded" bucket is what let the teacher
+   session treat a legal prohibition as if it were a preference.
+
+Already queued for the same write from earlier sessions: Part 1 definition alignment in
+`SYSTEM_TERMINATION`, the model-judged 1-10 trigger, ΒΡΗΚΕΣ/DECLARATION_EVENT, and possibly moving
+the `[[EXIT]]` instruction to a block that actually reaches its parser.
+
+### Explicitly parallel, not in the sequence
+
+The GOAL / OBSTACLE / STAKES gap the teacher session exposed (time pressure, psychological
+pressure, what was tried and rejected) touches neither cache nor lens. It runs whenever convenient
+and must not delay 1→6.
+
