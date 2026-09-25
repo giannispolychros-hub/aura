@@ -219,8 +219,22 @@ assert('Behavioural: the first-reply branch explains the shorter list rather tha
   /FIRST REPLY FLOOR/.test(methodFailureTextWhen(true)));
 
 // premiseInversionCtx cannot co-fire — proved, not assumed.
-assert('binaryOppositionCount increments at most once per turn, so it cannot reach 2 at msgCount === 1',
-  (CODE_SPLIT.match(/binaryOppositionCount\.current \+= 1/g) || []).length === 1);
+// RESTATED, STRICTLY STRONGER. This used to count the literal `binaryOppositionCount.current += 1`
+// and require exactly one. Wiring the First-WHY branch needed the counter incremented from a second
+// place, which that form would have forbidden outright. Rather than relax it to "at most two", both
+// paths now route through bumpBinaryOpposition, and the invariant is expressed as what it actually
+// means: NOTHING outside that one helper may touch the counter, so "at most once per turn" is a
+// property of the code's shape and not of anyone's reading of it.
+assert('nothing increments binaryOppositionCount outside bumpBinaryOpposition',
+  (CODE_SPLIT.match(/binaryOppositionCount\.current\s*(?:\+=|=(?!\s*0\b))/g) || []).length === 0);
+const BUMP_SRC = (() => { const a = CODE_SPLIT.indexOf('function bumpBinaryOpposition('); return a < 0 ? '' : CODE_SPLIT.slice(a, CODE_SPLIT.indexOf('\n}', a) + 2); })();
+assert('the helper exists and increments by exactly one, once',
+  /counterRef\.current = \(typeof counterRef\.current === "number" \? counterRef\.current : 0\) \+ 1;/.test(BUMP_SRC)
+  && (BUMP_SRC.match(/counterRef\.current\s*=(?!=)/g) || []).length === 1);
+assert('each caller bumps it at most once per turn — two call sites, the main path and First-WHY',
+  (CODE_SPLIT.match(/bumpBinaryOpposition\(binaryOppositionCount/g) || []).length === 2);
+assert('premiseInversionCtx therefore still cannot reach its threshold on a first reply',
+  /const premiseInversionCtx = deliverOnce\(\(binaryOppositionCount\.current >= 2\)/.test(CODE_SPLIT));
 assert('premiseInversionCtx requires binaryOppositionCount >= 2, so it is excluded on a first reply',
   /const premiseInversionCtx = deliverOnce\(\(binaryOppositionCount\.current >= 2\)/.test(CODE_SPLIT));
 

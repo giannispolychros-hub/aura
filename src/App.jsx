@@ -3405,6 +3405,18 @@ function detectsBinaryOppositionPhrasing(text) {
   return /(ή\s+.{1,60}?\s+ή\s+\S+|μπρος\s+γκρεμός|πίσω\s+ρέμα|είτε\s+.{1,60}?\s+είτε|(να\s+)?\S+[\w\u0370-\u03ff]{2,}\s*,?\s+ή\s+(να\s+)?\S*[\w\u0370-\u03ff]{2,}|\b(whether|should I)\b.{1,60}?\bor\b|\bor\s+(should\s+I|not)\b|δύο\s+επιλογές|δυο\s+επιλογές|δύο\s+δρόμ|δυο\s+δρόμ|από\s+τη\s+μία.{0,40}από\s+την\s+άλλη)/i.test(t);
 }
 
+// THE ONLY PLACE THIS COUNTER IS INCREMENTED, ON PURPOSE. test_conflict_matrix proves that
+// premiseInversionCtx cannot co-fire with the first-reply floor by requiring the counter to be
+// incrementable from exactly ONE place — that is what makes "at most once per turn" structural
+// instead of a property someone has to re-verify by reading. Wiring the First-WHY branch needed a
+// second increment and would have broken that guarantee, so both paths route through here instead
+// and the guarantee gets stronger rather than weaker: one turn, one call, one increment.
+function bumpBinaryOpposition(counterRef, text, detect) {
+  if (!counterRef || typeof counterRef !== "object" || typeof detect !== "function") return false;
+  if (!detect(String(text == null ? "" : text))) return false;
+  counterRef.current = (typeof counterRef.current === "number" ? counterRef.current : 0) + 1;
+  return true;
+}
 // Sibling detector, renamed for EARLY CLARITY BASELINE (function name kept for minimal churn —
 // this used to detect a relief-based question, now detects the present-state clarity baseline).
 function detectsEarlyReliefAsked(text) {
@@ -4596,8 +4608,8 @@ export default function AURAv2() {
     // pattern, purely structural, not psychological).
     {
       const lastUserMsgForBinary = [...msgs].reverse().find(m => m.role === "user");
-      if (lastUserMsgForBinary && detectsBinaryOppositionPhrasing(lastUserMsgForBinary.content)) {
-        binaryOppositionCount.current += 1;
+      if (lastUserMsgForBinary) {
+        bumpBinaryOpposition(binaryOppositionCount, lastUserMsgForBinary.content, detectsBinaryOppositionPhrasing);
       }
     }
     // TIMING FIX (causal-inventory audit — detectsMethodFailureSignal previously ran after the API
@@ -5876,6 +5888,37 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       ];
       setMessages(initMsgs);
       turnCount.current += 1;
+      // USER-SIDE DETECTORS, WIRED FROM THE MAIN PATH (dependency map, item 0). This branch never
+      // calls generateResponse, so none of these ran for the opening or the why-answer. Measured
+      // consequences: binaryOppositionCount stayed at 0 for a session that opened by naming both
+      // sides of its own dilemma, so PREMISE INVERSION's own "≥2" threshold was reached a full turn
+      // late; a concrete step stated at entry was invisible to the gate that depends on it; and a
+      // user who wrote "χωρίς ερωτήσεις" in either message was simply ignored.
+      //
+      // SAME REFS AS γρ. 4597-4626 AND 5366, never a second set of books, and pre-call like the
+      // main path's own deliberate timing fix. BOTH user messages are scanned, not just the last
+      // one: the opening and the why-answer are two distinct utterances that the main path would
+      // have counted on two separate turns. For the binary counter that makes no difference in
+      // practice, because the fast-path above already refuses to run First-WHY on a binary opening
+      // — scanning both simply keeps this correct if that ever changes.
+      try {
+        const _userTexts = initMsgs.filter(m => m && m.role === "user").map(m => String(m.content || ""));
+        // The three booleans are idempotent latches, so BOTH messages are scanned: the opening and
+        // the why-answer are two distinct utterances the main path would have seen on two turns, and
+        // a concrete step or a "χωρίς ερωτήσεις" stated in the opening must not be lost.
+        for (const _u of _userTexts) {
+          if (!informationModeActive.current && detectsMethodFailureSignal(_u)) methodFailureHint.current = true;
+          if (!concreteStepStated.current && detectsConcreteStep(_u)) concreteStepStated.current = true;
+          if (!informationModeActive.current && detectsNoQuestionsRequest(_u)) informationModeActive.current = true;
+        }
+        // THE COUNTER IS DIFFERENT AND GETS EXACTLY ONE INCREMENT. Scanning both messages here would
+        // let it reach 2 from a single turn, and test_conflict_matrix proves PREMISE INVERSION is
+        // excluded from a first reply precisely because that cannot happen. So it reads the last
+        // user message only, identically to the main path. Nothing is lost by that: the fast-path
+        // above already refuses to run First-WHY on a binary opening, so the why-answer is the only
+        // message here that could carry one.
+        bumpBinaryOpposition(binaryOppositionCount, _userTexts[_userTexts.length - 1], detectsBinaryOppositionPhrasing);
+      } catch (e) { /* observation must never affect the session */ }
       setLoading(true);
       try {
         // U1/U3: Inject memory context for this category
@@ -5885,6 +5928,24 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         const profileWithRules = profileCtx ? profileCtx + HONEST_UNCERTAINTY_RULE : '';
         const prompt = [getLensPrompt(inferred), memCtx, profileWithRules, buildFirstWhyFloor()].filter(Boolean).join('\n');
         const text = stripAraDeclarative(await callAura(initMsgs, prompt));
+        // THE NO-ADVICE FLOOR ON THE ENTRY TURN. Neither observer saw this reply before: an opening
+        // that offered the user options went uncounted, and the guard built for exactly that failure
+        // was blind precisely here. Observation only, identical in kind to the main path — a count
+        // and a console warning, never a rewrite. roadDiscoveryDue is false because
+        // userStagnationCtx does not exist on this branch, which is the honest value rather than a
+        // borrowed one.
+        try {
+          const _clean = String(text || '').replace(/\[\[[^\]]*\]\]/g, '');
+          const _viol = detectOutputViolation(_clean, { roadDiscoveryDue: false });
+          if (_viol) {
+            violationCounts.current[_viol] = (violationCounts.current[_viol] || 0) + 1;
+            console.warn('[AURA VIOLATION]', _viol, '| First-WHY turn |', _clean.trim().slice(0, 130));
+          }
+          if (detectsUnsourcedOptionOffer(_clean, initMsgs.filter(m => m && m.role === "user").map(m => m.content), parseRoadMap)) {
+            unsourcedOptionOffers.current += 1;
+            console.warn('[AURA VIOLATION] UNSOURCED_OPTIONS | First-WHY turn |', _clean.trim().slice(0, 130));
+          }
+        } catch (e) { /* observation must never affect the session */ }
         setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "ANSWER" }]);
         // U1: Start trajectory for this category
         if (memory.storageEnabled) {

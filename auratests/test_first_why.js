@@ -35,6 +35,7 @@ eval(extract('classifyQuestion'));
 eval(extract('isFactQuestion'));
 eval(extract('needsFirstWhy'));
 eval(extract('detectsBinaryOppositionPhrasing'));
+eval(extract('bumpBinaryOpposition'));
 
 let passed = 0, failed = 0;
 function assert(name, cond) { if (cond) { passed++; console.log("PASS — " + name); } else { failed++; console.log("FAIL — " + name); } }
@@ -146,12 +147,104 @@ const FW = raw.slice(raw.lastIndexOf('if (firstWhyPending)', FW_A), raw.indexOf(
 assert("both bodies were found and are non-trivial", GR.length > 10000 && FW.length > 500);
 assert("the First-WHY branch still calls the model directly, bypassing generateResponse",
   /callAura\(initMsgs, prompt\)/.test(FW) && !/generateResponse\(/.test(FW));
-const STEPS = ["detectsOutcomeScaleAsked","detectsCoreReadinessAsked","detectsShiftCheckAsked","detectsFriendPerspectiveAsked","detectsEarlyReliefAsked","detectsStakesAsked","detectsStakesCallbackDelivered","detectsAnchorsInvited","detectsConcreteStep","detectsBinaryOppositionPhrasing","detectOutputViolation","detectsUnsourcedOptionOffer","parseRoadMap","extractRoadMapFromProse","classifyRoadProvenance","detectSelfMarkedTension","detectUserStagnation","detectAssistantSelfRepetition","buildCoverageReport","tallyRoadTrace","createAnchor","recordQualitySignal"];
+const STEPS = ["detectsOutcomeScaleAsked","detectsCoreReadinessAsked","detectsShiftCheckAsked","detectsFriendPerspectiveAsked","detectsEarlyReliefAsked","detectsStakesAsked","detectsStakesCallbackDelivered","detectsAnchorsInvited","detectsConcreteStep","detectsBinaryOppositionPhrasing","detectsMethodFailureSignal","detectsNoQuestionsRequest","detectOutputViolation","detectsUnsourcedOptionOffer","parseRoadMap","extractRoadMapFromProse","classifyRoadProvenance","detectSelfMarkedTension","detectUserStagnation","detectAssistantSelfRepetition","buildCoverageReport","tallyRoadTrace","createAnchor","recordQualitySignal"];
 const bypassed = STEPS.filter(s => GR.includes(s + "(") && !FW.includes(s + "("));
-assert("MEASURED AND LOCKED: " + bypassed.length + " post-processing steps run on every other turn "
-  + "and not on this one", bypassed.length >= 20);
-assert("the No-Advice guard shipped today is among them — it does not see this turn",
-  bypassed.indexOf("detectsUnsourcedOptionOffer") !== -1);
+// ── 5b. THE SIX STEPS THE DEPENDENCY MAP SAID ARE THE MINIMUM ─────────────
+// Item 0 narrowed the scope: of the 22 bypassed steps, two are the safety floor (the No-Advice
+// observers) and four are the user-text detectors whose refs feed the REST of the session. Those
+// six are wired. The remaining ones are correctness, not safety, and stay bypassed for now — that
+// number is locked so the next change to it is deliberate.
+const SAFETY = ["detectOutputViolation", "detectsUnsourcedOptionOffer"];
+// Three are called directly here; the binary detector is PASSED BY REFERENCE to the shared
+// increment helper, so it has no parentheses in this slice and is asserted on its own below.
+const USER_TEXT = ["detectsMethodFailureSignal", "detectsConcreteStep", "detectsNoQuestionsRequest"];
+for (const w of SAFETY) assert("SAFETY FLOOR wired into the First-WHY turn: " + w, FW.includes(w + "("));
+for (const w of USER_TEXT) assert("USER-TEXT detector wired into the First-WHY turn: " + w, FW.includes(w + "("));
+assert("USER-TEXT detector wired into the First-WHY turn: detectsBinaryOppositionPhrasing, "
+  + "handed to the shared increment helper rather than called inline",
+  /bumpBinaryOpposition\([^)]*detectsBinaryOppositionPhrasing/.test(FW));
+assert("MEASURED AND LOCKED: " + bypassed.length + " steps are still bypassed — the ten reply "
+  + "latches and the road-map chain, which item 0 classified as correctness rather than safety",
+  bypassed.length === 18);
+
+// They must write the SAME refs the main path writes, or the session would keep two sets of books.
+assert("the binary counter feeding PREMISE INVERSION is bumped through the shared single site",
+  /bumpBinaryOpposition\(binaryOppositionCount/.test(FW));
+// One increment for this turn, never two. Scanning both messages here would let the counter reach 2
+// from a single turn, and test_conflict_matrix proves PREMISE INVERSION is excluded from a first
+// reply precisely because that cannot happen.
+assert("it is bumped exactly once on this turn, from the last user message only",
+  (FW.match(/bumpBinaryOpposition\(/g) || []).length === 1
+  && /bumpBinaryOpposition\(binaryOppositionCount, _userTexts\[_userTexts\.length - 1\]/.test(FW));
+// THE HELPER'S OWN CONTRACT, TESTED BEHAVIOURALLY. Every other assertion here reads source text,
+// and a mutation that deleted the detector guard — making it increment unconditionally — survived
+// all 62 suites. Source checks prove wiring; only a call proves behaviour.
+assert("the helper increments only when the detector matches",
+  (() => { const r = { current: 0 };
+    return bumpBinaryOpposition(r, "δεν ξέρω αν να μείνω ή να φύγω", detectsBinaryOppositionPhrasing) === true && r.current === 1; })());
+assert("the helper does NOT increment when the detector does not match",
+  (() => { const r = { current: 0 };
+    return bumpBinaryOpposition(r, "δεν ξέρω τι θέλω να κάνω με τη ζωή μου", detectsBinaryOppositionPhrasing) === false && r.current === 0; })());
+assert("it increments by exactly one, from whatever the counter already held",
+  (() => { const r = { current: 5 };
+    bumpBinaryOpposition(r, "νιώθω μπρος γκρεμός", detectsBinaryOppositionPhrasing); return r.current === 6; })());
+assert("a counter that has never been set starts at one, not NaN",
+  (() => { const r = {};
+    return bumpBinaryOpposition(r, "νιώθω μπρος γκρεμός", detectsBinaryOppositionPhrasing) === true && r.current === 1; })());
+assert("degenerate input is refused quietly rather than thrown",
+  bumpBinaryOpposition(null, "μπρος γκρεμός", detectsBinaryOppositionPhrasing) === false
+  && bumpBinaryOpposition({ current: 0 }, "μπρος γκρεμός", null) === false);
+
+assert("and the bump is NOT inside the loop that scans both messages",
+  FW.indexOf("bumpBinaryOpposition(") > FW.indexOf("for (const _u of _userTexts)")
+  && FW.indexOf("bumpBinaryOpposition(") > FW.lastIndexOf("detectsNoQuestionsRequest(_u)"));
+assert("the method-failure and concrete-step hints are the main path's own refs",
+  /methodFailureHint\.current\s*=/.test(FW) && /concreteStepStated\.current\s*=/.test(FW));
+assert("a 'χωρίς ερωτήσεις' in the opening or the why-answer now reaches informationModeActive",
+  /informationModeActive\.current\s*=\s*true/.test(FW));
+assert("the No-Advice counter is the main path's own ref, not a second tally",
+  /unsourcedOptionOffers\.current\s*\+=/.test(FW));
+
+// Observation must never break a turn — the rule the main path states in its own catch blocks.
+// EACH block is checked separately: a single count of ">= 1" was satisfied by the other one, so a
+// mutation that unwrapped the observer block entirely survived.
+const wrapped = (anchor) => {
+  const a = FW.indexOf(anchor);
+  if (a < 0) return false;
+  const c = FW.indexOf("catch (e) { /* observation must never affect the session */ }", a);
+  if (c < 0) return false;
+  // The catch must close THIS block. If another `try {` opens between the anchor and the catch, the
+  // catch belongs to that later block and this one is unwrapped — a mutation that removed exactly
+  // this block's catch survived an earlier version that only looked for a stray `catch`.
+  return !FW.slice(a, c).includes("try {");
+};
+assert("the user-text detector block is wrapped so it can never break the entry turn",
+  wrapped("const _userTexts ="));
+assert("the No-Advice observer block is wrapped too — checked on its own, not by a shared count",
+  wrapped("const _clean ="));
+// And neither block may be present-but-disabled. A presence check cannot tell a live call from one
+// sitting inside `if (false)`; a mutation proved exactly that.
+const notDisabled = (anchor) => {
+  const a = FW.indexOf(anchor);
+  if (a < 0) return false;
+  // Anywhere in the preceding window, not anchored to its end: `if (false) try {` puts the guard
+  // BEFORE the `try`, so an end-anchored pattern never matched it and the mutation survived.
+  const before = FW.slice(Math.max(0, a - 140), a);
+  return !/if\s*\(\s*(false|0)\s*\)|\b(false|0)\s*&&/.test(before);
+};
+assert("the user-text detector block is live, not short-circuited", notDisabled("const _userTexts ="));
+assert("the No-Advice observer block is live, not short-circuited", notDisabled("const _clean ="));
+// Both indices are asserted present first. indexOf returns -1 when absent, and -1 is less than any
+// real position, so the ordering check below passes vacuously while nothing is wired at all.
+const I_BINARY = FW.indexOf("bumpBinaryOpposition(");
+const I_CALL = FW.indexOf("callAura(initMsgs");
+const I_UNSOURCED = FW.indexOf("detectsUnsourcedOptionOffer(");
+assert("all three positions exist, so the two ordering checks cannot pass vacuously",
+  I_BINARY >= 0 && I_CALL >= 0 && I_UNSOURCED >= 0);
+assert("the user-text detectors run BEFORE the model call, as the main path deliberately reorders them to",
+  I_BINARY >= 0 && I_BINARY < I_CALL);
+assert("the No-Advice observers run AFTER it, on the reply that came back",
+  I_UNSOURCED >= 0 && I_UNSOURCED > I_CALL);
 
 // ── 6. NOTHING STALE SURVIVES A SAFETY OVERRIDE OR A RESET ────────────────
 // The question left open in an earlier instruction and never answered until now.

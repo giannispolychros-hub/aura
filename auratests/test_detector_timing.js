@@ -62,7 +62,14 @@ if (dynSuffixIdx < 0) {
 // the call exists AND cannot accidentally match the function's own `function detectX(text) {`
 // definition line, which uses a different, generic parameter name.
 const CHECKED = [
-  { name: 'detectsBinaryOppositionPhrasing', needle: 'detectsBinaryOppositionPhrasing(lastUserMsgForBinary.content)' },
+  // Needle updated when the First-WHY branch was given the same detector: the counter must be
+  // incrementable from exactly ONE place (test_conflict_matrix proves PREMISE INVERSION cannot
+  // co-fire with the first-reply floor on that basis), so both paths now call bumpBinaryOpposition
+  // and the detector is handed to it rather than called inline. Same precedent as detectUserStagnation
+  // below — what moved is the literal text, not the timing. The main path's call site still runs
+  // pre-API, which is the invariant this file guards, and the argument name keeps this needle unique
+  // to that path.
+  { name: 'detectsBinaryOppositionPhrasing', needle: 'bumpBinaryOpposition(binaryOppositionCount, lastUserMsgForBinary.content, detectsBinaryOppositionPhrasing)' },
   { name: 'detectSelfMarkedTension',         needle: 'tensionCtx = detectSelfMarkedTension(' },
   // Needle updated when the road-question stand-down was added: the call now sits behind a
   // short-circuit, `userStagnationCtx = (!roadQuestionState.current && detectUserStagnation(`.
