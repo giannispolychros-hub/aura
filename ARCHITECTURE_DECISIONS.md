@@ -987,3 +987,96 @@ selector was designed to decide from *opening + reason* and was wired to decide 
 alone, on half its input. **Item 4 is on hold until the reachability decision is taken**, because
 the selector's reliability depends on First-WHY reaching real users.
 
+---
+
+## Item 0: dependency map of everything the First-WHY turn bypasses (2026-09-25)
+
+Read-only. No code changed. Prerequisite for opening the reachability gate.
+
+**One correction to the framing first.** The First-WHY branch sends `initMsgs` = [user opening,
+assistant question, user answer] — **three** messages, so **two** user messages and one assistant
+message. It is therefore *not* equivalent to turn 1 of the main path, and the arithmetic of every
+count-gated mechanism has to be read against 2 user messages, not 1.
+
+### A. The 17 live context families — only 3 could actually produce content on that turn
+
+This matters, because it shrinks the ctx side of the problem from 17 to 3.
+
+**Could fire, and therefore are genuinely lost (3):**
+
+| family | what it does |
+|---|---|
+| `materialEvidenceCtx` (4660) | Counts mechanically from the user's own messages — money figures, named constraints, permission uncertainty — and surfaces them as observation, explicitly "NOT A SUFFICIENCY JUDGMENT". With two user messages available it would produce output. |
+| `tensionCtx` (4699) | Fires when the user put an opposition marker (αλλά/όμως) with first-person stance on both sides. Reads the LAST user message — which on this turn is the why-answer, exactly where a tension is likely to be stated. |
+| `closingDriftCtx` (4688) | Needs ≥2 user messages, which this turn now has. Edge case, but reachable. |
+
+`firstReplyFloorCtx` is **substituted**, not lost — `buildFirstWhyFloor()` carries equivalent
+content. `demoCtx` is dead (`''`).
+
+**Cannot fire on that turn regardless (14):** `coverageReportCtx` (needs ≥3 assistant replies),
+`explicitPauseCtx` (≥3 user msgs), `gatesCtx` (msgCount ≥ 3), `roadQuestionCtx` and
+`postMapCloseCtx` (need a delivered map), `coreReadinessCtx`, `shiftCheckCtx`,
+`friendPerspectiveCtx` (need a prior AURA question plus user confirmation), `premiseInversionCtx`
+(needs `binaryOppositionCount >= 2`), `selfRepetitionCtx` (≥2 assistant replies),
+`userStagnationCtx` (≥2 user replies plus shrinkage), `informationModeCtx` (needs a ref set only
+inside `generateResponse`), `clarityPivotCtx` (needs `clarityPivotHint`, set at γρ. 5916/5947 —
+*after* the First-WHY return at 5849), `methodFailureCtx` (needs a ref set inside
+`generateResponse`).
+
+### B. The 22 post-processing steps — this is where the real loss is
+
+Three of them are the ones that matter most, because they are set from the USER's text inside
+`generateResponse` and therefore never run for the opening or the why-answer:
+
+| step | γρ. | what is lost beyond the turn |
+|---|---|---|
+| `detectsBinaryOppositionPhrasing` | 4590 | `binaryOppositionCount` is not incremented. PREMISE INVERSION's own "≥2" threshold is therefore reached **one turn late** for every session that opens with binary phrasing — and that is the most-fired detector in the whole app (9/9 sessions, 70 replies). |
+| `detectsConcreteStep` | 4615 | `concreteStepStated` unset — feeds SOLUTION DEVELOPMENT OFFER and gates the Clarity Scale. |
+| `detectsMethodFailureSignal` | 4604 | `methodFailureHint` unset. |
+| `detectsNoQuestionsRequest` | 5357 | `informationModeActive` unset. **A user whose opening or why-answer says "χωρίς ερωτήσεις" is ignored.** |
+| the ten latch setters on AURA's reply | 5298-5353 | `earlyReliefAsked`, `outcomeScaleAsked`, `coreReadinessAsked/Confirmed`, `shiftCheckAsked/Confirmed`, `friendPerspectiveAsked/Confirmed`, `stakesAsked`, `stakesCallbackDelivered`, `anchorsInvited` — if AURA's reply on this turn asks any of those questions, **the application does not know it happened**, so the answer is never captured and the value never feeds forward. |
+| `detectsStylePreference` | 5218 | `setMemory` + `saveMemory` — a style preference stated in the opening is **not persisted**. |
+| `detectOutputViolation` | 5065 | `violationCounts` not incremented. |
+| `detectsUnsourcedOptionOffer` | 5072 | `unsourcedOptionOffers` not incremented — **no No-Advice observation at all on this turn**. |
+| `parseRoadMap` · `classifyRoadProvenance` · `tallyRoadTrace` · `extractRoadMapFromProse` | 5020, 5042, 5058, 5375 | `roadMapDelivered`, `roadMapRecovered`, `roadTraceTotals` unset. **Partly mitigated** — see C. |
+| `detectSelfMarkedTension` · `detectUserStagnation` · `detectAssistantSelfRepetition` · `buildCoverageReport` | — | Pure readers; they only feed the ctx families in A, so nothing extra is lost. |
+| `createAnchor` (5234) · `recordQualitySignal` (5276) | — | Closing-ritual and session-end paths; not applicable on this turn. |
+
+### C. External dependencies, stated explicitly
+
+| feeds | affected? |
+|---|---|
+| **`session_started` telemetry** | **No.** Emitted from the start button (γρ. 6345), path-independent. |
+| **`session_completed` telemetry** | **Partially.** The effect (γρ. 4500) is keyed on `sessionEnded` — "one measurement per ending, whichever path got there" — so it always fires. It also **re-derives `roadMap` by running the real parser over every assistant message of the session**, so that field survives the bypass. But `lens`, `lensSwitches`, `unsourcedOptions` and the three `roadRaw*` counters read refs this turn never touched, so they under-report by one turn. |
+| **`api_error` telemetry** | **No.** Emitted inside `callAura`, which this branch does call. |
+| **Road Map** | Per-turn trace lost; the session-end boolean survives via the re-derivation above. |
+| **Closing ritual** | Unaffected — `wordQuestionDelivered` / `reflectionDelivered` are termination-path state. |
+| **Memory / anchors** | The branch **does** write: `recordTrajectory` + `saveMemory` at γρ. 5882-5884. Style preference and anchors are not written. |
+| **`activeLens`** | The branch **does** set it: `activeLensRef.current = inferred`, `setActiveLens(inferred)`, `lensSwitches.current += 1`. One of only two paths that move the lens off SIMPLIFY. |
+
+### D. The circularity is closed at both ends
+
+The branch writes a trajectory when the user answers (γρ. 5882-5884), and a trajectory is exactly
+what makes `isBrandNewUserMsg` false. So First-WHY **bootstraps its own reachability** — after it
+has run once. It cannot run once, because the gate needs a trajectory. And the write that would
+create the trajectory sits behind `if (memory.storageEnabled)` (γρ. 5881), the same flag that
+defaults to false and blocks the gate in the first place. **Both ends of the loop are held shut by
+one default.**
+
+### E. What this means for the scope of item 2
+
+The mapping narrows it. Wiring "the whole main path" is not required and would be a large, risky
+change. What the First-WHY turn actually needs, in order of value:
+
+1. **The two No-Advice observers** — `detectOutputViolation` and `detectsUnsourcedOptionOffer` on
+   the reply. This is the safety floor and the reason the gate cannot open without it.
+2. **The four user-text detectors** — binary opposition, concrete step, method failure, no-questions
+   — so the session's own counters start from the real first message rather than one turn late.
+3. **The ten reply latches**, so a question asked on this turn is not invisible to the application.
+4. **`materialEvidenceCtx` and `tensionCtx`**, the only two ctx families with real content to
+   contribute on this turn.
+
+Items 1 and 2 of that list are the minimum for the gate. Items 3 and 4 are correctness, not safety.
+
+Awaiting approval before item 3 (opening the gate), per instruction.
+
