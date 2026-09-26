@@ -2401,6 +2401,19 @@ function linkDeclarationResponse(ledger, id, text, turn) {
   next[target] = { ...list[target], answeredAt: turn, text: body };
   return next;
 }
+// Counts only, in the tallyRoadTrace shape: a pure reduce over the ledger so session_completed can
+// report how many declarations a session issued and how many came back answered. It never returns
+// text — the ledger holds the user's own words and those must not travel into telemetry.
+function tallyDeclarations(ledger) {
+  const list = Array.isArray(ledger) ? ledger : [];
+  let issued = 0, answered = 0;
+  for (const r of list) {
+    if (!r || typeof r.id !== "string") continue;
+    issued += 1;
+    if (typeof r.answeredAt === "number") answered += 1;
+  }
+  return { issued: Math.min(9999, issued), answered: Math.min(9999, answered) };
+}
 function getDeclaration(ledger, id) {
   const list = Array.isArray(ledger) ? ledger : [];
   if (typeof id !== "string") return null;
@@ -4546,6 +4559,10 @@ export default function AURAv2() {
         // Which of the four prompts actually ran, and how often it moved. With the opening
         // selector reverted, 0 is the expected reading for most sessions — it means the lens
         // stayed SIMPLIFY, and anything above 0 is a compression pass, distress, or First-WHY.
+        // How many ask/answer declarations this session issued, and how many came back answered.
+        // Counts only — the ledger holds the user's own words and they never travel.
+        declIssued: tallyDeclarations(declarationLedger.current).issued,
+        declAnswered: tallyDeclarations(declarationLedger.current).answered,
         // Whether the exit contract had to REBUILD a map this session, kept apart from roadMap on
         // purpose: that one says a map exists, this one says it exists only because recovery ran, so
         // the compliance signal is never masked by the recovery that hides its symptom. The ref was
@@ -5376,6 +5393,45 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         anchorsInvited.current = true;
       }
       // State-machine fix: once set, stays set — does not silently revert mid-conversation.
+      // ── DECLARATION LEDGER — the ask/answer record, derived from the latches set above ──────
+      // The ledger was built generalised precisely so each new "did this reply answer that
+      // question?" signal would not need its own hidden tag, and it named EARLY_WORD and [[EXIT]]
+      // as its first two consumers. Only EARLY_WORD arrived; [[EXIT]] is documented-unreliable and
+      // was struck. So it held one id for its whole life while seven mechanisms went unmeasured —
+      // two of them named as due by gatesCtx on 144 turns across nine real sessions, with nothing
+      // happening and no way to see it.
+      //
+      // DERIVED, NOT INTERLEAVED: this reads the one-way latches already set above rather than
+      // threading twelve calls through their branching. Idempotent by construction — a latch never
+      // goes back to false, and issueDeclaration is skipped once an entry exists.
+      //
+      // TELEMETRY ONLY. Nothing below reads a declaration to decide anything. When an ask and its
+      // confirmation land in the same pass, linkDeclarationResponse REFUSES the link because the
+      // answer would not postdate the question — that refusal is the ledger's whole value and is
+      // left exactly as designed.
+      try {
+        const _turn = turnCount.current || 0;
+        const _pairs = [
+          ['early_clarity',      earlyReliefAsked.current,          false],
+          ['outcome_scale',      outcomeScaleAsked.current,         false],
+          ['core_readiness',     coreReadinessAsked.current,        coreReadinessConfirmed.current],
+          ['shift_check',        shiftCheckAsked.current,           shiftCheckConfirmed.current],
+          ['friend_perspective', friendPerspectiveAsked.current,    friendPerspectiveConfirmed.current],
+          ['stakes',             stakesAsked.current,               false],
+          ['anchors',            anchorsInvited.current,            false],
+        ];
+        for (const [_id, _asked, _answered] of _pairs) {
+          if (_asked && !getDeclaration(declarationLedger.current, _id)) {
+            declarationLedger.current = issueDeclaration(declarationLedger.current, _id, _turn);
+          }
+          if (_answered) {
+            const _rec = getDeclaration(declarationLedger.current, _id);
+            if (_rec && _rec.answeredAt === null) {
+              declarationLedger.current = linkDeclarationResponse(declarationLedger.current, _id, lastUserMsg, _turn);
+            }
+          }
+        }
+      } catch (e) { /* observation must never affect the session */ }
       if (!informationModeActive.current && detectsNoQuestionsRequest(lastUserMsg)) {
         informationModeActive.current = true;
       }

@@ -219,5 +219,97 @@ for (const fn of [SRC_ISSUE, SRC_LINK, SRC_GET]) {
     !/localStorage|sessionStorage|saveMemory|fetch\s*\(|callAura/.test(fn));
 }
 
+// ── THE LEDGER GAINS ITS SECOND THROUGH EIGHTH CONSUMERS ───────────────────
+//
+// WHY NOW. The ADR built this deliberately generalised — "κάθε μελλοντικό signal που χρειάζεται να
+// αποδείξει «αυτή η απάντηση απαντά σε εκείνη την ερώτηση» θα ζητήσει το δικό του tag, και θα
+// καταλήξουμε με N ad-hoc μηχανισμούς για ένα κοινό πρόβλημα" — and it named two first consumers,
+// EARLY_WORD and [[EXIT]]. Only EARLY_WORD arrived. [[EXIT]] is documented-unreliable and was
+// struck, so the ledger sat at one id for its whole life, and getDeclaration was never called in
+// any of its 22 revisions.
+//
+// Measured need: seven mechanisms never fired in nine real sessions, and for two of them the code
+// named them as due on 144 turns with nothing happening. Whether a mechanism was ASKED and whether
+// it was ANSWERED is exactly what this ledger holds, and it is four of the seven numbers that
+// session_completed could not report.
+//
+// DERIVED, NOT INTERLEAVED. The declarations are issued from one contiguous block that reads the
+// latches already set above it, rather than from twelve insertions threaded through shared
+// branching logic. Idempotent by construction: a latch is one-way, so re-running the block cannot
+// double-issue. Nothing reads the ledger to decide anything - it is telemetry only.
+const DECL_IDS = ['early_clarity','outcome_scale','core_readiness','shift_check','friend_perspective','stakes','anchors'];
+for (const id of DECL_IDS) {
+  assert('declaration id issued for: ' + id, new RegExp("'" + id + "'").test(CODE) || new RegExp('"' + id + '"').test(CODE));
+}
+assert('all ids satisfy the ledger\'s own identity contract',
+  DECL_IDS.every(id => /^[a-z][a-z0-9_]{0,31}$/.test(id)));
+// Anchored on the block's own `try {`, not on a character budget from its heading — the heading
+// carries a long rationale and a fixed window would expire the moment that prose grew, which is the
+// fixed-width-window failure this repo has now seen five times.
+const DECL_BLOCK = (() => {
+  const h = raw.indexOf('DECLARATION LEDGER');
+  if (h < 0) return '';
+  const t = raw.indexOf('try {', h);
+  const c = raw.indexOf('catch (e) { /* observation must never affect the session */ }', t);
+  return (t > h && c > t) ? raw.slice(t + 'try {'.length, c) : '';
+})();
+assert('the issuing block was located and is non-empty, so the checks below are real',
+  DECL_BLOCK.length > 200 && /issueDeclaration/.test(DECL_BLOCK));
+assert('the issuing block is wrapped so it can never break a turn — its body holds no nested try',
+  !DECL_BLOCK.includes('try {'));
+assert('getDeclaration finally has a consumer — the ledger is read, not only written',
+  (CODE.match(/getDeclaration\s*\(/g) || []).length >= 2);
+// The ANSWER side, not only the ask. A mutation deleting the link call left the suite green: it
+// asserted the ids and the issuing and never that an answer can be recorded at all.
+assert('the answer side is wired — a confirmation links back to its declaration',
+  /linkDeclarationResponse\(declarationLedger\.current/.test(DECL_BLOCK));
+assert('and it links the three mechanisms whose confirmation the app already detects',
+  /coreReadinessConfirmed\.current/.test(DECL_BLOCK)
+  && /shiftCheckConfirmed\.current/.test(DECL_BLOCK)
+  && /friendPerspectiveConfirmed\.current/.test(DECL_BLOCK));
+// The idempotence guard. Without it issueDeclaration re-issues every turn and askedAt drifts to the
+// latest turn, at which point the answer can never postdate the question and every link is refused
+// — a silent failure, since the refusals are supposed to mean something.
+assert('issuing is guarded, so a one-way latch cannot re-issue on every turn',
+  /if \(_asked && !getDeclaration\(/.test(DECL_BLOCK));
+
+assert('a pure tally exists, in the tallyRoadTrace shape',
+  /function tallyDeclarations\s*\(/.test(CODE));
+const TALLY = (() => { const a = CODE.indexOf('function tallyDeclarations('); return a < 0 ? '' : CODE.slice(a, CODE.indexOf('\n}', a) + 2); })();
+// BEHAVIOURAL, not a source scan: a mutation made the tally return the ledger's text and every
+// source-level purity check still passed. Called with a ledger that holds real text, it must return
+// numbers and nothing else.
+eval(TALLY);
+const _probe = tallyDeclarations([
+  { id: 'stakes', askedAt: 1, answeredAt: null, text: '' },
+  { id: 'shift_check', askedAt: 2, answeredAt: 4, text: 'ΜΥΣΤΙΚΟ ΚΕΙΜΕΝΟ ΧΡΗΣΤΗ' },
+]);
+assert('the tally counts correctly', _probe.issued === 2 && _probe.answered === 1);
+assert('the tally returns ONLY the two counts — no text can ride out on it',
+  Object.keys(_probe).length === 2
+  && Object.values(_probe).every(v => typeof v === 'number')
+  && !JSON.stringify(_probe).includes('ΜΥΣΤΙΚΟ'));
+assert('degenerate input is refused quietly',
+  tallyDeclarations(null).issued === 0 && tallyDeclarations([null, 7, {}]).issued === 0);
+assert('the tally is pure — no refs, no state, no storage',
+  !!TALLY && !/\.current|set[A-Z]|localStorage|saveMemory/.test(TALLY));
+const scAt = raw.indexOf('recordTelemetry("session_completed"');
+const sc = scAt === -1 ? '' : raw.slice(scAt, raw.indexOf('});', scAt));
+assert('session_completed was located, so the checks below are not vacuous', sc.length > 200 && /turns:/.test(sc));
+assert('counts reach telemetry: how many were issued and how many answered',
+  /declIssued:/.test(sc) && /declAnswered:/.test(sc));
+assert('and they are counts only — no question text, no answer text ever travels',
+  !/decl(Issued|Answered):[^\n]*(content|text|reply|message)/i.test(sc));
+// The intent is that no PRODUCT decision branches on a declaration. Stated as containment rather
+// than as a ban on `if`: the block's own idempotence guard must read the ledger, or it would
+// double-issue. So the rule is that getDeclaration appears nowhere outside its definition and this
+// one block — which is stricter than the crude version, and does not forbid the bookkeeping.
+const GET_OUTSIDE = CODE.split(/\n/).filter(l => /getDeclaration\s*\(/.test(l))
+  .filter(l => !/function getDeclaration\(/.test(l) && !DECL_BLOCK.includes(l.trim()));
+assert('the ledger is read only inside its own block — no product decision branches on it'
+  + (GET_OUTSIDE.length ? ' (found: ' + GET_OUTSIDE.length + ')' : ''),
+  GET_OUTSIDE.length === 0);
+
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);
