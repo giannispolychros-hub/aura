@@ -3218,7 +3218,7 @@ function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued,
   // ending. Safety, onboarding and the decline cooldown still return "none" above this line and
   // are unaffected.
   const userDeclaredExit = !!lastUserMsg && lastUserMsg.role === "user" &&
-    isExplicitClosure(lastUserMsg.content || "");
+    (isExplicitClosure(lastUserMsg.content || "") || declaresClosing(lastUserMsg.content || ""));
   if (userDeclaredExit || naturalExitReady || thirdTriggerJustAnswered) {
     decision = "confirm";
   } else if (currentMode === "ANSWER" && userMsgsAll.length >= 2 && !warningIssued && isModelPreClosing(text)) {

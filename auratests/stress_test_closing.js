@@ -9,7 +9,12 @@ const fs = require('fs');
     if (_f.existsSync(x)) { raw = _f.readFileSync(x, 'utf8'); break; }
   }
   if (!raw) throw new Error('App.jsx not found. Put these files next to App.jsx, or in a tests/ folder beside src/');
-  const names = ['isBareEmojiOrAcknowledgment','matchesClosingWord','endsWithClosingSignal','wasThirdTriggerAsked','isModelPreClosing','isExplicitClosure','decideTermination','stripAraDeclarative','detectPattern','detectAssistantSelfRepetition','sanitizeForPromptContext','capMessageHistory','detectsBinaryOppositionPhrasing','parseThreeBeatShift','parseRoadMap','detectUserStagnation','normalizeGreekText'];
+  // declaresClosing ADDED (2026-09-26): decideTermination's userDeclaredExit now reads it
+  // unconditionally, not just inside the textAsksRealQuestion suppression branch this suite's own
+  // fixtures never reach (their placeholder AURA reply is never a question). Omitting it here is
+  // exactly the omission this repo has already been burned by: a missing dependency does not fail
+  // loudly, it crashes the whole suite with no result line, which the runner treats as fatal.
+  const names = ['isBareEmojiOrAcknowledgment','matchesClosingWord','endsWithClosingSignal','wasThirdTriggerAsked','isModelPreClosing','isExplicitClosure','declaresClosing','decideTermination','stripAraDeclarative','detectPattern','detectAssistantSelfRepetition','sanitizeForPromptContext','capMessageHistory','detectsBinaryOppositionPhrasing','parseThreeBeatShift','parseRoadMap','detectUserStagnation','normalizeGreekText'];
   let src = '';
   for (const n of names) {
     const s = raw.indexOf('function ' + n + '(');
@@ -146,10 +151,24 @@ function firesWithQuestion(lastUserMsg, opts = {}) {
 check("F015-SAFETY", 'safetyMode=true + "Κλείνουμε" + AURA question -> decision is "none" (safety always wins)',
   firesWithQuestion("Κλείνουμε", { safetyMode: true }) === "none");
 
-// (c) NEGATIVE (false positive guard): a message that merely contains closing-adjacent words
-// inside a longer, still-open thought must NOT be treated as explicit closure.
-check("F015-FALSEPOS", '"νομίζω τελειώσαμε προς το παρόν, αλλά θέλω να πω κάτι ακόμα" + AURA question -> does NOT close',
-  firesWithQuestion("νομίζω τελειώσαμε προς το παρόν, αλλά θέλω να πω κάτι ακόμα") !== "confirm");
+// (c) ΓΝΩΣΤΟ, ΑΠΟΔΕΚΤΟ ΟΡΙΟ — όχι λάθος που ξεχάστηκε (2026-09-26, μαζί με τη διόρθωση του
+// userDeclaredExit gap). Η Βαθμίδα Α του declaresClosing πιάνει «τελειώσαμε» ΟΠΟΥΔΗΠΟΤΕ μέσα στο
+// μήνυμα — ακόμα κι όταν ακολουθεί «αλλά θέλω να πω κάτι ακόμα». Αυτό ήταν το σχεδιαστικό επιλεγμένο
+// trade-off για τα ήδη κατοχυρωμένα σημεία καταστολής (μία παρακρατημένη υπενθύμιση κοστίζει
+// ελάχιστα εκεί), και τώρα το ίδιο trade-off μεταφέρεται και στο userDeclaredExit, ένα σημείο
+// δράσης: η συνέπεια εδώ είναι decision="confirm", δηλαδή εμφανίζεται η κάρτα «πριν κλείσουμε».
+// Η ΣΥΝΕΠΕΙΑ ΕΙΝΑΙ ΑΝΑΣΤΡΕΨΙΜΗ, ΟΧΙ ΑΠΩΛΕΙΑ: η κάρτα έχει το κουμπί «Έχω κι άλλο να πω» —
+// handleClosureConfirm(false) απλώς την κλείνει, ο χρήστης συνεχίζει κανονικά, καμία απάντηση δεν
+// χάνεται, καμία συνεδρία δεν τερματίζεται μόνη της.
+// ΕΠΙΛΕΧΘΗΚΕ ΡΗΤΑ έναντι στενότερου ελέγχου (μόνο η Βαθμίδα Β, «η τελευταία πρόταση καταλήγει σε
+// λέξη κλεισίματος»): η στενότερη εκδοχή θα έλυνε αυτό το υποθετικό fixture, αλλά θα ξανάνοιγε μια
+// ΠΡΑΓΜΑΤΙΚΗ, ήδη επιβεβαιωμένη συνεδρία (session 1, «…ευχαριστώ κλείνουμε» — δεν περιέχει καμία
+// από τις λέξεις leave-taking που απαιτεί η Βαθμίδα Β, άρα πιάνεται ΜΟΝΟ από τη Βαθμίδα Α). Το F015
+// είναι κατασκευασμένο fixture για τη Βαθμίδα Α σε γενικό πλαίσιο, όχι αληθινή συνεδρία. Ανάμεσα σε
+// ένα μετρημένο, τεκμηριωμένο, αναστρέψιμο false-positive εδώ και ένα να ξανασπάσει μια πραγματική
+// συνεδρία, επιλέχθηκε το πρώτο.
+check("F015-FALSEPOS", '"νομίζω τελειώσαμε προς το παρόν, αλλά θέλω να πω κάτι ακόμα" + AURA question -> ΤΩΡΑ δίνει "confirm" (αποδεκτό trade-off, βλ. σχόλιο πάνω)',
+  firesWithQuestion("νομίζω τελειώσαμε προς το παρόν, αλλά θέλω να πω κάτι ακόμα") === "confirm");
 
 // (d) NEGATIVE (original rule preserved): a plain substantive message, not a closing signal at
 // all, + AURA's reply ending in a real question -> must still NOT close. This is the exact

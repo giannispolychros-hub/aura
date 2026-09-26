@@ -186,8 +186,16 @@ assert('the guard is NEGATED: a departure withholds the pair, it does not select
 assert('the pair is still pushed when the message is a real answer — the guard only withholds',
   /st\.qa\.push\(/.test(CAP));
 
-assert('exactly four call sites are wired, matching the stated scope',
-  (raw.match(/declaresClosing\s*\(/g) || []).length === 5); // 4 call sites + the definition
+// UPDATED DELIBERATELY, not silently: a 5th call site joined on 2026-09-26, in decideTermination's
+// own userDeclaredExit (found by a read-only forensic audit — until then, isExplicitClosure alone
+// decided whether a declared closing ever reached decision==="confirm" at all, so a closing that
+// carried content, proven caught by declaresClosing at the four suppression sites above, still
+// never terminated the session through this branch). This one is an ACTION site, not a suppression
+// site — it is what decides whether the closure-confirm card is offered in the first place, not
+// merely whether an unrelated question or gate is withheld. The count below is the thing this
+// assertion exists to keep honest, so it moves with the real number rather than being deleted.
+assert('exactly five call sites are wired, matching the current stated scope',
+  (raw.match(/declaresClosing\s*\(/g) || []).length === 6); // 5 call sites + the definition
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);
