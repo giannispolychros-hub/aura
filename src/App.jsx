@@ -4061,6 +4061,32 @@ function detectAssistantSelfRepetition(messages) {
   // match (e.g. just "Είπες ότι") was part of what caused the false positive above.
   const openingWords = s => (s.trim().toLowerCase().match(/^([a-zα-ωάέήίόύώϊϋΐΰ]+\s+){2}[a-zα-ωάέήίόύώϊϋΐΰ]+/) || [""])[0];
   const sameOpening = openingWords(last) && openingWords(last) === openingWords(prev);
+  // THE SAME CLOSING QUESTION IN THREE CONSECUTIVE REPLIES — a third, independent trigger, and
+  // deliberately NOT subject to hasSubstantialNewContent. Real session evidence (2026-09-26,
+  // session 3, replies 32-34): "Ποιο από τα δύο σε νοιάζει περισσότερο — να κάνει το σωστό ή να
+  // πουλήσει;" went out byte for byte three times while this function returned false on every one
+  // of those turns. Each reply had its own opening paragraph, so each had ≥2 unique words and the
+  // exemption switched the whole guard off. Measured on that pair: word overlap 0.00, well under
+  // the 0.55 threshold, so that trigger was silent too.
+  // WHY THREE AND NOT TWO, measured rather than chosen. The legitimate VERBATIM COST COLLISION
+  // pair that hasSubstantialNewContent exists for reuses the SAME closing question on two
+  // newly-named costs — checked directly, both replies produce an identical final question. So
+  // "same question twice" would re-open precisely the false positive the exemption was added to
+  // fix. Two in a row is genuinely ambiguous on the evidence available. Three in a row is not a
+  // template being applied to new material; it is being stuck, and that is what the user met.
+  const prev2 = assistantMsgs.length >= 3 ? (assistantMsgs[assistantMsgs.length - 3]?.content || "") : null;
+  const lastQuestion = s => {
+    const qs = String(s == null ? "" : s).match(/[^.;!?\n]*[;?]/g);
+    if (!qs) return "";
+    // Folded the same way the rest of this file folds: accents stripped, lowercased, final sigma
+    // ς→σ, whitespace collapsed. The 12-character floor keeps a bare "Τι;" or "Πού;" from matching.
+    return qs[qs.length - 1].normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase().replace(/ς/g, "σ").replace(/\s+/g, " ").trim();
+  };
+  const qLast = lastQuestion(last);
+  const sameQuestion = prev2 !== null && !!qLast && qLast.length >= 12 &&
+    qLast === lastQuestion(prev) && qLast === lastQuestion(prev2);
+  if (sameQuestion) return { repeated: true, lexicalSim, sameOpening: false, sameQuestion: true };
   if ((lexicalSim > 0.55 || sameOpening) && !hasSubstantialNewContent) {
     return { repeated: true, lexicalSim, sameOpening };
   }
@@ -5117,7 +5143,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // is generated, so it warns proactively rather than after the fact.
       const selfRepCheck = detectAssistantSelfRepetition(msgs);
       const selfRepetitionCtx = selfRepCheck.repeated
-        ? `\n[CODE-VERIFIED: your own last 2 replies were structurally similar (${selfRepCheck.sameOpening ? "same opening phrase" : "high word overlap"}) — this is exactly the kind of "no genuine movement" evidence that should trigger the Strategy Change pillar (see STRATEGY SWITCH TIMING/WHICH FAMILY TO SWITCH TO above), not just a wording tweak. Draw from a region of INTERVENTION SPACE you have not used yet this session.]\n`
+        ? `\n[CODE-VERIFIED: ${selfRepCheck.sameQuestion ? "you have now asked the SAME CLOSING QUESTION in three consecutive replies, word for word" : `your own last 2 replies were structurally similar (${selfRepCheck.sameOpening ? "same opening phrase" : "high word overlap"})`} — this is exactly the kind of "no genuine movement" evidence that should trigger the Strategy Change pillar (see STRATEGY SWITCH TIMING/WHICH FAMILY TO SWITCH TO above), not just a wording tweak. Draw from a region of INTERVENTION SPACE you have not used yet this session.]\n`
         : '';
       // ROAD QUESTIONS STAND-DOWN (see gatesCtx above): this block tells the model to switch region
       // or show the map — but the map has already been shown, and a short answer to a road question
