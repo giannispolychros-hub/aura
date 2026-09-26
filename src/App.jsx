@@ -2976,6 +2976,63 @@ function isModelPreClosing(text) {
 // "σε" in front of "ευχαριστώ" — left a residue and killed the whole match. Step (1) is untouched,
 // so this cannot open a back door: "όχι" or "σε" alone still has no declaration anywhere and still
 // returns false. What changed is only that such a word can now stand NEXT TO one.
+// DECLARES CLOSING — the gap the other two detectors document and cannot cover.
+//
+// THE HARM, three times in three real sessions. isExplicitClosure requires the WHOLE message to
+// reduce to closing words, and its own comment records the consequence: "Θα το σκεφτώ. Κλείνουμε."
+// is not caught. Real messages, all three genuine closings, none caught by either detector:
+//
+//   session 1  "δεν ξέρω θα το σκεφτώ άλλη στιγμή σε ευχαριστώ κλείνουμε"
+//   session 2  "Ναι θα το κάνω. Ευχαριστώ"
+//   session 3  "Θα το σκεφτώ... ευχαριστώ"
+//
+// Session 1's cost is measured: the gates suffix was not suppressed, AURA asked another question
+// after "κλείνουμε", and the road artifact recorded that departure as the user's thinking about
+// ΔΡΟΜΟΣ 1.
+//
+// THE WORDLIST WAS NEVER THE PROBLEM. "ευχαριστω" is already in both existing detectors' lists.
+// What fails is the whole-message requirement. So this is not a broader vocabulary — it is the same
+// vocabulary with a narrower SCOPE, and it comes in two tiers because one scope does not fit both.
+//
+// TIER A — declarations that cannot mean anything else, matched ANYWHERE in the message. This is
+// what catches session 1, whose message has no sentence boundary at all.
+// TIER B — the FINAL SENTENCE reduces to closing words. This is the minimal generalisation of the
+// existing rule: whole message → final sentence. It catches sessions 2 and 3.
+//
+// WHY NOT SIMPLY MATCH THE EXISTING LIST ANYWHERE, which is the obvious move and is wrong. That
+// list contains "παω", and session 2 contains "Απλά πάω στο πάρκο" mid-session; it contains "γεια",
+// which opens conversations; it contains "φτανει", and "δεν φτάνουν τα χρήματα" is the subject of
+// two whole sessions. Tier A is curated against exactly those.
+//
+// WHY THE AGREEMENT TOKENS STAY OUT OF TIER A. matchesClosingWord treats a bare "Ναι"/"Οκ"/
+// "Κατάλαβα" as closing, measured at 13 of 15 realistic mid-session acknowledgments. Those words
+// appear in tier B's reduction list, where they can only help a final sentence reduce — never
+// trigger on their own.
+//
+// MEASURED OVER ALL 89 REAL USER MESSAGES from the three sessions: 3 firings, which are exactly the
+// three closings above, and 0 false positives. Bare "Ναι" and "Κατάλαβα" do not fire; neither does
+// "ευχαριστώ, και τι γίνεται με το δάνειο;", where the thanks opens a sentence that continues.
+function declaresClosing(text) {
+  if (typeof text !== "string") return false;
+  const t = text.trim();
+  if (!t) return false;
+  const fold = x => String(x).normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/([a-z\u03b1-\u03c9])\1+/g, "$1").replace(/ς/g, "σ");
+  // TIER A. Unambiguous, anywhere. Deliberately excludes παω / γεια / φτανει / τελος, each of which
+  // has a common non-closing meaning that real sessions produced.
+  if (/κλεινουμε|κλεινω|τελειωσαμε|τα λεμε|καλη συνεχεια|καληνυχτα|καλο βραδυ|αντιο|μπαι|bye|αρκετα για σημερα|ασ το αφησουμε εδω/.test(fold(t))) return true;
+  // TIER B. The final sentence, and it must contain a leave-taking phrase before reducing — so a
+  // final sentence made only of "Ναι" can never qualify on the reduction alone.
+  const parts = t.split(/[.;!?\n]+|\u2026|\.\.\./).map(x => x.trim()).filter(Boolean);
+  if (!parts.length) return false;
+  const lastSentence = fold(parts[parts.length - 1]);
+  if (!/ευχαριστω|θα το σκεφτω|θα το δω|επισησ|παρομοιωσ/.test(lastSentence)) return false;
+  const stripped = lastSentence
+    .replace(/ευχαριστω|θα το σκεφτω|θα το δω|επισησ|παρομοιωσ|τα λεμε|γεια|αντιο|καληνυχτα|νομιζω ναι|ενταξει|καταλαβα|ακριβωσ|ωραια|σωστο|θενξ|thanks|οκ|ok|ναι|καλα|σε|πολυ/g, "")
+    .replace(/[.,!?;\s\u2026-]/g, "");
+  return stripped === "";
+}
+
 function isExplicitClosure(text) {
   const t = String(text == null ? "" : text).trim();
   if (!t) return false;
@@ -3197,7 +3254,11 @@ function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued,
   // AURA's own non-compliant reply override an explicit user closing request. Narrowed, not
   // removed: the override still applies to everything except the one case where the user's own
   // last message is itself an explicit termination/farewell (isExplicitClosure).
-  if ((decision === "confirm" || decision === "terminate") && textAsksRealQuestion && !isExplicitClosure(lastUserMsg?.content || "")) {
+  // declaresClosing is ADDED, never substituted: the narrow detector keeps its exact behaviour and
+  // this covers the case it documents as a known gap — a closing that carries content. Three real
+  // sessions produced one each, and none was caught. Suppression only: a false positive here leaves
+  // a question unasked at a close, which is the safe direction.
+  if ((decision === "confirm" || decision === "terminate") && textAsksRealQuestion && !isExplicitClosure(lastUserMsg?.content || "") && !declaresClosing(lastUserMsg?.content || "")) {
     decision = "none";
   }
 
@@ -5064,7 +5125,12 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // caught by decideTermination's own use of the same detector either. Recorded in
         // test_conflict_matrix.js rather than papered over.
         const lastUserMsgForGates = [...msgs].reverse().find(m => m.role === "user")?.content || "";
-        if (isExplicitClosure(lastUserMsgForGates)) return '';
+        // THE SITE WHOSE FAILURE WAS MEASURED. Session 1: the user wrote "…ευχαριστώ κλείνουμε",
+        // isExplicitClosure returned false because the message carried content, the gates suffix was
+        // not withheld, and AURA asked another question after the close. declaresClosing is added
+        // beside it rather than replacing it — the narrow detector's measured trade-off (13 of 15
+        // mid-session acknowledgments) is exactly why it is not simply widened.
+        if (isExplicitClosure(lastUserMsgForGates) || declaresClosing(lastUserMsgForGates)) return '';
         const due = [];
         // LIVE-EVIDENCE FIX (real session, the clearest instance of a code-verified gate beating a
         // prompt-only rule): the moment the user named their options — "Έχω 2 επιλογές" —
@@ -5400,7 +5466,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // itself a closing/stop signal, do not override it with a measurement question — respect
       // their explicit wish to stop, same suppression principle already used for Stop
       // Condition -> Earned Feedback.
-      if (concreteStepStated.current && !outcomeScaleAsked.current && parseThreeBeatShift(displayText) !== null && !matchesClosingWord(lastUserMsg)) {
+      // The closing suppression here already uses the BROAD detector, deliberately — see the
+      // comment above. declaresClosing is added for the one thing the broad detector also misses: a
+      // declaration inside a message that carries content.
+      if (concreteStepStated.current && !outcomeScaleAsked.current && parseThreeBeatShift(displayText) !== null && !matchesClosingWord(lastUserMsg) && !declaresClosing(lastUserMsg)) {
         displayText = "Πριν προχωρήσουμε — τώρα, πόσο ξεκάθαρο είναι αυτό, από το 1 έως το 10; Και πόσο αισθάνεσαι ότι αυτό που βρήκες είναι δική σου σκέψη ή επιλογή, από το 1 έως το 10;";
         outcomeScaleAsked.current = true;
       }

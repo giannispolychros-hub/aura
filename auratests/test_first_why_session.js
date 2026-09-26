@@ -34,9 +34,12 @@ function assert(name, cond) { if (cond) { passed++; console.log("PASS — " + na
 const DT_SRC = extract('decideTermination');
 const CALLED = [...new Set((DT_SRC.match(/\b([a-z][a-zA-Z0-9]{3,})\(/g) || []).map(x => x.slice(0, -1)))]
   .filter(n => raw.indexOf('function ' + n + '(') >= 0 && n !== 'decideTermination');
+// declaresClosing joined this set on 2026-09-26, when the closing suppression here stopped relying
+// on isExplicitClosure alone. This pin is what forced the harness to be updated rather than letting
+// the simulation fail misleadingly — a missing dependency does not fail loudly, it fails wrong.
 const EXPECTED = ['matchesClosingWord', 'isBareEmojiOrAcknowledgment', 'wasThirdTriggerAsked',
-                  'isExplicitClosure', 'isModelPreClosing'];
-assert("decideTermination's module-level dependencies are exactly the five this harness lifts"
+                  'isExplicitClosure', 'isModelPreClosing', 'declaresClosing'];
+assert("decideTermination's module-level dependencies are exactly the six this harness lifts"
   + (CALLED.length ? " (" + CALLED.join(", ") + ")" : ""),
   CALLED.length === EXPECTED.length && EXPECTED.every(n => CALLED.includes(n)));
 for (const f of EXPECTED.concat(['detectsConcreteStep', 'decideTermination'])) eval(extract(f));

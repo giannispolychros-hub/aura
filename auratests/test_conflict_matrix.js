@@ -241,6 +241,10 @@ assert('premiseInversionCtx requires binaryOppositionCount >= 2, so it is exclud
 console.log("\n=== CTX CONFLICT: closing signal × procedural gates ===");
 
 eval(extract('isExplicitClosure'));
+// The gates block now suppresses on isExplicitClosure OR declaresClosing, so the simulation below
+// needs both in scope. Without this the suite does not fail — it CRASHES, producing no result line
+// at all, which the runner treats as fatal precisely because a silent suite is worse than a red one.
+eval(extract('declaresClosing'));
 
 // gatesCtx is an inline IIFE, not a named function, so it is located by its own opening text and
 // then EVALUATED — the same behavioural approach the first-reply-floor section above uses, and for
@@ -319,13 +323,26 @@ assert('UNCHANGED: the msgCount < 3 guard still wins — before turn 3 the block
 assert('UNCHANGED: with all three gates satisfied the block still returns "" whatever the message',
   gatesTextWhen({ msgCount: 5, scaleAsked: true, anchors: true, stakes: true, lastUserText: SUBSTANTIVE }) === '');
 
-// KNOWN GAPS, measured and recorded rather than assumed away. These two pass both before and after
-// the fix — they are documentation, never evidence that it works. isExplicitClosure requires the
-// WHOLE message to reduce to closing words, so a closing word trailing real content is not caught;
-// and unlike matchesClosingWord it does not strip the colloquial trailing «ε». Both are also true of
+// ONE OF THE TWO KNOWN GAPS IS NOW CLOSED, and the assertion is inverted deliberately rather than
+// deleted. It used to read "«Θα το σκεφτώ. Κλείνουμε.» is NOT suppressed" and was pure
+// documentation of isExplicitClosure's whole-message requirement. Then three real sessions produced
+// that exact shape — "…ευχαριστώ κλείνουμε", "Ναι θα το κάνω. Ευχαριστώ", "Θα το σκεφτώ...
+// ευχαριστώ" — and in session 1 the cost was measured: the gates suffix was not withheld, AURA
+// asked another question after the close, and the road artifact recorded that departure as the
+// user's thinking about ΔΡΟΜΟΣ 1. declaresClosing now sits beside isExplicitClosure here, so this
+// case is suppressed. What the assertion tests is unchanged; what it expects is the opposite.
+assert('GAP CLOSED: «Θα το σκεφτώ. Κλείνουμε.» IS suppressed now — declaresClosing covers a closing that carries content',
+  gatesTextWhen({ ...TWO_DUE, lastUserText: 'Θα το σκεφτώ. Κλείνουμε.' }) === '');
+// NON-VACUITY: the narrow detector alone still does not catch it, so the line above is testing the
+// new detector rather than a change in the old one.
+assert('NON-VACUITY: isExplicitClosure alone still returns false on that message',
+  isExplicitClosure('Θα το σκεφτώ. Κλείνουμε.') === false);
+// AND THE SECOND GAP IS STILL A GAP, unchanged by this commit — «Τέλος ε;» needs the trailing «ε»
+// stripped, which only matchesClosingWord does, and "τέλος" is deliberately absent from tier A
+// because "τέλος πάντων" means "anyway".
+// isExplicitClosure requires the WHOLE message to reduce to closing words, and unlike
+// matchesClosingWord it does not strip the colloquial trailing «ε». Both are also true of
 // decideTermination, which uses the same detector — so this change does not widen an existing gap.
-assert('KNOWN GAP (documented): «Θα το σκεφτώ. Κλείνουμε.» is NOT suppressed — the message does not reduce to closing words',
-  gatesTextWhen({ ...TWO_DUE, lastUserText: 'Θα το σκεφτώ. Κλείνουμε.' }) !== '');
 assert('KNOWN GAP (documented): «Τέλος ε;» is NOT suppressed — isExplicitClosure does not strip the trailing «ε»',
   gatesTextWhen({ ...TWO_DUE, lastUserText: 'Τέλος ε;' }) !== '');
 
