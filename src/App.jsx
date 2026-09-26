@@ -3336,6 +3336,68 @@ function detectsMethodFailureSignal(text) {
 // "?". It exists only to give visibility during real testing (open the console while testing),
 // never to alter AURA's behavior or auto-correct content — doing the latter risks breaking
 // legitimate content with a heuristic that cannot reliably tell the difference.
+// CLAIMS ABOUT THE USER — Universal No-Evaluation and Κ5 (pattern ≠ trait) had no observer at
+// all until now. The only candidate was detectsPossibleAraPatternViolation below, which tests for
+// the literal word "Άρα", so every other surface form passed untouched. Three real sessions
+// produced five violations and none was seen. The worst is the last sentence of a session:
+// "Αυτό το ξέρεις ήδη." — measured at 0% of that person's own words, in the paragraph the
+// Blueprint charges 6€ to keep, and two turns after AURA had itself invented the hypothesis
+// "ο καθρέφτης γίνεται μαγικός όταν δείχνει κάτι που ο χρήστης δεν ήξερε ότι ήδη ήξερε". It told him he already knew.
+//
+// FORM, NEVER PROVENANCE, and that is what makes this detector possible. Asking whether a claim is
+// traceable to the user's words is the road this repo has already measured and closed: vocabulary
+// overlap turned out ANTI-correlated with fabrication, because a model writing an invented line
+// reuses their words by construction. A claim about someone's interior does not fail on content
+// words — it fails on a small closed set of CONSTRUCTIONS: knowledge attributed to them, a
+// totalising temporal claim, a character verdict, an appeal to a hidden interior. Syntax, not
+// meaning, so it needs no corpus and word reuse cannot game it.
+//
+// QUOTED SPANS ARE STRIPPED FIRST. The road artifact prints their answers inside «…» and reflections
+// quote verbatim, so mirroring someone who says "πάντα" would otherwise read as AURA totalising.
+//
+// KNOWN LIMIT, deliberately not closed: an UNQUOTED legitimate mirror ("είπες ότι πάντα είναι
+// το ίδιο") can flag. An attribution guard was considered and REJECTED on the evidence: the
+// real violation "Η ρίζα ήταν πάντα η ίδια — το είπες εσύ" carries an attribution and the
+// attribution is itself the false part (he said "είναι", present). Exempting attributed sentences
+// would exempt the clearest case. Measured 0 such false positives over 27 real replies.
+//
+// OBSERVATION ONLY, like the unsourced-option guard: it counts, never rewrites or blocks.
+function detectsClaimAboutUser(text) {
+  if (typeof text !== "string") return false;
+  const t = text.trim();
+  if (!t) return false;
+  // Quoted spans are the person speaking, printed back. The road artifact prints their answers
+  // inside «…» and reflections quote verbatim, so without this a mirrored "πάντα το ίδιο κάνω"
+  // reads as AURA totalising about them.
+  const own = t
+    .replace(/«[^»]*»/g, " ")
+    .replace(/\u201c[^\u201d]*\u201d/g, " ")
+    .replace(/"[^"]*"/g, " ");
+  const fold = own.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ");
+  // READ THESE AGAINST `fold`, NOT AGAINST GREEK AS TYPED. Three things were already applied:
+  // accents are stripped, everything is lowercased, and FINAL SIGMA IS NORMALISED ς→σ. So a word
+  // ending in ς must be written here ending in σ — "ξερεισ", not "ξερεις". Getting that wrong is
+  // silent: the regex simply never matches, and the guard reads as "no violations found". It cost
+  // three fixtures on the first rewrite of this block, which is why it is stated here in full.
+  // No \b anywhere either: it does not work on Greek letters in JS regex, a repeat bug already
+  // documented in this file. Every form is bounded by [^.;!?] so a match can never span sentences.
+  const FORMS = [
+    // THEIR KNOWLEDGE, ASSERTED — "Αυτό το ξέρεις ήδη."
+    /(ξερεισ|ηξερεσ|γνωριζεισ)[^.;!?]{0,20}ηδη|ηδη[^.;!?]{0,10}(ξερεισ|ηξερεσ)/,
+    // A TOTALISING TEMPORAL CLAIM — "Η ρίζα ήταν πάντα η ίδια" when they had said "είναι".
+    /(παντα|εξαρχησ)[^.;!?]{0,20}(ηταν|ειναι|ησουν)|(ηταν|εισαι|ησουν)[^.;!?]{0,10}παντα/,
+    // A CHARACTER VERDICT, asserted or denied — Κ5's exact prohibition.
+    // "Δεν ακούγεται παθογένεια. Ακούγεται σαν άνθρωπος που ξέρει ακριβώς τι του λείπει."
+    /ακουγεται σαν ανθρωπο|εισαι ανθρωποσ? που|ακουγεσαι σαν|δεν ακουγεται/,
+    // AN INTERIOR THEY NEVER REPORTED.
+    /στο βαθοσ|βαθια μεσα σου/,
+    // THE TOPIC DRIFT WORDING THE PROMPT ITSELF FORBIDS (γρ. 694, FIX 3).
+    /αυτο που (σε )?(απασχολει|νοιαζει) πραγματικα|αυτο που πραγματικα σε/,
+  ];
+  for (let i = 0; i < FORMS.length; i++) if (FORMS[i].test(fold)) return true;
+  return false;
+}
+
 function detectsPossibleAraPatternViolation(text) {
   return /Άρα[^.!?]*\./.test(text || "");
 }
@@ -4475,6 +4537,8 @@ export default function AURAv2() {
   // Counts replies where AURA presented a set of options and not one of them came from the user.
   // Observation only, per the staged plan: telemetry decides whether this ever gates a reply.
   const unsourcedOptionOffers = useRef(0);
+  // Claims about the user (No-Evaluation / Κ5). Counts only, same shape as the counter above.
+  const claimsAboutUser   = useRef(0);
   const violationCounts = useRef({}); // per-session tally of detectOutputViolation categories, debug-panel only
   const roadTraceLast = useRef(null); // last turn's road-map trace counters (numbers/booleans only), debug-panel only
   // THE SAME VALUES, ACCUMULATED AND PROMOTED. roadTraceLast holds only the last turn and
@@ -4659,6 +4723,7 @@ export default function AURAv2() {
         // guard that was missing when a real user was handed three careers he never raised; every
         // form-based guard we had returned nothing on that reply. Count only, never the text.
         unsourcedOptions: Math.min(9999, unsourcedOptionOffers.current),
+        userClaims: Math.min(9999, claimsAboutUser.current),
         lens: lensCode(activeLensRef.current),
         lensSwitches: lensSwitches.current,
         // Measured on the RAW model output and on each stage of our own chain, unlike the
@@ -5196,6 +5261,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         if (detectsUnsourcedOptionOffer(_clean, msgs.filter(m => m && m.role === "user").map(m => m.content), parseRoadMap)) {
           unsourcedOptionOffers.current += 1;
           console.warn('[AURA VIOLATION] UNSOURCED_OPTIONS | turn', msgCount, '|', _clean.trim().slice(0, 130));
+        }
+        if (detectsClaimAboutUser(_clean)) {
+          claimsAboutUser.current += 1;
+          console.warn('[AURA VIOLATION] USER_CLAIM | turn', msgCount, '|', _clean.trim().slice(0, 130));
         }
       } catch (e) { /* observation must never affect the session */ }
       const exitTagMatch = rawTextWithTags.match(/\[\[EXIT:(yes|no)\]\]\s*$/i);
@@ -6103,6 +6172,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             unsourcedOptionOffers.current += 1;
             console.warn('[AURA VIOLATION] UNSOURCED_OPTIONS | First-WHY turn |', _clean.trim().slice(0, 130));
           }
+          if (detectsClaimAboutUser(_clean)) {
+            claimsAboutUser.current += 1;
+            console.warn('[AURA VIOLATION] USER_CLAIM | First-WHY turn |', _clean.trim().slice(0, 130));
+          }
         } catch (e) { /* observation must never affect the session */ }
         setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "ANSWER" }]);
         // U1: Start trajectory for this category
@@ -6252,6 +6325,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     informationModeActive.current = false;
     methodFailureHint.current = false;
     unsourcedOptionOffers.current = 0;
+    claimsAboutUser.current = 0;
     violationCounts.current = {};
     roadTraceLast.current = null;
     roadTraceTotals.current = { rawLabels: 0, rawMap: 0, strippedMap: 0 };
