@@ -1080,3 +1080,102 @@ Items 1 and 2 of that list are the minimum for the gate. Items 3 and 4 are corre
 
 Awaiting approval before item 3 (opening the gate), per instruction.
 
+---
+
+## Steps 1δ, 2, 3α, 3β — measured, and one of them changes the plan (2026-09-26)
+
+### 1δ — a First-WHY session verified past its first turn ✓ shipped in `e522681`
+
+All nine real sessions (321 messages) replayed through `decideTermination` turn by turn, twice:
+with the state a First-WHY session actually has, and as if the latch had been set.
+
+| | |
+|---|---|
+| throws | **0** |
+| results outside the outcome enum | **0** |
+| sessions reaching a terminating decision | 4 / 9 |
+| sessions whose decision sequence changed | **0 / 9** |
+
+Statically, all thirteen latches the entry turn leaves unset are read **only as gates** — no
+arithmetic, no indexing, no dereference. So "unset" means "not yet" and can never be an error.
+**Nothing downstream breaks.**
+
+Two pre-existing findings reported rather than fixed: `roadMapRecovered` is written twice and read
+nowhere; and `wasThirdTriggerAsked` has **two** call sites inside `decideTermination`, one of which
+can be deleted without any of the 63 suites noticing.
+
+### 2 — why seven strategy mechanisms never fired: the code asked 144 times
+
+**Not detector blindness.** All seven are verbatim phrase matchers, and all seven correctly returned
+false because the move never happened in any wording. Verified with sibling-excluding intent probes;
+the two coincidental matches were inspected and rejected. A first, looser pass over-claimed
+"detector blind" for five of them and was wrong — the loose probes were matching neighbouring
+mechanisms (the late Outcome Scale for the early clarity baseline, the closing word request for the
+mid-session anchor invitation).
+
+The sibling mechanisms **do** fire: the late Outcome Scale in 1 reply, the closing word request in 2.
+So the closing ritual runs and the mid-session mechanisms do not.
+
+**And for two of the seven, the code's own condition was met the whole time.** `gatesCtx` pushes
+Decision Space Anchors and the Stakes Question into its `due` list whenever `anchorsInvited` and
+`stakesAsked` are unset, `msgCount >= 3`, no road question is pending and the last user message is
+not a closure. Replayed over the nine sessions:
+
+> **144 turns** named both mechanisms as due. **0 times** either happened.
+
+This matters for the plan: **naming what is due, in code, in the highest-attention tier, was already
+tried 144 times and did not produce the move.** Any new state whose output is another "this is due"
+line should expect the same result. The remaining five have no code nudge at all.
+
+### 3α — the loop's one real bridge does not fire reliably
+
+`detectUserStagnation` / `detectAssistantSelfRepetition` / `detectsMethodFailureSignal` are the
+SYNTHESIS → STRATEGY CHANGE feedback path, and the only pillar-to-pillar link in the architecture
+that matches its own prompt description. Over all nine full sessions:
+
+| detector | sessions | turns |
+|---|---|---|
+| `detectUserStagnation` | **1 / 9** | 2 |
+| `detectAssistantSelfRepetition` | **0 / 9** | 0 |
+| `detectsMethodFailureSignal` | **2 / 9** | 3 |
+
+**Five firings in 321 messages.** The comment at γρ. 3542 credits this family with closing the
+reactive-strategy gap; on real data it speaks five times in nine sessions. The reconstruction error
+runs the safe way — heuristic message boundaries make user turns longer and more varied, which
+pushes stagnation detection **down** — so 1/9 is if anything an underestimate of the gap, not of the
+firing.
+
+### 3β — `modelJudgesEnd` is neither a safety decision nor a simple leftover
+
+The answer is in this file already, in two paragraphs that were never read together.
+
+ADR-003's own reasoning (γρ. 74) reads: *«ποτέ semantic self-report στο ίδιο μεγάλο μοντέλο (το
+`[[EXIT:yes/no]]` tag **απέτυχε ακριβώς γι' αυτό τον λόγο**)»*. The tag was **measured to fail**, and
+that failure is the documented basis for the whole code-first-state decision. The
+ΚΑΤΑΣΤΑΣΗ ΣΗΜΕΡΑ section of 12 September then records it as a **known, unresolved contradiction**,
+explicitly *«χωρίς προτεινόμενη λύση»*: a mechanism this document calls documented-unreliable
+remained a live input to one of the two pillars it calls reliable.
+
+What makes it permanently false today is a **second, unrelated defect**: the instruction that
+produces the tag lives only in `SYSTEM_TERMINATION`, which is never the `basePrompt` where the tag
+is parsed. So the contradiction ADR-003 flagged is currently **neutralised by accident**.
+
+**Consequence, and it is a warning:** "fixing" the instruction placement would re-activate a
+mechanism this project already concluded is unreliable. The `[[EXIT]]` relocation that sat in the
+queued cache-invalidating batch should be **struck from it**, not scheduled. Step 5 may proceed on
+this basis: `modelJudgesEnd` stays false.
+
+### Step 4 pre-check — what the bridge would touch
+
+| name | App.jsx | tests | verdict |
+|---|---|---|---|
+| `roadMapDelivered` | 8 | **17** | heavily depended on — the bridge must only READ it |
+| `shiftCheckConfirmed` | 10 | 4 | read only |
+| `shiftConfirmed`, `userClosing` | 2 | 3 | **not fields at all** — parameter keys of `decidePostMapClose`, derived at its call site (γρ. 4835-4836) from `shiftCheckConfirmed.current` and the closure check. Reading them "from where they already are" means reusing that same derivation. |
+| `strategyChangeTriggered`, `strategyChangeCount`, `lastFamilyUsed` | **0** | **0** | free names, no collision |
+
+**One naming hazard flagged:** `familiesUsed` already exists and records **ctx block names**
+(`memCtx`, `tensionCtx`, …), not strategy families. A new `lastFamilyUsed` would be a second,
+different thing under a confusingly similar name — the exact "two sources of truth" the step's own
+instruction warns against. It needs a name that cannot be mistaken for `familiesUsed`.
+
