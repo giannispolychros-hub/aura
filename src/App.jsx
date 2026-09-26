@@ -3971,6 +3971,49 @@ function detectsStatedMoneyFigure(text) {
 // slices to its closing brace — an external const would simply not come along, and the extracted
 // copy would throw. Every other detector in this file already obeys that constraint. The regexes
 // carry no /g flag, so rebuilding them per call has no lastIndex semantics to worry about.
+// EXPLICIT PRODUCTION REQUEST — PATH ONE's trigger condition, which had no observer.
+//
+// PATH GENERATION declares two equal activation paths for the road map, and PATH ONE is "the
+// PRIORITY INTERRUPT LAYER fires on repeated, explicit solution-seeking", with the threshold taken
+// from a real transcript: the Evia session, where the user asked 4+ times, explicitly, with rising
+// frustration, and left for another AI. Searched: PRIORITY INTERRUPT LAYER appears 4 times in the
+// prompt and 0 times in the code, and no detector for a repeated request existed under any name.
+// The threshold was declared and nothing counted.
+//
+// It happened again at more than twice the threshold (session 3, 2026-09-26): twelve requests by
+// hand count, six refusals, and the session's real finding arrived only once AURA complied.
+//
+// MEASURED OVER ALL 89 REAL USER MESSAGES before this was written: 0 of 21 in the session that
+// produced a road map and no advice, 2 of 24 in session 2 — both immediately before AURA produced
+// market information — and 9 of 44 in session 3. In both sessions that collapsed into advice the
+// count rose just before the collapse; in the one that did not, it stayed at zero.
+//
+// DELIBERATELY NARROW. Every pattern here fired on a real message. Candidates that fired on nothing
+// were dropped rather than shipped untested: a bare "περισσότερα" would have flagged "θέλω
+// περισσότερα χρήματα", which is the subject of two whole sessions and not a request.
+//
+// COUNTS ONLY, NO CONSUMER. The prompt already says what to do when this fires; the observation is
+// what was missing. Wiring it into an interrupt needs these numbers first.
+function detectsExplicitProductionRequest(text) {
+  if (typeof text !== "string") return false;
+  const t = text.trim();
+  if (!t) return false;
+  const f = String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ");
+  // An imperative addressed to AURA, at the start of the message or of a sentence. The trailing
+  // (\s|$) keeps "κανε" out of "κανείς" and "πεσ" out of "πεσμένος".
+  if (/(^|[.;!?]\s*)(κανε|δωσε|δωσ|πεσ|πεσε|γραψε|εξηγησε|προτεινε|βοηθησε|βρεσ|δειξε)(\s|$)/.test(f)) return true;
+  if (/δωσ μου|δωσε μου|πεσ μου|πεσε μου|κανε εστω/.test(f)) return true;
+  // Asking for help outright.
+  if (/θελω τη βοηθεια|θελω βοηθεια|χρειαζομαι βοηθεια|βοηθησε με/.test(f)) return true;
+  // Asking for a hypothesis or an opinion — the exact thing session 3 asked for twelve times.
+  if (/μια υποθεση|υποθεσε|τι θα υπεθετεσ|τι πιστευεισ εσυ|τι θα ελεγεσ|πιστευεισ\?/.test(f)) return true;
+  // Asking for MORE of what was just produced. "αλλεσ 2" and "τι αλλο" are both real.
+  if (/τι αλλο|αλλεσ \d|αλλα \d/.test(f)) return true;
+  // Asking for information as such.
+  if (/πληροφοριεσ/.test(f)) return true;
+  return false;
+}
+
 function detectsExplicitConstraint(text) {
   const t = String(text == null ? "" : text);
   const PATTERNS = [
@@ -4626,6 +4669,12 @@ export default function AURAv2() {
   const unsourcedOptionOffers = useRef(0);
   // Claims about the user (No-Evaluation / Κ5). Counts only, same shape as the counter above.
   const claimsAboutUser   = useRef(0);
+  // PATH ONE's trigger, counted and read by nothing. explicitRequests is the session total;
+  // requestStreak is the current consecutive run and requestStreakMax the longest, because the
+  // prompt's threshold is about REPEATED asking rather than a total.
+  const explicitRequests  = useRef(0);
+  const requestStreak     = useRef(0);
+  const requestStreakMax  = useRef(0);
   const violationCounts = useRef({}); // per-session tally of detectOutputViolation categories, debug-panel only
   const roadTraceLast = useRef(null); // last turn's road-map trace counters (numbers/booleans only), debug-panel only
   // THE SAME VALUES, ACCUMULATED AND PROMOTED. roadTraceLast holds only the last turn and
@@ -4811,6 +4860,8 @@ export default function AURAv2() {
         // form-based guard we had returned nothing on that reply. Count only, never the text.
         unsourcedOptions: Math.min(9999, unsourcedOptionOffers.current),
         userClaims: Math.min(9999, claimsAboutUser.current),
+        explicitRequests: Math.min(9999, explicitRequests.current),
+        requestStreak: Math.min(9999, requestStreakMax.current),
         lens: lensCode(activeLensRef.current),
         lensSwitches: lensSwitches.current,
         // Measured on the RAW model output and on each stage of our own chain, unlike the
@@ -4867,6 +4918,20 @@ export default function AURAv2() {
       const lastUserMsgForBinary = [...msgs].reverse().find(m => m.role === "user");
       if (lastUserMsgForBinary) {
         bumpBinaryOpposition(binaryOppositionCount, lastUserMsgForBinary.content, detectsBinaryOppositionPhrasing);
+      }
+    }
+    // PATH ONE's counter, in the same pre-API place and on the same message. Observation only: the
+    // streak resets on any message that is not a request, so a run means consecutive asking.
+    {
+      const _lastUserForReq = [...msgs].reverse().find(m => m.role === "user");
+      if (_lastUserForReq) {
+        if (detectsExplicitProductionRequest(_lastUserForReq.content || "")) {
+          explicitRequests.current += 1;
+          requestStreak.current += 1;
+          if (requestStreak.current > requestStreakMax.current) requestStreakMax.current = requestStreak.current;
+        } else {
+          requestStreak.current = 0;
+        }
       }
     }
     // TIMING FIX (causal-inventory audit — detectsMethodFailureSignal previously ran after the API
@@ -6421,6 +6486,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     methodFailureHint.current = false;
     unsourcedOptionOffers.current = 0;
     claimsAboutUser.current = 0;
+    explicitRequests.current = 0;
+    requestStreak.current = 0;
+    requestStreakMax.current = 0;
     violationCounts.current = {};
     roadTraceLast.current = null;
     roadTraceTotals.current = { rawLabels: 0, rawMap: 0, strippedMap: 0 };
