@@ -741,7 +741,7 @@ keys on grammatical form. Order 1→5 ships first; 6 is one cache write at the e
 | 1 | Unsourced-option detector — catches advice delivered as a declarative sentence | none |
 | 2 | CI runs 33 suites while 57 exist — 24 never run | none |
 | 3 | Map the 35 one-shot prompt rules against the ~19 code latches (read-only) | none |
-| 4 | Re-land the lens via `deliverOnce(..., budget 1)` — one turn, as its prompt says | none |
+| 4 | Re-land the lens via `deliverOnce(..., budget 1)` — one turn, as its prompt says | none — **shipped 2026-09-26, see below** |
 | 5 | Phase 0 — `test_tag_contract_integrity` per block, catching the `[[EXIT]]` class | none |
 | 6 | **One cache write, four changes together** — below | one write |
 
@@ -1657,3 +1657,35 @@ prompt δεν αγγίχτηκε.
 
 Tests 2223 → 2229, 68 suites, 0 failed, 0 silent. Τρεις μεταλλάξεις, καμία δεν επέζησε. Κανένα prompt
 δεν αγγίχτηκε.
+
+## 26 Σεπτεμβρίου — item 4 χτίστηκε: ο lens ξανασυνδέεται στο κύριο μονοπάτι, ποτέ μέσω activeLensRef
+
+**Τι είχε σπάσει την προηγούμενη φορά.** Το Phase 1 (`b5db808`) συνέδεσε το `inferLensFallback` στο
+κύριο μονοπάτι **γράφοντας το `activeLensRef`** — session-level state, ενώ κάθε lens prompt λέει
+ρητά *"USE THIS LENS ONCE. Ask one question. Then stop and wait."* Μια εκπαιδευτικός νοσηλευτικής,
+1300€, 4 παιδιά, σκόραρε EXPLORE· η συνεδρία δεν το άφησε ποτέ· η AURA πρότεινε επιλογές που δεν
+είχε ζητήσει. Ανατράπηκε αυθημερόν (`Phase 1 reverted`, παραπάνω).
+
+**Τι χτίστηκε τώρα, διαφορετικά.** `computeOpeningLensChoice(currentMode, msgCount, lensSwitchesSoFar,
+lastUserText)` — καθαρή συνάρτηση, μηδέν αναφορά σε `.current`, μηδέν κλήση `setActiveLens`. Δεν
+επιλέγει τη «στάση» της συνεδρίας· επιλέγει **ποιο** από τα ήδη υπάρχοντα 4 lens prompts θα
+χρησιμοποιήσει το `basePrompt` για ΜΙΑ κλήση, μέσω `deliverOnce(..., budget 1)` στο σημείο κλήσης.
+Το `activeLensRef`/`lensSwitches`/`setActiveLens` παραμένουν εντελώς ανέγγιχτα — η σταθερή στάση της
+συνεδρίας πριν και μετά αυτό το turn είναι ακριβώς η ίδια.
+
+**Ο φρουρός, τριπλός, με τη σειρά που κόβει περισσότερο:** (1) `currentMode === "ANSWER"` — ποτέ σε
+COMPRESSION/SUPPORTIVE. (2) `msgCount === 1` — μόνο το πρώτο μήνυμα μιας συνεδρίας που προσπέρασε το
+First-WHY. (3) `lensSwitchesSoFar === 0` — αν το DISTRESS (ή οτιδήποτε άλλο) έχει ήδη διεκδικήσει το
+lens ΠΡΙΝ κληθεί το `generateResponse` αυτού του turn, δεν υπερισχύει· αλλιώς ένα PERSPECTIVE από
+DISTRESS θα συνυπήρχε με ένα δεύτερο, αντικρουόμενο EXPLORE overlay στο ίδιο ακριβώς turn.
+
+**Εύρος, ρητά δηλωμένο ώστε να μη διευρυνθεί σιωπηλά.** Αυτό κλείνει ΜΟΝΟ το item 4. ΔΕΝ συνδέει το
+`selfRepetitionCtx`, το `userStagnationCtx` ή το `clarityPivotHint` με το lens σύστημα — αυτή είναι
+ξεχωριστή, μη εγκεκριμένη ακόμα απόφαση, με το ίδιο ρίσκο: ένα generative lens να ενεργοποιηθεί
+ακριβώς τη στιγμή που κάποιος δείχνει στασιμότητα.
+
+Tests 70 suites, 2276 passed, 0 failed, 0 silent (νέο αρχείο: `test_opening_lens_choice.js`, 18
+βεβαιώσεις). Έξι μεταλλάξεις — οι τρεις όροι του φρουρού, η εξαίρεση SIMPLIFY, ένα off-by-one στο
+`msgCount`, και η αφαίρεση του `|| activeLensRef.current` fallback στο σημείο κλήσης — καμία δεν
+επέζησε. Κανένα prompt ή cache block δεν αγγίχτηκε (επιβεβαιωμένο: `AURA_CORE_PERSONALITY` βαθμολογεί
+το ίδιο sha256 pin, `test_minimal_closing.js` πράσινο).

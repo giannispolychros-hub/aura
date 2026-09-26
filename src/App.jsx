@@ -1342,6 +1342,35 @@ function getLensPrompt(lens) {
     default:            return SYSTEM_LENS_SIMPLIFY;
   }
 }
+// OPENING LENS — item 4 of "the approved order after the lens incident" (ARCHITECTURE_DECISIONS.md).
+// Re-lands inferLensFallback on the main path, the one place Phase 1 (b5db808) wired it and produced
+// a real No-Advice violation: a nursing teacher on 1300€ with four children scored EXPLORE, the
+// session never left it (activeLens is session-level), and AURA surfaced options he never asked
+// for — one of them possibly illegal for a civil servant. He named the violation himself. See
+// ARCHITECTURE_DECISIONS.md, "Phase 1 reverted: a lens is a single-use instrument, and session
+// state cannot hold one".
+//
+// THIS TIME: the return value only picks which of the four ALREADY-EXISTING lens prompts basePrompt
+// uses for ONE call, gated by deliverOnce at the caller (budget 1). It never writes activeLensRef,
+// never calls setActiveLens, never touches lensSwitches — the session's standing lens is exactly
+// what it was before this turn and exactly what it is after it, matching what every lens prompt's
+// own text already demands ("USE THIS LENS ONCE. Ask one question. Then stop and wait.") instead of
+// re-creating a generative posture left standing for the rest of the session.
+//
+// Extracted for testability, same reason decidePostMapClose was: pure with respect to its inputs,
+// no ref read inside it — the caller supplies lensSwitchesSoFar as a snapshot, so this function
+// cannot itself read or mutate session state.
+function computeOpeningLensChoice(currentMode, msgCount, lensSwitchesSoFar, lastUserText) {
+  // Only the plain first reply of a session that skipped First-WHY (msgCount === 1, currentMode
+  // === "ANSWER") AND only when nothing has already claimed the lens this turn
+  // (lensSwitchesSoFar === 0). DISTRESS sets PERSPECTIVE and increments lensSwitches BEFORE calling
+  // generateResponse — this guard is what keeps a distressed opening from ALSO receiving a
+  // same-turn EXPLORE/CHALLENGE override, which would stack a second, contradictory lens choice on
+  // the one turn where safety already made its own, deliberate one.
+  if (currentMode !== "ANSWER" || msgCount !== 1 || lensSwitchesSoFar !== 0) return '';
+  const suggested = inferLensFallback(lastUserText || '', '');
+  return suggested === "SIMPLIFY" ? '' : suggested; // SIMPLIFY is already the standing default
+}
 
 // ─────────────────────────────────────────────
 // SAFETY: crisis / emotional distress detection
@@ -4736,6 +4765,7 @@ export default function AURAv2() {
   const postMapCloseCtxDelivered      = useRef(0); // budget 2 — same reasoning as shiftCheckCtx
   const friendPerspectiveCtxDelivered = useRef(0); // budget 1 — single-turn directive
   const premiseInversionCtxDelivered  = useRef(0); // budget 2 — see the note above its ctx
+  const openingLensCtxDelivered       = useRef(0); // budget 1 — item 4, re-lands inferLensFallback on the main path, see computeOpeningLensChoice
   const awaitingEarlyWord      = useRef(false); // set true right after [[EARLY_WORD:yes]] tag seen
   // DECLARATION_EVENT ledger, session-scoped and never persisted. Beside awaitingEarlyWord
   // rather than replacing it: that path has tests around it and works, and a rewrite would buy
@@ -5072,10 +5102,14 @@ A line missing above means only that one pattern was not matched — the absence
         msgs.filter(m => m.role === "user").length >= 3 ?
         `\n[EXPLICIT PAUSE AVAILABLE — optional, use at most once this session if conversation has reached a natural reflection point: briefly pause topic, ask one question about HOW the user prefers to search for clarity (e.g. "Έχω μια απορία για τον τρόπο που ψάχνεις — όχι για το θέμα σου. Προτιμάς να φτάσουμε σε μια απόφαση ή να καταλάβεις γιατί κολλάς;"), then return naturally to session. Never announce it as a special feature.]\n` : '';
 
+      const openingLensChoice = deliverOnce(
+        computeOpeningLensChoice(currentMode, msgCount, lensSwitches.current, msgs[msgs.length - 1]?.content),
+        openingLensCtxDelivered, 1
+      );
       const basePrompt =
         currentMode === "COMPRESSION" ? SYSTEM_COMPRESSION :
         currentMode === "SUPPORTIVE"  ? SYSTEM_SUPPORTIVE :
-        getLensPrompt(activeLensRef.current);
+        getLensPrompt(openingLensChoice || activeLensRef.current);
       // BUG FIX: the demo must be suppressed when the user explicitly chose "start directly" on the
       // intro-choice screen. isBrandNewUser is memory-based and stays correct for its other uses
       // (onboarding step tracking, duringOnboarding flag); only the DEMO injection is gated here, so
@@ -6522,6 +6556,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     postMapCloseCtxDelivered.current = 0;
     friendPerspectiveCtxDelivered.current = 0;
     premiseInversionCtxDelivered.current = 0;
+    openingLensCtxDelivered.current = 0;
     awaitingEarlyWord.current = false;
     earlyCapturedWord.current = null;
     binaryOppositionCount.current = 0;
