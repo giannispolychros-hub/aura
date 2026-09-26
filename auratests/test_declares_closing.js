@@ -130,9 +130,27 @@ if (typeof D === 'function') {
     !/\.content\b/.test(SRC) && !/\bmessages\b/.test(SRC));
 }
 
-// ── 8. WIRING — the three SUPPRESSION sites, and only those ──────────────────
-// Each is "do not do X when the user is closing". The detector is added BESIDE the existing check,
-// never replacing it, so the narrow detector's own behaviour is untouched.
+// ── 8. WIRING — every remaining site that reads a user-closing detector ──────
+// UPDATED DELIBERATELY (2026-09-26), not silently. This started as "the three SUPPRESSION sites,
+// and only those" — a red-team pass over the app's full remaining action-point list found four
+// more sites that read isExplicitClosure/matchesClosingWord without declaresClosing, graded them by
+// risk, and extended the three genuinely zero-risk ones plus one narrow-scope one with the same
+// mechanism, in the SAME PLACE this suite already checks it — reusing this array, not writing a
+// second one.
+//   - explicitClosure telemetry (session_completed): TELEMETRY ONLY, no consumer changes behaviour.
+//   - closingDriftCtx's index-finder: SOFT ADVISORY, same risk class as the three already here.
+//   - userClosing -> decidePostMapClose: SOFT ADVISORY, same risk class.
+//   - the bare-emoji reply chooser: real but narrow — fires only when AURA's OWN reply this turn is
+//     already bare-emoji AND the user's message declares closing. INHERITS THE SAME KNOWN TRADE-OFF
+//     AS F015 (Tier A matches "τελειώσαμε" anywhere, even followed by "αλλά θέλω να πω κάτι ακόμα"):
+//     a false positive here picks "Καληνύχτα." instead of "Τι σκέφτεσαι τώρα;" — one sentence,
+//     reversible by the user's very next message, never a card, never a termination. Accepted
+//     explicitly for the same reason as F015: the narrower alternative (Tier B alone) would miss
+//     real closings this site exists to catch, for a theoretical edge case with no real-session
+//     evidence behind it.
+// Each is "do not do X when the user is closing" (or "count X as closing" for the telemetry site).
+// The detector is added BESIDE the existing check, never replacing it, so the narrow detector's own
+// behaviour is untouched everywhere.
 // ANCHORED ON THE CONDITION ITSELF, never on a fixed character window. A ±700-char window around
 // "textAsksRealQuestion" missed its own call site by 7717 characters, because the first occurrence
 // of that name is its declaration far above. Fixed-width windows have expired six times in this
@@ -143,6 +161,10 @@ const SITES = [
    'textAsksRealQuestion'],
   ['the gates suffix is withheld when the user is closing', null, 'lastUserMsgForGates'],
   ['the Outcome Scale is not forced onto a closing turn', null, 'parseThreeBeatShift(displayText)'],
+  ['explicitClosure telemetry counts a closing that carries content, too', null, '_declared = true'],
+  ['closingDriftCtx\'s index-finder recognises a content-carrying closing', null, 'endsWithClosingSignal(m.content)'],
+  ['decidePostMapClose\'s userClosing recognises a content-carrying closing', null, 'userClosing: isExplicitClosure'],
+  ['the bare-emoji reply chooser recognises a content-carrying closing (same trade-off as F015, accepted)', null, 'userWasClosing = matchesClosingWord'],
 ];
 SITES.forEach(([label, _re, name]) => {
   // Every executable line that mentions this name, so the check cannot land on a declaration.
@@ -194,8 +216,10 @@ assert('the pair is still pushed when the message is a real answer — the guard
 // site — it is what decides whether the closure-confirm card is offered in the first place, not
 // merely whether an unrelated question or gate is withheld. The count below is the thing this
 // assertion exists to keep honest, so it moves with the real number rather than being deleted.
-assert('exactly five call sites are wired, matching the current stated scope',
-  (raw.match(/declaresClosing\s*\(/g) || []).length === 6); // 5 call sites + the definition
+// UPDATED AGAIN (same day): four more call sites joined in the same red-team pass documented
+// above. All four are additive to an existing OR/boolean, none replaces or removes a check.
+assert('exactly nine call sites are wired, matching the current stated scope',
+  (raw.match(/declaresClosing\s*\(/g) || []).length === 10); // 9 call sites + the definition
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);

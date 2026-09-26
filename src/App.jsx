@@ -4839,7 +4839,11 @@ export default function AURAv2() {
       }
       let _declared = false;
       for (let i = 0; i < messages.length; i++) {
-        if (messages[i].role === "user" && isExplicitClosure(messages[i].content || "")) { _declared = true; break; }
+        // declaresClosing ADDED (2026-09-26): isExplicitClosure alone missed the same three real
+        // closings-with-content this whole detector exists for, so this telemetry field under-
+        // reported explicitClosure on exactly those sessions. Telemetry only — no consumer reads
+        // _declared to change behaviour.
+        if (messages[i].role === "user" && (isExplicitClosure(messages[i].content || "") || declaresClosing(messages[i].content || ""))) { _declared = true; break; }
       }
       recordTelemetry("session_completed", {
         turns: turnCount.current || 0,
@@ -5044,7 +5048,10 @@ A line missing above means only that one pattern was not matched — the absence
         if (roadQuestionState.current) return '';
         const userMsgs = msgs.filter(m => m.role === "user");
         if (userMsgs.length < 2) return '';
-        const idx = userMsgs.findIndex(m => matchesClosingWord(m.content) || endsWithClosingSignal(m.content));
+        // declaresClosing ADDED (2026-09-26): same soft-advisory risk class as the sites already
+        // wired below — a false positive here only affects the TIMING of a reminder about not
+        // reciprocating farewells, never a forced reply.
+        const idx = userMsgs.findIndex(m => matchesClosingWord(m.content) || endsWithClosingSignal(m.content) || declaresClosing(m.content));
         if (idx < 0 || idx === userMsgs.length - 1) return '';
         return `\n[CODE-VERIFIED: the user gave a closing signal ${userMsgs.length - 1 - idx} message(s) ago and the exchange is still going. Do not reciprocate farewells, emoji, or pleasantries — that is what extended this. If the closing sequence has not run yet, run it NOW, in this reply. If it has already run, end here with nothing further: no summary, no anchor question, no second closing. Starting a fresh closing sequence after farewells have already been exchanged reads as not having noticed the conversation ended.]\n`;
       })();
@@ -5171,7 +5178,9 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
           roadMapDelivered: roadMapDelivered.current,
           roadQuestionPending: _pending,
           shiftConfirmed: shiftCheckConfirmed.current,
-          userClosing: isExplicitClosure(_lastUser) || matchesClosingWord(_lastUser),
+          // declaresClosing ADDED (2026-09-26): same soft-advisory risk class — this only gates
+          // whether postMapCloseCtx's reminder fires, never a forced reply.
+          userClosing: isExplicitClosure(_lastUser) || matchesClosingWord(_lastUser) || declaresClosing(_lastUser),
         })
           ? `\n[CODE-VERIFIED: a ΔΡΟΜΟΣ/ΚΕΡΔΙΖΕΙΣ/ΚΟΣΤΙΖΕΙ map has already been delivered in this session, and the road questions are finished. THE MAP IS A STAGE, NOT THE CLOSE — THREE VALID ENDINGS above are endings of the MAP, not of the session, and reading them as a stopping point is what actually went wrong: in two real sessions the map landed and the very next reply was advice, naming sources the user had never mentioned. No Advice and GUARDRAIL 2 apply here with full force — having produced a map relaxes nothing.
 THIS SESSION STILL CLOSES THE WAY EVERY SESSION CLOSES, in the order the Sequencing rule above already fixes: Clarity + Ownership Scale as the gate, then USER-VERIFIED SHIFT CHECK's canonical question, and only on their own affirmative answer, STATE SHIFT RECOGNITION and the three beats. Do not skip ahead to the beats, and do not treat the map as having already answered the shift question — it asks whether THEY see something differently, which a map cannot answer on their behalf.
@@ -5602,7 +5611,13 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // was a closing/farewell, a bare-emoji reply should become a natural CLOSE, not a question that
       // wrongly reopens a finished conversation. Otherwise, a neutral forward question.
       if (isBareEmojiOrAcknowledgment(displayText)) {
-        const userWasClosing = matchesClosingWord(lastUserMsg);
+        // declaresClosing ADDED (2026-09-26): INHERITS THE SAME KNOWN TRADE-OFF AS F015 in
+        // stress_test_closing.js — Tier A matches "τελειώσαμε" anywhere, even followed by "αλλά
+        // θέλω να πω κάτι ακόμα". Accepted explicitly, same reasoning as F015: the consequence
+        // here is one sentence choice ("Καληνύχτα." vs "Τι σκέφτεσαι τώρα;"), reversible by the
+        // user's very next message — never a card, never a termination — and this only fires when
+        // AURA's OWN reply this turn is ALSO bare-emoji, a narrow double condition.
+        const userWasClosing = matchesClosingWord(lastUserMsg) || declaresClosing(lastUserMsg);
         const addition = userWasClosing ? "Καληνύχτα." : "Τι σκέφτεσαι τώρα;";
         displayText = (displayText.trim() ? displayText.trim() + " " : "") + addition;
       }
