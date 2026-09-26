@@ -163,6 +163,29 @@ assert('the live badges are all still there, each still driven by its own flag',
   ['isInsight','isSnapshot','isSafe'].every(n =>
     new RegExp('\\b' + n + '\\s+&& <div className="msg-badge').test(CODE)) && /\.msg-badge\{/.test(CODE));
 
+// ── DELETED LEFTOVERS — three declarations that had no consumer and served no live feature ──
+//
+// Found by a systematic scan of all 724 declarations rather than one at a time. All three were
+// leftovers of features that no longer exist, verified against every revision of App.jsx:
+//
+//   SYSTEM_AUDIT      117 revisions, consumers EVER: 0 — an alias for the removed AUDIT mode
+//   isBrandNewUser    117 revisions, consumers: 3 until 2026-08-15, orphaned by the demo removal
+//   introChoiceRef    116 revisions, read twice in the first revision only; generateResponse, the
+//                     consumer its own comment named, references neither it nor introChoice today
+//
+// Unlike checkAnchorCoverage — which stays, because its own comment records a deliberate hold and
+// the structure still answers a live question — none of these closes any gap. They are locked out
+// here so a future re-introduction is a deliberate act rather than a silent return.
+assert('SYSTEM_AUDIT is gone — the AUDIT mode it aliased was removed',
+  !/\bSYSTEM_AUDIT\b/.test(CODE));
+assert('isBrandNewUser is gone — the demo path it served was removed',
+  !/\bisBrandNewUser\b/.test(CODE));
+assert('introChoiceRef is gone — the async mirror had no reader left',
+  !/\bintroChoiceRef\b/.test(CODE));
+// The state it mirrored is NOT deleted: introChoice is live and still drives the intro screen.
+assert('introChoice itself is untouched and still live', /\bintroChoice\b/.test(CODE));
+
+
 console.log(`\n${passed} passed, ${failed} failed`);
 
 if (failed > 0) {

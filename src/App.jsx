@@ -1065,8 +1065,6 @@ CLOSING HOMEWORK when terminating:
 IMPORTANT: Safety Override is already defined in AURA_CORE_PERSONALITY and applies here.
 Do not terminate if the user is in distress.`;
 
-// Backward compatibility aliases — SYSTEM_AUDIT now uses active lens (set at call site)
-const SYSTEM_AUDIT  = SYSTEM_LENS_SIMPLIFY; // fallback only — overridden in misfire recovery
 
 const SYSTEM_SUPPORTIVE = `You are AURA in Supportive Mode.
 
@@ -4276,8 +4274,6 @@ export default function AURAv2() {
   // SCOPE FIX (AST analysis): misfireInput and setMisfireInput are used in the misfire-recovery
   // panel but were never declared anywhere — that panel threw ReferenceError the moment it rendered.
   const [misfireInput, setMisfireInput] = useState("");
-  const introChoiceRef = useRef(null); // mirror for async access inside generateResponse
-  useEffect(() => { introChoiceRef.current = introChoice; }, [introChoice]);
   // philosophyShown removed — its screen («Γνώθι σαυτόν») was deleted and nothing set it
   const [introShown, setIntroShown] = useState(() => {
     // Returning users skip intro — only show once per install
@@ -4738,8 +4734,6 @@ A line missing above means only that one pattern was not matched — the absence
         currentMode === "COMPRESSION" ? SYSTEM_COMPRESSION :
         currentMode === "SUPPORTIVE"  ? SYSTEM_SUPPORTIVE :
         getLensPrompt(activeLensRef.current);
-      const isBrandNewUser = onboardingStepRef.current < 14 &&
-        (memory.anchors||[]).length === 0 && (memory.trajectories||[]).length === 0;
       // BUG FIX: the demo must be suppressed when the user explicitly chose "start directly" on the
       // intro-choice screen. isBrandNewUser is memory-based and stays correct for its other uses
       // (onboarding step tracking, duringOnboarding flag); only the DEMO injection is gated here, so
