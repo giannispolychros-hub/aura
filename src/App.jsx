@@ -5129,7 +5129,16 @@ A line missing above means only that one pattern was not matched — the absence
         if (st.qa.length < st.asked) {
           const lastUser = [...msgs].reverse().find(m => m.role === "user");
           const lastAura = [...msgs].reverse().find(m => m.role === "assistant");
-          if (lastUser) st.qa.push({
+          // A DEPARTURE IS NOT AN ANSWER. Measured harm, session 1: the road question for ΔΡΟΜΟΣ 1
+          // went out, the user replied "…ευχαριστώ κλείνουμε", and this recorded that as his answer.
+          // The artifact then printed it under "Η ΣΚΕΨΗ ΣΟΥ, ΑΝΑ ΔΡΟΜΟ" as his thinking about a road
+          // neither line mentions — User Ownership failing in the output the Blueprint charges for.
+          // Withholding is the safe direction and the documented one: buildRoadArtifact already
+          // OMITS unanswered roads rather than completing them, so the cost of a wrong call here is
+          // one row absent from the artifact, never an invented one present.
+          // This does NOT address the other half of that failure: the reply was also not a road-1
+          // question, although the instruction asked for exactly one. That is prompt compliance.
+          if (lastUser && !declaresClosing(lastUser.content || "")) st.qa.push({
             road: st.asked,
             name: st.roads[st.asked - 1],
             q: String((lastAura && lastAura.content) || '').trim(),

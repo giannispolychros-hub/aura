@@ -153,8 +153,41 @@ SITES.forEach(([label, _re, name]) => {
   assert('WIRING: it is ADDED beside the existing check, not replacing it — ' + label.slice(0, 28),
     withCall.length === 1 && /isExplicitClosure\s*\(|matchesClosingWord\s*\(/.test(withCall[0]));
 });
-assert('exactly three call sites are wired in this commit, matching the stated scope',
-  (raw.match(/declaresClosing\s*\(/g) || []).length === 4); // 3 call sites + the definition
+// ── 9. THE FOURTH SUPPRESSION SITE: the road artifact must not record a departure ──
+// THE HARM THIS CLOSES, and it is the one that reached the flagship output. Session 1: the road
+// question for ΔΡΟΜΟΣ 1 went out, the user replied "…ευχαριστώ κλείνουμε", and the capture below
+// recorded that departure as his answer. The artifact then printed, under "Η ΣΚΕΨΗ ΣΟΥ, ΑΝΑ ΔΡΟΜΟ":
+//
+//     ΔΡΟΜΟΣ 1 — Αγορά + ανακαίνιση στούντιο, μετά πώληση
+//     Μένει το ερώτημα που ξεκίνησες: δουλειά ή κάτι άλλο…
+//     «δεν ξέρω θα το σκεφτώ άλλη στιγμή σε ευχαριστώ κλείνουμε»
+//
+// Neither line is about that road. This is User Ownership failing in the output the Blueprint
+// charges for, and it is a suppression, not an action: buildRoadArtifact already OMITS unanswered
+// roads on purpose — "show it thinner rather than completing it" — so a false positive costs one
+// omitted row, which is the behaviour the artifact already documents as correct.
+//
+// NOT A FIX FOR THE OTHER HALF, stated so it is not mistaken for one. The same reply was also not a
+// road-1 question: the model received "Ask EXACTLY ONE question about ΔΡΟΜΟΣ 1" and asked a generic
+// one instead. That is prompt compliance and no code here addresses it.
+const CAP_AT = raw.indexOf('if (st.qa.length < st.asked) {');
+assert('NON-VACUITY: the road Q/A capture site is findable', CAP_AT > 0);
+const CAP = raw.slice(CAP_AT, raw.indexOf('const cap = Math.min(st.roads.length, 3);', CAP_AT));
+assert('NON-VACUITY: the capture slice is bounded by its real neighbour', CAP.length > 200 && CAP.length < 2200);
+assert('WIRING: a departure is not recorded as the answer to a road question',
+  /declaresClosing\s*\(/.test(CAP));
+assert('WIRING: the guard is on the USER message, which is the one that would be misread as an answer',
+  /declaresClosing\([^)]*lastUser/.test(CAP));
+// NEGATED, and pinned as negated. A surviving mutation inverted the guard so that ONLY a departure
+// was recorded — the exact opposite behaviour — and every other assertion passed, because they all
+// checked that the call and the push exist rather than which way the condition runs.
+assert('the guard is NEGATED: a departure withholds the pair, it does not select it',
+  /&&\s*!declaresClosing\(/.test(CAP));
+assert('the pair is still pushed when the message is a real answer — the guard only withholds',
+  /st\.qa\.push\(/.test(CAP));
+
+assert('exactly four call sites are wired, matching the stated scope',
+  (raw.match(/declaresClosing\s*\(/g) || []).length === 5); // 4 call sites + the definition
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);
