@@ -1754,3 +1754,44 @@ Tests: 72 suites, 2332 passed, 0 failed, 0 silent (νέο αρχείο: `test_go
 guard, `detectsGoalStated` πάντα true, hardcoded `obstacleKnown = true` (πιάστηκε μόνο αφού
 ενισχύθηκε το wiring-test με ξεχωριστό static check ανά σήμα — η πρώτη εκδοχή το άφησε να περάσει)
 — καμία δεν επέζησε τελικά. Κανένα prompt ή cache block αγγίχτηκε.
+
+## 26 Σεπτεμβρίου — MASTER PRIORITY RULE αποκτά εκτεθειμένο, κωδικοποιημένο στάδιο
+
+**Αρχαιολογία πρώτα, ρητή οδηγία: «Δες πρώτα αν έχει ήδη κάτι χτιστεί».** Pickaxe σε 12 πιθανά
+ονόματα (sessionStage, masterPriorityStage, priorityStage, sequenceStage, mprStage, stageCtx,
+sessionPhase, currentStage, masterPriorityCtx, priorityRuleCtx, sequenceCtx, mprCtx) σε όλο το
+ιστορικό — μηδέν αποτελέσματα. Καμία συνάρτηση/ref με σχετικό όνομα στο σημερινό αρχείο. Πρώτη
+κατασκευή, όχι ανάκτηση.
+
+**Τι χτίστηκε.** Το MASTER PRIORITY RULE (γρ. 256) ήδη ονομάζει τη σειρά του αυτολεξεί: *"1. SAFETY
+→ ... 2. GRACEFUL EXIT → ... 3. OPENING → ... 4. STATE DETECTION → ... 5. MEANING LOCK → ... 6.
+PERSPECTIVE SWAP → adaptive questioning (normal protocol)"*. Μέχρι τώρα, τίποτα δεν έλεγε στο μοντέλο
+ΣΕ ΠΟΙΟ βήμα βρισκόταν — παρόλο που τα περισσότερα υποκείμενα γεγονότα ήταν ήδη κωδικοποιημένα
+σκόρπια (`safetyMode`, `isExplicitClosure`/`declaresClosing`/`matchesClosingWord`, `msgCount`).
+
+`computeMasterPriorityStage(safetyMode, msgCount, userSignalsClosing)` — καθαρή συνάρτηση, τηρεί
+ΑΚΡΙΒΩΣ τη σειρά προτεραιότητας που ήδη δηλώνει ο κανόνας (SAFETY πριν GRACEFUL EXIT πριν OPENING).
+`describeMasterPriorityStageCtx(stage)` παράγει το κείμενο, χρησιμοποιώντας τις ΙΔΙΕΣ λέξεις που ήδη
+υπάρχουν (SAFETY/GRACEFUL EXIT/OPENING/PERSPECTIVE SWAP) — ποτέ νέα ορολογία.
+
+**Εύρος, ρητά δηλωμένο.** Τα βήματα 4 (STATE DETECTION) και 5 (MEANING LOCK) ΔΕΝ εκτίθενται
+ξεχωριστά — το σήμα DISTRESS-επιπέδου για το STATE DETECTION ζει σε άλλο closure (`handleSend`) και
+θα χρειαζόταν νέα σύνδεση· το MEANING LOCK's FACT/ANALYSIS/PERSONAL έχει κωδικοποιημένη κάλυψη μόνο
+για το FACT μισό. Και τα δύο πέφτουν μέσα στο PERSPECTIVE_SWAP, το γενικό «κανονικός βρόχος» στάδιο —
+συνειδητός περιορισμός εύρους, όχι σιωπηλή παράλειψη.
+
+**Ίδια αρχιτεκτονική με το `goalObstacleStakesCtx`**: υπολογίζεται φρέσκο κάθε turn, καμία νέα
+`useRef`, κανένα νέο σημείο reset. Μία διαφορά, σκόπιμη: το `masterPriorityStageCtx` **δεν** μπαίνει
+στο `fired`/`familiesUsed` collision logger, γιατί είναι πάντα ενεργό (καμία «ήσυχη» κατάσταση) — αν
+μπάρα, θα έπνιγε το σπάνιο, ουσιαστικό σήμα σύγκρουσης που ο logger υπάρχει για να πιάσει.
+
+**Παράπλευρο εύρημα, διορθώθηκε.** Η νέα κλήση `declaresClosing()` μέσα στο `userSignalsClosing`
+είναι το 10ο σημείο κλήσης — το pin στο `test_declares_closing.js` ενημερώθηκε ρητά (9→10 σημεία,
+11 συνολικές εμφανίσεις), με σχόλιο που εξηγεί ότι αυτό είναι διαφορετική κατηγορία (παρατηρητικό
+σήμα, όχι suppression/action site).
+
+Tests: 73 suites, 2354 passed, 0 failed, 0 silent (νέο αρχείο: `test_master_priority_stage.js`, 22
+βεβαιώσεις). Έξι μεταλλάξεις — αφαίρεση κάθε ελέγχου προτεραιότητας (SAFETY/GRACEFUL_EXIT), off-by-one
+στο OPENING, αφαίρεση σήματος από το `userSignalsClosing`, λανθασμένη προσθήκη στο collision logger,
+απώλεια της πρότασης περιορισμού εύρους στο PERSPECTIVE_SWAP κείμενο — καμία δεν επέζησε. Κανένα
+prompt ή cache block αγγίχτηκε.

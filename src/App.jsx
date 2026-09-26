@@ -1400,6 +1400,46 @@ function describeEscalationCtx(level) {
   }
 }
 
+// MASTER PRIORITY RULE STAGE — exposes which step of the already-existing sequence (see "MASTER
+// PRIORITY RULE" above: "1. SAFETY -> ... 2. GRACEFUL EXIT -> ... 3. OPENING -> ... 4. STATE
+// DETECTION -> ... 5. MEANING LOCK -> ... 6. PERSPECTIVE SWAP -> adaptive questioning (normal
+// protocol)") this turn is in. Founder's own framing for this step: depending on stage — αρχή, μέση,
+// τέλος — bring the right strategies forward; awareness only, never a behaviour change.
+//
+// ARCHAEOLOGY DONE FIRST, per direct instruction: pickaxe search across all history for
+// sessionStage/masterPriorityStage/priorityStage/sequenceStage/mprStage/stageCtx/sessionPhase/
+// currentStage/masterPriorityCtx/priorityRuleCtx/sequenceCtx/mprCtx found zero commits for any of
+// them, and no function/ref with a related name exists in the current file. First build, not a
+// recovery — see test_master_priority_stage.js for the full record.
+//
+// SCOPE, stated plainly: STATE DETECTION (step 4) and MEANING LOCK (step 5) are not exposed as
+// their own stages — STATE DETECTION's DISTRESS-level signal lives in a different closure
+// (handleSend) and reading it here would need new plumbing; MEANING LOCK's FACT/ANALYSIS/PERSONAL
+// split only has code backing for the FACT half. Both fold into PERSPECTIVE_SWAP, the catch-all
+// "normal loop" stage — a deliberate limit, not a silent omission.
+//
+// Pure, same reason computeEscalationLevel is: no ref read inside either function, the caller
+// supplies plain snapshots (safetyMode, msgCount, and userSignalsClosing built from the three
+// closing detectors already used elsewhere in this file).
+function computeMasterPriorityStage(safetyMode, msgCount, userSignalsClosing) {
+  // Precedence follows the rule's own numbered order: SAFETY (1) before GRACEFUL EXIT (2) before
+  // OPENING (3) — never re-ordered here, since re-ordering would silently contradict the prompt
+  // text this is meant to expose, not invent.
+  if (safetyMode) return 'SAFETY';
+  if (userSignalsClosing) return 'GRACEFUL_EXIT';
+  if (msgCount === 1) return 'OPENING';
+  return 'PERSPECTIVE_SWAP'; // steps 4-5 fold in here, see SCOPE above
+}
+function describeMasterPriorityStageCtx(stage) {
+  switch (stage) {
+    case 'SAFETY': return `\n[MASTER PRIORITY RULE — STAGE: SAFETY (code-verified). Per MASTER PRIORITY RULE step 1 above, all other protocols pause; this is absolute and unconditional.]\n`;
+    case 'GRACEFUL_EXIT': return `\n[MASTER PRIORITY RULE — STAGE: GRACEFUL EXIT (code-verified: the user's own last message signals closure). Per MASTER PRIORITY RULE step 2 and CLOSURE DOMINANCE RULE above, this governs now.]\n`;
+    case 'OPENING': return `\n[MASTER PRIORITY RULE — STAGE: OPENING (code-verified: this is the session's first reply on the main path). Per MASTER PRIORITY RULE step 3 above.]\n`;
+    case 'PERSPECTIVE_SWAP': return `\n[MASTER PRIORITY RULE — STAGE: PERSPECTIVE SWAP / adaptive questioning, the normal loop (code-verified by elimination: none of SAFETY, GRACEFUL EXIT, or OPENING apply this turn). Per MASTER PRIORITY RULE step 6 above — STATE DETECTION and MEANING LOCK (steps 4-5) are folded in here since no reliable pre-call signal for them exists without new state; a deliberate scope limit, not a silent omission.]\n`;
+    default: return '';
+  }
+}
+
 // ─────────────────────────────────────────────
 // SAFETY: crisis / emotional distress detection
 // ─────────────────────────────────────────────
@@ -5138,6 +5178,18 @@ A line missing above means only that one pattern was not matched — the absence
         return describeGoalObstacleStakesCtx(goalKnown, obstacleKnown, stakesKnown);
       })();
 
+      // MASTER PRIORITY RULE STAGE — same architecture as goalObstacleStakesCtx/materialEvidenceCtx
+      // just above: recomputed fresh from msgs every turn, no new ref, no reset-block edit. Reuses
+      // the three closing detectors already used elsewhere (e.g. closingDriftCtx) for
+      // userSignalsClosing, and safetyMode/msgCount which already exist in this scope.
+      const masterPriorityStageCtx = (() => {
+        const userMsgs = msgs.filter(m => m.role === "user");
+        const lastUserText = userMsgs.length > 0 ? (userMsgs[userMsgs.length - 1].content || "") : "";
+        const userSignalsClosing = isExplicitClosure(lastUserText) || declaresClosing(lastUserText) || matchesClosingWord(lastUserText);
+        const stage = computeMasterPriorityStage(safetyMode, msgCount, userSignalsClosing);
+        return describeMasterPriorityStageCtx(stage);
+      })();
+
       // ── Explicit Pause injection (#5 fix) ──
       // Max 1 per 5 sessions. Injected as system instruction — AURA decides when to use it naturally.
       // CLOSING DRIFT (live evidence, second occurrence of the same failure): the prompt rule
@@ -5445,7 +5497,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // weakest-to-strongest, so hard constraints occupy the final, highest-attention position:
       // (1) informational background, (2) situational signals, (3) hard constraints last.
       const dynamicSuffix = [
-        memCtx, profileCtx, materialEvidenceCtx, goalObstacleStakesCtx, coverageReportCtx, demoCtx, informationModeCtx, explicitPauseCtx,
+        memCtx, profileCtx, materialEvidenceCtx, goalObstacleStakesCtx, masterPriorityStageCtx, coverageReportCtx, demoCtx, informationModeCtx, explicitPauseCtx,
         coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, roadQuestionCtx,
         postMapCloseCtx,
         gatesCtx, closingDriftCtx, firstReplyFloorCtx,

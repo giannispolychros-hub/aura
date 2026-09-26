@@ -218,8 +218,17 @@ assert('the pair is still pushed when the message is a real answer — the guard
 // assertion exists to keep honest, so it moves with the real number rather than being deleted.
 // UPDATED AGAIN (same day): four more call sites joined in the same red-team pass documented
 // above. All four are additive to an existing OR/boolean, none replaces or removes a check.
-assert('exactly nine call sites are wired, matching the current stated scope',
-  (raw.match(/declaresClosing\s*\(/g) || []).length === 10); // 9 call sites + the definition
+//
+// UPDATED AGAIN (same day, MASTER PRIORITY RULE STAGE): a 10th call site joined inside
+// masterPriorityStageCtx's userSignalsClosing composition — `isExplicitClosure(lastUserText) ||
+// declaresClosing(lastUserText) || matchesClosingWord(lastUserText)`. DIFFERENT CATEGORY from the
+// nine above: those are suppression sites ("withhold X when closing") or the one action site
+// (userDeclaredExit); this one is a pure, always-computed OBSERVATIONAL signal (which MASTER
+// PRIORITY RULE stage this turn is in) — it withholds nothing and suppresses nothing on its own,
+// it only feeds prompt text. Still additive to the same OR pattern as every other site, so the
+// count moves with the real number rather than being silently left stale.
+assert('exactly ten call sites are wired, matching the current stated scope',
+  (raw.match(/declaresClosing\s*\(/g) || []).length === 11); // 10 call sites + the definition
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);
