@@ -4546,6 +4546,13 @@ export default function AURAv2() {
         // Which of the four prompts actually ran, and how often it moved. With the opening
         // selector reverted, 0 is the expected reading for most sessions — it means the lens
         // stayed SIMPLIFY, and anything above 0 is a compression pass, distress, or First-WHY.
+        // Whether the exit contract had to REBUILD a map this session, kept apart from roadMap on
+        // purpose: that one says a map exists, this one says it exists only because recovery ran, so
+        // the compliance signal is never masked by the recovery that hides its symptom. The ref was
+        // built with that contract and read nowhere — blueprint_generated's roadsRecovered fires
+        // only when a Blueprint is produced, and recomputes its own value, so a session that never
+        // reached one measured recovery nowhere at all.
+        roadRecoveredEver: roadMapRecovered.current === true,
         // How many replies presented a set of options of which NOT ONE came from the user. The
         // guard that was missing when a real user was handed three careers he never raised; every
         // form-based guard we had returned nothing on that reply. Count only, never the text.

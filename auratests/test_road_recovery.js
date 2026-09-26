@@ -172,5 +172,41 @@ assert("WIRING: telemetry reports recovery as its own signal, not a copy of the 
 assert("WIRING: no model call is introduced — recovery is pure code over existing text",
   !/callAura/.test(extract('extractRoadMapFromProse')));
 
+// ── THE SESSION-LEVEL SIGNAL, WHICH WAS BUILT AND NEVER READ ──────────────
+// roadMapRecovered was introduced with this contract to say "a map exists only because the exit
+// contract rebuilt it", deliberately kept apart from roadMapDelivered "so the compliance signal is
+// never masked by the recovery that hides its symptom". A systematic scan found it written twice
+// and read nowhere: 12 revisions, consumers EVER 0.
+//
+// The assertion above is correct and stays — but it slices blueprint_generated, and that event
+// fires ONLY when a Blueprint is produced, from its own locally recomputed _mapRecovered. So
+// recovery in a session that never reaches a Blueprint was measured nowhere at all. That is the gap
+// this closes, with the ref that already existed for it.
+// Reading the ref proves nothing if nothing ever sets it — a mutation deleting the write left the
+// whole suite green while the signal stayed false forever. Mirrors the roadMapDelivered assertion
+// above, which had the write covered and this one did not.
+assert("WIRING: recovery actually SETS the session-level ref, in the recovery region",
+  (()=>{const h=raw.slice(raw.indexOf("// ROAD QUESTIONS — ARM"), raw.indexOf("// Termination decision"));
+        return /roadMapRecovered\.current\s*=\s*true/.test(h);})());
+assert("WIRING: and it is reset per session, so it never leaks between sessions",
+  /roadMapRecovered\.current\s*=\s*false/.test(raw));
+const scAt = raw.indexOf('recordTelemetry("session_completed"');
+const sc = scAt === -1 ? "" : raw.slice(scAt, raw.indexOf('});', scAt));
+assert("the session_completed block was located, so the assertions below are not vacuous",
+  sc.length > 200 && /turns:/.test(sc));
+assert("session_completed carries the session-level recovery signal",
+  /roadRecoveredEver:/.test(sc));
+assert("and it reads the ref that already tracked it, not a fresh recomputation",
+  /roadRecoveredEver:[^\n]*roadMapRecovered\.current/.test(sc));
+// Counts and booleans only, per the schema and the standing privacy rule.
+assert("it carries no conversation content",
+  !/roadRecoveredEver:[^\n]*(content|text|reply|message)/i.test(sc));
+// The two signals must stay distinguishable: a session where the model produced a map natively and
+// one where the contract rebuilt it must not read alike.
+const rmExpr = (sc.match(/\broadMap:\s*([^,\n]+)/) || [])[1];
+const revExpr = (sc.match(/\broadRecoveredEver:\s*([^,\n]+)/) || [])[1];
+assert("recovery is reported as its own signal, not a copy of the compliance one",
+  !!rmExpr && !!revExpr && rmExpr.trim() !== revExpr.trim());
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed > 0 ? 1 : 0);
