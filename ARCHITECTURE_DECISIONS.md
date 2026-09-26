@@ -1795,3 +1795,45 @@ Tests: 73 suites, 2354 passed, 0 failed, 0 silent (νέο αρχείο: `test_ma
 στο OPENING, αφαίρεση σήματος από το `userSignalsClosing`, λανθασμένη προσθήκη στο collision logger,
 απώλεια της πρότασης περιορισμού εύρους στο PERSPECTIVE_SWAP κείμενο — καμία δεν επέζησε. Κανένα
 prompt ή cache block αγγίχτηκε.
+
+## 26 Σεπτεμβρίου — δύο ακόμα από τα «τρία όπλα»: observation-only test + Strategy Change scalar-ref
+
+**#1 — `_rqEarlyExit`, το πιο παλιό εκκρεμές item της ημέρας, μηδέν production αλλαγή.**
+Στατικά είχε αποδειχθεί (γρ. ~6035) ότι το `_rqEarlyExit` διαβάζει το ίδιο `decision` που η σημερινή
+πρώτη διόρθωση (`355bbd5`) επηρέασε — αλλά ποτέ δεν είχε τρέξει πραγματικά. Το
+`test_rq_early_exit_observation.js` το αποδεικνύει εκτελώντας το ίδιο το production expression σε
+lockstep pin (χαρακτήρα-προς-χαρακτήρα με τη γραμμή του App.jsx — αν αλλάξει η παραγωγή, το pin
+σπάει πρώτο) πάνω στο ΙΔΙΟ fixture του target μηνύματος. Επιβεβαιώθηκε: `_rqEarlyExit === true`
+μέσω `declaresClosing`, όχι `isExplicitClosure`· μια κανονική απάντηση road-question δεν το
+πυροδοτεί· η παλιά διαδρομή (`isExplicitClosure` καθαρό) παραμένει αναλλοίωτη. Καμία γραμμή
+production δεν άγγιξε — μόνο νέο test αρχείο.
+
+**#2 — Strategy Change 1-scalar-ref, το δεύτερο εκκρεμές item.**
+Αρχαιολογία πρώτα: το `window.__auraLastCollision.highest` υπολογίζει ήδη `fired[fired.length-1]`
+ανά turn, αλλά μόνο σε console/window (εφήμερο, ποτέ στο prompt) και μόνο όταν `fired.length >= 2`.
+Το `coverageReportCtx` ήδη αναφέρει «Signal families already used this session» — αλλά είναι
+ΣΩΡΕΥΤΙΚΟ σύνολο με σειρά πρώτης χρήσης, ποτέ επανάληψη/πρόσφατο. Κανένα από τα δύο δεν κάνει αυτό
+που χτίστηκε τώρα.
+
+`computeLastFiredFamily(prevFamily, prevStreak, highestThisTurn)` — καθαρή συνάρτηση. Το
+**εκκρεμές edge case** που ανέβαλε αυτό το item: `highestThisTurn === null` (fired.length === 0,
+ήσυχο turn) **παγώνει** την αναφορά — ούτε μηδενίζει ούτε αυξάνει το streak, γιατί ένα ήσυχο turn
+δεν είναι απόδειξη ότι το μοτίβο έσπασε. `describeLastFiredFamilyCtx` σιωπά μέχρι streak >= 2 —
+καμία «θόρυβος» στην πρώτη εμφάνιση μιας οικογένειας.
+
+**Χρονισμός, ίδιος με το `familiesUsed`/`coverageReportCtx`**: το ref ενημερώνεται ΜΕΣΑ στο ήδη
+υπάρχον collision-logger try/catch (τέλος του turn), το ctx διαβάζεται στην ΑΡΧΗ του ΕΠΟΜΕΝΟΥ turn,
+πριν το `dynamicSuffix` — ένα turn πίσω, σκόπιμα, μηδενική αναδιάταξη του ήδη δουλεμένου κώδικα.
+Deliberately ΕΚΤΟΣ του `fired`/`familiesUsed` collision logger (αναφέρεται στο ιστορικό, δεν είναι
+το ίδιο μια οικογένεια που πυροδότησε αυτό το turn) — ίδιος λόγος με το `masterPriorityStageCtx`.
+
+Reset σε 2 σημεία (πλήρες session reset + αλλαγή θέματος), ίδια σύμβαση με `escalationLevel` δίπλα
+του.
+
+Tests: 75 suites, 2385 passed, 0 failed, 0 silent (δύο νέα αρχεία: `test_rq_early_exit_observation.js`
+7 βεβαιώσεις, `test_last_fired_family.js` 23 βεβαιώσεις). Στο #1, μία ελεγχόμενη μετάλλαξη στην
+production γραμμή επιβεβαίωσε ότι το lockstep pin πιάνει drift, μετά αποκαταστάθηκε. Στο #2, 6
+μεταλλάξεις — αφαίρεση του edge-case freeze, streak πάντα 1, θόρυβος σε streak 1, αφαίρεση του
+wiring από το try/catch, αφαίρεση reset σε session reset (πιάστηκε μόνο αφού ενισχύθηκε το test με
+μέτρημα occurrences — η πρώτη εκδοχή το άφησε να περάσει), αφαίρεση reset σε αλλαγή θέματος — καμία
+δεν επέζησε τελικά. Κανένα prompt ή cache block αγγίχτηκε.

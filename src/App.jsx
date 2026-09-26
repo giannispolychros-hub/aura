@@ -1440,6 +1440,31 @@ function describeMasterPriorityStageCtx(stage) {
   }
 }
 
+// LAST FIRED FAMILY — "Strategy Change 1-scalar-ref", deferred earlier the same day: reuses
+// fired[fired.length-1] (the collision logger's own "highest = last in the array, since
+// attention-order places the strongest last" rule) so a repeated winner across turns becomes
+// visible, which is what EXPLORATION COVERAGE PRINCIPLE's "prefer whichever you have not yet used"
+// needs to be actionable rather than aspirational. window.__auraLastCollision already computes
+// this per turn but only to console/window, ephemeral, only on a real (>=2) collision.
+// coverageReportCtx already reports the cumulative SET of families used — never recency, never
+// repetition. Neither already does this.
+//
+// THE DEFERRED EDGE CASE: highestThisTurn null (fired.length === 0, a quiet turn) must freeze the
+// ref rather than reset or credit the streak — a quiet turn is not evidence the pattern broke, and
+// crediting it would inflate a streak on a turn where nothing actually fired.
+//
+// Pure, same reason every stage/level function today is: no ref read inside either function, the
+// caller supplies a plain snapshot.
+function computeLastFiredFamily(prevFamily, prevStreak, highestThisTurn) {
+  if (highestThisTurn == null) return { family: prevFamily, streak: prevStreak }; // the deferred edge case — freeze, do not update
+  const streak = (highestThisTurn === prevFamily) ? (prevStreak + 1) : 1;
+  return { family: highestThisTurn, streak };
+}
+function describeLastFiredFamilyCtx(family, streak) {
+  if (!family || streak < 2) return ''; // nothing worth flagging until the SAME family has won twice or more
+  return `\n[CODE-VERIFIED: "${family}" has been the highest-attention signal (per the collision logger's own "highest = fired[fired.length-1]" rule) for ${streak} consecutive turns now. Per EXPLORATION COVERAGE PRINCIPLE/WHICH FAMILY TO SWITCH TO above, consider a family not yet used this session.]\n`;
+}
+
 // ─────────────────────────────────────────────
 // SAFETY: crisis / emotional distress detection
 // ─────────────────────────────────────────────
@@ -4877,6 +4902,7 @@ export default function AURAv2() {
   const binaryOppositionCount  = useRef(0);     // structural repetition count, feeds PREMISE INVERSION reliability
   const clarityPivotHint       = useRef(null);  // "LOOP" or "AVOIDANCE" - code-verified, feeds CLARITY PIVOT hybrid fix
   const escalationLevel        = useRef(0); // 0 Baseline, 1 Pivot, 2 targeted follow-up, 3 Perspective Swap, 4 AUTO-KILL — see computeEscalationLevel
+  const lastFiredFamily        = useRef({ family: null, streak: 0 }); // reuses fired[fired.length-1] across turns — see computeLastFiredFamily
   const friendPerspectiveAsked     = useRef(false);
   const friendPerspectiveConfirmed = useRef(false); // user's own 'yes, different' — should feed Reflection Summary
   const [earlyReliefValue, setEarlyReliefValue] = useState(null); // holds CLARITY (before), 1-10 or null — name kept for minimal churn, see EARLY CLARITY BASELINE rule
@@ -5190,6 +5216,12 @@ A line missing above means only that one pattern was not matched — the absence
         return describeMasterPriorityStageCtx(stage);
       })();
 
+      // LAST FIRED FAMILY ctx — reads lastFiredFamily.current as it stood at the END of the
+      // PREVIOUS turn (same deliberate one-turn-behind timing as familiesUsed/coverageReportCtx
+      // above): this turn's own update happens later, inside the existing collision-logger
+      // try/catch, after this turn's `fired` array exists.
+      const lastFiredFamilyCtx = describeLastFiredFamilyCtx(lastFiredFamily.current.family, lastFiredFamily.current.streak);
+
       // ── Explicit Pause injection (#5 fix) ──
       // Max 1 per 5 sessions. Injected as system instruction — AURA decides when to use it naturally.
       // CLOSING DRIFT (live evidence, second occurrence of the same failure): the prompt rule
@@ -5497,7 +5529,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // weakest-to-strongest, so hard constraints occupy the final, highest-attention position:
       // (1) informational background, (2) situational signals, (3) hard constraints last.
       const dynamicSuffix = [
-        memCtx, profileCtx, materialEvidenceCtx, goalObstacleStakesCtx, masterPriorityStageCtx, coverageReportCtx, demoCtx, informationModeCtx, explicitPauseCtx,
+        memCtx, profileCtx, materialEvidenceCtx, goalObstacleStakesCtx, masterPriorityStageCtx, lastFiredFamilyCtx, coverageReportCtx, demoCtx, informationModeCtx, explicitPauseCtx,
         coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, roadQuestionCtx,
         postMapCloseCtx,
         gatesCtx, closingDriftCtx, firstReplyFloorCtx,
@@ -5518,6 +5550,12 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // ACCUMULATED BEFORE THE >= 2 GATE, deliberately: a family that fired alone still
         // fired, and EXPLORATION COVERAGE asks what has been USED, not what collided.
         fired.forEach(f => { if (familiesUsed.current.indexOf(f) === -1) familiesUsed.current.push(f); });
+        // LAST FIRED FAMILY — same "highest = fired[fired.length-1]" rule as the collision log
+        // below, but computed regardless of length (a single family firing alone is still THE
+        // family for this turn, not something only meaningful once 2+ collide). null on a quiet
+        // turn (fired.length === 0) is the deferred edge case computeLastFiredFamily freezes on.
+        const highestThisTurn = fired.length > 0 ? fired[fired.length - 1] : null;
+        lastFiredFamily.current = computeLastFiredFamily(lastFiredFamily.current.family, lastFiredFamily.current.streak, highestThisTurn);
         if (fired.length >= 2) {
           // Winner = last in the array, since attention-order places the strongest last.
           // Κ13 "WHY THIS MOVE" — answered by observation rather than by another rule. The signals
@@ -6588,6 +6626,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       warningIssued.current = false;
       clarificationRound.current = 0; // RT-fix #6: previously only reset on full resetSession, not domain change
       escalationLevel.current = 0; // a stuck loop about the old topic must not count against the new one
+      lastFiredFamily.current = { family: null, streak: 0 }; // a repeat streak about the old topic must not count against the new one
     }
     setCurrentDomain(domain);
     const turn     = turnCount.current + 1;
@@ -6700,6 +6739,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     binaryOppositionCount.current = 0;
     clarityPivotHint.current = null;
     escalationLevel.current = 0;
+    lastFiredFamily.current = { family: null, streak: 0 };
     friendPerspectiveAsked.current = false;
     friendPerspectiveConfirmed.current = false;
     setEarlyReliefValue(null);
