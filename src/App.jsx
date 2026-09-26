@@ -3652,31 +3652,63 @@ function detectsUnsourcedOptionOffer(text, userTexts, parse) {
   // GATE 2 — a frame that presents a SET OF THINGS THE USER COULD DO. Without one, an enumeration
   // is just a sentence with commas, which is most of natural Greek.
   if (!/(κατευθυνσ|επιλογ|λυσ|δρομο|τροπο|δυνατοτητ|εναλλακτικ|κατηγορι|σεναρι|ιδεε)/.test(fold(t))) return false;
-  // GATE 3 — the enumeration itself. Bulleted or numbered lines first; failing that, a span
-  // introduced by a colon or a dash and split on commas or ή. Two items minimum.
-  let items = (t.match(/^[ \t]*(?:[-\u2022\u00b7]|\d+[.)])\s+(.+)$/gm) || [])
+  // GATE 3 — the enumerations. Bulleted or numbered lines form one; each colon- or dash-introduced
+  // span, split on commas or ή, forms another. Two items minimum, each.
+  //
+  // EVERY enumeration, not just the first. Until 2026-09-26 this stopped at the first list it found
+  // and gate 4 judged the WHOLE MESSAGE from that one list, so an opening that mirrored the user's
+  // own words exonerated every invented list below it. Measured on the reply that collapsed a real
+  // 24-turn session: the first list was his own profile ("νοσηλευτής, ειδική αγωγή, καλός στην
+  // επικοινωνία"), traceable to his message 12, and the audit ended there. Long replies are exactly
+  // the ones that mirror first and offer second, so this made the guard unreliable on all of them.
+  // test_unsourced_options.js §4c (D1).
+  const lists = [];
+  const lines = (t.match(/^[ \t]*(?:[-\u2022\u00b7]|\d+[.)])\s+(.+)$/gm) || [])
     .map(x => x.replace(/^[ \t]*(?:[-\u2022\u00b7]|\d+[.)])\s+/, "").trim());
-  if (items.length < 2) {
-    // [ \t]* and NOT \s* — \s crosses a newline, which let this inline path reach into the
-    // bulleted lines below a colon and claim items that start with "- ". The two paths were then
-    // not independent: deleting the list path entirely left the suite green. Found by mutation.
-    const re = /[:\u2014\u2013][ \t]*([^\n:\u2014\u2013]{6,400})/g;
-    let m = null;
-    while ((m = re.exec(t)) !== null) {
-      const parts = m[1].split(/,|\s+\u03ae\s+/).map(x => x.trim()).filter(x => x.length >= 3);
-      if (parts.length >= 2) { items = parts; break; }
-    }
+  if (lines.length >= 2) lists.push(lines);
+  // [ \t]* and NOT \s* — \s crosses a newline, which let this inline path reach into the
+  // bulleted lines below a colon and claim items that start with "- ". The two paths were then
+  // not independent: deleting the list path entirely left the suite green. Found by mutation.
+  const re = /[:\u2014\u2013][ \t]*([^\n:\u2014\u2013]{6,400})/g;
+  let m = null;
+  while ((m = re.exec(t)) !== null) {
+    const parts = m[1].split(/,|\s+\u03ae\s+/).map(x => x.trim()).filter(x => x.length >= 3);
+    if (parts.length >= 2) lists.push(parts);
   }
-  if (items.length < 2) return false;
-  // GATE 4 — provenance, last. Flag only when not one item is traceable to the user's own words.
+  // AN OPTION IS A THING, NOT A CLAUSE. Splitting any dash span on commas also carves up ordinary
+  // prose: "— που χτίζονται από την εμπειρία, όχι τον τίτλο" became a two-item list of invented
+  // options and flagged a reply that offered nothing. That false alarm existed before this change;
+  // auditing every enumeration would have made it the reason the real reply flagged — a green
+  // result reached by the wrong mechanism. Items opening on a relative pronoun, conjunction or
+  // negation are grammar, not offers. Articles, prepositions and "να" are deliberately NOT here:
+  // "η νοσηλευτική" and "να ξανασπουδάσω" are things a person could do. §4c (D2).
+  const CLAUSE_OPENER = /^(που|οποι[α-ω]*|οχι|αλλα|γιατι|οτι|ωστε|καθως|επειδη|αφου|ενω|οταν|μηπως|δεν|μην|θα|ειναι|εχει|εχεις|τοτε|ισως)$/;
+  const real = [];
+  for (let i = 0; i < lists.length; i++) {
+    const kept = [];
+    for (let j = 0; j < lists[i].length; j++) {
+      const first = (fold(lists[i][j]).match(/[a-z\u03b1-\u03c90-9]+/) || [""])[0];
+      if (!CLAUSE_OPENER.test(first)) kept.push(lists[i][j]);
+    }
+    if (kept.length >= 2) real.push(kept);
+  }
+  if (!real.length) return false;
+  // GATE 4 — provenance, last, and PER ENUMERATION. Flag when any one enumeration has not a single
+  // item traceable to the user's own words. The bar INSIDE a list stays ZERO — one traceable item
+  // still withholds the flag, which is what suite sections 2 and 4 protect. What changed is that a
+  // clean list no longer speaks for the rest of the message.
   const said = toks(hist.join(" "));
   const bag = {};
   for (let i = 0; i < said.length; i++) bag[said[i]] = true;
-  for (let i = 0; i < items.length; i++) {
-    const w = toks(items[i]);
-    for (let j = 0; j < w.length; j++) if (bag[w[j]] === true) return false;
+  for (let i = 0; i < real.length; i++) {
+    let sourced = false;
+    for (let j = 0; j < real[i].length && !sourced; j++) {
+      const w = toks(real[i][j]);
+      for (let k = 0; k < w.length; k++) if (bag[w[k]] === true) { sourced = true; break; }
+    }
+    if (!sourced) return true;
   }
-  return true;
+  return false;
 }
 function detectOutputViolation(text, ctx) {
   const n = String(text == null ? "" : text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();

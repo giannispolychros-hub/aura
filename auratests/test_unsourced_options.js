@@ -150,6 +150,104 @@ assert("KNOWN GAP holds for a single BULLETED option too — a comma inside it i
 assert("the same reply DOES enumerate two items once a second is added — the floor is the only reason",
   D("Υπάρχουν δύο κατευθύνσεις που δεν έχεις αναφέρει: η κατ' οίκον νοσηλεία, τα ιδιαίτερα.", A_USER) === true);
 
+// ── 4c. EVERY ENUMERATION IS AUDITED, NOT JUST THE FIRST ──────────────────
+// FOUND IN PRODUCTION on 2026-09-26, in the second real Road Map session ever measured. A 24-turn
+// session collapsed into career advice — market information, named certifications, "Ψάξε …" — and
+// this detector reported 2 hits. Reading why the worst reply was cleared exposed TWO separate
+// defects, and neither is the "the detector is too lenient" story it first looked like.
+//
+// D1 — ONLY THE FIRST ENUMERATION WAS EVER AUDITED. Gate 3 stopped at the first list it found, and
+// gate 4 then issued a verdict for the WHOLE MESSAGE from that one list. So an innocent opening —
+// a mirror of the user's own words, which is precisely what the Mirror Rule asks for — exonerated
+// every invented list below it. On the real reply the first enumeration was his own profile
+// ("νοσηλευτής, ειδική αγωγή, καλός στην επικοινωνία"), traceable to his message 12, and the audit
+// ended there. This is not a tuning miss: it makes the guard unreliable on EVERY long reply,
+// because long replies are exactly the ones that mirror first and offer second.
+//
+// D2 — A SUBORDINATE CLAUSE SPLIT ON A COMMA COUNTED AS AN OPTION LIST. The inline path takes any
+// dash- or colon-introduced span and splits it on commas, so "— που χτίζονται από την εμπειρία,
+// όχι τον τίτλο" became a two-item enumeration of invented options. That is a FALSE ALARM the
+// detector has TODAY, in ordinary Greek prose, and it is not hypothetical: fixing D1 alone made
+// the real reply flag THROUGH THIS FRAGMENT instead of through its actual invented options — a
+// green result reached by the wrong mechanism, which is worse than the red one.
+//
+// THE MEASUREMENT THAT SET THE SHAPE — three variants over all 14 labelled fixtures above plus the
+// 24 verbatim replies of the real session:
+//
+//     first list only (before)      14/14 fixtures    2 hits in the real session
+//     all lists, no item filter     14/14 fixtures    3 hits  ← the third is D2's false alarm
+//     all lists + item filter       14/14 fixtures    2 hits  ← shipped
+//
+// The labelled set does not separate the three. Only the two constructed cases below do, which is
+// why they are fixtures and not a comment.
+
+// D1's isolating case: first list is the user's own (σερβιτόρος/ίντερνετ are his words), the
+// second is entirely AURA's. Before this change the reply read as clean.
+const TWO_LISTS_SECOND_INVENTED =
+  "Αυτό που περιγράφεις — σερβιτόρος, ίντερνετ, σπουδές — είναι πολλές κατευθύνσεις μαζί.\n\n" +
+  "Υπάρχουν και δύο που δεν ανέφερες: μεταφράσεις, ή ηχοληψία.";
+assert("D1: a sourced opening list no longer exonerates a fully invented list below it",
+  D(TWO_LISTS_SECOND_INVENTED, B_USER) === true);
+
+// D2's isolating case: one dash-introduced relative clause, no options anywhere. Nothing in it is
+// traceable to the user, so before the item filter it flagged.
+const CLAUSE_NOT_A_LIST = "Υπάρχει μία κατηγορία υπηρεσιών — που χτίζεται από την εμπειρία, όχι τον τίτλο.";
+assert("D2: a relative clause split on a comma is not an enumeration of options",
+  D(CLAUSE_NOT_A_LIST, B_USER) === false);
+
+// The item filter must not become a way to empty a real list. Both items here open with ordinary
+// nouns and must survive it.
+assert("the item filter keeps genuine noun-phrase options — it only drops clause fragments",
+  D("Υπάρχουν δύο κατευθύνσεις — φροντιστήριο, ή ηχοληψία.", B_USER) === true);
+
+// THE REGRESSION THIS CHANGE MOST RISKED. Auditing every enumeration means the Mirror fixture's
+// trailing "— όχι την καλύτερη, αυτή που σε τραβάει περισσότερο —" is now audited too, and it was
+// surviving only on the incidental token "αυτή". With the item filter it is not an enumeration at
+// all. If this flags, the detector forbids the Mirror Rule.
+assert("the mirror survives a per-enumeration audit, and not by incidental word overlap",
+  D(A01_MIRROR, A_USER) === false);
+
+// THE TWO-ITEM FLOOR SURVIVES THE ITEM FILTER. Found by a surviving mutation, not by reading:
+// relaxing the post-filter floor from two items to one left every other assertion green. It must
+// not relax. A span with one real option and one clause fragment is a SINGLE introduced option
+// after filtering, and §4b's documented floor says a single option is not caught — deliberately,
+// because one named thing is far more often a question's subject than an offer. Without this
+// fixture the clause filter could silently become a way to lower that floor.
+assert("filtering a clause out of a two-part span leaves ONE option, which the floor still excludes",
+  D("Υπάρχει μία κατηγορία — ηχοληψία, που χτίζεται από την εμπειρία.", B_USER) === false);
+// Non-vacuity: the same span with a second REAL option does flag, so the assertion above is the
+// floor doing the work and not the frame or provenance gate refusing.
+assert("the same span flags once the filtered list has two real options again",
+  D("Υπάρχει μία κατηγορία — ηχοληψία, μεταφράσεις, που χτίζεται από την εμπειρία.", B_USER) === true);
+
+// ── 4d. THE REAL REPLY THIS WAS FOUND IN IS STILL NOT CAUGHT ──────────────
+// Recorded as a gap, deliberately, so nobody reads 4c as covering it. The reply below is the one
+// that collapsed the session, and after the fix it still does not flag. Two reasons, both measured:
+//
+//   1. Its actual invented options are not an enumeration this detector can see. They are two
+//      SENTENCES — "Μία είναι υπηρεσίες υποστήριξης οικογενειών …  Η άλλη είναι εκπαιδευτικές/
+//      υποστηρικτικές υπηρεσίες …" — and gate 3 only extracts list lines and comma spans. The
+//      options were never items, so their provenance was never asked.
+//   2. The one comma span it does extract, ["φροντιστήριο", "ειδική υποστήριξη"], is genuinely
+//      invented, and gate 4 clears it on the single exact token "ειδικη", which he used in
+//      "ειδική αγωγή" about his own job. One shared word exonerates a list of two.
+//
+// Both are real and neither belongs in this commit: (1) is new capability — sentence-level
+// enumeration — and (2) changes the ZERO bar that sections 2 and 4 exist to protect. Pinned here
+// so the next change to either has to face this reply.
+const S2_USER_PROFILE = [
+  "σκέφτομαι διάφορα για αύξηση εισοδήματος αλλά δεν εύκολα γιατί είναι 4 τα παιδιά που έχω ελάχιστος ο χρόνος είμαι εκπαιδευτικός στην ειδική αγωγή οπότε μόνο σαββατοκύριακα ή αργά το βράδυ ότι καταφέρω για έξτρα δουλειά και πάλι θα με πολύ κολλή κουρασμένος δεν ξέρω τι μπορώ να κάνω",
+  "νομίζω ότι μπορώ και ψυχολογώ καλά τους ανθρώπους για τη δουλεύω και στην ειδική αγωγή και με και νοσηλευτής απλά δεν έχω χάρτη ψυχολόγου και σκέφτομαι και για σπουδές ψυχολογίας αλλά θέλει πολλά χρόνια",
+  "δεν ξέρω δεν το έχω σκεφτεί καθόλου όπως είπα και πριν δεν το έχω σκεφτεί καθόλου όπως είπα και πριν",
+];
+const S2_MENU = "Εντάξει. Τότε ας το πούμε αλλιώς.\n\nΑπό το προφίλ που έχεις — νοσηλευτής, ειδική αγωγή, καλός στην επικοινωνία με ανθρώπους — υπάρχουν δύο κατηγορίες που αξίζει να ξέρεις ότι υπάρχουν:\n\nΜία είναι υπηρεσίες υποστήριξης οικογενειών με παιδιά ειδικών αναγκών, που δεν απαιτούν ψυχολογική άδεια. Η άλλη είναι εκπαιδευτικές/υποστηρικτικές υπηρεσίες — φροντιστήριο, ειδική υποστήριξη — που χτίζονται από την εμπειρία, όχι τον τίτλο.\n\nΠοια από τις δύο σου κεντρίζει έστω λίγο το ενδιαφέρον;";
+assert("KNOWN GAP: the reply that collapsed the real session is a violation and still is not caught",
+  D(S2_MENU, S2_USER_PROFILE) === false);
+// Non-vacuity: the gap must be about provenance and sentence shape, not about the frame gate
+// failing — this reply DOES carry a category noun and DOES reach gate 3.
+assert("that gap is not the frame gate quietly refusing — the reply reaches the enumeration gate",
+  /κατηγορ/i.test(S2_MENU) && D(S2_MENU, ["τίποτα κοινό εδώ πέρα"]) === true);
+
 // ── 5. DEGENERATE INPUT NEVER THROWS AND NEVER FLAGS ──────────────────────
 assert("empty, null and non-string input are refused quietly",
   D("", B_USER) === false && D(null, B_USER) === false && D(undefined, B_USER) === false && D(42, B_USER) === false);
