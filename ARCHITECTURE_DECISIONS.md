@@ -1689,3 +1689,36 @@ Tests 70 suites, 2276 passed, 0 failed, 0 silent (νέο αρχείο: `test_ope
 `msgCount`, και η αφαίρεση του `|| activeLensRef.current` fallback στο σημείο κλήσης — καμία δεν
 επέζησε. Κανένα prompt ή cache block δεν αγγίχτηκε (επιβεβαιωμένο: `AURA_CORE_PERSONALITY` βαθμολογεί
 το ίδιο sha256 pin, `test_minimal_closing.js` πράσινο).
+
+## 26 Σεπτεμβρίου — η ESCALATION κλίμακα αποκτά μετρητή, πάνω στα ήδη υπάρχοντα ονόματά της
+
+**Αφορμή, ρητή οδηγία του ιδρυτή: «Καλύτερα να χτίσουμε σε ό,τι υπάρχει».** Ο ιδρυτής περιέγραψε ένα
+όραμα 4 σταδίων (Baseline/Clarity Pivot/Escalation με Inversion-Fact-Grounding-Perspective Swap/
+Auto-Kill). Ο έλεγχος έδειξε ότι η ΚΛΙΜΑΚΑ ήδη υπάρχει, αυτολεξεί, στο prompt (γρ. 533): *"Level 1
+(Pivot) → Level 2 (targeted follow-up) → Level 3 (Perspective Swap) → AUTO-KILL → Graceful Exit.
+Never skip levels. Never announce."* Και το ακριβές κείμενο του Graceful Exit (γρ. 904): *"Δεν
+προέκυψε καθαρό μοτίβο ακόμα. Μπορούμε να συνεχίσουμε ή να το αφήσουμε εδώ."* Τα ονόματα «Baseline
+Mode», «Inversion», «Fact-Grounding» δεν υπάρχουν αυτολεξεί — παράφραση του ιδρυτή πάνω στο
+πραγματικό (γενικό) «Level 2 (targeted follow-up)». Το πραγματικό κενό: **μηδέν κώδικας** πίσω από
+όλη την κλίμακα — κανένας μετρητής "ποιο level", καμία επιβολή του "όχι πάνω από 3 απόπειρες".
+
+**Τι χτίστηκε: μετρητής πάνω στην ήδη υπάρχουσα κλίμακα, με τα ΔΙΚΑ ΤΗΣ ονόματα, όχι παράλληλη δομή.**
+`computeEscalationLevel(prevLevel, stuckSignalFired)` — καθαρή συνάρτηση, μηδέν `.current`. «Κολλημένο
+σήμα» = οποιοδήποτε από τα ήδη υπολογισμένα `clarityPivotCtx`/`selfRepetitionCtx`/`userStagnationCtx`
+(καμία νέα ανίχνευση). Αν πυροδοτεί: ανεβαίνει ένα level, ποτέ δεν προσπερνάει (matching "Never skip
+levels"), κόβεται στο 4 (AUTO-KILL). Αν σταματήσει: **σιωπηλή επιστροφή στο Baseline (0)** — ακριβώς η
+φράση του ιδρυτή. `describeEscalationCtx(level)` παράγει το prompt-injected κείμενο, χρησιμοποιώντας
+ρητά τις ΙΔΙΕΣ λέξεις που ήδη υπάρχουν στην κλίμακα (Pivot/targeted follow-up/Perspective Swap/
+AUTO-KILL/Graceful Exit) — ποτέ "Inversion" ή "Fact-Grounding", που δεν υπάρχουν στο πραγματικό
+prompt.
+
+**Εύρος: μόνο prompt injection, όπως όλα τα άλλα ctx σε αυτή τη λίστα.** Δεν αλλάζει lens, δεν αλλάζει
+`basePrompt`, δεν αγγίζει `activeLensRef` — μηδέν ρίσκο τύπου Phase 1. Reset σε 2 σημεία (πλήρες
+session reset + αλλαγή θέματος, ίδια σύμβαση με `compressionCount`/`clarificationRound` δίπλα του).
+
+Tests: 71 suites, 2304 passed, 0 failed, 0 silent (νέο αρχείο: `test_escalation_level.js`, 27
+βεβαιώσεις). Επτά μεταλλάξεις — αφαίρεση του cap στο AUTO-KILL, αφαίρεση του silent-return-to-baseline,
+off-by-two στην κλιμάκωση, μετονομασία του Level 2 label σε «Fact-Grounding» (πιάστηκε μόνο αφού
+ενισχύθηκε το test — η πρώτη εκδοχή το άφησε να περάσει, διορθώθηκε πριν το commit), και αφαίρεση ενός
+από τα τρία σήματα (`userStagnationCtx`) από το OR — καμία δεν επέζησε τελικά. Κανένα prompt ή cache
+block αγγίχτηκε.

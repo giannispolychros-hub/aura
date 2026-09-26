@@ -1372,6 +1372,34 @@ function computeOpeningLensChoice(currentMode, msgCount, lensSwitchesSoFar, last
   return suggested === "SIMPLIFY" ? '' : suggested; // SIMPLIFY is already the standing default
 }
 
+// ESCALATION LEVEL — code-level tracking for the ladder that already exists as prompt text (see
+// "ESCALATION" above: "Level 1 (Pivot) → Level 2 (targeted follow-up) → Level 3 (Perspective Swap)
+// → AUTO-KILL → Graceful Exit. Never skip levels. Never announce."). Until now this was 100% model
+// judgement — nothing counted which level a session was on. Founder's instruction for this step:
+// build ON the existing ladder, in its own vocabulary, not a parallel structure with new names.
+//
+// Both functions are pure, same reason computeOpeningLensChoice is: no ref read inside either one,
+// the caller supplies a plain boolean/number snapshot. This ONLY produces prompt-injected text — it
+// changes no lens, no basePrompt, no routing, never repeats Phase 1's mistake of writing state that
+// stands until something else clears it.
+function computeEscalationLevel(prevLevel, stuckSignalFired) {
+  // Movement resumed (none of the three stuck-signals fired this turn) — silent return to
+  // Baseline, exactly as the ladder's own AUTO-KILL & Graceful Exit step describes it.
+  if (!stuckSignalFired) return 0;
+  // Never skip levels (the ladder's own rule) — one step at a time, capped at 4 (AUTO-KILL) so a
+  // long stall does not keep counting past the point where Graceful Exit is already due.
+  return Math.min((prevLevel || 0) + 1, 4);
+}
+function describeEscalationCtx(level) {
+  switch (level) {
+    case 0: return '';
+    case 1: return `\n[ESCALATION LEVEL 1 (Pivot) — CODE-VERIFIED: a stuck pattern (loop/avoidance/repetition/stagnation) was just detected this turn. Per ESCALATION above, this is the first attempt.]\n`;
+    case 2: return `\n[ESCALATION LEVEL 2 (targeted follow-up) — CODE-VERIFIED: the stuck pattern has now persisted through Level 1. Per ESCALATION above, do not repeat Level 1's move — ask a sharper, targeted follow-up that builds on the previous answer.]\n`;
+    case 3: return `\n[ESCALATION LEVEL 3 (Perspective Swap) — CODE-VERIFIED: the stuck pattern has persisted through Levels 1 and 2. Per ESCALATION above, this is the final attempt — apply Perspective Swap.]\n`;
+    default: return `\n[AUTO-KILL — CODE-VERIFIED: escalation attempts produced no movement. Per ESCALATION and GENERAL EXIT CRITERIA above, offer Graceful Exit now rather than a further attempt.]\n`;
+  }
+}
+
 // ─────────────────────────────────────────────
 // SAFETY: crisis / emotional distress detection
 // ─────────────────────────────────────────────
@@ -4775,6 +4803,7 @@ export default function AURAv2() {
   const earlyCapturedWord      = useRef(null);  // the user's verbatim answer, fed into Part 1 later
   const binaryOppositionCount  = useRef(0);     // structural repetition count, feeds PREMISE INVERSION reliability
   const clarityPivotHint       = useRef(null);  // "LOOP" or "AVOIDANCE" - code-verified, feeds CLARITY PIVOT hybrid fix
+  const escalationLevel        = useRef(0); // 0 Baseline, 1 Pivot, 2 targeted follow-up, 3 Perspective Swap, 4 AUTO-KILL — see computeEscalationLevel
   const friendPerspectiveAsked     = useRef(false);
   const friendPerspectiveConfirmed = useRef(false); // user's own 'yes, different' — should feed Reflection Summary
   const [earlyReliefValue, setEarlyReliefValue] = useState(null); // holds CLARITY (before), 1-10 or null — name kept for minimal churn, see EARLY CLARITY BASELINE rule
@@ -5353,6 +5382,15 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       const userStagnationCtx = (!roadQuestionState.current && detectUserStagnation(msgs).stagnant)
         ? `\n[CODE-VERIFIED: the user's own last 2 replies introduced almost no new material AND became markedly shorter than their earlier ones. This is observed from what they actually wrote, not inferred about how they feel. It is direct evidence that the current approach has stopped producing movement FOR THEM — the strongest possible input to STRATEGY PRE-MORTEM GATE's "is this strategy failing here?" check. Do not wait for them to repeat themselves further or to say so explicitly: switch to a genuinely different region of INTERVENTION SPACE now, or if enough material already exists, stop gathering and reflect the shape of what they have already given (PROBLEM STRUCTURE MAP / VERBATIM COST COLLISION). AND IF GENUINELY DISTINCT DIRECTIONS ARE ALREADY IMPLIED BY WHAT THEY HAVE SAID, THIS IS THE MOMENT FOR ROAD DISCOVERY — THE ONE NAMED EXCEPTION's PATH TWO, with all its output tests (distinctness, consequence, level, completeness) and their QUALITY BAILOUT clauses intact. A user who has stopped producing new material is not asking for another question; they have given what they have. Showing them the actual shape of their decision space is the work. If the material genuinely does not support distinct directions, say that plainly instead — that is also a real finding, never a reason to invent one. TWO MOVES THAT BELONG SPECIFICALLY TO THIS MOMENT, available here and nowhere else (founder's framing — the product is not an AI that asks good questions, it is one that works out which question this person's thinking needs now; both of these become possible precisely because the evidence above shows the problem has stopped being understanding of the topic and has become inability to move): (a) ASK WHY IT IS STILL OPEN rather than asking more about the topic — "τι είναι αυτό που σε κάνει να το σκέφτεσαι ακόμα;" targets the stuckness itself, not its content, and it works on any subject because it presupposes nothing about what kind of problem this is. (b) QUESTION THE FRAME, but only where their own material contradicts it — when someone has described a decision at length while everything they actually said points elsewhere, "μήπως δεν προσπαθείς να αποφασίσεις αυτό, αλλά κάτι άλλο;" is legitimate. HARD CONDITION on (b): only when the evidence for the mismatch is in their own words, never as a general-purpose move, and always as a question they can reject outright — if they say no, that is the end of it and the frame stands. Offered as a question, never as an interpretation stated.]\n`
         : '';
+      // ESCALATION LEVEL (founder's instruction: build on the existing ladder, not a parallel one).
+      // Reuses the three stuck-signals already computed above — no new detector. "Stuck" means any
+      // of: a structural loop/avoidance match (clarityPivotCtx), AURA repeating itself
+      // (selfRepetitionCtx), or the user producing no new material (userStagnationCtx). The instant
+      // none of the three fire, the level silently returns to Baseline (0) — matching the ladder's
+      // own "AUTO-KILL & Graceful Exit ... silent return to Baseline" description exactly.
+      const stuckSignalFired = !!(clarityPivotCtx || selfRepetitionCtx || userStagnationCtx);
+      escalationLevel.current = computeEscalationLevel(escalationLevel.current, stuckSignalFired);
+      const escalationCtx = describeEscalationCtx(escalationLevel.current);
       // ATTENTION-ORDER FIX (decision-architecture audit finding): position inside injected context
       // affects how reliably an instruction is followed, and firstReplyFloorCtx — a HARD floor
       // constraint ("do not press on the very first reply") — previously sat 6th of 13, buried
@@ -5361,7 +5399,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // (1) informational background, (2) situational signals, (3) hard constraints last.
       const dynamicSuffix = [
         memCtx, profileCtx, materialEvidenceCtx, coverageReportCtx, demoCtx, informationModeCtx, explicitPauseCtx,
-        coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx, roadQuestionCtx,
+        coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, roadQuestionCtx,
         postMapCloseCtx,
         gatesCtx, closingDriftCtx, firstReplyFloorCtx,
       ].filter(Boolean).join('\n');
@@ -5375,7 +5413,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         const fired = Object.entries({
           memCtx, profileCtx, materialEvidenceCtx, demoCtx, informationModeCtx, explicitPauseCtx,
           coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx,
-          clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, tensionCtx, roadQuestionCtx, postMapCloseCtx, gatesCtx, closingDriftCtx,
+          clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, roadQuestionCtx, postMapCloseCtx, gatesCtx, closingDriftCtx,
           firstReplyFloorCtx,
         }).filter(([, v]) => v).map(([k]) => k);
         // ACCUMULATED BEFORE THE >= 2 GATE, deliberately: a family that fired alone still
@@ -6450,6 +6488,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       compressionCount.current = 0;
       warningIssued.current = false;
       clarificationRound.current = 0; // RT-fix #6: previously only reset on full resetSession, not domain change
+      escalationLevel.current = 0; // a stuck loop about the old topic must not count against the new one
     }
     setCurrentDomain(domain);
     const turn     = turnCount.current + 1;
@@ -6561,6 +6600,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     earlyCapturedWord.current = null;
     binaryOppositionCount.current = 0;
     clarityPivotHint.current = null;
+    escalationLevel.current = 0;
     friendPerspectiveAsked.current = false;
     friendPerspectiveConfirmed.current = false;
     setEarlyReliefValue(null);
