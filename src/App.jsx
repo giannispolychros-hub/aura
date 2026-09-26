@@ -2437,8 +2437,19 @@ function getDeclaration(ledger, id) {
 // A future call site that passes a whole message by mistake produces a MISSING FIELD, never a
 // leak. Keys are whitelisted too, because a key is a channel like any other.
 //
-// Nothing is persisted: window only, gone on reload, exactly like the cost counters. It is
-// wrapped so that instrumentation can never take a session down with it.
+// PERSISTED ONLY UNDER ?debug=1, and that limit is the decision rather than a default. On
+// 2026-09-26 two real Road Map sessions were run from a phone and produced zero numbers: this log
+// was in-memory, console.log is invisible on mobile, and every figure later reported from those
+// sessions had to be recovered by re-running the detectors over pasted text by hand. The debug
+// panel exists because "the console is unreachable on mobile, which is where the real Road Map
+// sessions happen" — and the instrument it serves was still console-only.
+// WHY NO CONSENT GATE IS INVOLVED: the schema below physically cannot hold conversation content —
+// strings, objects and arrays are dropped by this function, which test_telemetry proves by feeding
+// it real transcript text. A record that cannot contain content is not a new category of stored
+// data once written to disk. WHY IT IS STILL GATED: collecting from every visitor's device by
+// default is a separate product decision with a consent gate attached, and this is not it.
+// Bounded like every other persisted array here (see _writeMemoryNow), and every storage call is
+// wrapped separately, so a full or blocked store loses the write and never the session.
 function recordTelemetry(event, fields) {
   try {
     if (typeof event !== "string" || !/^[a-z_]{1,32}$/.test(event)) return null;
@@ -2453,6 +2464,16 @@ function recordTelemetry(event, fields) {
     if (typeof window !== "undefined") {
       (window.__auraTelemetry = window.__auraTelemetry || []).push(rec);
       console.log("[AURA telemetry]", JSON.stringify(rec));
+      try {
+        if (new URLSearchParams(window.location.search).get("debug") === "1") {
+          const store = window.localStorage;
+          let log = [];
+          try { log = JSON.parse(store.getItem("aura_telemetry_log") || "[]"); } catch (e2) { log = []; }
+          if (!Array.isArray(log)) log = [];
+          log.push(rec);
+          store.setItem("aura_telemetry_log", JSON.stringify(log.slice(-500)));
+        }
+      } catch (e1) { /* no URL, no store, quota full, private mode — never the session's problem */ }
     }
     return rec;
   } catch (e) { return null; }
@@ -2754,6 +2775,38 @@ function exportBlueprint(ankerText, zones, meta) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+// TELEMETRY EXPORT — the other half of persistence, and the reason the numbers were lost twice in
+// one day. Writing the log to disk keeps it across a reload; this is how it leaves the device at
+// all. The debug panel already existed for exactly this situation ("the console is unreachable on
+// mobile, which is where the real Road Map sessions happen") but offered no way to remove anything
+// from the phone, so every figure from two real sessions was reconstructed by hand from pasted text.
+// Same Blob-and-click path exportMemory has used since long before this — no new mechanism.
+// COUNTS ONLY, by construction rather than by promise: it emits the records recordTelemetry built,
+// and that schema drops strings, objects and arrays. There is no field here that could carry a turn.
+// Falls back to the in-session array when the stored log is missing, which is what happens if the
+// instrument was switched on partway through a session.
+function exportTelemetry() {
+  let rows = [];
+  try {
+    const stored = JSON.parse(window.localStorage.getItem("aura_telemetry_log") || "[]");
+    if (Array.isArray(stored)) rows = stored;
+  } catch (e) { rows = []; }
+  if (!rows.length && typeof window !== "undefined" && Array.isArray(window.__auraTelemetry)) {
+    rows = window.__auraTelemetry;
+  }
+  const data = {
+    exportedAt: new Date().toISOString(),
+    note: "AURA telemetry — counts and flags only, never anything a person typed.",
+    records: rows.length,
+    events: rows,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url; a.download = "aura_telemetry.json"; a.click();
+  URL.revokeObjectURL(url);
+}
+
 function exportMemory(mem) {
   const data = {
     exportedAt: new Date().toISOString(),
@@ -6632,8 +6685,11 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         )}
 
         {/* ── Debug panel: read-only view of already-existing counters (turnCount, the passive
-            detectOutputViolation tally). Counters only — never reply text, never localStorage,
-            never user data. Gated on ?debug=1, read once via debugMode.current. Re-renders
+            detectOutputViolation tally). Counters only — never reply text, never user data.
+            IT NOW READS ONE STORAGE KEY, and the earlier "never localStorage" line is retired
+            deliberately: the export button below reads `aura_telemetry_log`, whose records cannot
+            contain anything a person typed (recordTelemetry drops strings, objects and arrays).
+            Gated on ?debug=1, read once via debugMode.current. Re-renders
             naturally whenever `messages` changes, since that's this component's own render
             trigger — no interval, no dedicated state. ── */}
         {debugMode.current && (
@@ -6659,6 +6715,15 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             {roadTraceLast.current?.provenance && (
               <div>prov: sup={roadTraceLast.current.provenance.supported}/{roadTraceLast.current.provenance.lines} unsup={roadTraceLast.current.provenance.unsupported} mild={roadTraceLast.current.provenance.mild} sev={roadTraceLast.current.provenance.severe} novel={roadTraceLast.current.provenance.novelFactLines}</div>
             )}
+            {/* THE ONE INTERACTIVE ELEMENT IN THIS PANEL, and it needs pointerEvents of its own:
+                the container sets them to "none" so the overlay never intercepts a tap meant for
+                the conversation underneath, which would inherit down to a button and make it dead.
+                This is how a phone session's numbers leave the phone — the gap that cost two real
+                sessions on 2026-09-26, when the measurement existed and was uncollectable. */}
+            <button
+              onClick={exportTelemetry}
+              style={{pointerEvents:"auto",marginTop:"5px",background:"transparent",color:"#d8d4cc",border:"1px solid #6b665e",borderRadius:"3px",fontSize:"11px",fontFamily:"monospace",padding:"2px 6px",cursor:"pointer"}}
+            >τηλεμετρία (.json)</button>
           </div>
         )}
 

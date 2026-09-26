@@ -152,8 +152,19 @@ if (SRC) {
     /typeof\s+v\s*===\s*["']boolean["']/.test(SRC) && /Number\.isInteger/.test(SRC));
   assert('Nothing in the recorder body reads a message, its content, or the input box',
     !/\.content\b/.test(SRC) && !/\bmessages\b/.test(SRC) && !/\binput\b/.test(SRC));
-  assert('The recorder never writes to persistent storage',
-    !/localStorage|sessionStorage|saveMemory/.test(SRC));
+  // CHANGED DELIBERATELY on 2026-09-26, recorded rather than quietly relaxed. This was a blanket
+  // ban on any storage call, written when the recorder was window-only. What the ban actually
+  // protected was two things, and both are now asserted directly and more strictly than before:
+  // no coupling to the MEMORY system, and no unconditional write. §8 adds the behavioural proof
+  // the blanket ban never gave — that content cannot reach the disk even if a call site regresses.
+  assert('The recorder is never coupled to the memory system or its key',
+    !/saveMemory|MEMORY_KEY|_writeMemoryNow/.test(SRC));
+  assert('The recorder never uses sessionStorage — one persistence path, not two',
+    !/sessionStorage/.test(SRC));
+  assert('The recorder writes exactly one storage key, its own',
+    (SRC.match(/setItem\(/g) || []).length === 1 && /setItem\(\s*["']aura_telemetry_log["']/.test(SRC));
+  assert('Every write is gated — the debug check precedes the write in the body, never after it',
+    SRC.indexOf("get(\"debug\")") > -1 && SRC.indexOf("get(\"debug\")") < SRC.indexOf('setItem('));
   assert('The recorder never calls the API', !/fetch\s*\(|callAura/.test(SRC));
   assert('The recorder is wrapped so it can never throw into a session', /try\s*{/.test(SRC));
 }
@@ -294,6 +305,145 @@ assert('__auraUsageLog still exists (cost instrumentation not disturbed)',
   CODE.includes('__auraUsageLog'));
 assert('Telemetry uses its own log, separate from cost counts',
   CODE.includes('__auraTelemetry'));
+
+// ── 8. PERSISTENCE — because the console is unreachable where the sessions happen ─────
+//
+// THE HARM THIS CLOSES, and this file's own header already named it: "learned only because the
+// founder pasted two transcripts by hand. That is not a measurement system." On 2026-09-26 that
+// cost us twice in one day. Two real Road Map sessions were run from a phone; both produced a
+// verified First-WHY card, a measured lens, five located bugs — and ZERO numbers, because
+// window.__auraTelemetry is in-memory with no persistence and console.log is invisible on mobile.
+// Every number reported from those sessions was recovered by re-running the detectors over pasted
+// text, by hand. Meanwhile localStorage is used elsewhere in the file without difficulty.
+//
+// WHY THIS NEEDS NO CONSENT DECISION, and the argument is structural rather than a promise. The
+// schema above physically cannot hold conversation content: sections 1-3 feed real transcript text
+// into the recorder and prove strings, objects and arrays are dropped by the recorder itself. A
+// record that cannot contain content does not become a new category of stored data by being
+// written to disk. So persistence introduces nothing the existing disclosure does not cover.
+//
+// DEBUG-GATED ON PURPOSE, and this is a deliberate limit, not an oversight. Persistence happens
+// only when ?debug=1 is on the URL — the founder's own instrument on his own device. It does NOT
+// collect from real users, and it is not a step toward doing so: opening that question is a
+// product decision with a consent gate attached, and it is not this change.
+const LS_KEY = 'aura_telemetry_log';
+function fakeStore(opts) {
+  const o = opts || {};
+  const m = {};
+  return {
+    getItem: k => (o.throwOnRead ? (() => { throw new Error('blocked'); })() : (k in m ? m[k] : null)),
+    setItem: (k, v) => { if (o.throwOnWrite) throw new Error('quota'); m[k] = String(v); },
+    removeItem: k => { delete m[k]; },
+    _raw: () => m,
+  };
+}
+function withWindow(search, store, fn) {
+  const prev = global.window;
+  global.window = { __auraTelemetry: [], location: { search }, localStorage: store };
+  try { return fn(); } finally { global.window = prev; }
+}
+function storedIn(store) {
+  const s = store._raw()[LS_KEY];
+  if (s === undefined) return null;
+  try { return JSON.parse(s); } catch (e) { return 'UNPARSEABLE'; }
+}
+
+if (typeof recordTelemetry === 'function') {
+  // 8a — it persists when the instrument is on.
+  const s1 = fakeStore();
+  withWindow('?debug=1', s1, () => {
+    recordTelemetry('session_completed', { turns: 24, roadMap: false });
+  });
+  const p1 = storedIn(s1);
+  assert('with ?debug=1 the record is written to localStorage, so a phone session survives reload',
+    Array.isArray(p1) && p1.length === 1 && p1[0].ev === 'session_completed' && p1[0].turns === 24);
+
+  // 8b — it collects nothing when the instrument is off. A measurement tool that writes to every
+  // visitor's device by default is a different product decision, and this is not it.
+  const s2 = fakeStore();
+  withWindow('', s2, () => { recordTelemetry('session_started', { turns: 0 }); });
+  assert('without the debug flag NOTHING is written — no silent collection from real users',
+    storedIn(s2) === null);
+
+  // 8c — it accumulates across sessions, which is the whole point: a reload must not erase the
+  // previous session's numbers, because that is exactly how both real sessions were lost.
+  const s3 = fakeStore();
+  withWindow('?debug=1', s3, () => { recordTelemetry('session_completed', { turns: 20 }); });
+  withWindow('?debug=1', s3, () => { recordTelemetry('session_completed', { turns: 24 }); });
+  const p3 = storedIn(s3);
+  assert('a second session appends rather than replacing — the first session is still there',
+    Array.isArray(p3) && p3.length === 2 && p3[0].turns === 20 && p3[1].turns === 24);
+
+  // 8d — bounded, like every other persisted array in this file (trajectories/obstacles/anchors
+  // are all capped in _writeMemoryNow). An unbounded log fills the quota and then the failure is
+  // silent, which is the state we are trying to leave.
+  const s4 = fakeStore();
+  withWindow('?debug=1', s4, () => {
+    for (let i = 0; i < 620; i++) recordTelemetry('session_started', { turns: Math.min(9999, i) });
+  });
+  const p4 = storedIn(s4);
+  assert('the persisted log is capped, so it can never grow without bound',
+    Array.isArray(p4) && p4.length <= 500 && p4.length > 0);
+  assert('the cap keeps the MOST RECENT records, not the oldest',
+    Array.isArray(p4) && p4[p4.length - 1].turns === 619);
+
+  // 8e — instrumentation must never take a session down. A full or blocked store is normal on a
+  // phone, and the record must still reach memory and still be returned.
+  const s5 = fakeStore({ throwOnWrite: true });
+  let r5 = null;
+  const mem5 = withWindow('?debug=1', s5, () => {
+    r5 = recordTelemetry('session_completed', { turns: 7 });
+    return global.window.__auraTelemetry.slice();
+  });
+  assert('a localStorage that throws on write does not break recording',
+    r5 && r5.turns === 7 && mem5.length === 1);
+  const s6 = fakeStore({ throwOnRead: true });
+  let r6 = null;
+  withWindow('?debug=1', s6, () => { r6 = recordTelemetry('session_completed', { turns: 8 }); });
+  assert('a localStorage that throws on read does not break recording either',
+    r6 && r6.turns === 8);
+
+  // 8f — THE CONSTRAINT, re-asserted at the NEW boundary. Sections 1-3 prove content never enters
+  // a record; this proves it never reaches the disk, which is a different surface and the one that
+  // would matter if a future call site regressed.
+  const s7 = fakeStore();
+  withWindow('?debug=1', s7, () => {
+    recordTelemetry('session_completed', { turns: 3, preview: CONTENT, msg: { content: CONTENT } });
+  });
+  const rawWritten = s7._raw()[LS_KEY] || '';
+  assert('conversation content never reaches the persisted log',
+    rawWritten.length > 0 && !rawWritten.includes('παιδι') && !rawWritten.includes(CONTENT.slice(0, 12)));
+}
+
+// ── 9. GETTING IT OFF THE PHONE ──────────────────────────────────────────────────────
+// Persisting is half the fix. `?debug=1` already exists precisely because "the console is
+// unreachable on mobile, which is where the real Road Map sessions happen" — yet the panel showed
+// violations, a road trace and provenance, and offered no way to remove any of it from the device.
+// exportMemory has done exactly this for memory since long before: a Blob and a download click.
+const EXP = extract('exportTelemetry');
+assert('exportTelemetry exists', !!EXP);
+if (EXP) {
+  assert('it reads the persisted log, so it can carry sessions earlier than this one',
+    EXP.includes('aura_telemetry_log'));
+  assert('it downloads a file, reusing the same Blob path exportMemory already uses',
+    /new Blob\(/.test(EXP) && /download/.test(EXP));
+  assert('it carries no conversation content — nothing but the records themselves',
+    !/(content|messages|reply|transcript)/i.test(EXP.replace(/\/\/[^\n]*/g, '')));
+}
+// WIRING, by containment rather than by proximity. The first version of this assertion looked for
+// `exportTelemetry(` and failed against correct code: React takes the handler by reference,
+// `onClick={exportTelemetry}`, with no call site to find. Anchored on the panel's own gate so it
+// cannot pass on a reference sitting anywhere else in the file.
+const PANEL_AT = CODE.indexOf('{debugMode.current && (');
+assert('the debug panel block is findable, so the checks below cannot be vacuous', PANEL_AT > 0);
+const PANEL = CODE.slice(PANEL_AT, CODE.indexOf('{/* ── Open anchors ── */}', PANEL_AT));
+assert('the panel slice is bounded and real, not the rest of the file', PANEL.length > 200 && PANEL.length < 6000);
+assert('WIRING: the debug panel offers the export, so the numbers can leave a phone',
+  PANEL.includes('exportTelemetry'));
+assert('WIRING: the export is reachable — the panel sets pointerEvents:none, so the control re-enables its own',
+  /pointerEvents:\s*["']auto["']/.test(PANEL));
+assert('the panel still paints counters only — no reply text is rendered beside the button',
+  !/\.content\b/.test(PANEL) && !/displayText/.test(PANEL));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);
