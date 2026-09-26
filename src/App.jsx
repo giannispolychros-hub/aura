@@ -4676,6 +4676,12 @@ export default function AURAv2() {
   const explicitRequests  = useRef(0);
   const requestStreak     = useRef(0);
   const requestStreakMax  = useRef(0);
+  // GATES DUE vs GATES DELIVERED. The hard override for Anchors/Stakes was built once and REVERTED
+  // for documented harm, so the step before rebuilding it is measuring how often a gate is due AND
+  // ignored. Per-turn snapshot plus two session counters; nothing reads them.
+  const gatesDueSnapshot  = useRef({ anchors: false, stakes: false, scale: false });
+  const gatesDue          = useRef(0);
+  const gatesIgnored      = useRef(0);
   const violationCounts = useRef({}); // per-session tally of detectOutputViolation categories, debug-panel only
   const roadTraceLast = useRef(null); // last turn's road-map trace counters (numbers/booleans only), debug-panel only
   // THE SAME VALUES, ACCUMULATED AND PROMOTED. roadTraceLast holds only the last turn and
@@ -4863,6 +4869,8 @@ export default function AURAv2() {
         userClaims: Math.min(9999, claimsAboutUser.current),
         explicitRequests: Math.min(9999, explicitRequests.current),
         requestStreak: Math.min(9999, requestStreakMax.current),
+        gatesDue: Math.min(9999, gatesDue.current),
+        gatesIgnored: Math.min(9999, gatesIgnored.current),
         lens: lensCode(activeLensRef.current),
         lensSwitches: lensSwitches.current,
         // Measured on the RAW model output and on each stage of our own chain, unlike the
@@ -5162,6 +5170,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           : '';
       })(), postMapCloseCtxDelivered, 2);
       const gatesCtx = (() => {
+        // Cleared first, every turn: this block returns '' from several places, and a stale snapshot
+        // would make the post-API comparison below judge a gate that was never injected.
+        gatesDueSnapshot.current = { anchors: false, stakes: false, scale: false };
         // ROAD QUESTIONS STAND-DOWN: while a road question is pending this turn, two "ask this"
         // instructions in one prompt is the collision this repo has already paid for once. Scoped
         // strictly to this condition — nothing changes when no road question is pending.
@@ -5208,6 +5219,13 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         if (concreteStepStated.current && !outcomeScaleAsked.current) due.push('Clarity + Ownership Scale ("τώρα, πόσο ξεκάθαρο είναι τι θέλεις να κάνεις... και πόσο αισθάνεσαι ότι είναι δική σου σκέψη ή επιλογή, 1-10;") — BUT ONLY AFTER the decision space itself has been made visible: if the user has just named genuinely distinct directions, ROAD DISCOVERY comes first and this scale waits for the turn after. Rating clarity before showing them what they actually have is backwards.');
         if (!anchorsInvited.current) due.push('Decision Space Anchors ("ποιες λέξεις ή σύντομες φράσεις...")');
         if (!stakesAsked.current) due.push('Stakes Question ("αν αυτή η απόφαση μείνει θολή για άλλον έναν χρόνο...")');
+        // The snapshot is taken here, from the same three conditions the reminder is built from, so
+        // "due" means exactly what the injected text claimed rather than a second derivation.
+        gatesDueSnapshot.current = {
+          anchors: !anchorsInvited.current,
+          stakes: !stakesAsked.current,
+          scale: (concreteStepStated.current && !outcomeScaleAsked.current),
+        };
         if (due.length === 0) return '';
         // Fresh, end-of-prompt placement — not a new rule, a reminder of already-declared rules
         // that live ~2000 lines into a 54KB core prompt. Real-transcript evidence: the Outcome
@@ -5424,6 +5442,22 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           claimsAboutUser.current += 1;
           console.warn('[AURA VIOLATION] USER_CLAIM | turn', msgCount, '|', _clean.trim().slice(0, 130));
         }
+        // GATES DUE vs DELIVERED. Judged with the detectors that already exist, on the same
+        // tag-stripped text as every other observer here. A gate that was due and does not appear in
+        // the reply is the measurement the reverted hard override would need before being rebuilt.
+        try {
+          const _snap = gatesDueSnapshot.current || {};
+          const _delivered = {
+            anchors: detectsAnchorsInvited(_clean),
+            stakes: detectsStakesAsked(_clean),
+            scale: detectsOutcomeScaleAsked(_clean),
+          };
+          ['anchors', 'stakes', 'scale'].forEach(k => {
+            if (!_snap[k]) return;
+            gatesDue.current += 1;
+            if (!_delivered[k]) gatesIgnored.current += 1;
+          });
+        } catch (e) { /* observation must never affect the session */ }
       } catch (e) { /* observation must never affect the session */ }
       const exitTagMatch = rawTextWithTags.match(/\[\[EXIT:(yes|no)\]\]\s*$/i);
       const modelJudgesEnd = exitTagMatch ? exitTagMatch[1].toLowerCase() === "yes" : false;
@@ -6490,6 +6524,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     explicitRequests.current = 0;
     requestStreak.current = 0;
     requestStreakMax.current = 0;
+    gatesDue.current = 0;
+    gatesIgnored.current = 0;
+    gatesDueSnapshot.current = { anchors: false, stakes: false, scale: false };
     violationCounts.current = {};
     roadTraceLast.current = null;
     roadTraceTotals.current = { rawLabels: 0, rawMap: 0, strippedMap: 0 };

@@ -269,7 +269,7 @@ assert('The extracted block is the real one — it still contains all three gate
 // has to supply every ref the real code reads, exactly as it already supplies the four gate flags —
 // without it the evaluated template throws ReferenceError and this whole suite silently produces no
 // output at all, which is how it first showed up: not as a failure, as an absent count.
-function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = false, anchors = false, stakes = false, roadPending = false }) {
+function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = false, anchors = false, stakes = false, roadPending = false, sharedSnapshot = null }) {
   const msgs = [
     { role: 'user',      content: 'Έχω ένα δίλημμα με τη δουλειά μου και δεν ξεκαθαρίζει.' },
     { role: 'assistant', content: 'Τι σε κρατάει εκεί;' },
@@ -282,12 +282,53 @@ function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = 
   const anchorsInvited     = { current: anchors };
   const stakesAsked        = { current: stakes };
   const roadQuestionState  = { current: roadPending ? { roads: ['Χ'], asked: 1, qa: [], mapAcknowledged: true } : null };
-  return eval(gatesTemplate);
+  // gatesDueSnapshot joined the refs this block writes on 2026-09-26, when the due list started
+  // being recorded for telemetry. Same lesson as roadPending above, and it arrived the same way:
+  // not as a failure but as an absent count.
+  // sharedSnapshot lets two calls run against ONE ref, which is the only way to test that the block
+  // clears the snapshot at the top. A fresh ref per call cannot go stale, so a mutation deleting the
+  // clear survived every assertion until this existed.
+  const gatesDueSnapshot   = sharedSnapshot || { current: { anchors: false, stakes: false, scale: false } };
+  const _text = eval(gatesTemplate);
+  gatesTextWhen.lastSnapshot = gatesDueSnapshot.current;
+  return _text;
 }
 
+// THE SNAPSHOT IS PART OF THIS BLOCK'S BEHAVIOUR NOW, so it is asserted here where the block is
+// actually evaluated rather than only read as source. It must report the same three conditions the
+// injected reminder is built from — a second derivation is how two sources of truth start.
 // Exactly two gates due: the Scale is marked asked; Anchors and Stakes are not.
 const TWO_DUE = { msgCount: 5, concrete: false, scaleAsked: true, anchors: false, stakes: false };
 const SUBSTANTIVE = 'Με φοβίζει ότι θα χάσω τη σταθερότητά μου.';
+
+// ── THE DUE SNAPSHOT MATCHES WHAT THE REMINDER CLAIMED ──────────────────────
+gatesTextWhen({ ...TWO_DUE, lastUserText: SUBSTANTIVE });
+assert('SNAPSHOT: with Anchors and Stakes unasked, both are recorded as due',
+  gatesTextWhen.lastSnapshot.anchors === true && gatesTextWhen.lastSnapshot.stakes === true);
+assert('SNAPSHOT: the Scale is not due when it was already asked',
+  gatesTextWhen.lastSnapshot.scale === false);
+gatesTextWhen({ msgCount: 5, scaleAsked: true, anchors: true, stakes: true, lastUserText: SUBSTANTIVE });
+assert('SNAPSHOT: with all three satisfied, nothing is recorded as due',
+  gatesTextWhen.lastSnapshot.anchors === false && gatesTextWhen.lastSnapshot.stakes === false &&
+  gatesTextWhen.lastSnapshot.scale === false);
+gatesTextWhen({ msgCount: 5, concrete: true, scaleAsked: false, anchors: true, stakes: true, lastUserText: SUBSTANTIVE });
+assert('SNAPSHOT: the Scale is due exactly when a concrete step was stated and it was not asked',
+  gatesTextWhen.lastSnapshot.scale === true);
+gatesTextWhen({ ...TWO_DUE, lastUserText: 'Θα το σκεφτώ. Κλείνουμε.' });
+assert('SNAPSHOT: a closing turn records nothing as due, so a withheld gate is never counted ignored',
+  gatesTextWhen.lastSnapshot.anchors === false && gatesTextWhen.lastSnapshot.stakes === false);
+
+// STALENESS ACROSS TURNS, which one ref is the only way to reach. Turn 1 leaves Anchors and Stakes
+// due; turn 2 is a closing turn where the block returns early. If the snapshot is not cleared at the
+// top, turn 1's flags survive into turn 2 and the post-API comparison counts two gates as ignored on
+// a turn where none was ever injected.
+const SHARED = { current: { anchors: false, stakes: false, scale: false } };
+gatesTextWhen({ ...TWO_DUE, lastUserText: SUBSTANTIVE, sharedSnapshot: SHARED });
+assert('NON-VACUITY: the shared ref really was set by the first turn',
+  SHARED.current.anchors === true && SHARED.current.stakes === true);
+gatesTextWhen({ ...TWO_DUE, lastUserText: 'Θα το σκεφτώ. Κλείνουμε.', sharedSnapshot: SHARED });
+assert("SNAPSHOT: an early return CLEARS the previous turn's flags — no gate is counted ignored on a turn that injected none",
+  SHARED.current.anchors === false && SHARED.current.stakes === false && SHARED.current.scale === false);
 
 // CONTROL FIRST, deliberately: without it the two suppression assertions below could be satisfied
 // by a block that returns '' for everything, i.e. by breaking the gates entirely.
