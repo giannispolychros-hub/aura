@@ -136,14 +136,21 @@ assert('CLOSING: the closing flag is still set, so the Blueprint stays reachable
 assert('CLOSING: Part 2 is still told not to repeat the summary',
   /Do not repeat the Reflection Summary/.test(FINAL));
 
-// ══ NO CACHE INVALIDATION ══════════════════════════════════════════════════
-// A2 lives in the per-call trigger message, not in a prompt. Both cached blocks are untouched.
-// HASHED, NOT COUNTED. A raw length pin is ambiguous: the prompt contains one character outside
-// the BMP, so JavaScript counts 292,802 UTF-16 units where Python counts 292,801 code points.
-// Both are right for their runtime and neither identifies the text. The digest does.
+// ══ THE CACHE PIN ══════════════════════════════════════════════════════════
+// A2 itself lives in the per-call trigger message, not in a prompt, and this pin was written to
+// prove that. HASHED, NOT COUNTED. A raw length pin is ambiguous: the prompt contains one character
+// outside the BMP, so JavaScript counts UTF-16 units where Python counts code points. Both are
+// right for their runtime and neither identifies the text. The digest does.
+//
+// THE DIGEST CHANGED ONCE, DELIBERATELY, on 2026-09-26 (2066c6c9dfefa1bb → bb44fc9e364a6a26). The
+// status-quo road was added to the map-composition rules: a founder's finding from a real session
+// where someone weighing a job change was shown one road and the direction of changing nothing
+// never appeared, although it is the only one that requires no decision. +1763 characters, one
+// cache invalidation, paid knowingly. See test_status_quo_road.js for what the block must contain.
+// This pin is not a rule against editing the prompt — it is a rule against editing it by accident.
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY is byte-identical (sha256 2066c6c9dfefa1bb…)',
-  PROMPT_SHA.slice(0, 16) === '2066c6c9dfefa1bb');
+assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 bb44fc9e364a6a26…)',
+  PROMPT_SHA.slice(0, 16) === 'bb44fc9e364a6a26');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',
