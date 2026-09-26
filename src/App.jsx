@@ -4094,6 +4094,39 @@ function detectsPermissionUncertainty(text) {
   return /(επιτρ[εέ]πεται|απαγορε[υύ]εται|ε[ιί]ναι\s+ν[οό]μιμ|ν[οό]μιμ[εοη]ς|υπαλληλικ[οό][ςυ]\s+κ[ωώ]δικα|ασυμβ[ιί]βαστ|[αά]δεια\s+απ[οό]\s+την\s+υπηρεσ[ιί]α)/i.test(t);
 }
 
+// GOAL / OBSTACLE / STAKES coverage — the gap ARCHITECTURE_DECISIONS.md already named explicitly
+// ("The GOAL / OBSTACLE / STAKES gap the teacher session exposed (time pressure, psychological
+// pressure, what was tried and rejected)... runs whenever convenient"). Founder's instruction for
+// this step: observational only, never a new behaviour — the model already decides everything;
+// this only tells it, in plain terms, which of the three the user has and has not yet named in
+// their own words. Same discipline as materialEvidenceCtx just above: structural pattern match,
+// never semantic judgment about what the goal/obstacle/stakes actually ARE.
+//
+// KNOWN, ACCEPTED LIMITATION (stated so it is not mistaken for validated): these three patterns are
+// deliberately broad, common Greek phrasings — unlike detectsBinaryOppositionPhrasing's tight
+// grammatical form, a false "stated" reading is easy (e.g. "δεν μπορώ" appears in many sentences
+// that name no real obstacle). This is a first, coarse pass, not measured against real transcripts
+// yet — the cost of a false "known" is silence (the model gets no nudge to look here), never a new
+// question forced on the user, so a false positive is the safe-direction error, same asymmetry
+// GOAL/OBSTACLE/STAKES already accepts as a deferred, non-blocking gap.
+function detectsGoalStated(text) {
+  return /(θ[εέ]λω\s+να|θα\s+[ήη]θελα\s+να|στ[όο]χος\s+(μου|ε[ιί]ναι)|σκοπ[όο]ς\s+(μου|ε[ιί]ναι)|προσπαθ[ώω]\s+να|ψ[άα]χνω\s+(να|τρ[όο]πο)|χρει[άα]ζομαι\s+να\s+(αποφασ[ίι]σω|καταλ[άα]βω|βρω))/i.test(text || "");
+}
+function detectsObstacleStated(text) {
+  return /(δεν\s+μπορ[ώω]\s+να|με\s+εμποδ[ίι]ζει|το\s+πρ[όο]βλημα\s+(μου\s+)?ε[ιί]ναι|δυσκολε[ύυ]ομαι|κολλ[άα]ω|φοβ[άα]μαι\s+([όο]τι|π[ωώ]ς|να)|δεν\s+ξ[εέ]ρω\s+π[ώω]ς\s+να|με\s+κρατ[άα](ει)?\s+π[ίι]σω)/i.test(text || "");
+}
+function detectsStakesStated(text) {
+  return /(αν\s+δεν|θα\s+χ[άα]σω|προθεσμ[ίι]α|μ[έε]χρι\s+το|[έε]χω\s+[ήη]δη\s+δοκιμ[άα]σει|δεν\s+βο[ήη]θησε|δεν\s+λειτο[ύυ]ργησε|τελευτα[ίι]α\s+ευκαιρ[ίι]α|δεν\s+αντ[έε]χω\s+[άα]λλο|πι[έε]ζομαι|υπ[όο]\s+π[ίι]εση)/i.test(text || "");
+}
+function describeGoalObstacleStakesCtx(goalKnown, obstacleKnown, stakesKnown) {
+  if (goalKnown && obstacleKnown && stakesKnown) return ''; // all three named — nothing to flag, avoid noise once complete
+  const missing = [];
+  if (!goalKnown) missing.push('GOAL (τι θέλει να πετύχει, να αποφασίσει, ή να καταλάβει)');
+  if (!obstacleKnown) missing.push('OBSTACLE (τι το εμποδίζει συγκεκριμένα)');
+  if (!stakesKnown) missing.push('STAKES (τι κινδυνεύει, τι πίεση χρόνου ή ψυχολογική πίεση υπάρχει, τι έχει ήδη δοκιμαστεί και δεν βοήθησε)');
+  return `\n[CODE-VERIFIED KNOWLEDGE STATE (observation only, never a checklist to interrogate): the user has not yet named, in their own words, the following — ${missing.join('; ')}. If the material already naturally covers one of these, recognise it as covered; this never forces a question just to fill a category, and it authorizes nothing and blocks nothing. Once all three are named this stops appearing.]\n`;
+}
+
 function detectSelfMarkedTension(text) {
   const t = String(text == null ? "" : text).trim();
   if (!t) return false;
@@ -5091,6 +5124,20 @@ export default function AURAv2() {
 A line missing above means only that one pattern was not matched — the absence of THAT pattern, never evidence that the material as a whole is thin.]\n`;
       })();
 
+      // GOAL / OBSTACLE / STAKES coverage — closes the gap ARCHITECTURE_DECISIONS.md already named
+      // ("Explicitly parallel, not in the sequence"). Same architecture as materialEvidenceCtx just
+      // above: recomputed fresh from msgs every turn, no ref, no reset-block edit, informational
+      // tier only, never wired to any gate. See detectsGoalStated/detectsObstacleStated/
+      // detectsStakesStated above for the accepted false-positive limitation this starts from.
+      const goalObstacleStakesCtx = (() => {
+        const userMsgs = msgs.filter(m => m.role === "user");
+        if (userMsgs.length === 0) return '';
+        const goalKnown = userMsgs.some(m => detectsGoalStated(m.content));
+        const obstacleKnown = userMsgs.some(m => detectsObstacleStated(m.content));
+        const stakesKnown = userMsgs.some(m => detectsStakesStated(m.content));
+        return describeGoalObstacleStakesCtx(goalKnown, obstacleKnown, stakesKnown);
+      })();
+
       // ── Explicit Pause injection (#5 fix) ──
       // Max 1 per 5 sessions. Injected as system instruction — AURA decides when to use it naturally.
       // CLOSING DRIFT (live evidence, second occurrence of the same failure): the prompt rule
@@ -5398,7 +5445,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // weakest-to-strongest, so hard constraints occupy the final, highest-attention position:
       // (1) informational background, (2) situational signals, (3) hard constraints last.
       const dynamicSuffix = [
-        memCtx, profileCtx, materialEvidenceCtx, coverageReportCtx, demoCtx, informationModeCtx, explicitPauseCtx,
+        memCtx, profileCtx, materialEvidenceCtx, goalObstacleStakesCtx, coverageReportCtx, demoCtx, informationModeCtx, explicitPauseCtx,
         coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, roadQuestionCtx,
         postMapCloseCtx,
         gatesCtx, closingDriftCtx, firstReplyFloorCtx,
@@ -5411,7 +5458,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // every fix today lacked.)
       try {
         const fired = Object.entries({
-          memCtx, profileCtx, materialEvidenceCtx, demoCtx, informationModeCtx, explicitPauseCtx,
+          memCtx, profileCtx, materialEvidenceCtx, goalObstacleStakesCtx, demoCtx, informationModeCtx, explicitPauseCtx,
           coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx,
           clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, roadQuestionCtx, postMapCloseCtx, gatesCtx, closingDriftCtx,
           firstReplyFloorCtx,
