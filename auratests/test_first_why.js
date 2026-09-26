@@ -121,22 +121,63 @@ for (const [label, text] of BINARY_FORMS) {
 assert("and it does not fire on a sentence with no opposition at all",
   detectsBinaryOppositionPhrasing("δεν ξέρω τι θέλω να κάνω με τη ζωή μου") === false);
 
-// ── 4. REACHABILITY — LOCKED, NOT ENDORSED ────────────────────────────────
-assert("the returning-user gate is still in the trigger condition",
-  /messages\.length === 0 && !firstWhyPending && !isBrandNewUserMsg && needsFirstWhy\(userText\)/.test(raw));
-assert("'brand new' still means no stored anchor and no stored trajectory",
-  /isBrandNewUserMsg = messages\.length === 0 && \(memory\.anchors\|\|\[\]\)\.length === 0 && \(memory\.trajectories\|\|\[\]\)\.length === 0/.test(raw));
-// Anchored inside EMPTY_MEMORY, the default object. A bare /storageEnabled:\s*false/ is satisfied
-// by a COMMENT elsewhere that quotes "{storageEnabled:false}" — a surviving mutation showed the
-// assertion passing with the real default flipped to true. Fourth assertion in this repo decided by
-// a comment rather than by code.
+// ── 4. REACHABILITY — THE GATE IS OPEN (step 1γ) ──────────────────────────
+// These four assertions used to LOCK the gate shut, so that opening it would fail loudly and have
+// to be updated deliberately rather than drift. This is that deliberate update.
+//
+// WHY IT OPENED. First-WHY required a RETURNING user. "Returning" meant a stored anchor or
+// trajectory; those are written only when memory.storageEnabled is true; and that defaults to
+// FALSE. So the ENTRY pillar — which the prompt calls the essence of the application — could not
+// fire for anyone on default settings, while the prompt's own evidence read "0 of 20 real users
+// returned after first use, and the entry point is the leading suspect". The branch also writes a
+// trajectory when the user answers, which is exactly what would satisfy the gate, so First-WHY
+// bootstrapped its own reachability and could never take the first step. One default held both
+// ends of that loop shut.
+//
+// NOTHING ELSE CHANGED. Not the question, not the prompt, not the pillars, no new question, no
+// state machine. One conjunct removed from one condition, and the variable it read deleted because
+// nothing else read it.
+assert("the returning-user gate is gone from the trigger condition",
+  /messages\.length === 0 && !firstWhyPending && needsFirstWhy\(userText\)/.test(raw));
+assert("isBrandNewUserMsg is deleted, not left computed and unused",
+  !/isBrandNewUserMsg/.test(raw));
+// Judged on EXECUTABLE lines only. The comment above the trigger explains why the memory condition
+// was removed and therefore names memory.storageEnabled on purpose; a scan that cannot tell prose
+// from code would flag the documentation for describing the very thing it removed.
+const TRIGGER_CODE = (() => {
+  const a = raw.indexOf('// First-Why trigger');
+  const b = raw.indexOf('setFirstWhyPending(true);', a);
+  if (a < 0 || b <= a) return '';
+  return raw.slice(a, b).split("\n").filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+})();
+assert("the trigger's executable region was located and is non-empty, so the next check is real",
+  TRIGGER_CODE.length > 40 && /needsFirstWhy\(userText\)/.test(TRIGGER_CODE));
+assert("First-WHY's reachability no longer depends on memory at all",
+  !/memory\./.test(TRIGGER_CODE) && !/storageEnabled/.test(TRIGGER_CODE));
+// Unchanged facts, still asserted: the default is still off, and the path the old comment pointed
+// brand-new users to is still dead. Opening the gate did not touch either.
 const EMPTY_MEM = raw.slice(raw.indexOf('const EMPTY_MEMORY = () => ({'), raw.indexOf('const EMPTY_MEMORY = () => ({') + 900);
 assert("the default memory object was located, so the assertion below is not vacuous",
   EMPTY_MEM.length > 200 && /schemaVersion/.test(EMPTY_MEM));
-assert("memory storage still defaults to OFF, which is what makes the gate unpassable by default",
+assert("memory storage still defaults to OFF — unchanged, and now irrelevant to First-WHY",
   /storageEnabled:\s*false/.test(EMPTY_MEM));
-assert("the alternative the code promises brand-new users is still a dead empty string",
-  /const demoCtx = '';/.test(raw));
+// Same distinction: the comment may describe the dead path it stopped pointing at; no executable
+// line may route a brand-new user anywhere on the strength of it.
+const CODE_LINES = raw.split("\n").filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+assert("demoCtx is still a dead empty string", /const demoCtx = '';/.test(CODE_LINES));
+// Narrowed to the deleted variable and to this trigger. A blanket ban on the word was wrong: an
+// unrelated isBrandNewUser exists in the demo path at γρ. 4741 — itself declared and never read,
+// a separate leftover of the demo removal, out of this step's scope and deliberately untouched.
+assert("the deleted variable is gone from executable code",
+  !/isBrandNewUserMsg/.test(CODE_LINES));
+assert("and the First-WHY trigger itself branches on nothing about who the user is",
+  !/brandNew/i.test(TRIGGER_CODE) && !/anchors|trajectories/.test(TRIGGER_CODE));
+// The four conditions that remain are the whole gate. Pinned so a fifth cannot appear unnoticed.
+assert("exactly three conditions remain: first message, not already pending, and needsFirstWhy",
+  (() => {
+    const m = raw.match(/if \(([^)]*needsFirstWhy\(userText\))\) \{/);
+    return !!m && m[1].split("&&").length === 3;
+  })());
 
 // ── 5. THE TURN IS UNGUARDED, AND THAT IS THE FACT BEING LOCKED ───────────
 const GR_AT = raw.indexOf('const generateResponse = useCallback');

@@ -5859,10 +5859,26 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       return;
     }
 
-    // First-Why trigger — only on first message of a new session, and only for returning users
-    // (a genuinely brand-new user's first message gets the demo-opening question instead — see demoCtx)
-    const isBrandNewUserMsg = messages.length === 0 && (memory.anchors||[]).length === 0 && (memory.trajectories||[]).length === 0;
-    if (messages.length === 0 && !firstWhyPending && !isBrandNewUserMsg && needsFirstWhy(userText)) {
+    // First-Why trigger — on the first message of a session, whoever is sending it.
+    //
+    // A RETURNING-USER CONDITION USED TO SIT HERE AND IS DELIBERATELY GONE. It required a stored
+    // anchor or trajectory; those are written only when memory.storageEnabled is true; and that
+    // defaults to false. So the ENTRY pillar — the one the prompt calls the essence of the
+    // application — could not fire for anyone on default settings. Worse, this branch WRITES a
+    // trajectory once the user answers, which is precisely what would have satisfied the condition:
+    // First-WHY gated itself behind having already run. One default held both ends of that loop
+    // shut, while the prompt's own evidence read "0 of 20 real users returned after first use, and
+    // the entry point is the leading suspect".
+    //
+    // The old comment here also sent brand-new users to a demo-opening question "instead". That
+    // path is demoCtx, which has been a hardcoded empty string since the demo was removed, so they
+    // received neither. Removed rather than corrected, because there is no longer an "instead".
+    //
+    // NOTHING ELSE CHANGED: not the question, not its prompt, not the pillars, no new question and
+    // no state machine. One conjunct removed, and the variable it read deleted because nothing else
+    // read it. What still gates this turn is unchanged — needsFirstWhy, including the γρ. 377
+    // binary fast-path, still decides whether asking is appropriate at all.
+    if (messages.length === 0 && !firstWhyPending && needsFirstWhy(userText)) {
       setFirstWhyMessage(userText);
       setMessages([{ id: nextMsgId(), role: "user", content: userText }]);
       setFirstWhyPending(true);
