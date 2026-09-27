@@ -15,8 +15,20 @@
 // WHEN THE UNDERLYING DETECTOR GAPS ARE FIXED (small diffs to existing detectors — declaresClosing
 // for CLOSING_WORD_AMBIGUITY, detectsUnsourcedOptionOffer's GATE 2 for ADVICE_LEAKAGE — never new
 // detectors): rename this file to test_session5_fingerprints.js, run the full suite, and require
-// 68 suites / 0 failed / 0 silent before that commit. Until then, this file is visible, versioned
+// 75 suites / 0 failed / 0 silent before that commit. Until then, this file is visible, versioned
 // forensic evidence of two specific, reproducible gaps — not hidden debt.
+//
+// THIS COUNT IS NOT A FIXED TARGET — RE-COUNT AT PROMOTION TIME. 75 is what `ls test_*.js
+// stress_test_*.js | wc -l` in auratests/ returned on 2026-09-27, the day this file was written.
+// Other, unrelated work may add or remove suites before this is promoted — re-run that same count
+// at promotion time and require whatever it says then, not this number from memory. The method
+// (count the glob, require 0 failed / 0 silent) is the actual contract, not today's figure.
+//
+// THE PROMOTION COMMIT MUST BE VERIFIED, NOT JUST THE SUITE COUNT. When these 2 assertions go
+// GREEN, confirm the diff of that commit touches ONLY this file (the rename, plus whatever line(s)
+// fixed the two detectors) — never bundle it with unrelated changes. A suite count matching before
+// and after proves nothing on its own: unrelated work landing in the same window could add and
+// remove suites in numbers that happen to cancel out. Read the actual diff.
 //
 // AURA — 7 BEHAVIORAL FINGERPRINTS FROM A REAL SESSION, SYNTHETIC FORM
 //
