@@ -3577,6 +3577,16 @@ function detectsClaimAboutUser(text) {
     /στο βαθοσ|βαθια μεσα σου/,
     // THE TOPIC DRIFT WORDING THE PROMPT ITSELF FORBIDS (γρ. 694, FIX 3).
     /αυτο που (σε )?(απασχολει|νοιαζει) πραγματικα|αυτο που πραγματικα σε/,
+    // AN UNATTRIBUTED EMOTIONAL VERDICT (AURA_STAGE1_SPEC.md R1/R2, 2026-09-28) — a feeling
+    // declared as fact, never hedged, never attributed to their own words (quotes are already
+    // stripped above). Not yet grounded in a specific real-session violation, unlike the five forms
+    // above — closes a gap they do not cover: a plain "Νιώθεις απογοητευμένος." matches none of
+    // them. See auratests/test_user_claims.js §2b for the measurement-before-Stage-2 note.
+    // QUESTION-EXCLUDED BY CONSTRUCTION, deliberately: "Νιώθεις θυμωμένος;" is AURA's own single
+    // most common legitimate way to ask about emotion. The negative lookahead requires no Greek
+    // question mark (;) before the sentence ends, so only the DECLARATIVE verdict flags, never the
+    // question AURA is supposed to keep asking.
+    /(νιωθεισ|αισθανεσαι)[^.;!?]{0,25}(απογοητευμεν|θυμωμεν|λυπημεν|φοβισμεν|εξαντλημεν|προδομεν|μοναχ|ενοχ)(?![^.!]*;)|(εισαι|ησουν)[^.;!?]{0,15}(απογοητευμεν|θυμωμεν|λυπημεν|φοβισμεν|εξαντλημεν|προδομεν|μοναχ)(?![^.!]*;)/,
   ];
   for (let i = 0; i < FORMS.length; i++) if (FORMS[i].test(fold)) return true;
   return false;

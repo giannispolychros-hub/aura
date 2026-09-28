@@ -95,6 +95,29 @@ if (typeof D === 'function') {
   assert('FORM: the second person stated as a trait, though not yet observed live',
     D('Είσαι άνθρωπος που αποφεύγει τη σύγκρουση.') === true);
 
+  // ── 2b. AN UNATTRIBUTED EMOTIONAL VERDICT (AURA_STAGE1_SPEC.md R1/R2, 2026-09-28) ─────────────
+  // NOT YET GROUNDED IN A REAL-SESSION VIOLATION, unlike the forms above — added because the five
+  // existing forms match none of them: a plain "Νιώθεις απογοητευμένος." asserts a feeling as fact
+  // and passes every one of the five original FORMS untouched. Stage 1's own "measurement before
+  // Stage 2" step (AURA_STAGE1_SPEC.md) exists to confirm this against real sessions before the
+  // next stage builds on it — recorded here as a form, not as evidence, same as 2a above.
+  assert('FORM: a feeling declared as fact, second person, νιώθεις + emotion — a class the five original forms miss entirely',
+    D('Νιώθεις απογοητευμένος από αυτό.') === true);
+  assert('FORM: same construction with είσαι + emotion adjective',
+    D('Είσαι θυμωμένος με τον εαυτό σου γι\' αυτό.') === true);
+  assert('FORM: still fires with an intervening adverb between the verb and the emotion word — pins the window width, not just adjacency',
+    D('Νιώθεις πραγματικά πολύ απογοητευμένος από αυτό.') === true);
+
+  // THE FALSE-POSITIVE RISK THIS FORM CREATES, AND WHY IT IS EXCLUDED BY CONSTRUCTION: "Νιώθεις
+  // θυμωμένος;" is AURA's own single most common, legitimate way to ask about emotion. A form that
+  // flagged the question form would brake the product's core mechanism, not a violation of it.
+  assert('the QUESTION form does not flag — this is AURA asking, not AURA declaring',
+    D('Νιώθεις θυμωμένος με αυτό;') === false);
+  assert('the QUESTION form with είσαι does not flag either',
+    D('Είσαι απογοητευμένος από το αποτέλεσμα;') === false);
+  assert('a question embedding the emotion word deeper in the sentence still does not flag',
+    D('Αυτό που περιγράφεις — νιώθεις προδομένος από αυτή την απόφαση, ή κάτι άλλο;') === false);
+
   // EACH ALTERNATIVE OF THE CHARACTER-VERDICT FORM, SEPARATELY. Found by a surviving mutation:
   // the real session-2 reply matches BOTH "ακούγεται σαν άνθρωπο…" and "δεν ακούγεται", so
   // disabling the first branch left every assertion green. One fixture per branch, each chosen so
