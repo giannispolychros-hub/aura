@@ -1527,6 +1527,10 @@ const EMPTY_MEMORY = () => ({
   // content: each entry is a key derived from a word already in anchors, plus a timestamp.
   // No sentence, no reason, nothing about the person.
   rejectedPatterns: [],
+  // R3, AURA_STAGE1_SPEC.md — patterns the person WAS shown (regardless of their answer), with the
+  // count at the time, so the same evidence never re-arms the gate on a later session close. Also
+  // stored, not session-scoped, for the same reason as rejectedPatterns above.
+  patternsSurfaced: [],
   misfires: [],
   sessionCount: 0,
 
@@ -1572,6 +1576,7 @@ function loadMemory() {
     merged.anchors      = Array.isArray(merged.anchors)      ? merged.anchors      : [];
     merged.qualityLog   = Array.isArray(merged.qualityLog)   ? merged.qualityLog   : [];
     merged.rejectedPatterns = Array.isArray(merged.rejectedPatterns) ? merged.rejectedPatterns : [];
+    merged.patternsSurfaced = Array.isArray(merged.patternsSurfaced) ? merged.patternsSurfaced : [];
     // Ensure profile exists with all keys
     merged.profile = { ...EMPTY_MEMORY().profile, ...(merged.profile || {}) };
     // RT-fix: sanitize numeric profile fields — a single non-finite value (NaN, string, corrupted
@@ -2630,6 +2635,36 @@ function recordPatternRejection(mem, key) {
   // boundary, and recording why someone set it would be the inference this whole layer exists
   // to avoid.
   return { ...base, rejectedPatterns: [...list, { key, at: Date.now() }] };
+}
+// R3, AURA_STAGE1_SPEC.md (2026-09-28) — COOLDOWN + NOVELTY GATE on the RECURRING signal.
+//
+// isPatternRejected above only tracks an explicit "Όχι". Short of that — "Ναι", "Μερικώς", or the
+// closing sequence simply running again — nothing stopped the same recurring word from re-arming
+// setRecognitionPending every session-close, forever, with no new evidence required. R3: "δεν
+// ξαναφέρνουμε το ίδιο pattern επειδή πέρασε χρόνος/συνεδρίες· το ξαναφέρνουμε μόνο με αρκετό νέο
+// στοιχείο ή όταν το ανοίξει ξανά ο χρήστης."
+//
+// ONE CONDITION SATISFIES BOTH HALVES OF R3 AT ONCE: buildRecurringSignal's `count` can only rise
+// when the person keeps the SAME word again in a NEW session's word-capture prompt — which is
+// simultaneously "new evidence" and "the user reopening it themselves". So the gate only needs to
+// compare the current count against the count it had when last surfaced.
+//
+// A PARAMETER ON AN EXISTING MECHANISM, NOT A NEW DETECTOR: same shape as rejectedPatterns above,
+// same key from patternKey, no new anchor category, no new signal type.
+function wasPatternRecentlyShown(mem, key, currentCount) {
+  if (!key || !mem || !Array.isArray(mem.patternsSurfaced)) return false;
+  const rec = mem.patternsSurfaced.find(r => r && r.key === key);
+  if (!rec) return false;
+  // "Recently shown" means no NEW evidence has accumulated since it was last surfaced — the
+  // current count must exceed what it was then, never merely equal or less.
+  return currentCount <= (rec.atCount || 0);
+}
+function recordPatternSurfaced(mem, key, count) {
+  const base = mem || {};
+  const list = Array.isArray(base.patternsSurfaced) ? base.patternsSurfaced : [];
+  if (!key) return { ...base, patternsSurfaced: list };
+  const filtered = list.filter(r => !(r && r.key === key));
+  return { ...base, patternsSurfaced: [...filtered, { key, atCount: count, at: Date.now() }] };
 }
 // BLUEPRINT ZONES — the first place the Evidence Architecture reaches the user.
 //
@@ -6216,8 +6251,14 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       try {
         const _kw = getMostRecentWordAnchor(memory)?.text;
         const _sig = _kw ? buildRecurringSignal(memory, _kw) : null;
-        if (_sig && !isPatternRejected(memory, patternKey({ kind: "recurring", word: _sig.word }))) {
+        const _key = _sig ? patternKey({ kind: "recurring", word: _sig.word }) : null;
+        if (_sig && !isPatternRejected(memory, _key) && !wasPatternRecentlyShown(memory, _key, _sig.count)) {
           setRecognitionPending({ kind: "recurring", word: _sig.word, count: _sig.count });
+          if (memory.storageEnabled) {
+            const _surfaced = recordPatternSurfaced(memory, _key, _sig.count);
+            setMemory(_surfaced);
+            saveMemory(_surfaced);
+          }
         }
       } catch (e) { /* the gate must never block a closing */ }
       applyTerminationIllumination();
@@ -6237,8 +6278,14 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       try {
         const _kw = getMostRecentWordAnchor(memory)?.text;
         const _sig = _kw ? buildRecurringSignal(memory, _kw) : null;
-        if (_sig && !isPatternRejected(memory, patternKey({ kind: "recurring", word: _sig.word }))) {
+        const _key = _sig ? patternKey({ kind: "recurring", word: _sig.word }) : null;
+        if (_sig && !isPatternRejected(memory, _key) && !wasPatternRecentlyShown(memory, _key, _sig.count)) {
           setRecognitionPending({ kind: "recurring", word: _sig.word, count: _sig.count });
+          if (memory.storageEnabled) {
+            const _surfaced = recordPatternSurfaced(memory, _key, _sig.count);
+            setMemory(_surfaced);
+            saveMemory(_surfaced);
+          }
         }
       } catch (e) { /* the gate must never block a closing */ }
       applyTerminationIllumination();

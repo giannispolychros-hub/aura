@@ -571,6 +571,84 @@ if (typeof isPatternRejected === 'function' && typeof recordPatternRejection ===
     recordPatternRejection({ anchors: [{ id: 'a1' }], rejectedPatterns: [] }, key).anchors.length === 1);
 }
 
+// ── R3, AURA_STAGE1_SPEC.md (2026-09-28) — COOLDOWN + NOVELTY GATE on the RECURRING signal ────
+//
+// THE GAP THIS CLOSES. isPatternRejected only tracks an explicit "Όχι". Anything short of that —
+// the person answers "Ναι"/"Μερικώς", or the closing sequence simply runs again — has NOTHING
+// stopping the SAME recurring word from re-arming setRecognitionPending every single session-close,
+// forever, with no new evidence required. R3: "δεν ξαναφέρνουμε το ίδιο pattern επειδή πέρασε
+// χρόνος/συνεδρίες· το ξαναφέρνουμε μόνο με αρκετό νέο στοιχείο ή όταν το ανοίξει ξανά ο χρήστης."
+//
+// ONE CONDITION SATISFIES BOTH HALVES OF R3 AT ONCE. In this codebase, buildRecurringSignal's
+// `count` can only increase when the person keeps the SAME word again in a NEW session's word-
+// capture prompt — that is simultaneously "new evidence" AND "the user reopening it themselves".
+// So the gate needs only compare current count against the count it had when last surfaced.
+//
+// A PARAMETER ON AN EXISTING MECHANISM, NOT A NEW DETECTOR (per spec, and per this repo's own
+// stated preference): no new anchor category, no new signal type — a second small array on memory,
+// same shape as rejectedPatterns, read and written by two pure functions in the same file as
+// patternKey/isPatternRejected/recordPatternRejection.
+const SRC_WASSHOWN = extract('wasPatternRecentlyShown');
+const SRC_RECSURF = extract('recordPatternSurfaced');
+assert('wasPatternRecentlyShown exists', SRC_WASSHOWN !== null);
+assert('recordPatternSurfaced exists', SRC_RECSURF !== null);
+let wasPatternRecentlyShown = null, recordPatternSurfaced = null;
+load(SRC_WASSHOWN, 'wasPatternRecentlyShown', f => { wasPatternRecentlyShown = f; });
+load(SRC_RECSURF, 'recordPatternSurfaced', f => { recordPatternSurfaced = f; });
+
+if (typeof wasPatternRecentlyShown === 'function' && typeof recordPatternSurfaced === 'function') {
+  const K = 'recurring:χρόνος';
+  assert('NEVER SHOWN: no record at all is not "recently shown" — a first-ever pattern must be able to fire',
+    wasPatternRecentlyShown({ patternsSurfaced: [] }, K, 2) === false &&
+    wasPatternRecentlyShown({}, K, 2) === false && wasPatternRecentlyShown(null, K, 2) === false);
+
+  const shownAt2 = recordPatternSurfaced({ patternsSurfaced: [] }, K, 2);
+  assert('RECORD: it stores a key, the count at the time, and a timestamp',
+    (() => { const e = (shownAt2.patternsSurfaced || [])[0];
+              return !!e && e.key === K && e.atCount === 2 && typeof e.at === 'number'; })());
+
+  assert('SAME EVIDENCE: shown once at count 2, asked again at count 2 — still "recently shown", no new evidence',
+    wasPatternRecentlyShown(shownAt2, K, 2) === true);
+  assert('LESS EVIDENCE (should not occur, defensive): count 1 after being shown at 2 is still "recently shown"',
+    wasPatternRecentlyShown(shownAt2, K, 1) === true);
+  assert('NEW EVIDENCE: the SAME word kept again in a later session raises the count — no longer "recently shown"',
+    wasPatternRecentlyShown(shownAt2, K, 3) === false);
+
+  assert('RE-RECORD: surfacing again at the new count replaces the old record, not duplicates it',
+    (() => { const twice = recordPatternSurfaced(shownAt2, K, 3);
+              return (twice.patternsSurfaced || []).filter(r => r && r.key === K).length === 1 &&
+                     (twice.patternsSurfaced || []).find(r => r.key === K).atCount === 3; })());
+
+  assert('A DIFFERENT PATTERN KEY is unaffected by another key\'s record',
+    wasPatternRecentlyShown(shownAt2, 'recurring:εισόδημα', 2) === false);
+
+  assert('MISSING KEY is a no-op, never a blanket "recently shown"',
+    recordPatternSurfaced({ patternsSurfaced: [] }, null, 2).patternsSurfaced.length === 0 &&
+    wasPatternRecentlyShown(shownAt2, null, 2) === false);
+
+  assert('the existing memory is carried through untouched',
+    recordPatternSurfaced({ anchors: [{ id: 'a1' }], patternsSurfaced: [] }, K, 2).anchors.length === 1);
+
+  // ── WIRING: the novelty gate sits in the SAME arming condition as isPatternRejected ──────────
+  const _ARM2 = (() => {
+    const i = CODE.indexOf('const _sig = _kw ? buildRecurringSignal');
+    return i < 0 ? '' : CODE.slice(i, CODE.indexOf('applyTerminationIllumination', i));
+  })();
+  assert('WIRING: the arming site is still locatable after the change', _ARM2.length > 100);
+  assert('WIRING: wasPatternRecentlyShown gates the SAME setRecognitionPending call as isPatternRejected — not a separate, possibly-skippable check',
+    /if \(_sig && !isPatternRejected\([^)]*\) && !wasPatternRecentlyShown\(/.test(_ARM2));
+  assert('WIRING: when it does surface, the new count is recorded behind the SAME consent gate as everything else',
+    /storageEnabled[\s\S]{0,200}recordPatternSurfaced\(/.test(_ARM2) ||
+    /recordPatternSurfaced\([\s\S]{0,200}storageEnabled/.test(_ARM2));
+  assert('WIRING: recording uses saveMemory, the same persistence path as a rejection',
+    /recordPatternSurfaced\([\s\S]{0,150}saveMemory\(/.test(_ARM2));
+  // NON-VACUITY for the length-window assertion at γρ. 619 above (buildRecurringSignal...
+  // setRecognitionPending within 400 chars): re-checked here explicitly so a future widening of
+  // this block is caught by name, not just by the pre-existing assertion silently going red.
+  assert('NON-VACUITY: the 400-char window between buildRecurringSignal and setRecognitionPending still holds after this addition',
+    /buildRecurringSignal\([\s\S]{0,400}setRecognitionPending\(\{/.test(CODE));
+}
+
 // ── Κ2 — a rejected pattern produces no zone ───────────────────────────────
 if (typeof buildBlueprintZones === 'function') {
   const W = 'trajectory_word';
