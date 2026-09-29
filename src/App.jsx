@@ -3689,7 +3689,9 @@ function detectsClaimAboutUser(text) {
   // documented in this file. Every form is bounded by [^.;!?] so a match can never span sentences.
   const FORMS = [
     // THEIR KNOWLEDGE, ASSERTED — "Αυτό το ξέρεις ήδη."
-    /(ξερεισ|ηξερεσ|γνωριζεισ)[^.;!?]{0,20}ηδη|ηδη[^.;!?]{0,10}(ξερεισ|ηξερεσ)/,
+    // QUESTION-EXCLUDED (2026-09-29, same lookahead as the emotional form below): "Τι ξέρεις ήδη
+    // γι' αυτό;" is AURA asking, and this form used to flag it. See test_user_claims.js §2d.
+    /(?:(ξερεισ|ηξερεσ|γνωριζεισ)[^.;!?]{0,20}ηδη|ηδη[^.;!?]{0,10}(ξερεισ|ηξερεσ))(?![^.!]*;)/,
     // A TOTALISING TEMPORAL CLAIM — "Η ρίζα ήταν πάντα η ίδια" when they had said "είναι".
     /(παντα|εξαρχησ)[^.;!?]{0,20}(ηταν|ειναι|ησουν)|(ηταν|εισαι|ησουν)[^.;!?]{0,10}παντα/,
     // A CHARACTER VERDICT, asserted or denied — Κ5's exact prohibition.

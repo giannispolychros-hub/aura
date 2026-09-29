@@ -118,6 +118,41 @@ if (typeof D === 'function') {
   assert('a question embedding the emotion word deeper in the sentence still does not flag',
     D('Αυτό που περιγράφεις — νιώθεις προδομένος από αυτή την απόφαση, ή κάτι άλλο;') === false);
 
+  // ── 2d. FORM 1 HAD NO QUESTION EXCLUSION (found 2026-09-29, fixed at the founder's request) ────
+  // Measured while investigating 2c: "Τι ξέρεις ήδη γι' αυτό;" returned TRUE. That is AURA ASKING,
+  // not asserting — the same distinction FORM 6 already carves out for "Νιώθεις θυμωμένος;", and
+  // for the same reason: a counter that flags the question the product is supposed to keep asking
+  // measures nothing but its own noise. Same lookahead, same semantics as FORM 6.
+  assert('QUESTION: "Τι ξέρεις ήδη γι\' αυτό;" is AURA asking — does not flag (was true before this fix)',
+    D('Τι ξέρεις ήδη γι\' αυτό;') === false);
+  assert('QUESTION, second alternative: "Ήδη ξέρεις …;" (ήδη before the verb) does not flag either',
+    D('Ήδη ξέρεις τι θέλεις;') === false);
+  assert('STILL FIRES, first alternative: the declarative "…ξέρεις ήδη." is untouched',
+    D('Ο καθρέφτης χωρίς μαγεία δεν πουλάει. Αυτό το ξέρεις ήδη.') === true);
+  assert('STILL FIRES, second alternative: the declarative "Ήδη ξέρεις …." (ήδη before the verb)',
+    D('Ήδη ξέρεις την απάντηση.') === true);
+  assert('a question in an EARLIER sentence does not shield a declarative violation in a later one',
+    D('Τι σε τραβάει; Αυτό το ξέρεις ήδη.') === true);
+  assert('a declarative violation followed by a question in a LATER sentence still flags',
+    D('Αυτό το ξέρεις ήδη. Ποιο είναι το επόμενο βήμα;') === true);
+  // THE VERBS OF THE FORM, EACH ON ITS OWN. Found by mutation while fixing the above: two of the
+  // form's verbs (γνωρίζεις; ήξερες in the "ήδη first" branch) had never had a fixture, so dropping
+  // either left the whole suite green. These pre-date the question fix and are pinned here because
+  // this is the regex that fix touched.
+  assert('VERB: "γνωρίζεις … ήδη" is the same claim as "ξέρεις … ήδη"',
+    D('Το γνωρίζεις ήδη.') === true);
+  assert('VERB: past "ήξερες … ήδη" in the verb-first branch',
+    D('Το ήξερες ήδη.') === true);
+  assert('VERB: "ήδη … ήξερες" in the ήδη-first branch',
+    D('Ήδη ήξερες την απάντηση.') === true);
+  // KNOWN TRADE-OFF, PINNED AS ONE: the exclusion looks to the end of the SENTENCE, so a violation
+  // and a question sharing one sentence ("Το ξέρεις ήδη — και τώρα τι;") is not flagged. FORM 6 has
+  // exactly the same property and the same reason: telling the two halves apart would need
+  // clause-level parsing this detector deliberately does not do. If the counts justify it, this is
+  // the assertion to change, consciously.
+  assert('KNOWN TRADE-OFF: a violation and a question inside ONE sentence is not flagged — same limit as FORM 6',
+    D('Το ξέρεις ήδη — και τώρα τι;') === false);
+
   // ── 2c. KNOWLEDGE ASSERTED WITHOUT "ήδη" (real session, 2026-09-29) ───────────────────────────
   // "…κάνεις κάτι, αλλά ξέρεις ότι δεν αγγίζει τη ρίζα." — FORM 1 needs "ξέρεις … ήδη", so this
   // sibling passed untouched. HONEST CAVEAT, recorded rather than hidden: in that session the
