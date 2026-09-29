@@ -148,9 +148,17 @@ assert('CLOSING: Part 2 is still told not to repeat the summary',
 // never appeared, although it is the only one that requires no decision. +1763 characters, one
 // cache invalidation, paid knowingly. See test_status_quo_road.js for what the block must contain.
 // This pin is not a rule against editing the prompt — it is a rule against editing it by accident.
+//
+// CHANGED AGAIN, DELIBERATELY, on 2026-09-29 (bb44fc9e364a6a26 → 639e57faa7126041). New MEMORY
+// QUESTION protocol line, same family as the existing PRIVACY QUESTION right above it: a real
+// two-session transcript showed AURA ask a question shaped by cross-session memory signal, then
+// deny "δεν έχω πρόσβαση" when asked directly — a false claim that contradicted its own question.
+// Replaces the denial with a true one (no verbatim transcript ever exists, memory on or off)
+// without revealing what the signal actually contains. +1068 characters, one cache invalidation,
+// paid knowingly.
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 bb44fc9e364a6a26…)',
-  PROMPT_SHA.slice(0, 16) === 'bb44fc9e364a6a26');
+assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 639e57faa7126041…)',
+  PROMPT_SHA.slice(0, 16) === '639e57faa7126041');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',
