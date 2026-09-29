@@ -2207,6 +2207,32 @@ function parseThreeBeatShift(text) {
   if (!brought.trim() || !found.trim() || !changed.trim()) return null;
   return { brought: brought.trim(), found: found.trim(), changed: changed.trim() };
 }
+// ΒΡΗΚΕΣ PROVENANCE — PASSIVE TELEMETRY ONLY, real-session finding (2026-09-29). A real session
+// showed AURA introduce an idea itself, then close crediting the person with "finding" it in the
+// same reply. See auratests/test_found_provenance.js for the full account of why this is a
+// COUNTER, never a rewrite: the obvious fix (compare ΒΡΗΚΕΣ's words against the user's own prior
+// messages) is the exact word-overlap provenance technique buildRoadArtifact's own comment above
+// documents as measured and rejected for this product ("errors in both directions") — and
+// buildRoadArtifact's actual answer, assembling structured fields from verified pieces instead of
+// auditing free text, does not transfer to ΒΡΗΚΕΣ, which is narrative synthesis with nothing to
+// assemble it from. So this only counts, exactly like detectsUnsourcedOptionOffer/
+// detectsClaimAboutUser beside it — never alters what the person sees, never blocks a reply.
+//
+// Same exact-token-overlap technique classifyRoadProvenance already uses above (content words only,
+// stopword-filtered, 4+ characters) — self-contained rather than calling it, same reason every
+// other detector in this file duplicates rather than composes: the test suites extract and eval
+// one function at a time.
+function detectsUnverifiedFoundClaim(foundText, userTexts) {
+  const norm = s => String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const STOP = new Set(['για','και','που','αυτο','ειναι','τους','την','της','του','στο','στη','στον','στην',
+                        'με','σε','απο','των','δεν','θα','να','τι','ενα','μια','ολα','κατι','αλλα','οτι','ευρω']);
+  const hist = Array.isArray(userTexts) ? userTexts : [];
+  if (!hist.length) return false;
+  const corpus = norm(hist.join(" ◎ "));
+  const content = norm(foundText).split(/[^a-zα-ω0-9]+/i).filter(w => w.length >= 4 && !STOP.has(w));
+  if (content.length === 0) return false;
+  return !content.some(w => corpus.includes(w));
+}
 // DORMANT — NOT WIRED INTO THE APPLICATION (adversarial self-audit finding): this function is
 // defined and covered by 12 passing tests in test_anchor_coverage.js, but is called ZERO times
 // anywhere in the app. The tests therefore validate logic that never actually runs — a green
@@ -4937,6 +4963,9 @@ export default function AURAv2() {
   const unsourcedOptionOffers = useRef(0);
   // Claims about the user (No-Evaluation / Κ5). Counts only, same shape as the counter above.
   const claimsAboutUser   = useRef(0);
+  // ΒΡΗΚΕΣ PROVENANCE — real-session finding (2026-09-29). Counts only, same shape as the two
+  // counters above — see detectsUnverifiedFoundClaim's own comment for why this stays a counter.
+  const unverifiedFoundClaims = useRef(0);
   // PATH ONE's trigger, counted and read by nothing. explicitRequests is the session total;
   // requestStreak is the current consecutive run and requestStreakMax the longest, because the
   // prompt's threshold is about REPEATED asking rather than a total.
@@ -5146,6 +5175,7 @@ export default function AURAv2() {
         // form-based guard we had returned nothing on that reply. Count only, never the text.
         unsourcedOptions: Math.min(9999, unsourcedOptionOffers.current),
         userClaims: Math.min(9999, claimsAboutUser.current),
+        unverifiedFoundClaims: Math.min(9999, unverifiedFoundClaims.current),
         explicitRequests: Math.min(9999, explicitRequests.current),
         requestStreak: Math.min(9999, requestStreakMax.current),
         gatesDue: Math.min(9999, gatesDue.current),
@@ -5804,6 +5834,11 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         if (detectsClaimAboutUser(_clean)) {
           claimsAboutUser.current += 1;
           console.warn('[AURA VIOLATION] USER_CLAIM | turn', msgCount, '|', _clean.trim().slice(0, 130));
+        }
+        const _threeBeat = parseThreeBeatShift(_clean);
+        if (_threeBeat && detectsUnverifiedFoundClaim(_threeBeat.found, msgs.filter(m => m && m.role === "user").map(m => m.content))) {
+          unverifiedFoundClaims.current += 1;
+          console.warn('[AURA VIOLATION] UNVERIFIED_FOUND | turn', msgCount, '|', _threeBeat.found.trim().slice(0, 130));
         }
         // GATES DUE vs DELIVERED. Judged with the detectors that already exist, on the same
         // tag-stripped text as every other observer here. A gate that was due and does not appear in
@@ -6988,6 +7023,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     methodFailureHint.current = false;
     unsourcedOptionOffers.current = 0;
     claimsAboutUser.current = 0;
+    unverifiedFoundClaims.current = 0;
     explicitRequests.current = 0;
     requestStreak.current = 0;
     requestStreakMax.current = 0;
