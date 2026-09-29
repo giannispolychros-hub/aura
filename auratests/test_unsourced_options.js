@@ -124,6 +124,47 @@ assert("'μέθοδοι' alone (no 'δομές' anywhere) is enough to reach the
 assert("'δομές' alone (no 'μέθοδοι' anywhere) is enough to reach the enumeration gate",
   D("Υπάρχουν δομές για ακριβώς αυτό — φαρμακευτική υποστήριξη, ιατρεία διακοπής.", GENERIC_USER) === true);
 
+// ── 1c. A DEEPER REAL GAP (2026-09-29): an enumeration with NO colon/dash/bullet at all ──────
+// FOUND IN A SECOND REAL SESSION (career/income), NOT reproduced here — same privacy discipline.
+// AURA named specific unrequested tools as a bare sentence: "Το Bubble, το Glide, το Adalo είναι
+// τέτοια." No colon, no dash, no bullet — a comma-separated list in SUBJECT position, closed by
+// "είναι + [demonstrative]". Neither existing Gate 3 path (bulleted lines; colon/dash-introduced
+// span) can see this shape at all, so widening Gate 2's word list alone (this fix also adds
+// "εργαλει" — εργαλεία/εργαλείο — since that is this reply's actual frame word) is not sufficient
+// on its own; confirmed false against the live function before this fix, with "εργαλει" already
+// hypothetically added to Gate 2.
+//
+// NARROW BY THE SAME DISCIPLINE AS EVERY OTHER GATE HERE: only "[list] είναι τέτοια/αυτά/αυτές/
+// αυτοί/έτσι" — a specific, recognisable Greek construction for presenting members of a category —
+// not "any comma-separated list anywhere," which would reopen the false-positive risk Gate 2/the
+// CLAUSE_OPENER filter exist to close. Checked against the existing fixture set above (A01_MIRROR,
+// B_QUESTION, B_WITHHELD, A_REFLECTION, A_ASKS, B_MULTIPLE_CHOICE): zero accidental matches.
+const TOOLS_VIOLATION =
+  "Υπάρχουν εργαλεία που λέγονται \"no-code\" — χτίζεις εφαρμογή χωρίς να γράφεις κώδικα. Το Bubble, το Glide, το Adalo είναι τέτοια. Μπορείς να ενσωματώσεις AI μέσω API.";
+const GENERIC_USER_2 = ["θέλω κάτι διαφορετικό να χτίσω", "δεν ξέρω πώς να το υλοποιήσω χωρίς κώδικα"];
+assert("a real gap: a bare 'X, Y, Z είναι τέτοια' enumeration, no colon/dash/bullet, must be caught",
+  D(TOOLS_VIOLATION, GENERIC_USER_2) === true);
+// Isolated to the extraction path itself, independent of Gate 2's word list.
+assert("the bare-subject-list path alone finds the enumeration, given a qualifying Gate-2 frame word",
+  D("Υπάρχουν επιλογές — το Bubble, το Glide, το Adalo είναι τέτοια.", GENERIC_USER_2) === true);
+// THE REPEAT CAP MUST REACH BACK THROUGH THE WHOLE LIST, NOT JUST THE LAST TWO ITEMS. If the
+// extraction only captured the segment immediately before "είναι" plus one more, a 3+ item list
+// where the FIRST item is the user's own traceable word would still wrongly flag: the regex would
+// silently drop that item from the match and never give gate 4 a chance to see it. Found by
+// mutation — shrinking the repeat cap left every other assertion here green.
+const USER_NAMED_ONLY_THE_FIRST_TOOL = ["σκέφτομαι το Bubble για να φτιάξω κάτι"];
+assert("the full list is captured, not just the tail — a traceable FIRST item still exonerates the whole list",
+  D("Υπάρχουν επιλογές — το Bubble, το Glide, το Adalo είναι τέτοια.", USER_NAMED_ONLY_THE_FIRST_TOOL) === false);
+// The demonstrative word is load-bearing, not decorative: without one, "X, Y ειναι <ordinary
+// adjective>" must not be read as an enumeration frame — same non-vacuity discipline as §4c.
+assert("NON-VACUITY: 'είναι' alone, without a demonstrative, does not trigger the new path",
+  D("Υπάρχουν επιλογές — το Bubble και το Glide είναι δωρεάν.", GENERIC_USER_2) === false);
+// A genuine mirror in this exact grammar must still survive — same protection Gate 4 already gives
+// A01_MIRROR, exercised here through the NEW extraction path instead of the colon/dash one.
+const TOOLS_USER_NAMED_THEM = ["σκέφτομαι το Bubble ή το Glide για να φτιάξω κάτι"];
+assert("MIRROR SURVIVES through the new path too: items traceable to the user's own words are not flagged",
+  D("Υπάρχουν επιλογές — το Bubble, το Glide είναι τέτοια.", TOOLS_USER_NAMED_THEM) === false);
+
 // ── 2. THE MIRROR THAT MUST SURVIVE ───────────────────────────────────────
 // Same grammar as A00, opposite provenance. If this flags, the detector forbids the Mirror Rule.
 assert("mirroring the user's OWN list is not a violation, though its grammar is identical",

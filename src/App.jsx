@@ -4088,7 +4088,11 @@ function detectsUnsourcedOptionOffer(text, userTexts, parse) {
   // invented menu the same way "κατευθύνσεις" already does, and this gate never saw it. Same
   // provenance logic below applies unchanged — this only widens which FRAMES qualify a reply for
   // that check, exactly like every other word already in this list.
-  if (!/(κατευθυνσ|επιλογ|λυσ|δρομο|τροπο|δυνατοτητ|εναλλακτικ|κατηγορι|σεναρι|ιδεε|μεθοδ|δομ)/.test(fold(t))) return false;
+  //
+  // "εργαλει" ADDED 2026-09-29, SAME DAY, A SEPARATE SESSION — "Υπάρχουν εργαλεία που λέγονται
+  // 'no-code'... Το Bubble, το Glide, το Adalo είναι τέτοια." See GATE 3 below for the other half
+  // of this fix: even with "εργαλει" here, this exact reply still needed a new extraction path.
+  if (!/(κατευθυνσ|επιλογ|λυσ|δρομο|τροπο|δυνατοτητ|εναλλακτικ|κατηγορι|σεναρι|ιδεε|μεθοδ|δομ|εργαλει)/.test(fold(t))) return false;
   // GATE 3 — the enumerations. Bulleted or numbered lines form one; each colon- or dash-introduced
   // span, split on commas or ή, forms another. Two items minimum, each.
   //
@@ -4110,6 +4114,26 @@ function detectsUnsourcedOptionOffer(text, userTexts, parse) {
   let m = null;
   while ((m = re.exec(t)) !== null) {
     const parts = m[1].split(/,|\s+\u03ae\s+/).map(x => x.trim()).filter(x => x.length >= 3);
+    if (parts.length >= 2) lists.push(parts);
+  }
+  // A THIRD SHAPE, ADDED 2026-09-29 — a real session gap: neither path above can see a bare
+  // comma-separated list in SUBJECT position, with no colon, dash or bullet at all: "Το Bubble, το
+  // Glide, το Adalo είναι τέτοια." NARROW BY THE SAME DISCIPLINE AS EVERY OTHER PATH HERE: only
+  // "[list] είναι τέτοια/αυτά/αυτές/αυτοί/έτσι" — a specific, recognisable Greek construction for
+  // presenting members of a category — never a bare "any comma list," which would reopen exactly
+  // the false-positive risk Gate 2 and the CLAUSE_OPENER filter below exist to close. Sentence
+  // punctuation is excluded from each segment so the match cannot cross a sentence boundary and
+  // swallow unrelated prose — found by hand-testing against the real reply, not by mutation.
+  // test_unsourced_options.js §1c.
+  const re3 = /((?:[^,\n.!;\u00b7]{2,40},\s*){1,4}[^,\n.!;\u00b7]{2,40})\s+(?:\u03b5[\u03af\u03b9]\u03bd\u03b1\u03b9)\s+(?:\u03c4[\u03ad\u03b5]\u03c4\u03bf\u03b9\u03b1|\u03b1\u03c5\u03c4[\u03ac\u03b1]|\u03b1\u03c5\u03c4[\u03ad\u03b5]\u03c2|\u03b1\u03c5\u03c4[\u03bf\u03cc][\u03af\u03b9]|[\u03ad\u03b5]\u03c4\u03c3\u03b9)/gi;
+  let m3 = null;
+  while ((m3 = re3.exec(t)) !== null) {
+    const parts = m3[1].split(",").map(x => x.trim()).filter(x => x.length >= 3);
+    // This floor is redundant with the `real` stage's own >=2 check below — confirmed by mutation
+    // that removing it changes nothing observable, and confirmed the SAME redundancy already
+    // exists on the bulleted-lines path above (`if (lines.length >= 2) lists.push(lines)`), so
+    // this is pre-existing style in this function, not something new. Kept for the same
+    // fail-fast-at-the-source reason the other two paths keep theirs.
     if (parts.length >= 2) lists.push(parts);
   }
   // AN OPTION IS A THING, NOT A CLAUSE. Splitting any dash span on commas also carves up ordinary
