@@ -104,6 +104,26 @@ assert("the nurse's bulleted directions are caught — a separate session, same 
 assert("a purely bulleted offer is caught through the list path, not through a stray dash fragment",
   D(A_BULLETS_ONLY, B_USER) === true);
 
+// ── 1b. A REAL 2026-09-29 GAP: "μέθοδοι/δομές" was missing from the Gate 2 word list ────────
+// FOUND IN A REAL SESSION (smoking cessation), NOT reproduced here — same privacy discipline as
+// test_first_why_session.js: only the STRUCTURAL pattern is kept, never the person's own words.
+// AURA declared what the user's "real issue" was, then offered an unsolicited menu framed with
+// "μέθοδοι και δομές" (methods and structures) instead of any of the words Gate 2 already checked
+// for (κατευθύνσεις/επιλογές/λύσεις/δρόμοι/τρόποι/δυνατότητες/εναλλακτικές/κατηγορίες/σενάρια/
+// ιδέες) — so the whole detector never reached the enumeration gate. Confirmed by running the live
+// function against the real reply before this fix: false.
+const METHODS_STRUCTURES_VIOLATION =
+  "Υπάρχουν μέθοδοι και δομές για ακριβώς αυτό — σταδιακή μείωση, απότομη διακοπή, φαρμακευτική υποστήριξη, ιατρεία διακοπής.";
+const GENERIC_USER = ["σκέφτομαι να κόψω μια συνήθεια εδώ και καιρό, αλλά δεν ξέρω πώς"];
+assert("a real gap: 'μέθοδοι/δομές' frames an invented menu exactly like 'κατευθύνσεις' does, and must be caught the same way",
+  D(METHODS_STRUCTURES_VIOLATION, GENERIC_USER) === true);
+// Isolated, so each word is independently required — the combined fixture above would still pass
+// with only one of the two present, which is not what "added both" should mean.
+assert("'μέθοδοι' alone (no 'δομές' anywhere) is enough to reach the enumeration gate",
+  D("Υπάρχουν μέθοδοι για ακριβώς αυτό — σταδιακή μείωση, απότομη διακοπή.", GENERIC_USER) === true);
+assert("'δομές' alone (no 'μέθοδοι' anywhere) is enough to reach the enumeration gate",
+  D("Υπάρχουν δομές για ακριβώς αυτό — φαρμακευτική υποστήριξη, ιατρεία διακοπής.", GENERIC_USER) === true);
+
 // ── 2. THE MIRROR THAT MUST SURVIVE ───────────────────────────────────────
 // Same grammar as A00, opposite provenance. If this flags, the detector forbids the Mirror Rule.
 assert("mirroring the user's OWN list is not a violation, though its grammar is identical",

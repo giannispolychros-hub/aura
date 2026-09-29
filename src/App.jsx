@@ -4056,7 +4056,13 @@ function detectsUnsourcedOptionOffer(text, userTexts, parse) {
   const toks = x => (fold(x).match(/[a-z\u03b1-\u03c90-9]{4,}/g) || []);
   // GATE 2 — a frame that presents a SET OF THINGS THE USER COULD DO. Without one, an enumeration
   // is just a sentence with commas, which is most of natural Greek.
-  if (!/(κατευθυνσ|επιλογ|λυσ|δρομο|τροπο|δυνατοτητ|εναλλακτικ|κατηγορι|σεναρι|ιδεε)/.test(fold(t))) return false;
+  //
+  // "μεθοδ"/"δομ" ADDED 2026-09-29 — a real session gap: "Υπάρχουν μέθοδοι και δομές για ακριβώς
+  // αυτό — σταδιακή μείωση, απότομη διακοπή, φαρμακευτική υποστήριξη, ιατρεία διακοπής." framed an
+  // invented menu the same way "κατευθύνσεις" already does, and this gate never saw it. Same
+  // provenance logic below applies unchanged — this only widens which FRAMES qualify a reply for
+  // that check, exactly like every other word already in this list.
+  if (!/(κατευθυνσ|επιλογ|λυσ|δρομο|τροπο|δυνατοτητ|εναλλακτικ|κατηγορι|σεναρι|ιδεε|μεθοδ|δομ)/.test(fold(t))) return false;
   // GATE 3 — the enumerations. Bulleted or numbered lines form one; each colon- or dash-introduced
   // span, split on commas or ή, forms another. Two items minimum, each.
   //
