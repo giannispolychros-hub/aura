@@ -3529,6 +3529,65 @@ function buildCommitmentSignal(pair) {
   if (!(pair.committed.turn > pair.considered.turn)) return null;
   return { verb: pair.considered.verb, before: pair.considered.text, after: pair.committed.text };
 }
+// ΑΠΟΚΛΙΣΗ (DIVERGENCE) SIGNAL — AURA_STAGE1_SPEC.md, Stage 2 (2026-09-29). Same two-evidence
+// shape as buildCommitmentSignal above: NO-PATTERN is a valid, explicit outcome, never a failure
+// of this layer. Shelved in the spec itself until real evidence existed; the ADR override note at
+// the top of AURA_STAGE1_SPEC.md is that evidence.
+//
+// TIED TO THE ANCHOR WORD, NOT A SHARED VERB — unlike COMMITMENT. The spec's own worked example,
+// "δεν δουλεύει" + "συνεχίζω να το κάνω", shares no verb at all (the second half is anaphoric,
+// "το"). The only code-level way already in this file to establish "these two statements are
+// about the same thing" without a semantic judgment call is the mechanism RECURRING already uses:
+// the literal word the person chose to keep, exact-matched — same discipline as
+// countPriorWordEchoes above. So both detectors below require the CURRENT anchor word to
+// literally appear in the sentence. Narrower than the spec's own example taken alone (which never
+// repeats the word), but zero false-attribution risk — approved explicitly over a looser wording
+// match, the same call the founder already made for RECURRING's own exact-matching.
+//
+// NO \b: it does not match Greek letters in JS regex (repeat bug, already documented and pinned
+// elsewhere in this file). A lookaround stands in for it, same technique already used at the
+// sentence-split site in deliverFinalClosure.
+function detectsActionFailureStatement(text, anchorWord) {
+  const w = String(anchorWord == null ? "" : anchorWord).trim()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ς/g, "σ");
+  if (!w || w.length < 3) return false;
+  const t = String(text == null ? "" : text)
+    .normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ς/g, "σ");
+  const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (!new RegExp("(?<![a-zα-ω0-9])" + escaped + "(?![a-zα-ω0-9])", "i").test(t)) return false;
+  // NARROW BY APPROVAL (2026-09-29): only a declared failure of the named thing itself — never
+  // general frustration ("δύσκολο", "δεν είμαι σίγουρος", "βαρέθηκα"), and never AURA/the
+  // conversation itself (that is detectsMethodFailureSignal's separate, already-existing
+  // territory — different target, deliberately non-overlapping wording).
+  return /δεν\s+(δουλευ(ει|ουν)|πιανει|πιανουν|βγαζει\s+αποτελεσμα|βγαζουν\s+αποτελεσμα|αξιζει\s+πια)/.test(t);
+}
+// The other half of the pair: an explicit continuation of the SAME named thing, stated later
+// (same session or a future one). Same anchor-word requirement and same fold, for the same reason.
+function detectsContinuationStatement(text, anchorWord) {
+  const w = String(anchorWord == null ? "" : anchorWord).trim()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ς/g, "σ");
+  if (!w || w.length < 3) return false;
+  const t = String(text == null ? "" : text)
+    .normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ς/g, "σ");
+  const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (!new RegExp("(?<![a-zα-ω0-9])" + escaped + "(?![a-zα-ω0-9])", "i").test(t)) return false;
+  return /(συνεχιζω|ακομα\s+το\s+κανω|δεν\s+το\s+εχω\s+σταματησει)/.test(t);
+}
+// Pairing, mirroring buildCommitmentSignal's shape exactly: two evidence or nothing. `failure` and
+// `continuation` are each { word, text, turn? } — turn is a monotonic per-user-message counter
+// within a session; a CROSS-SESSION pair (failure reconstructed from a persisted divergence_flag
+// anchor, continuation from the new session's own ref) carries no turn on the failure half, so
+// ordering is enforced only when both halves came from the same session — cross-session ordering
+// is already guaranteed by construction (the flag anchor necessarily predates the session reading it).
+function buildDivergenceSignal(failure, continuation) {
+  if (!failure || !continuation) return null;
+  const fw = String(failure.word || "").trim().toLowerCase();
+  const cw = String(continuation.word || "").trim().toLowerCase();
+  if (!fw || fw !== cw) return null;
+  if (typeof failure.turn === "number" && typeof continuation.turn === "number"
+      && !(continuation.turn > failure.turn)) return null;
+  return { word: failure.word, failureText: failure.text, continuationText: continuation.text };
+}
 // State-machine fix (real-transcript evidence, severe): the user explicitly asked "μπορείς να
 // βοηθήσεις χωρίς να ρωτάς;" — AURA complied briefly, then drifted back into Socratic questions
 // a few exchanges later, because nothing held that mode active except the model's own attention
@@ -4926,6 +4985,11 @@ export default function AURAv2() {
   // Session-scoped on purpose: a transition belongs to the session it happened in, and keeping it
   // in a ref rather than in memory means it adds nothing to what consent has to cover.
   const commitmentPair       = useRef(null);
+  // ΑΠΟΚΛΙΣΗ (DIVERGENCE) pair — AURA_STAGE1_SPEC.md Stage 2. { failure, continuation }, same
+  // "first wins" shape as commitmentPair above. Session-scoped like it — the CROSS-session half
+  // of the pair (when the failure statement was said in an earlier session) lives in mem.anchors
+  // as a "divergence_flag" anchor instead, read back at closing time.
+  const divergencePair       = useRef(null);
   const outcomeScaleAsked    = useRef(false);
   const coreReadinessAsked     = useRef(false); // ROOT RE-FOCUS step-one question just posed
   const coreReadinessConfirmed = useRef(false);
@@ -5188,6 +5252,25 @@ export default function AURAv2() {
           if (_intent.stage === "considered" && !_pair.considered) _pair.considered = _entry;
           if (_intent.stage === "committed" && !_pair.committed) _pair.committed = _entry;
           commitmentPair.current = _pair;
+        }
+      }
+      // ΑΠΟΚΛΙΣΗ capture — AURA_STAGE1_SPEC.md Stage 2. Same "first wins" discipline as the
+      // COMMITMENT block above, same pre-API timing. Checked against the CURRENT anchor word
+      // (the word from a PAST session's closing, exactly what RECURRING itself reads at its own
+      // closing-time call sites) — this session's own word is not chosen until ITS closing, too
+      // late to be the anchor for anything said during it.
+      if (lastUserMsgForConcreteStep) {
+        const _dWord = getMostRecentWordAnchor(memory)?.text;
+        if (_dWord) {
+          const _dPair = divergencePair.current || { failure: null, continuation: null };
+          const _dTurn = msgs.filter(m => m.role === "user").length;
+          if (!_dPair.failure && detectsActionFailureStatement(lastUserMsgForConcreteStep.content, _dWord)) {
+            _dPair.failure = { word: _dWord, text: lastUserMsgForConcreteStep.content, turn: _dTurn };
+          }
+          if (!_dPair.continuation && detectsContinuationStatement(lastUserMsgForConcreteStep.content, _dWord)) {
+            _dPair.continuation = { word: _dWord, text: lastUserMsgForConcreteStep.content, turn: _dTurn };
+          }
+          divergencePair.current = _dPair;
         }
       }
     }
@@ -6254,12 +6337,52 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         const _kw = getMostRecentWordAnchor(memory)?.text;
         const _sig = _kw ? buildRecurringSignal(memory, _kw) : null;
         const _key = _sig ? patternKey({ kind: "recurring", word: _sig.word }) : null;
+        let _gateArmed = false;
         if (_sig && !isPatternRejected(memory, _key) && !wasPatternRecentlyShown(memory, _key, _sig.count)) {
           setRecognitionPending({ kind: "recurring", word: _sig.word, count: _sig.count });
+          _gateArmed = true;
           if (memory.storageEnabled) {
             const _surfaced = recordPatternSurfaced(memory, _key, _sig.count);
             setMemory(_surfaced);
             saveMemory(_surfaced);
+          }
+        }
+        // ΑΠΟΚΛΙΣΗ (DIVERGENCE) — AURA_STAGE1_SPEC.md Stage 2. Only checked when RECURRING did
+        // not already arm the gate THIS closing (`recognitionPending` itself is React state and
+        // would not reflect the setRecognitionPending call above until the next render, so a
+        // local flag is required rather than reading the state back) — one Recognition Gate card
+        // per closing, never two stacked.
+        if (!_gateArmed && _kw) {
+          const _openFlag = (memory.anchors || []).find(a => a && a.category === "divergence_flag"
+            && a.status === "open" && (a.text || "").trim().toLowerCase() === _kw.trim().toLowerCase());
+          const _dFailure = (divergencePair.current && divergencePair.current.failure)
+            || (_openFlag ? { word: _openFlag.text, text: _openFlag.before } : null);
+          const _dContinuation = divergencePair.current && divergencePair.current.continuation;
+          const _dSig = buildDivergenceSignal(_dFailure, _dContinuation);
+          if (_dSig) {
+            const _dKey = patternKey({ kind: "divergence", word: _dSig.word });
+            const _dCount = (_sig && _sig.count) || 1;
+            if (!isPatternRejected(memory, _dKey) && !wasPatternRecentlyShown(memory, _dKey, _dCount)) {
+              setRecognitionPending({ kind: "divergence", word: _dSig.word,
+                failureText: _dSig.failureText, continuationText: _dSig.continuationText });
+              let _dMem = _openFlag ? closeAnchor(memory, _openFlag.id, "resolved") : memory;
+              if (memory.storageEnabled) {
+                _dMem = recordPatternSurfaced(_dMem, _dKey, _dCount);
+                setMemory(_dMem);
+                saveMemory(_dMem);
+              }
+            }
+          } else if (divergencePair.current && divergencePair.current.failure && !divergencePair.current.continuation
+                     && !_openFlag) {
+            // Only the failure half happened this session — persist it so a future session's
+            // continuation statement can find it. Never overwrite an already-open flag for the
+            // same word: the first declared failure is the one that pairs, not the latest.
+            // Same consent shape as every other anchor write in this file: setMemory always (the
+            // session's own UI reflects it), saveMemory to disk only behind consent.
+            const _withFlag = createAnchor({ ...memory }, divergencePair.current.failure.word,
+              "divergence_flag", "open", { before: divergencePair.current.failure.text });
+            setMemory(_withFlag);
+            if (memory.storageEnabled) saveMemory(_withFlag);
           }
         }
       } catch (e) { /* the gate must never block a closing */ }
@@ -6281,12 +6404,52 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         const _kw = getMostRecentWordAnchor(memory)?.text;
         const _sig = _kw ? buildRecurringSignal(memory, _kw) : null;
         const _key = _sig ? patternKey({ kind: "recurring", word: _sig.word }) : null;
+        let _gateArmed = false;
         if (_sig && !isPatternRejected(memory, _key) && !wasPatternRecentlyShown(memory, _key, _sig.count)) {
           setRecognitionPending({ kind: "recurring", word: _sig.word, count: _sig.count });
+          _gateArmed = true;
           if (memory.storageEnabled) {
             const _surfaced = recordPatternSurfaced(memory, _key, _sig.count);
             setMemory(_surfaced);
             saveMemory(_surfaced);
+          }
+        }
+        // ΑΠΟΚΛΙΣΗ (DIVERGENCE) — AURA_STAGE1_SPEC.md Stage 2. Only checked when RECURRING did
+        // not already arm the gate THIS closing (`recognitionPending` itself is React state and
+        // would not reflect the setRecognitionPending call above until the next render, so a
+        // local flag is required rather than reading the state back) — one Recognition Gate card
+        // per closing, never two stacked.
+        if (!_gateArmed && _kw) {
+          const _openFlag = (memory.anchors || []).find(a => a && a.category === "divergence_flag"
+            && a.status === "open" && (a.text || "").trim().toLowerCase() === _kw.trim().toLowerCase());
+          const _dFailure = (divergencePair.current && divergencePair.current.failure)
+            || (_openFlag ? { word: _openFlag.text, text: _openFlag.before } : null);
+          const _dContinuation = divergencePair.current && divergencePair.current.continuation;
+          const _dSig = buildDivergenceSignal(_dFailure, _dContinuation);
+          if (_dSig) {
+            const _dKey = patternKey({ kind: "divergence", word: _dSig.word });
+            const _dCount = (_sig && _sig.count) || 1;
+            if (!isPatternRejected(memory, _dKey) && !wasPatternRecentlyShown(memory, _dKey, _dCount)) {
+              setRecognitionPending({ kind: "divergence", word: _dSig.word,
+                failureText: _dSig.failureText, continuationText: _dSig.continuationText });
+              let _dMem = _openFlag ? closeAnchor(memory, _openFlag.id, "resolved") : memory;
+              if (memory.storageEnabled) {
+                _dMem = recordPatternSurfaced(_dMem, _dKey, _dCount);
+                setMemory(_dMem);
+                saveMemory(_dMem);
+              }
+            }
+          } else if (divergencePair.current && divergencePair.current.failure && !divergencePair.current.continuation
+                     && !_openFlag) {
+            // Only the failure half happened this session — persist it so a future session's
+            // continuation statement can find it. Never overwrite an already-open flag for the
+            // same word: the first declared failure is the one that pairs, not the latest.
+            // Same consent shape as every other anchor write in this file: setMemory always (the
+            // session's own UI reflects it), saveMemory to disk only behind consent.
+            const _withFlag = createAnchor({ ...memory }, divergencePair.current.failure.word,
+              "divergence_flag", "open", { before: divergencePair.current.failure.text });
+            setMemory(_withFlag);
+            if (memory.storageEnabled) saveMemory(_withFlag);
           }
         }
       } catch (e) { /* the gate must never block a closing */ }
@@ -6782,6 +6945,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     warningIssued.current = false;
     concreteStepStated.current = false;
     commitmentPair.current = null;
+    divergencePair.current = null;
     setRecognitionPending(false);
     outcomeScaleAsked.current = false;
     coreReadinessAsked.current = false;
@@ -7465,8 +7629,18 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             <div className="mem-card">
               <div className="mem-label">μοτίβο</div>
               <div className="mem-text">
-                Διάλεξες «{recognitionPending.word}» ως αυτό που κρατάς, σε {recognitionPending.count} ξεχωριστές συνεδρίες.
-                <br />Το αναγνωρίζεις;
+                {recognitionPending.kind === "divergence" ? (
+                  <>
+                    Είπες «{recognitionPending.failureText}».
+                    <br />Αργότερα είπες «{recognitionPending.continuationText}».
+                    <br />Πώς ταιριάζουν αυτά τα δύο από τη δική σου οπτική;
+                  </>
+                ) : (
+                  <>
+                    Διάλεξες «{recognitionPending.word}» ως αυτό που κρατάς, σε {recognitionPending.count} ξεχωριστές συνεδρίες.
+                    <br />Το αναγνωρίζεις;
+                  </>
+                )}
               </div>
               <div className="mem-note">
                 Αν πεις όχι, φεύγει και δεν ξαναεμφανίζεται.
@@ -7475,7 +7649,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               <div className="choice-btns">
                 <button className="choice-btn" onClick={() => {
                   const _rejected = recordPatternRejection({ ...memory },
-                    patternKey({ kind: "recurring", word: recognitionPending.word }));
+                    patternKey({ kind: recognitionPending.kind, word: recognitionPending.word }));
                   setMemory(_rejected);
                   if (memory.storageEnabled) saveMemory(_rejected, true);
                   recordTelemetry("ownership_confirmed", { answer: 0 });
@@ -7486,7 +7660,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                   // and «Ναι» dismissed it identically, so "partly" printed the pattern in the
                   // Blueprint exactly as if it had been claimed outright — User Ownership failing at
                   // the one place it is explicitly asked about. It now withholds, without recording.
-                  setHeldPattern(patternKey({ kind: "recurring", word: recognitionPending.word }));
+                  setHeldPattern(patternKey({ kind: recognitionPending.kind, word: recognitionPending.word }));
                   recordTelemetry("ownership_confirmed", { answer: 1 });
                   setRecognitionPending(false);
                 }}>Μερικώς</button>
@@ -7496,7 +7670,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                   // sheet could not say that the person had confirmed anything. Session-scoped,
                   // like heldPattern: the sheet is downloaded in this same session, and a
                   // confirmation is not a new category of stored data.
-                  confirmedPattern.current = patternKey({ kind: "recurring", word: recognitionPending.word });
+                  confirmedPattern.current = patternKey({ kind: recognitionPending.kind, word: recognitionPending.word });
                   recordTelemetry("ownership_confirmed", { answer: 2 });
                   setRecognitionPending(false);
                 }}>Ναι</button>
