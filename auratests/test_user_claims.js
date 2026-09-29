@@ -118,6 +118,30 @@ if (typeof D === 'function') {
   assert('a question embedding the emotion word deeper in the sentence still does not flag',
     D('Αυτό που περιγράφεις — νιώθεις προδομένος από αυτή την απόφαση, ή κάτι άλλο;') === false);
 
+  // ── 2c. KNOWLEDGE ASSERTED WITHOUT "ήδη" (real session, 2026-09-29) ───────────────────────────
+  // "…κάνεις κάτι, αλλά ξέρεις ότι δεν αγγίζει τη ρίζα." — FORM 1 needs "ξέρεις … ήδη", so this
+  // sibling passed untouched. HONEST CAVEAT, recorded rather than hidden: in that session the
+  // person had themselves said they were not addressing the real root, so this line was arguably a
+  // faithful mirror. This detector judges FORM, never provenance (see the header — vocabulary
+  // overlap was measured anti-correlated with fabrication), so it cannot tell that apart, and it is
+  // an observation-only counter: the cost of a mirror counted here is a telemetry line, not a
+  // changed reply. MEASURED before writing: over all 1283 Greek strings in this suite the form
+  // hits only "αξίζει ΝΑ ξέρεις ότι υπάρχουν" (subjunctive — information offered, a different
+  // failure that detectsUnsourcedOptionOffer owns), so the subjunctive is excluded and the
+  // remaining corpus hit count is zero.
+  assert('FORM: indicative "ξέρεις ότι …" asserts what they know — the real 2026-09-29 reply',
+    D('Η εικόνα με το τσιγάρο είναι ακριβής — κάνεις κάτι, αλλά ξέρεις ότι δεν αγγίζει τη ρίζα.') === true);
+  assert('FORM: same construction, plain sentence start',
+    D('Ξέρεις ότι αυτό δεν θα αλλάξει τίποτα.') === true);
+  assert('the SUBJUNCTIVE "αξίζει να ξέρεις ότι …" is information offered, not knowledge asserted — not this form',
+    D('Υπάρχει κάτι που αξίζει να ξέρεις ότι υπάρχει.') === false);
+  assert('a QUESTION with the same words does not flag — AURA asking, not declaring',
+    D('Ξέρεις ότι αυτό δεν θα αλλάξει τίποτα;') === false);
+  assert('the person\'s own quoted words are not AURA speaking — same quote-stripping as every other form',
+    D('Είπες «ξέρεις ότι δεν αγγίζει τη ρίζα».') === false);
+  assert('a DECLARATIVE "ξέρεις" without an ότι-clause does not flag — the form needs the indicative ότι, not the bare verb',
+    D('Από αυτά που ξέρεις για τον εαυτό σου, διάλεξε ένα.') === false);
+
   // EACH ALTERNATIVE OF THE CHARACTER-VERDICT FORM, SEPARATELY. Found by a surviving mutation:
   // the real session-2 reply matches BOTH "ακούγεται σαν άνθρωπο…" and "δεν ακούγεται", so
   // disabling the first branch left every assertion green. One fixture per branch, each chosen so

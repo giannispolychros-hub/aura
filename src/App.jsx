@@ -3709,6 +3709,13 @@ function detectsClaimAboutUser(text) {
     // question mark (;) before the sentence ends, so only the DECLARATIVE verdict flags, never the
     // question AURA is supposed to keep asking.
     /(νιωθεισ|αισθανεσαι)[^.;!?]{0,25}(απογοητευμεν|θυμωμεν|λυπημεν|φοβισμεν|εξαντλημεν|προδομεν|μοναχ|ενοχ)(?![^.!]*;)|(εισαι|ησουν)[^.;!?]{0,15}(απογοητευμεν|θυμωμεν|λυπημεν|φοβισμεν|εξαντλημεν|προδομεν|μοναχ)(?![^.!]*;)/,
+    // KNOWLEDGE ASSERTED WITHOUT "ήδη" (real session, 2026-09-29) — "κάνεις κάτι, αλλά ξέρεις ότι
+    // δεν αγγίζει τη ρίζα." FORM 1 needs "ήδη". Indicative only: "αξίζει ΝΑ ξέρεις ότι" is
+    // information offered, not knowledge asserted (excluded by the lookbehind), and a question is
+    // excluded the same way as the emotional form above. Form only — it cannot tell a faithful
+    // mirror from an invention, by the same measured rule as everything else here.
+    // See auratests/test_user_claims.js §2c.
+    /(?<!να )ξερεισ οτι[^.;!?]{0,60}(?![^.!]*;)/,
   ];
   for (let i = 0; i < FORMS.length; i++) if (FORMS[i].test(fold)) return true;
   return false;
