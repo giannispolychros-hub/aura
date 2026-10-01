@@ -21,10 +21,10 @@
 // that is pinned below.
 //
 // KNOWN, PINNED CONSEQUENCES (documented rather than hidden):
-//   • POLARITY. The real confirmation wording is "…το επιτρέπεις και στον εαυτό σου;" — there "Ναι"
-//     means "I allow it to myself too" (the SAME), while friendPerspectiveCtx tells the model the user
-//     confirmed "yes, DIFFERENT". The ctx text was not touched (out of scope); the mismatch is real
-//     and is asserted in §5 so it cannot be forgotten.
+//   • POLARITY (CLOSED the same day). The real confirmation wording is "…το επιτρέπεις και στον εαυτό
+//     σου;" — there "Ναι" means "I allow it to myself too" (the SAME), while friendPerspectiveCtx told the
+//     model the user confirmed "yes, DIFFERENT". The ctx now says only that the user answered "yes"
+//     (true for both wordings); its directive is unchanged. Pinned in §5.
 //   • The widened shift wording is an OPEN question ("Τι άλλαξε μέσα σου…"). detectsAffirmativeShort
 //     accepts any short reply starting with "νιώθω", so "Νιώθω το ίδιο" would count as a yes.
 //
@@ -186,10 +186,13 @@ if (shift && friend && affirm && spont) {
 if (shift && friend && affirm && spont) {
   assert('KNOWN RISK, pinned: after the OPEN shift question, a short "Νιώθω το ίδιο" counts as a yes (detectsAffirmativeShort accepts "νιώθω …")',
     runShift([{ aura: 'Τι άλλαξε μέσα σου από πριν ως τώρα;' }, { user: 'Νιώθω το ίδιο' }]).confirmed === true);
-  assert('KNOWN MISMATCH, pinned: for "…το επιτρέπεις και στον εαυτό σου;" a "Ναι" means the SAME, yet the latch records "yes, different"',
+  assert('CLOSED 2026-10-01: after "…το επιτρέπεις και στον εαυτό σου;" a "Ναι" still confirms (the latch is unchanged) …',
     runFriend([{ aura: 'Αυτό που θα έλεγες στον φίλο — το επιτρέπεις και στον εαυτό σου;' }, { user: 'Ναι' }]).confirmed === true);
-  assert('the ctx text that says "yes, different" is untouched (so the mismatch above is real and visible)',
-    /The user just confirmed "yes, different" to the friend-perspective question/.test(CODE));
+  assert('… but the ctx no longer claims the user said "yes, DIFFERENT" — for this wording "Ναι" means the SAME. It now says only that they answered "yes"',
+    /The user just answered "yes" to the friend-perspective question/.test(CODE) &&
+    !/just confirmed "yes, different"/.test(CODE));
+  assert('the directive is unchanged: proceed to the Reflection Summary, no further exploratory question',
+    /feeds directly into the Reflection Summary sequence now\. Do NOT ask another exploratory question first/.test(CODE));
 }
 
 // ── 6. ONLY THESE THREE CHANGED ───────────────────────────────────────────────────────────────────

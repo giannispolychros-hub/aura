@@ -1493,7 +1493,17 @@ function detectSafetySignal(text) {
     /(πένθος|τραύμα|κατάρρευση|κρίση|κακοποίηση|απώλεια αγαπημένου)/i,
   ];
   // FIX 2: model-level safety fallback already in A6 prompt — client catches obvious misses only
-  if (crisis.some(p => p.test(text))) return "CRISIS";
+  // MATCHED ON THE ACCENT-STRIPPED TEXT (2026-10-01, closes a measured gap): "θελω να πεθανω" typed without
+  // accents, or "ΘΕΛΩ ΝΑ ΠΕΘΑΝΩ" in capitals, was not caught at all, because the patterns above are written
+  // with accents. Each CRISIS pattern is rebuilt from its own source with the accents stripped and tried
+  // against the accent-stripped message. Case needs no handling (the /i flag already equates upper and lower
+  // case, and ς with σ) — a mutation test showed lowercasing and sigma normalisation were dead code. This
+  // path accepts everything the old exact match accepted, because both sides are folded the same way.
+  // ONLY the CRISIS list is folded: DISTRESS below is matched exactly as before.
+  // See auratests/test_crisis_vocabulary.js §4.
+  const fold = s => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const folded = fold(text);
+  if (crisis.some(p => new RegExp(fold(p.source), "i").test(folded))) return "CRISIS";
   if (distress.some(p => p.test(text))) return "DISTRESS";
   return null;
 }
@@ -3841,8 +3851,8 @@ function detectsFriendPerspectiveAsked(text) {
   // confirmation question was "Αυτό που θα έλεγες στον φίλο — το επιτρέπεις και στον εαυτό σου;".
   // ONLY this second, yes/no question arms the latch. The OPEN first question ("…τι θα του έλεγες;")
   // must NOT: a real user answered it "Ναι , γιατί όχι..?", which detectsAffirmativeShort would read
-  // as a confirmation. KNOWN MISMATCH, pinned in the test: for this wording "Ναι" means the SAME
-  // ("I allow it to myself too"), while friendPerspectiveCtx says the user confirmed "yes, different".
+  // as a confirmation. For this wording "Ναι" means the SAME ("I allow it to myself too"), which is why
+  // friendPerspectiveCtx says only that the user answered "yes" and not that they found it different.
   if (typeof text !== "string") return false;
   const fold = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ");
   return (fold.match(/[^.!?;]*[?;]/g) || []).some(q => /φιλοσ?(?![α-ω])/.test(q) && /επιτρεπεισ (?:και )?στον εαυτο σου/.test(q));
@@ -5021,6 +5031,9 @@ export default function AURAv2() {
   const isListeningRef = useRef(false);
   // Keep ref in sync with state
   const setIsListeningSync = useCallback((val) => { isListeningRef.current = val; setIsListening(val); }, []);
+  // The mic button is shown only where the browser really has speech recognition. startListening returns
+  // silently without it, so an always-visible button looked like a feature and did nothing (Firefox, some iOS).
+  const speechSupported = typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   const recognitionRef = useRef(null);
   // First-Why protocol
   const [firstWhyPending, setFirstWhyPending] = useState(false);
@@ -5204,7 +5217,7 @@ export default function AURAv2() {
   const escalationLevel        = useRef(0); // 0 Baseline, 1 Pivot, 2 targeted follow-up, 3 Perspective Swap, 4 AUTO-KILL — see computeEscalationLevel
   const lastFiredFamily        = useRef({ family: null, streak: 0 }); // reuses fired[fired.length-1] across turns — see computeLastFiredFamily
   const friendPerspectiveAsked     = useRef(false);
-  const friendPerspectiveConfirmed = useRef(false); // user's own 'yes, different' — should feed Reflection Summary
+  const friendPerspectiveConfirmed = useRef(false); // user's own 'yes' to the confirmation question — should feed Reflection Summary
   const [earlyReliefValue, setEarlyReliefValue] = useState(null); // holds CLARITY (before), 1-10 or null — name kept for minimal churn, see EARLY CLARITY BASELINE rule
   const [lateReliefValue, setLateReliefValue] = useState(null);   // holds CLARITY (after), 1-10 or null — name kept for minimal churn, see CLARITY + OWNERSHIP SCALE rule
   const [ownershipValue, setOwnershipValue] = useState(null);     // holds OWNERSHIP, 1-10 or null — new axis, no "before" counterpart (ownership only makes sense post-solution)
@@ -5330,6 +5343,14 @@ export default function AURAv2() {
         unsourcedOptions: Math.min(9999, unsourcedOptionOffers.current),
         userClaims: Math.min(9999, claimsAboutUser.current),
         unverifiedFoundClaims: Math.min(9999, unverifiedFoundClaims.current),
+        // The per-category tally detectOutputViolation keeps in violationCounts, which until now only the
+        // ?debug=1 panel and the console could see — so No-Evaluation / No-Advice, measured on every reply,
+        // never reached the exported file. Counts only; the reply text is never read here.
+        violEvaluation: Math.min(9999, violationCounts.current.EVALUATION || 0),
+        violAdvice: Math.min(9999, violationCounts.current.ADVICE || 0),
+        violRole: Math.min(9999, violationCounts.current.ROLE || 0),
+        violRoadMapMissing: Math.min(9999, violationCounts.current.ROAD_MAP_MISSING || 0),
+        violAdviceCascade: Math.min(9999, violationCounts.current.ADVICE_CASCADE || 0),
         explicitRequests: Math.min(9999, explicitRequests.current),
         requestStreak: Math.min(9999, requestStreakMax.current),
         gatesDue: Math.min(9999, gatesDue.current),
@@ -5794,7 +5815,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         ? `\n[The user has now used binary-opposition phrasing ("ή...ή", "μπρος-πίσω" style) more than once this session — PREMISE INVERSION's own trigger condition is objectively confirmed, not something to re-judge from memory. If the two sides ALSO already have specific, named costs (not just repeated options), VERBATIM COST COLLISION is the more grounded choice — prefer it over PREMISE INVERSION whenever concrete costs are already in hand.]\n`
         : '', premiseInversionCtxDelivered, 2);
       const friendPerspectiveCtx = deliverOnce(friendPerspectiveConfirmed.current
-        ? `\n[The user just confirmed "yes, different" to the friend-perspective question — per CONTENT FIX above, this feeds directly into the Reflection Summary sequence now. Do NOT ask another exploratory question first — a real transcript showed exactly this mistake, continuing to probe after the pivot point had already surfaced.]\n`
+        ? `\n[The user just answered "yes" to the friend-perspective question — per CONTENT FIX above, this feeds directly into the Reflection Summary sequence now. Do NOT ask another exploratory question first — a real transcript showed exactly this mistake, continuing to probe after the pivot point had already surfaced.]\n`
         : '', friendPerspectiveCtxDelivered, 1);
       const clarityPivotCtx = clarityPivotHint.current
         ? `\n[CODE-VERIFIED: this turn matches CLARITY PIVOT's "${clarityPivotHint.current}" case above (detected structurally, not psychologically inferred) — use that specific response, not a generic one.]\n`
@@ -8061,7 +8082,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                 disabled={loading}
                 enterKeyHint="send"
               />
-              <div style={{display:"flex",justifyContent:"flex-end",gap:"8px",marginTop:"6px"}}><button className={`mic-btn ${isListening?"active":""}`} onClick={isListening?stopListening:startListening} disabled={loading}>{isListening?"◉":"🎙"}</button><button className={`send-btn ${input.trim()?"ready":""}`} onClick={handleSubmit} disabled={!input.trim()||loading}>Go</button></div>
+              <div style={{display:"flex",justifyContent:"flex-end",gap:"8px",marginTop:"6px"}}>{speechSupported && <button className={`mic-btn ${isListening?"active":""}`} onClick={isListening?stopListening:startListening} disabled={loading}>{isListening?"◉":"🎙"}</button>}<button className={`send-btn ${input.trim()?"ready":""}`} onClick={handleSubmit} disabled={!input.trim()||loading}>Go</button></div>
             </div>
             {turnCount.current > 0 && (
               <div className="turn-counter">{turnCount.current} {turnCount.current===1 ? "ανταλλαγή" : "ανταλλαγές"}</div>

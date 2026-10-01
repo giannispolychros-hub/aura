@@ -15,9 +15,9 @@
 // συνεχίζω αυτή τη συζήτηση" and "θέλω να χαθώ από εδώ για διακοπές" stay CRISIS; they are pinned
 // below as AMBIGUOUS-BY-DESIGN so nobody "fixes" them later by narrowing the list.
 //
-// SCOPE: this changes ONLY the CRISIS vocabulary. DISTRESS and the helpline line 10306 are untouched
-// (the founder is confirming the number); pinned in §5. The accent-less / UPPERCASE gap found while
-// measuring is NOT fixed here and is pinned in §4 so it stays visible.
+// SCOPE: this changes ONLY the CRISIS list. DISTRESS and the helpline line 10306 are untouched (the founder
+// is confirming the number); pinned in §5. UPDATE 2026-10-01: the accent-less / UPPERCASE gap found while
+// measuring ("θελω να πεθανω" was not caught at all) is now closed for the CRISIS list — §4.
 //
 // Fixtures are synthetic or generic phrases; no user text from a real session is stored.
 const fs = require('fs');
@@ -126,15 +126,50 @@ if (typeof D === 'function') {
   ];
   for (const [t, why] of AMBIGUOUS) assert('AMBIGUOUS-BY-DESIGN, CAUGHT: «' + t + '» — ' + why, D(t) === 'CRISIS');
 
-  // ── 4. KNOWN GAPS, pinned and NOT fixed here (out of scope; found while measuring) ───────────
-  assert('KNOWN GAP, not fixed: the same words typed WITHOUT accents are not caught ("θελω να πεθανω")',
-    D('θελω να πεθανω') === null);
-  assert('KNOWN GAP, not fixed: UPPERCASE without accents is not caught ("ΘΕΛΩ ΝΑ ΠΕΘΑΝΩ")',
-    D('ΘΕΛΩ ΝΑ ΠΕΘΑΝΩ') === null);
+  // ── 4. TYPED WITHOUT ACCENTS / IN CAPITALS (closed 2026-10-01; before, NONE of these were caught) ──
+  // The CRISIS list is matched on the folded text as well (accents stripped, lowercase, final sigma
+  // normalised) — a phone keyboard in Greek very often produces no accents at all. Only the CRISIS
+  // list is folded; DISTRESS is matched exactly as before (see §5).
+  const UNACCENTED = [
+    ['θελω να πεθανω', 'the exact phrase that was missed'],
+    ['ΘΕΛΩ ΝΑ ΠΕΘΑΝΩ', 'UPPERCASE, no accents (the way Greek capitals are written)'],
+    ['ΘΈΛΩ ΝΑ ΠΕΘΆΝΩ', 'uppercase with accents'],
+    ['Θέλω Να Πεθάνω', 'mixed case'],
+    ['δεν αντεχω αλλο', 'unchanged phrase, no accents'],
+    ['κουραστηκα να ζω', 'one of the four new phrases, no accents'],
+    ['δεν θελω να ειμαι πια εδω', 'one of the four new phrases, no accents'],
+    ['σκεφτομαι να τα τελειωσω ολα', 'one of the four new phrases, no accents'],
+    ['δεν εχει νοημα να συνεχιζω', 'one of the four new phrases, no accents'],
+    ['ΔΕΝ ΕΧΕΙ ΝΟΗΜΑ ΝΑ ΣΥΝΕΧΙΖΩ', 'one of the four new phrases, uppercase'],
+    ['θα ηθελα να χαθω απο προσωπου γης', 'no accents, with the final sigma written as ς'],
+    ['θελω να τελειωσω τη ζωη μου', 'crisis form, no accents'],
+    ['δεν θελω να ζω', 'unchanged phrase, no accents'],
+    ['θελω να βαλω τελοσ', 'a final σ typed instead of ς (pattern «βάλω τέλος» ends in ς)'],
+    ['ΝΑ ΒΑΛΩ ΤΕΛΟΣ', 'capitals, final sigma'],
+    ['θελω να εξαφανιστω', 'unchanged phrase, no accents'],
+    ['θα ηταν καλυτερα χωρις εμενα', 'unchanged phrase, no accents'],
+    ['αυτοκτονια', 'stem, no accents'],
+  ];
+  for (const [t, why] of UNACCENTED) assert('CAUGHT without accents/case: «' + t + '» — ' + why, D(t) === 'CRISIS');
+  const UNACCENTED_NOT = [
+    ['να τελειωσω τη δουλεια μου μεχρι αυριο', 'the founder\'s example, no accents'],
+    ['ΝΑ ΤΕΛΕΙΩΣΩ ΤΟ ΕΡΓΟ', 'the founder\'s example, uppercase'],
+    ['πρεπει να τελειωσω ολα τα εργα μεχρι αυριο', '"ολα" before a noun, no accents'],
+    ['θελω να τελειωσω ολα μου τα εργα', '"ολα μου τα", no accents'],
+    ['φοβαμαι να χαθω στις λεπτομερειες', 'details, no accents'],
+    ['θελω να αλλαξω δουλεια', 'neutral, no accents'],
+    ['ΤΙ ΣΕ ΦΕΡΝΕΙ ΕΔΩ', 'neutral, uppercase'],
+  ];
+  for (const [t, why] of UNACCENTED_NOT) assert('NOT CRISIS without accents/case: «' + t + '» — ' + why, D(t) !== 'CRISIS');
+  assert('non-string input does not throw', D(null) === null && D(undefined) === null && D('') === null);
+
+  // ── 4b. KNOWN GAPS, pinned and NOT fixed here ───────────────────────────────────────────────
   assert('KNOWN GAP, not fixed: grief with no keyword ("πέθανε ο πατέρας μου") reads as nothing',
     D('πέθανε ο πατέρας μου') === null);
   assert('KNOWN GAP, not fixed: "δεν αντέχω" needs "άλλο" ("χώρισα και δεν αντέχω")',
     D('χώρισα και δεν αντέχω') === null);
+  assert('KNOWN GAP, not fixed: DISTRESS is still accent-sensitive ("εχω κριση πανικου" reads as nothing) — DISTRESS is untouched by design',
+    D('εχω κριση πανικου') === null);
 
   // ── 5. DISTRESS IS UNTOUCHED ─────────────────────────────────────────────────────────────────
   assert('DISTRESS unchanged: «έχω κρίση πανικού»', D('έχω κρίση πανικού') === 'DISTRESS');
