@@ -25,12 +25,12 @@
 
 | | |
 |---|---|
-| **Αρχείο-αλήθεια** | `src/App.jsx` (~4.800 γραμμές, ~620 KB) |
+| **Αρχείο-αλήθεια** | `src/App.jsx` (~8.100 γραμμές, ~860 KB) |
 | **Backend** | `api/aura.js` |
 | **Branch** | `main` — δουλεύουμε κατευθείαν εδώ, το hardening έκλεισε |
 | **Deploy** | Vercel, αυτόματα σε κάθε push στο `main` |
 | **Live** | https://aura-ruddy-six.vercel.app |
-| **Tests** | 375 σε 33 suites, φάκελος `auratests/` |
+| **Tests** | 2.760 assertions σε 82 suites (1/10/2026), φάκελος `auratests/` |
 
 **Το `App.jsx` περιέχει τα πάντα:** το system prompt (~50%), τον κώδικα, το UI. Δεν είναι σπασμένο σε modules — και **δεν πρέπει να σπάσει**: το prompt caching εξαρτάται από σταθερό πρόθεμα, και τα tests εξάγουν συναρτήσεις με `indexOf('function X')`.
 
