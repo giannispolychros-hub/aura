@@ -19,8 +19,8 @@
 // Widening any of them would change what the model is told, therefore what it says. So the strict
 // detectors are LEFT EXACTLY AS THEY ARE (and pinned below, gaps included), and the ruler gets
 // OBSERVATION-ONLY twins that nothing in the live path reads for a decision:
-//   detectsGateQuestionsLoose   {stakes, friend, shift}
-//   detectsStepAnswerLoose      (userText, previousAuraText)
+//   detectsGateQuestionsLoose   {stakes}   (the friend/shift flags and detectsStepAnswerLoose were REMOVED on
+//                               2026-10-01: nothing read them — see test_latches_real_wording.js header)
 // plus two passive widenings of detectors that were already observation-only:
 //   detectOutputViolation  — EVALUATION now also sees four approvals it missed
 //   detectsClaimAboutUser  — FORM 8, "υπάρχει μία τάση … το βλέπεις ως …"
@@ -66,7 +66,6 @@ eval(extract('looksLikeAdviceCascade'));
 const V = lift('detectOutputViolation');
 const C = lift('detectsClaimAboutUser');
 const L = lift('detectsGateQuestionsLoose');
-const S = lift('detectsStepAnswerLoose');
 const strictStakes = lift('detectsStakesAsked');
 const strictFriend = lift('detectsFriendPerspectiveAsked');
 const strictShift = lift('detectsShiftCheckAsked');
@@ -128,10 +127,9 @@ if (C) {
 
 // ── 3. THE GATE-QUESTION TWIN: sees the wording AURA really used ──────────────────────────────────
 if (L) {
-  assert('returns the three flags, all false, for empty or non-string input',
-    JSON.stringify(L('')) === '{"stakes":false,"friend":false,"shift":false}' &&
-    JSON.stringify(L(null)) === '{"stakes":false,"friend":false,"shift":false}' &&
-    JSON.stringify(L(42)) === '{"stakes":false,"friend":false,"shift":false}');
+  assert('returns {stakes:false} for empty or non-string input',
+    JSON.stringify(L('')) === '{"stakes":false}' && JSON.stringify(L(null)) === '{"stakes":false}' &&
+    JSON.stringify(L(42)) === '{"stakes":false}');
 
   // STAKES
   assert('STAKES, real wording: "τι πιστεύεις ότι θα κοστίσει περισσότερο … για έναν ακόμα χρόνο;"',
@@ -145,55 +143,6 @@ if (L) {
   assert('STAKES: NOT a cost question with no horizon of waiting',
     L('Θα κοστίσει περισσότερο η μετακόμιση;').stakes === false);
 
-  // FRIEND
-  assert('FRIEND, real wording 1: "Αν ένας φίλος σου έλεγε … τι θα του έλεγες;"',
-    L('Αν ένας φίλος σου έλεγε ακριβώς αυτά που μου είπες — τι θα του έλεγες;').friend === true);
-  assert('FRIEND, real wording 2: "Αν ένας φίλος σου ερχόταν με αυτό … τι θα του έλεγες;"',
-    L('Αν ένας φίλος σου ερχόταν με αυτό — το μπέρδεμα και την ιδέα — τι θα του έλεγες;').friend === true);
-  assert('FRIEND, the confirmation question: "το επιτρέπεις και στον εαυτό σου;"',
-    L('Αυτό που θα έλεγες στον φίλο — το επιτρέπεις και στον εαυτό σου;').friend === true);
-  assert('FRIEND: NOT a question about a friend that is not the perspective shift',
-    L('Ο φίλος σου ήξερε για αυτό;').friend === false);
-  assert('FRIEND: NOT "τι θα του έλεγες" aimed at someone else',
-    L('Τι θα του έλεγες στον διευθυντή σου;').friend === false);
-  assert('FRIEND: NOT a declarative',
-    L('Ένας φίλος σου θα του έλεγε κάτι.').friend === false);
-
-  // SHIFT
-  assert('SHIFT, wording the strict latch already knows',
-    L('Νιώθεις ότι κάτι άλλαξε σε σχέση με το πώς έβλεπες αυτό στην αρχή;').shift === true);
-  assert('SHIFT, the variant the strict latch misses: "Τι άλλαξε μέσα σου από πριν ως τώρα;"',
-    L('Τι άλλαξε μέσα σου από πριν ως τώρα;').shift === true);
-  assert('SHIFT: NOT a change in the world',
-    L('Τι άλλαξε στην εταιρεία από πριν ως τώρα;').shift === false);
-  assert('SHIFT: NOT AURA declaring that something changed',
-    L('Κάτι άλλαξε μέσα σου.').shift === false);
-
-  assert('each flag is independent: one reply carrying two questions reports both',
-    (() => { const r = L('Τι άλλαξε μέσα σου από πριν ως τώρα; Αν ένας φίλος σου ερχόταν με αυτό, τι θα του έλεγες;');
-      return r.shift === true && r.friend === true && r.stakes === false; })());
-}
-
-// ── 4. THE STEP-ANSWER TWIN: needs AURA's question, so a bare phrase is never read as a step ───────
-if (S) {
-  const ASK = 'Ποιο θα είναι το πρώτο πράγμα που θα κάνεις;';
-  assert('a short noun phrase answering "το πρώτο πράγμα που θα κάνεις" counts — "Έκτακτο συμβούλιο"',
-    S('Έκτακτο συμβούλιο', ASK) === true);
-  assert('"Θα το ψάξω" counts — a first-person future the strict detector has no verb for',
-    S('Θα το ψάξω', ASK) === true);
-  assert('"Θα του τηλεφωνήσω" counts',
-    S('Θα του τηλεφωνήσω.', ASK) === true);
-  assert('NOT a step: "Δεν ξέρω"', S('Δεν ξέρω', ASK) === false);
-  assert('NOT a step: hedged', S('Ίσως θα το ψάξω', ASK) === false);
-  assert('NOT a step: "Θα δω" is a deferral', S('Θα δω.', ASK) === false);
-  assert('NOT a step: a question back', S('Τι εννοείς;', ASK) === false);
-  assert('NOT a step: a refusal', S('Τίποτα', ASK) === false);
-  assert('NOT a step: a long paragraph is an explanation, not an answer',
-    S('Έκτακτο συμβούλιο με όλους όσους εμπλέκονται και μετά να δούμε τι θα γίνει με τον προϋπολογισμό του έργου', ASK) === false);
-  assert('CONTEXT GUARD: the same phrase after a question that did not ask for a step is NOT a step',
-    S('Έκτακτο συμβούλιο', 'Πώς νιώθεις γι\' αυτό;') === false);
-  assert('non-string input on either side is false, never a throw',
-    S(null, ASK) === false && S('Θα το ψάξω', null) === false && S(undefined, undefined) === false);
 }
 
 // ── 4b. EVERY ALTERNATIVE AND EVERY BOUND HAS ITS OWN FIXTURE ─────────────────────────────────────
@@ -250,47 +199,15 @@ if (L) {
     L('Αν περιμένεις έναν ακόμα χρόνο, τι θα αλλάξει;').stakes === false);
   assert('STAKES: the cost word and the horizon must sit in the SAME question',
     L('Αυτό θα κοστίσει. Τι θα κάνεις αν περιμένεις;').stakes === false);
-  assert('FRIEND: "φίλου" (genitive) counts',
-    L('Αν η ιδέα του φίλου σου ερχόταν σε σένα — τι θα του έλεγες;').friend === true);
-  assert('FRIEND: "τι θα έλεγες" without "του"',
-    L('Αν ένας φίλος σου έλεγε αυτό, τι θα έλεγες;').friend === true);
-  assert('FRIEND: the confirmation without "και"',
-    L('Αυτό που θα έλεγες στον φίλο — το επιτρέπεις στον εαυτό σου;').friend === true);
-  assert('FRIEND: "φιλοσοφία" is not a friend', L('Τι θα έλεγες για τη φιλοσοφία σου;').friend === false);
-  assert('FRIEND: the confirmation wording with no friend in the question is not the perspective shift',
-    L('Το επιτρέπεις και στον εαυτό σου;').friend === false);
-  assert('SHIFT: a question about the inside that does not ask about a CHANGE is not the shift check',
-    L('Τι νιώθεις μέσα σου από πριν ως τώρα;').shift === false);
-}
-if (S) {
-  const ASK = 'Ποιο θα είναι το πρώτο πράγμα που θα κάνεις;';
-  assert('STEP ASKED: "το πρώτο βήμα" also asks for a step', S('Θα το ψάξω', 'Ποιο είναι το πρώτο βήμα;') === true);
-  assert('STEP ASKED: "τι θα κάνεις" also asks for a step', S('Θα το ψάξω', 'Τι θα κάνεις τώρα;') === true);
-  assert('STEP ASKED: the previous message must be a QUESTION',
-    S('Θα το ψάξω', 'Ποιο θα είναι το πρώτο πράγμα που θα κάνεις.') === false);
-  assert('STEP BOUND: ten words is still an answer',
-    S('Θα στείλω ένα μήνυμα σε όλους τους συναδέλφους μου σήμερα', ASK) === true);
-  assert('STEP BOUND: eleven words is an explanation',
-    S('Θα στείλω ένα μήνυμα σε όλους τους συναδέλφους μου σήμερα πρωί', ASK) === false);
-  assert('STEP BOUND: a four-word noun phrase counts',
-    S('Ένα έκτακτο συμβούλιο αύριο', ASK) === true);
-  assert('STEP BOUND: a five-word noun phrase does not',
-    S('Ένα έκτακτο συμβούλιο με όλους', ASK) === false);
-  assert('STEP: a "Θα …" answer may run longer than four words',
-    S('Θα το ψάξω αύριο το πρωί', ASK) === true);
-  for (const [u, why] of [['Μήπως θα το ψάξω', 'μήπως'], ['Μπορεί να το ψάξω', 'μπορεί'], ['Όχι', 'όχι'], ['Ναι', 'ναι'],
-      ['Εντάξει.', 'εντάξει'], ['οκ', 'οκ'], ['Θα το δω', 'θα το δω'], ['Αύριο', 'αύριο'], ['Σήμερα', 'σήμερα'],
-      ['Τώρα', 'τώρα'], ['Αργότερα', 'αργότερα'], ['OK', 'latin ok'], ['', 'empty']]) {
-    assert('STEP NOT: "' + u + '" (' + why + ')', S(u, ASK) === false);
-  }
 }
 
 // ── 5. THE STRICT DETECTORS ARE UNTOUCHED — gaps included, on purpose ─────────────────────────────
 // Each assertion below pins a KNOWN, DELIBERATE blind spot. If one of them starts failing, someone
 // widened a latch that drives the injected reminder or the Outcome Scale override: that is a change
 // to what AURA says, a decision for the founder, and the failure is meant to make it conscious.
-// UPDATE 2026-10-01: the founder decided to widen the stakes, friend and shift latches (and ONLY those);
-// their three gaps are closed below. detectsConcreteStep stays a pinned gap.
+// UPDATE 2026-10-01: the founder decided to widen the stakes, friend and shift latches; the SHIFT widening was
+// removed the same day (small benefit, a known false-confirmation risk). Stakes and friend gaps are closed below.
+// The shift latch and detectsConcreteStep stay pinned gaps.
 if (strictStakes && strictFriend && strictShift && strictStep) {
   assert('strict stakes latch: canonical wording is seen',
     strictStakes('Αν αυτή η απόφαση μείνει θολή για άλλον έναν χρόνο, τι πιστεύεις ότι θα σου κοστίσει περισσότερο;') === true);
@@ -298,8 +215,10 @@ if (strictStakes && strictFriend && strictShift && strictStep) {
     strictStakes('Αν αυτό δεν ξεκαθαρίσει για έναν ακόμα χρόνο — τι πιστεύεις ότι θα κοστίσει περισσότερο;') === true);
   assert('FORMER KNOWN GAP, closed 2026-10-01 by founder decision: the friend latch now reads "το επιτρέπεις και στον εαυτό σου"',
     strictFriend('Αυτό που θα έλεγες στον φίλο — το επιτρέπεις και στον εαυτό σου;') === true);
-  assert('FORMER KNOWN GAP, closed 2026-10-01 by founder decision: the shift latch now reads "Τι άλλαξε μέσα σου από πριν ως τώρα;"',
-    strictShift('Τι άλλαξε μέσα σου από πριν ως τώρα;') === true);
+  assert('KNOWN GAP, deliberate again (the widening was REMOVED 2026-10-01, founder decision): the shift latch does not read "Τι άλλαξε μέσα σου από πριν ως τώρα;"',
+    strictShift('Τι άλλαξε μέσα σου από πριν ως τώρα;') === false);
+  assert('the shift latch still reads its original wording',
+    strictShift('Νιώθεις ότι κάτι άλλαξε σε σχέση με το πώς έβλεπες αυτό στην αρχή;') === true);
   assert('KNOWN GAP, deliberate: the live step detector still has no reading for a bare noun phrase',
     strictStep('Έκτακτο συμβούλιο') === false);
   assert('KNOWN GAP, deliberate: …nor for "Θα το ψάξω"', strictStep('Θα το ψάξω') === false);
@@ -326,9 +245,8 @@ const gateAt = CODE.indexOf('if (concreteStepStated.current && !outcomeScaleAske
 assert('NON-VACUITY: the Outcome Scale override is findable', gateAt > 0);
 assert('the Outcome Scale override is untouched — it keeps its own closing guards',
   /!matchesClosingWord\(lastUserMsg\) && !declaresClosing\(lastUserMsg\)/.test(CODE.slice(gateAt, gateAt + 260)));
-assert('the step twin appears in no assignment: it never sets concreteStepStated and never writes displayText',
-  !/detectsStepAnswerLoose[^\n]*(concreteStepStated|displayText)\s*(=|\.current\s*=)/.test(CODE) &&
-  !/(concreteStepStated|displayText)[^\n]*detectsStepAnswerLoose/.test(CODE));
+assert('the step twin and the friend/shift flags of the gate twin were REMOVED (nothing read them)',
+  !/detectsStepAnswerLoose/.test(CODE) && !/out\.friend|out\.shift/.test(CODE));
 assert('the gate-question twin is not read by any reminder or context builder',
   !/(Ctx|Suffix|dynamicSuffix)[^\n]*detectsGateQuestionsLoose/.test(CODE));
 assert('the twin counts nothing that reaches a reply: no assignment to displayText on its verdict',

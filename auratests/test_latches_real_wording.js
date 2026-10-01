@@ -1,4 +1,4 @@
-// ── ΤΑ ΤΡΙΑ LATCHES ΑΝΑΓΝΩΡΙΖΟΥΝ ΤΑ ΠΡΑΓΜΑΤΙΚΑ ΛΟΓΙΑ ΤΗΣ AURA (απόφαση ιδρυτή, 2026-10-01) ─────────────
+// ── ΤΑ ΔΥΟ LATCHES (STAKES, ΦΙΛΟΣ) ΑΝΑΓΝΩΡΙΖΟΥΝ ΤΑ ΠΡΑΓΜΑΤΙΚΑ ΛΟΓΙΑ ΤΗΣ AURA (το shift check γύρισε πίσω) (απόφαση ιδρυτή, 2026-10-01) ─────────────
 //
 // WHY. test_ruler_detectors.js §5 pinned three KNOWN GAPS on purpose: the stakes, friend-perspective
 // and shift-check latches did not recognise the wording the model REALLY used, so a question that
@@ -25,8 +25,11 @@
 //     σου;" — there "Ναι" means "I allow it to myself too" (the SAME), while friendPerspectiveCtx told the
 //     model the user confirmed "yes, DIFFERENT". The ctx now says only that the user answered "yes"
 //     (true for both wordings); its directive is unchanged. Pinned in §5.
-//   • The widened shift wording is an OPEN question ("Τι άλλαξε μέσα σου…"). detectsAffirmativeShort
-//     accepts any short reply starting with "νιώθω", so "Νιώθω το ίδιο" would count as a yes.
+//   • SHIFT LATCH — WIDENING REMOVED THE SAME DAY (2026-10-01, founder decision). The widened wording was an
+//     OPEN question ("Τι άλλαξε μέσα σου…"); the one real reply to it was a non-answer, so nothing changed in
+//     practice, and detectsAffirmativeShort accepts any short reply starting with "νιώθω", so "Νιώθω το ίδιο"
+//     would have counted as a yes. Small benefit, known risk: §3 pins the latch back to its original form.
+//     The same day the unused observation twins (friend/shift flags, detectsStepAnswerLoose) were removed too.
 //
 // Fixtures are synthetic with the same grammatical shape as what was measured; no user text is stored.
 const fs = require('fs');
@@ -117,24 +120,24 @@ if (friend) {
     friend('') === false && friend(null) === false && friend(undefined) === false && friend(42) === false);
 }
 
-// ── 3. SHIFT CHECK ───────────────────────────────────────────────────────────────────────────────
+// ── 3. SHIFT CHECK — THE WIDENING WAS REMOVED THE SAME DAY (founder decision, 2026-10-01) ─────────────
+// Why: for the open wording "Τι άλλαξε μέσα σου από πριν ως τώρα;" the real reply was a non-answer, so nothing
+// changed in practice, and detectsAffirmativeShort accepts any short reply starting with "νιώθω", so
+// "Νιώθω το ίδιο" would have counted as a yes. Small benefit, known risk: the latch is back to its original form.
 if (shift) {
-  assert('SHIFT, real wording the latch missed: "Τι άλλαξε μέσα σου από πριν ως τώρα;"',
-    shift('Τι άλλαξε μέσα σου από πριν ως τώρα;') === true);
-  assert('SHIFT, a Latin question mark', shift('Τι άλλαξε μέσα σου από πριν ως τώρα?') === true);
-  assert('UNCHANGED: the wording the latch already knew', shift('Νιώθεις ότι κάτι άλλαξε σε σχέση με το πώς έβλεπες αυτό στην αρχή;') === true);
-  assert('UNCHANGED: with the "Πριν κλείσουμε —" lead-in',
+  assert('SHIFT, original wording is still recognised', shift('Νιώθεις ότι κάτι άλλαξε σε σχέση με το πώς έβλεπες αυτό στην αρχή;') === true);
+  assert('SHIFT, original wording with the "Πριν κλείσουμε —" lead-in',
     shift('Πριν κλείσουμε — νιώθεις ότι κάτι άλλαξε σε σχέση με το πώς έβλεπες αυτό στην αρχή;') === true);
+  assert('SHIFT, REVERTED: the open variant "Τι άλλαξε μέσα σου από πριν ως τώρα;" is NOT recognised (known gap, deliberate)',
+    shift('Τι άλλαξε μέσα σου από πριν ως τώρα;') === false);
   assert('MUST NOT CHANGE: the SECOND-step question is not the shift check (protects the two-step sequence)',
     shift('Με τι μπήκες εδώ... και με τι φεύγεις τώρα;') === false);
-  assert('MUST NOT CHANGE: a change in the world, not inside the person',
-    shift('Τι άλλαξε στην εταιρεία από πριν ως τώρα;') === false);
-  assert('MUST NOT CHANGE: AURA declaring a change', shift('Κάτι άλλαξε μέσα σου.') === false);
-  assert('MUST NOT CHANGE: inside the person, but not asking about a CHANGE',
-    shift('Τι νιώθεις μέσα σου από πριν ως τώρα;') === false);
+  assert('MUST NOT CHANGE: a change in the world', shift('Τι άλλαξε στην εταιρεία από πριν ως τώρα;') === false);
   assert('MUST NOT CHANGE: an unrelated question', shift('Τι σε κρατάει περισσότερο σε αυτό;') === false);
   assert('MUST NOT CHANGE: empty / null / non-string do not throw',
     shift('') === false && shift(null) === false && shift(undefined) === false && shift(42) === false);
+  assert('the widening code is gone from the source (no "μεσα σου" fold in detectsShiftCheckAsked)',
+    !/μεσα σου/.test(extract('detectsShiftCheckAsked')));
 }
 
 // ── 4. THE LATCH PATHS, as the code runs them (lines "shiftCheckConfirmed" / "friendPerspectiveConfirmed") ──
@@ -160,17 +163,12 @@ function runFriend(exchanges) {
   return { asked, confirmed };
 }
 if (shift && friend && affirm && spont) {
-  const V = 'Τι άλλαξε μέσα σου από πριν ως τώρα;';
-  assert('SHIFT FLOW: the variant question is recognised, and a real non-answer ("Τίποτα απλά στο αναφέρω") does NOT confirm',
-    (r => r.asked === true && r.confirmed === false)(runShift([{ aura: V }, { user: 'Τίποτα απλά στο αναφέρω' }])));
-  assert('SHIFT FLOW: a real "Όχι. Απλά πρέπει να γίνουν όσα πρέπει" does NOT confirm',
-    runShift([{ aura: V }, { user: 'Όχι. Απλά πρέπει να γίνουν όσα πρέπει' }]).confirmed === false);
-  assert('SHIFT FLOW: "Ναι, κάτι άλλαξε" after the variant question confirms — AURA now proceeds',
-    runShift([{ aura: V }, { user: 'Ναι, κάτι άλλαξε' }]).confirmed === true);
-  assert('SHIFT FLOW, unchanged: the old wording + "Ναι" still confirms',
+  assert('SHIFT FLOW, original: the old wording + "Ναι" confirms',
     runShift([{ aura: 'Νιώθεις ότι κάτι άλλαξε σε σχέση με το πώς έβλεπες αυτό στην αρχή;' }, { user: 'Ναι' }]).confirmed === true);
-  assert('SHIFT FLOW, unchanged: the second-step question never arms the latch, so a later "Ναι" confirms nothing',
+  assert('SHIFT FLOW, original: the second-step question never arms the latch, so a later "Ναι" confirms nothing',
     runShift([{ aura: 'Με τι μπήκες εδώ... και με τι φεύγεις τώρα;' }, { user: 'Ναι' }]).confirmed === false);
+  assert('SHIFT FLOW, reverted: the open variant never arms the latch, so "Νιώθω το ίδιο" confirms nothing (the risk that led to the removal)',
+    runShift([{ aura: 'Τι άλλαξε μέσα σου από πριν ως τώρα;' }, { user: 'Νιώθω το ίδιο' }]).confirmed === false);
 
   const F2 = 'Αυτό που θα έλεγες στον φίλο — το επιτρέπεις και στον εαυτό σου;';
   const F1 = 'Αν ένας φίλος σου έλεγε ακριβώς αυτά που μου είπες — τι θα του έλεγες;';
@@ -184,8 +182,6 @@ if (shift && friend && affirm && spont) {
 
 // ── 5. KNOWN, PINNED CONSEQUENCES — documented, not fixed (out of scope) ──────────────────────────
 if (shift && friend && affirm && spont) {
-  assert('KNOWN RISK, pinned: after the OPEN shift question, a short "Νιώθω το ίδιο" counts as a yes (detectsAffirmativeShort accepts "νιώθω …")',
-    runShift([{ aura: 'Τι άλλαξε μέσα σου από πριν ως τώρα;' }, { user: 'Νιώθω το ίδιο' }]).confirmed === true);
   assert('CLOSED 2026-10-01: after "…το επιτρέπεις και στον εαυτό σου;" a "Ναι" still confirms (the latch is unchanged) …',
     runFriend([{ aura: 'Αυτό που θα έλεγες στον φίλο — το επιτρέπεις και στον εαυτό σου;' }, { user: 'Ναι' }]).confirmed === true);
   assert('… but the ctx no longer claims the user said "yes, DIFFERENT" — for this wording "Ναι" means the SAME. It now says only that they answered "yes"',
@@ -219,7 +215,7 @@ assert('the gate-reminder lines read the latches exactly as before',
 // ── 7. LOCKSTEP WITH THE OBSERVATION TWIN — so the two cannot drift apart ─────────────────────────
 // The twin (detectsGateQuestionsLoose) is deliberately BROADER (it also takes "αν δεν …", "στοιχίσει", and
 // the open friend question), so the relation asserted is: whatever the latch recognises, the twin does too.
-if (stakes && friend && shift && loose) {
+if (stakes && loose) {
   const corpus = [
     'Αν αυτό δεν ξεκαθαρίσει για έναν ακόμα χρόνο — τι πιστεύεις ότι θα κοστίσει περισσότερο;',
     'Αν αυτή η απόφαση μείνει θολή για άλλον έναν χρόνο, τι πιστεύεις ότι θα σου κοστίσει περισσότερο;',
@@ -234,8 +230,6 @@ if (stakes && friend && shift && loose) {
   for (const t of corpus) {
     const L = loose(t);
     if (stakes(t) && !L.stakes) bad.push('stakes: ' + t);
-    if (friend(t) && !L.friend) bad.push('friend: ' + t);
-    if (shift(t) && !L.shift) bad.push('shift: ' + t);
   }
   assert('LOCKSTEP: nothing a latch recognises is missed by the twin (' + (bad.length ? bad.join(' | ') : 'ok') + ')', bad.length === 0);
 }

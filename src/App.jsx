@@ -3830,17 +3830,12 @@ function detectsAffirmativeShort(text) {
 // detects AURA's shift-verification question, right before the three-beat structure. Reuses
 // detectsAffirmativeShort for the user's response side, same as the core-readiness mechanism.
 function detectsShiftCheckAsked(text) {
-  if (/νιώθεις ότι κάτι άλλαξε.{0,40}πώς έβλεπες αυτό στην αρχή/i.test(text || "")) return true;
-  // WIDENED 2026-10-01 (founder decision — see auratests/test_latches_real_wording.js): a real reply
-  // asked "Τι άλλαξε μέσα σου από πριν ως τώρα;", which the pattern above does not know. A QUESTION
-  // about a change INSIDE the person; "Τι άλλαξε στην εταιρεία;" is not it, and neither is the
-  // second-step "Με τι μπήκες… με τι φεύγεις;" (no "άλλαξε"), which must never arm this latch.
-  // KNOWN RISK, pinned in the test: this wording is open, and detectsAffirmativeShort (untouched)
-  // accepts any short reply starting with "νιώθω", so "Νιώθω το ίδιο" would read as a yes.
-  if (typeof text !== "string") return false;
-  const fold = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ");
-  return (fold.match(/[^.!?;]*[?;]/g) || []).some(q => /αλλαξε/.test(q) && /μεσα σου/.test(q));
+  return /νιώθεις ότι κάτι άλλαξε.{0,40}πώς έβλεπες αυτό στην αρχή/i.test(text || "");
 }
+// (2026-10-01) A wider reading of the open wording "Τι άλλαξε μέσα σου από πριν ως τώρα;" was added to this
+// latch and REMOVED the same day: the real reply to it was a non-answer, and detectsAffirmativeShort accepts any
+// short reply starting with "νιώθω", so "Νιώθω το ίδιο" would have counted as a yes. See
+// auratests/test_latches_real_wording.js §3.
 // Detects THIRD TRIGGER's friend-perspective confirmation question (real gap found via transcript
 // audit — CONTENT FIX above already instructs this to feed the Reflection Summary, but a real
 // session continued with more exploratory questions instead of enforcing it, same reliability
@@ -3857,67 +3852,26 @@ function detectsFriendPerspectiveAsked(text) {
   const fold = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ");
   return (fold.match(/[^.!?;]*[?;]/g) || []).some(q => /φιλοσ?(?![α-ω])/.test(q) && /επιτρεπεισ (?:και )?στον εαυτο σου/.test(q));
 }
-// ── THE RULER'S TWINS — observation only, and deliberately NOT the latches above ──────────────────
-// A measurement pass over real AURA replies (2026-10) found that the strict detectors above and
-// below do not recognise the wording the model really uses: the stakes latch wants "θα σου
-// κοστίσει" and the model wrote "θα κοστίσει"; the friend latch wants the second question in one
-// exact form; the shift latch does not know "Τι άλλαξε μέσα σου από πριν ως τώρα;".
-// THEY WERE NOT WIDENED, because they are not counters: each one sets a latch that decides what
-// reminder is injected into the model next turn, so widening it changes what AURA says. That is a
-// decision for the founder, not a measurement fix. This function is the measurement fix: the same
-// three questions, recognised in the wording AURA really used, read ONLY by instrumentation (the
-// delivered-stakes side of the gatesDue/gatesIgnored counter) and by any future replay scorer.
-// Nothing here may set a latch, build a ctx, or touch displayText — test_ruler_detectors.js §6
-// pins that. Only sentences that ARE questions are examined (a Greek "…;" or "…?"), so AURA
-// declaring something never reads as AURA asking it.
-// SELF-CONTAINED on purpose (suites lift detectors with indexOf('function X(')): the fold is
-// inlined. READ THE PATTERNS AGAINST THE FOLD — accents stripped, lowercased, final sigma → σ.
+// ── THE STAKES TWIN — observation only, read ONLY by the gatesDue/gatesIgnored counter ───────────────
+// The stakes LATCH above now recognises the wording the model really used. This broader twin is kept for one
+// reason: the delivered-stakes side of the gatesDue/gatesIgnored counter reads it, so a stakes question that
+// was asked in a variant the latch does not know ("στοιχίσει", "αν δεν …") is not counted as ignored.
+// It used to also answer for the friend and shift questions, and a step-answer twin sat beside it; all of
+// those were REMOVED on 2026-10-01 because nothing read them (the friend latch was widened properly, the shift
+// widening was dropped). Nothing here may set a latch, build a ctx, or touch displayText. Only sentences that
+// ARE questions are examined (a Greek "…;" or "…?"), so AURA declaring something never reads as asking it.
+// SELF-CONTAINED on purpose (suites lift detectors with indexOf('function X(')): the fold is inlined.
 function detectsGateQuestionsLoose(text) {
-  const none = { stakes: false, friend: false, shift: false };
-  if (typeof text !== "string" || !text.trim()) return none;
-  const fold = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ς/g, "σ");
-  const questions = fold.match(/[^.!?;]*[?;]/g) || [];
-  const out = { stakes: false, friend: false, shift: false };
-  for (const q of questions) {
+  const out = { stakes: false };
+  if (typeof text !== "string" || !text.trim()) return out;
+  const fold = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ");
+  for (const q of (fold.match(/[^.!?;]*[?;]/g) || [])) {
     // The COST of staying unresolved over time — a cost word AND a horizon of waiting. A price
     // question about a thing ("πόσο θα κοστίσει το εισιτήριο του χρόνου;") has no horizon.
     if (/κοστισει|στοιχισει/.test(q) &&
         /εναν (?:ακομα )?χρονο|μεινει θολ|αν (?:δεν|περιμενεισ)/.test(q)) out.stakes = true;
-    // The friend perspective, either of its two questions. "φίλος" is bounded on both sides so
-    // "φιλοσοφία" is not a friend.
-    if (/φιλο(?:σ|υ)?(?![α-ω])/.test(q) &&
-        (/τι θα (?:του )?ελεγεσ/.test(q) || /επιτρεπεισ (?:και )?στον εαυτο σου/.test(q))) out.friend = true;
-    // The shift check: a change, asked about INSIDE the person. "Τι άλλαξε στην εταιρεία;" is not it.
-    if (/αλλαξε/.test(q) &&
-        (/μεσα σου/.test(q) || /σε σχεση με το πωσ εβλεπεσ/.test(q))) out.shift = true;
   }
   return out;
-}
-// Did the person ANSWER a question that asked for a step with something that is a step? The strict
-// detectsConcreteStep needs "θα + one of 18 verbs", so a bare noun phrase ("Έκτακτο συμβούλιο") or
-// a verb outside the list ("Θα το ψάξω") is invisible to it — which is how a real session reached
-// its closing with a stated step and no Outcome Scale. THAT detector gates a hard override of the
-// reply, so it is left untouched (see detectsConcreteStep's own comment: widening `base` "is a
-// separate decision to be made from a specification"). This twin only MEASURES, and it asks for the
-// one thing that makes a bare noun phrase safe to read as a step: AURA's own previous message must
-// have been the question that asks for one. Without that, "Έκτακτο συμβούλιο" is just two words.
-// Two arguments, no state, decides nothing. Hedges, refusals, deferrals, questions and long
-// explanations are not answers.
-function detectsStepAnswerLoose(userText, previousAuraText) {
-  if (typeof userText !== "string" || typeof previousAuraText !== "string") return false;
-  const f = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ς/g, "σ").trim();
-  const asked = f(previousAuraText);
-  if (!/[?;]/.test(asked)) return false;
-  if (!/πρωτο (?:πραγμα|βημα)|τι θα κανεισ/.test(asked)) return false;
-  const u = f(userText);
-  const words = u.split(/\s+/).filter(Boolean);
-  if (words.length === 0 || words.length > 10) return false;
-  if (/[?;]/.test(u)) return false;
-  if (/(?:^| )(?:δεν|ισωσ|μηπωσ|μπορει|τιποτα|οχι)(?: |$)/.test(u)) return false;
-  if (/^(?:ναι|ενταξει|οκ|ok)\W*$/.test(u) || /θα (?:το )?δω/.test(u)) return false;
-  // A time is the answer to "Πότε;", not a step.
-  if (/^(?:αυριο|σημερα|τωρα|αργοτερα)\W*$/.test(u)) return false;
-  return /^θα /.test(u) || words.length <= 4;
 }
 // Detects CHECK BEFORE ADDING's promise-inclusive wording — the button's correct home (red-team
 // fix: it belongs right after the promise "μπορώ να σου δείξω πώς έφτασες εδώ" is stated, never
