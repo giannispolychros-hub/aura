@@ -3811,14 +3811,32 @@ function detectsAffirmativeShort(text) {
 // detects AURA's shift-verification question, right before the three-beat structure. Reuses
 // detectsAffirmativeShort for the user's response side, same as the core-readiness mechanism.
 function detectsShiftCheckAsked(text) {
-  return /νιώθεις ότι κάτι άλλαξε.{0,40}πώς έβλεπες αυτό στην αρχή/i.test(text || "");
+  if (/νιώθεις ότι κάτι άλλαξε.{0,40}πώς έβλεπες αυτό στην αρχή/i.test(text || "")) return true;
+  // WIDENED 2026-10-01 (founder decision — see auratests/test_latches_real_wording.js): a real reply
+  // asked "Τι άλλαξε μέσα σου από πριν ως τώρα;", which the pattern above does not know. A QUESTION
+  // about a change INSIDE the person; "Τι άλλαξε στην εταιρεία;" is not it, and neither is the
+  // second-step "Με τι μπήκες… με τι φεύγεις;" (no "άλλαξε"), which must never arm this latch.
+  // KNOWN RISK, pinned in the test: this wording is open, and detectsAffirmativeShort (untouched)
+  // accepts any short reply starting with "νιώθω", so "Νιώθω το ίδιο" would read as a yes.
+  if (typeof text !== "string") return false;
+  const fold = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ");
+  return (fold.match(/[^.!?;]*[?;]/g) || []).some(q => /αλλαξε/.test(q) && /μεσα σου/.test(q));
 }
 // Detects THIRD TRIGGER's friend-perspective confirmation question (real gap found via transcript
 // audit — CONTENT FIX above already instructs this to feed the Reflection Summary, but a real
 // session continued with more exploratory questions instead of enforcing it, same reliability
 // class as the shift-check/core-readiness gates).
 function detectsFriendPerspectiveAsked(text) {
-  return /αυτό που θα έλεγες στον φίλο.{0,50}διαφορετικό από αυτό που επιτρέπεις στον εαυτό σου/i.test(text || "");
+  if (/αυτό που θα έλεγες στον φίλο.{0,50}διαφορετικό από αυτό που επιτρέπεις στον εαυτό σου/i.test(text || "")) return true;
+  // WIDENED 2026-10-01 (founder decision — see auratests/test_latches_real_wording.js): the real
+  // confirmation question was "Αυτό που θα έλεγες στον φίλο — το επιτρέπεις και στον εαυτό σου;".
+  // ONLY this second, yes/no question arms the latch. The OPEN first question ("…τι θα του έλεγες;")
+  // must NOT: a real user answered it "Ναι , γιατί όχι..?", which detectsAffirmativeShort would read
+  // as a confirmation. KNOWN MISMATCH, pinned in the test: for this wording "Ναι" means the SAME
+  // ("I allow it to myself too"), while friendPerspectiveCtx says the user confirmed "yes, different".
+  if (typeof text !== "string") return false;
+  const fold = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ");
+  return (fold.match(/[^.!?;]*[?;]/g) || []).some(q => /φιλοσ?(?![α-ω])/.test(q) && /επιτρεπεισ (?:και )?στον εαυτο σου/.test(q));
 }
 // ── THE RULER'S TWINS — observation only, and deliberately NOT the latches above ──────────────────
 // A measurement pass over real AURA replies (2026-10) found that the strict detectors above and
@@ -3971,7 +3989,16 @@ function extractTwoNumbers(text) {
 // reminder (dynamicSuffix, DECISION PASS is buried ~2000 lines into a 54KB core — recency-favored
 // position per lost-in-the-middle research) can be added exactly when a gate is due but unasked.
 function detectsStakesAsked(text) {
-  return /(μείνει θολή για άλλον έναν χρόνο|τι πιστεύεις ότι θα σου κοστίσει περισσότερο)/i.test(text || "");
+  if (/(μείνει θολή για άλλον έναν χρόνο|τι πιστεύεις ότι θα σου κοστίσει περισσότερο)/i.test(text || "")) return true;
+  // WIDENED 2026-10-01 (founder decision — see auratests/test_latches_real_wording.js): the model
+  // really wrote "τι πιστεύεις ότι θα κοστίσει περισσότερο αν δεν έρθει για έναν ακόμα χρόνο;" (no
+  // "σου"), so a question that WAS asked read as still due and the GATES DUE reminder kept asking
+  // for it. Judged per QUESTION sentence: a cost word AND a horizon of waiting in the same one — a
+  // declarative, a price question about a thing ("…το εισιτήριο του χρόνου;") and a cost question with
+  // no horizon do not count. Only wording seen in a real reply is accepted.
+  if (typeof text !== "string") return false;
+  const fold = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return (fold.match(/[^.!?;]*[?;]/g) || []).some(q => /κοστισει/.test(q) && /εναν (?:ακομα )?χρονο|μεινει θολ/.test(q));
 }
 // Separate from detectsStakesAsked above, which only catches the ORIGINAL question early in the
 // session. This catches the CALLBACK specifically (the reference-back before the Blueprint) —

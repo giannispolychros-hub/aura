@@ -289,15 +289,17 @@ if (S) {
 // Each assertion below pins a KNOWN, DELIBERATE blind spot. If one of them starts failing, someone
 // widened a latch that drives the injected reminder or the Outcome Scale override: that is a change
 // to what AURA says, a decision for the founder, and the failure is meant to make it conscious.
+// UPDATE 2026-10-01: the founder decided to widen the stakes, friend and shift latches (and ONLY those);
+// their three gaps are closed below. detectsConcreteStep stays a pinned gap.
 if (strictStakes && strictFriend && strictShift && strictStep) {
   assert('strict stakes latch: canonical wording is seen',
     strictStakes('Αν αυτή η απόφαση μείνει θολή για άλλον έναν χρόνο, τι πιστεύεις ότι θα σου κοστίσει περισσότερο;') === true);
-  assert('KNOWN GAP, deliberate: strict stakes latch still misses "θα κοστίσει περισσότερο" (no "σου")',
-    strictStakes('Αν αυτό δεν ξεκαθαρίσει για έναν ακόμα χρόνο — τι πιστεύεις ότι θα κοστίσει περισσότερο;') === false);
-  assert('KNOWN GAP, deliberate: strict friend latch still misses "το επιτρέπεις και στον εαυτό σου"',
-    strictFriend('Αυτό που θα έλεγες στον φίλο — το επιτρέπεις και στον εαυτό σου;') === false);
-  assert('KNOWN GAP, deliberate: strict shift latch still misses "Τι άλλαξε μέσα σου από πριν ως τώρα;"',
-    strictShift('Τι άλλαξε μέσα σου από πριν ως τώρα;') === false);
+  assert('FORMER KNOWN GAP, closed 2026-10-01 by founder decision: the stakes latch now reads "θα κοστίσει περισσότερο" (no "σου") — see test_latches_real_wording.js',
+    strictStakes('Αν αυτό δεν ξεκαθαρίσει για έναν ακόμα χρόνο — τι πιστεύεις ότι θα κοστίσει περισσότερο;') === true);
+  assert('FORMER KNOWN GAP, closed 2026-10-01 by founder decision: the friend latch now reads "το επιτρέπεις και στον εαυτό σου"',
+    strictFriend('Αυτό που θα έλεγες στον φίλο — το επιτρέπεις και στον εαυτό σου;') === true);
+  assert('FORMER KNOWN GAP, closed 2026-10-01 by founder decision: the shift latch now reads "Τι άλλαξε μέσα σου από πριν ως τώρα;"',
+    strictShift('Τι άλλαξε μέσα σου από πριν ως τώρα;') === true);
   assert('KNOWN GAP, deliberate: the live step detector still has no reading for a bare noun phrase',
     strictStep('Έκτακτο συμβούλιο') === false);
   assert('KNOWN GAP, deliberate: …nor for "Θα το ψάξω"', strictStep('Θα το ψάξω') === false);
