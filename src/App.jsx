@@ -3718,6 +3718,12 @@ function detectsClaimAboutUser(text) {
     // mirror from an invention, by the same measured rule as everything else here.
     // See auratests/test_user_claims.js §2c.
     /(?<!να )ξερεισ οτι[^.;!?]{0,60}(?![^.!]*;)/,
+    // A TENDENCY NAMED IN AURA'S OWN WORDS (real session, 2026-10) — "Εδώ υπάρχει μία τάση: … τα
+    // βλέπεις ως παγίδα". The label is AURA's, not the person's, and it is attached to how THEY
+    // see things. The second-person verb is what keeps "υπάρχει μία τάση στην αγορά" out: a
+    // tendency in the world is not a claim about them. Question-excluded like the forms above.
+    // Form only. See auratests/test_ruler_detectors.js §2.
+    /υπαρχει (?:μια|ενα) (?:ταση|μοτιβο|προτυπο)[^.;!?]{0,100}(?:βλεπεισ|νιωθεισ|θεωρεισ|φοβασαι)(?![^.!]*;)/,
   ];
   for (let i = 0; i < FORMS.length; i++) if (FORMS[i].test(fold)) return true;
   return false;
@@ -3813,6 +3819,68 @@ function detectsShiftCheckAsked(text) {
 // class as the shift-check/core-readiness gates).
 function detectsFriendPerspectiveAsked(text) {
   return /αυτό που θα έλεγες στον φίλο.{0,50}διαφορετικό από αυτό που επιτρέπεις στον εαυτό σου/i.test(text || "");
+}
+// ── THE RULER'S TWINS — observation only, and deliberately NOT the latches above ──────────────────
+// A measurement pass over real AURA replies (2026-10) found that the strict detectors above and
+// below do not recognise the wording the model really uses: the stakes latch wants "θα σου
+// κοστίσει" and the model wrote "θα κοστίσει"; the friend latch wants the second question in one
+// exact form; the shift latch does not know "Τι άλλαξε μέσα σου από πριν ως τώρα;".
+// THEY WERE NOT WIDENED, because they are not counters: each one sets a latch that decides what
+// reminder is injected into the model next turn, so widening it changes what AURA says. That is a
+// decision for the founder, not a measurement fix. This function is the measurement fix: the same
+// three questions, recognised in the wording AURA really used, read ONLY by instrumentation (the
+// delivered-stakes side of the gatesDue/gatesIgnored counter) and by any future replay scorer.
+// Nothing here may set a latch, build a ctx, or touch displayText — test_ruler_detectors.js §6
+// pins that. Only sentences that ARE questions are examined (a Greek "…;" or "…?"), so AURA
+// declaring something never reads as AURA asking it.
+// SELF-CONTAINED on purpose (suites lift detectors with indexOf('function X(')): the fold is
+// inlined. READ THE PATTERNS AGAINST THE FOLD — accents stripped, lowercased, final sigma → σ.
+function detectsGateQuestionsLoose(text) {
+  const none = { stakes: false, friend: false, shift: false };
+  if (typeof text !== "string" || !text.trim()) return none;
+  const fold = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ς/g, "σ");
+  const questions = fold.match(/[^.!?;]*[?;]/g) || [];
+  const out = { stakes: false, friend: false, shift: false };
+  for (const q of questions) {
+    // The COST of staying unresolved over time — a cost word AND a horizon of waiting. A price
+    // question about a thing ("πόσο θα κοστίσει το εισιτήριο του χρόνου;") has no horizon.
+    if (/κοστισει|στοιχισει/.test(q) &&
+        /εναν (?:ακομα )?χρονο|μεινει θολ|αν (?:δεν|περιμενεισ)/.test(q)) out.stakes = true;
+    // The friend perspective, either of its two questions. "φίλος" is bounded on both sides so
+    // "φιλοσοφία" is not a friend.
+    if (/φιλο(?:σ|υ)?(?![α-ω])/.test(q) &&
+        (/τι θα (?:του )?ελεγεσ/.test(q) || /επιτρεπεισ (?:και )?στον εαυτο σου/.test(q))) out.friend = true;
+    // The shift check: a change, asked about INSIDE the person. "Τι άλλαξε στην εταιρεία;" is not it.
+    if (/αλλαξε/.test(q) &&
+        (/μεσα σου/.test(q) || /σε σχεση με το πωσ εβλεπεσ/.test(q))) out.shift = true;
+  }
+  return out;
+}
+// Did the person ANSWER a question that asked for a step with something that is a step? The strict
+// detectsConcreteStep needs "θα + one of 18 verbs", so a bare noun phrase ("Έκτακτο συμβούλιο") or
+// a verb outside the list ("Θα το ψάξω") is invisible to it — which is how a real session reached
+// its closing with a stated step and no Outcome Scale. THAT detector gates a hard override of the
+// reply, so it is left untouched (see detectsConcreteStep's own comment: widening `base` "is a
+// separate decision to be made from a specification"). This twin only MEASURES, and it asks for the
+// one thing that makes a bare noun phrase safe to read as a step: AURA's own previous message must
+// have been the question that asks for one. Without that, "Έκτακτο συμβούλιο" is just two words.
+// Two arguments, no state, decides nothing. Hedges, refusals, deferrals, questions and long
+// explanations are not answers.
+function detectsStepAnswerLoose(userText, previousAuraText) {
+  if (typeof userText !== "string" || typeof previousAuraText !== "string") return false;
+  const f = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ς/g, "σ").trim();
+  const asked = f(previousAuraText);
+  if (!/[?;]/.test(asked)) return false;
+  if (!/πρωτο (?:πραγμα|βημα)|τι θα κανεισ/.test(asked)) return false;
+  const u = f(userText);
+  const words = u.split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 10) return false;
+  if (/[?;]/.test(u)) return false;
+  if (/(?:^| )(?:δεν|ισωσ|μηπωσ|μπορει|τιποτα|οχι)(?: |$)/.test(u)) return false;
+  if (/^(?:ναι|ενταξει|οκ|ok)\W*$/.test(u) || /θα (?:το )?δω/.test(u)) return false;
+  // A time is the answer to "Πότε;", not a step.
+  if (/^(?:αυριο|σημερα|τωρα|αργοτερα)\W*$/.test(u)) return false;
+  return /^θα /.test(u) || words.length <= 4;
 }
 // Detects CHECK BEFORE ADDING's promise-inclusive wording — the button's correct home (red-team
 // fix: it belongs right after the promise "μπορώ να σου δείξω πώς έφτασες εδώ" is stated, never
@@ -4185,6 +4253,23 @@ function detectOutputViolation(text, ctx) {
   if (!n) return null;
   const EVAL = /(καλη (επιλογη|αποφαση|κινηση|προσπαθεια)|σωστα (κανεις|εκανες)|μπραβο|λογικο ακουγεται|σωστη σκεψη|καλα εκανες)/;
   if (EVAL.test(n)) return "EVALUATION";
+  // FOUR MORE APPROVALS THE PROMPT ALREADY FORBIDS, all measured as invisible to the list above on
+  // real AURA replies (2026-10, four real sessions): "Καλή αρχή" (named by UNIVERSAL NO-EVALUATION
+  // itself), "Χαίρομαι που πήγε καλά", "Αυτό δεν είναι αίσθηση μόνο — είναι πραγματικό" (AURA ruling
+  // whether a feeling is real), and "Δύο ώρες τη μέρα είναι αρκετές για να ξεκινήσεις" (AURA ruling a
+  // plan sufficient). OBSERVATION ONLY, exactly like the line above: the verdict feeds a counter and
+  // a console warning, never a rewrite. Matched against a copy with final sigma normalised (ς→σ, so
+  // these are written with σ) and with quoted spans removed — a person's own words printed back in
+  // « » are the Mirror Rule working, not an approval. The sufficiency ruling is judged per
+  // SENTENCE so it can exclude a question ("…αρκετές για να ξεκινήσεις;" is AURA asking), an
+  // attributed claim ("Είπες ότι…") and a negation ("Δεν είναι αρκετές…"). See
+  // auratests/test_ruler_detectors.js §1, which pins each of those exclusions.
+  const ns = n.replace(/ς/g, "σ").replace(/«[^»]*»/g, " ").replace(/\u201c[^\u201d]*\u201d/g, " ").replace(/"[^"]*"/g, " ");
+  if (/καλη αρχη|χαιρομαι που[^.;!?]{0,25}(?:καλα|ομορφα)|δεν ειναι (?:μονο )?(?:αισθηση|εντυπωση)(?: μονο)?[^.;!?]{0,6}ειναι (?:πραγματικ|αληθινο)/.test(ns)) return "EVALUATION";
+  if (ns.split(/(?<=[.!?;·])\s*/).some(s =>
+        !/[?;]$/.test(s) &&
+        !/ειπεσ|ειπατε|λεσ οτι|λετε οτι|ανεφερεσ|γραψεσ|εχεισ πει/.test(s) &&
+        /(?<!δεν )ειναι αρκετ\S* για (?:να|τ)/.test(s))) return "EVALUATION";
   // Conversational imperatives are how AURA asks — they are not advice and must not flag.
   const CONV = /^(πες|πειτε|σκεψου|δες|φαντασου|περιγραψε|ονομασε|δωσε μου|παρε τον χρονο|κρατα|βαλε το)/;
   const IMP = /(^|[.!;·]\s*)(παρε|κανε|μιλησε|ζητα|στειλε|γραψε|ξεκινα|σταματα|αλλαξε|φυγε|μεινε|δοκιμασε|κλεισε|πηγαινε)/;
@@ -5880,7 +5965,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           const _snap = gatesDueSnapshot.current || {};
           const _delivered = {
             anchors: detectsAnchorsInvited(_clean),
-            stakes: detectsStakesAsked(_clean),
+            // Strict OR twin: the strict detector wants "θα σου κοστίσει" and the model has been
+            // measured writing "θα κοστίσει", which made a delivered question read as ignored. This
+            // is the COUNTER side only — the latch that sets stakesAsked stays strict.
+            stakes: detectsStakesAsked(_clean) || detectsGateQuestionsLoose(_clean).stakes,
             scale: detectsOutcomeScaleAsked(_clean),
           };
           ['anchors', 'stakes', 'scale'].forEach(k => {
