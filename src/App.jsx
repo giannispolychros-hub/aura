@@ -3743,6 +3743,12 @@ function detectsClaimAboutUser(text) {
     // tendency in the world is not a claim about them. Question-excluded like the forms above.
     // Form only. See auratests/test_ruler_detectors.js §2.
     /υπαρχει (?:μια|ενα) (?:ταση|μοτιβο|προτυπο)[^.;!?]{0,100}(?:βλεπεισ|νιωθεισ|θεωρεισ|φοβασαι)(?![^.!]*;)/,
+    // FORM 9 — AURA'S OWN LABEL, NEED OR INNER STATE PUT ON THE PERSON (fifth real session, 2026-10-01):
+    // "αυτό το κουβαλάς ήδη μαζί σου", "μοιάζει περισσότερο με ανάγκη για δομή", "μοιάζει να ψάχνεις…",
+    // "Αυτό που ψάχνεις δεν είναι AI φίλος". Each one is hedged or followed by "Σωστά;", but the label is AURA's,
+    // not the person's. Question-excluded like the forms above; a person's own words in « » are already stripped.
+    // Measured against the prompt's 442 quoted sentences: no prescribed sentence matches. Form only.
+    /(?:κουβαλασ|εχεισ)[^.;!?]{0,20}ηδη[^.;!?]{0,12}(?:μαζι|μεσα) σου(?![^.!]*;)|μοιαζει[^.;!?]{0,30}με αναγκη(?![^.!]*;)|μοιαζει να (?:ψαχνεισ|θελεισ|αναζητασ|φοβασαι|νιωθεισ)(?![^.!]*;)|αυτο που (?:ψαχνεισ|θελεισ|περιγραφεισ) δεν ειναι(?![^.!]*;)/,
   ];
   for (let i = 0; i < FORMS.length; i++) if (FORMS[i].test(fold)) return true;
   return false;
@@ -4269,7 +4275,11 @@ function detectOutputViolation(text, ctx) {
   if (ns.split(/(?<=[.!?;·])\s*/).some(s =>
         !/[?;]$/.test(s) &&
         !/ειπεσ|ειπατε|λεσ οτι|λετε οτι|ανεφερεσ|γραψεσ|εχεισ πει/.test(s) &&
-        /(?<!δεν )ειναι αρκετ\S* για (?:να|τ)/.test(s))) return "EVALUATION";
+        (/(?<!δεν )ειναι αρκετ\S* για (?:να|τ)/.test(s) ||
+         // (2026-10-01, fifth real session) "Καλή ερώτηση", "Εύλογο ερώτημα", "Καλή ιδέα" — the last is on the
+         // prompt's own prohibited list. Measured against the prompt's 442 quoted sentences: no prescribed
+         // sentence matches. «Καλή τύχη» is NOT here on purpose: the prompt calls "Καλή τύχη αύριο" a clean goodbye.
+         /(?:καλη|ωραια|εξαιρετικη|ευλογη) ερωτηση|(?:καλο|ευλογο) ερωτημα|(?:καλη|ωραια) ιδεα/.test(s)))) return "EVALUATION";
   // Conversational imperatives are how AURA asks — they are not advice and must not flag.
   const CONV = /^(πες|πειτε|σκεψου|δες|φαντασου|περιγραψε|ονομασε|δωσε μου|παρε τον χρονο|κρατα|βαλε το)/;
   const IMP = /(^|[.!;·]\s*)(παρε|κανε|μιλησε|ζητα|στειλε|γραψε|ξεκινα|σταματα|αλλαξε|φυγε|μεινε|δοκιμασε|κλεισε|πηγαινε)/;
