@@ -2252,6 +2252,64 @@ function detectsUnverifiedFoundClaim(foundText, userTexts) {
   if (content.length === 0) return false;
   return !content.some(w => corpus.includes(w));
 }
+// INTENT WITHOUT ROADS — a PASSIVE COUNTER, nothing else (founder decision, 2026-10-01; see
+// auratests/test_intent_no_roads.js). A fifth real session had the user say "ίσως ασχοληθώ και το χτίσω", answer
+// "Τίποτα" to "τι σε εμποδίζει", and be closed with a goodbye — no road was laid out. The founder chose NOT to add a
+// signal to the model; only to MEASURE how often it happens, so a later decision rests on data.
+// TRUE when ALL THREE hold: (α) the user expressed UNCERTAIN INTENT in their own words — "ίσως" + an action verb,
+// "σκέφτομαι να", "μάλλον θα" (a question, a negation and a stative verb like "ξέρω/νομίζω/έχω" do not count);
+// (β) `stepStated` is false — the caller passes what the app ALREADY recorded (concreteStepStated or the COMMITMENT
+// capture's committed entry), so this adds no detector of its own for it; (γ) NO assistant reply set two or more of
+// the user's own phrases side by side in ONE sentence. A phrase is the user's if it is a quoted span that appears in
+// something they wrote, or an unquoted run of 3+ consecutive words (with at least one 5+ letter word) that does.
+// KNOWN LIMITS: (β) inherits the blind spots of detectsConcreteStep and COMMITMENT ("Το Claude", "Θα το χτίσω" are
+// invisible to both), so it OVER-counts sessions where a step was named in words they do not know. (γ) reads FORM: it
+// cannot tell a faithful mirror from a paraphrase that reuses words. A delivered road map is excluded by the CALLER
+// (it has the real parser's flag). SELF-CONTAINED on purpose (suites lift detectors with indexOf('function X(')).
+function detectsIntentWithoutRoads(messages, stepStated) {
+  if (!Array.isArray(messages) || stepStated) return false;
+  const fold = x => String(x == null ? "" : x).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ");
+  const turns = messages.filter(m => m && typeof m.content === "string");
+  const users = turns.filter(m => m.role === "user").map(m => fold(m.content));
+  const sentences = text => text.split(/(?<=[.;!?])\s+|\n+/).filter(Boolean);
+  // (α) uncertain intent, in the user's own words.
+  const STATIVE = /^(?:ξερω|νομιζω|πιστευω|νιωθω|αισθανομαι|μπορω|θελω|ξερουμε)$/;
+  const uncertain = users.some(t => sentences(t).some(sent => {
+    if (/[?;]\s*$/.test(sent)) return false;
+    if (/(?<!δεν )σκεφτομαι να |μαλλον θα /.test(sent)) return true;
+    const at = sent.search(/(?:^|\s)ισωσ(?:\s|$)/);
+    if (at < 0) return false;
+    const verb = /[α-ω]{3,}(?:ω|ομαι|ουμε)(?![α-ω])/.exec(sent.slice(at + 5, at + 5 + 25));
+    return !!verb && !STATIVE.test(verb[0]);
+  }));
+  if (!uncertain) return false;
+  // (γ) did any assistant reply set two or more of the user's own phrases side by side, in one sentence?
+  const words = x => fold(x).match(/[α-ω0-9]+/g) || [];
+  const tri = new Set();
+  for (const t of users) { const w = words(t); for (let i = 0; i + 2 < w.length; i++) tri.add(w.slice(i, i + 3).join(" ")); }
+  for (const m of turns) {
+    if (m.role !== "assistant") continue;
+    for (const sent of sentences(m.content)) {
+      const frags = [];
+      for (const q of sent.matchAll(/«([^»]+)»|\u201c([^\u201d]+)\u201d|"([^"]+)"/g)) {
+        const f = words(q[1] || q[2] || q[3]).join(" ");
+        if (f.length >= 4 && users.some(u => (" " + words(u).join(" ") + " ").includes(" " + f + " "))) frags.push(f);
+      }
+      const w = words(sent), covered = new Array(w.length).fill(false);
+      for (let i = 0; i + 2 < w.length; i++) if (tri.has(w.slice(i, i + 3).join(" "))) covered[i] = covered[i + 1] = covered[i + 2] = true;
+      for (let i = 0; i < w.length; i++) {
+        if (!covered[i]) continue;
+        let j = i; while (j < w.length && covered[j]) j++;
+        const run = w.slice(i, j);
+        if (run.some(x => x.length >= 5)) frags.push(run.join(" "));
+        i = j;
+      }
+      const distinct = [...new Set(frags)].filter((f, _, all) => !all.some(g => g !== f && g.includes(f)));
+      if (distinct.length >= 2) return false;
+    }
+  }
+  return true;
+}
 // DORMANT — NOT WIRED INTO THE APPLICATION (adversarial self-audit finding): this function is
 // defined and covered by 12 passing tests in test_anchor_coverage.js, but is called ZERO times
 // anywhere in the app. The tests therefore validate logic that never actually runs — a green
@@ -5280,9 +5338,14 @@ export default function AURAv2() {
         // _declared to change behaviour.
         if (messages[i].role === "user" && (isExplicitClosure(messages[i].content || "") || declaresClosing(messages[i].content || ""))) { _declared = true; break; }
       }
+      // PASSIVE COUNTER (founder decision, 2026-10-01): uncertain intent that never became a step and closed with no
+      // road. Computed here from `messages` like roadMap — no ref, no consumer, never shown to the model. (β) reads
+      // the app's EXISTING records (concreteStepStated, and the COMMITMENT capture's committed entry, read only).
+      const _intentNoRoads = !_roadMap && detectsIntentWithoutRoads(messages, concreteStepStated.current || !!(commitmentPair.current && commitmentPair.current.committed));
       recordTelemetry("session_completed", {
         turns: turnCount.current || 0,
         roadMap: _roadMap,
+        intentNoRoads: _intentNoRoads ? 1 : 0,
         roadLabels: _roadLabels,
         beatParsed: _beatParsed,
         beatLabels: _beatLabels,
