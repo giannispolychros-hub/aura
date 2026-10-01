@@ -1476,7 +1476,16 @@ function detectSafetySignal(text) {
     /\b(suicide|suicidal|self.harm|self.hurt|kill myself|end my life|don't want to (live|be here)|want to die|want to disappear|can't go on)\b/i,
     // RT-CRITICAL-fix: \b does not recognize Greek letters as word characters in JS regex —
     // every Greek pattern here previously NEVER matched, in any real sentence, ever. Removed \b.
-    /(αυτοκτον|αυτοτραυματ|δεν θέλω να ζω|θέλω να πεθάν|θέλω να χαθώ|να χαθώ|να τελειώσω|δεν αντέχω άλλο|δεν βλέπω νόημα|δεν υπάρχει λόγος να συνεχίσω|δεν βλέπω λόγο να συνεχίσω|ίσως (ούτε )?η ζωή μου|δεν αξίζει (πια|πλέον)|τι νόημα έχει πια|κουράστηκα να (προσπαθώ|υπάρχω|αγωνίζομαι|συνεχίζω)|δώσω τέλος|να δώσω ένα τέλος|βάλω (ένα )?τέλος|να μην ξυπνήσω|να μην είμαι εδώ|να εξαφανιστώ|καλύτερα νεκρ|θα ήταν καλύτερα χωρίς εμένα|κακό στον εαυτό μου|βλάψω τον εαυτό μου|να φύγω από τη ζωή|δεν έχω λόγο να ζω|τελειώνω με όλα)/i,
+    // CRISIS VOCABULARY, revised 2026-10-01 (founder decision; see auratests/test_crisis_vocabulary.js).
+    // REMOVED the bare «να τελειώσω» and «να χαθώ»: they made «να τελειώσω τη δουλειά μου» a CRISIS,
+    // which sets safetyMode and stops the session from ever closing. KEPT their crisis forms
+    // («θέλω να χαθώ», «να χαθώ από προσώπου γης», «να τελειώσω τη ζωή μου», «να τελειώσω όλα» when
+    // «όλα» does not start a noun phrase…). ADDED four indirect phrasings that were missing:
+    // «κουράστηκα να ζω», «δεν θέλω να είμαι πια εδώ», «σκέφτομαι να τα τελειώσω όλα»,
+    // «δεν έχει νόημα να συνεχίζω». RULE: a phrase that can be read BOTH ways is CAUGHT — a false
+    // alarm costs less than a missed real signal. KNOWN GAP, not fixed: the list is accent-sensitive,
+    // so «θελω να πεθανω» typed without accents is not caught (pinned in the test).
+    /(αυτοκτον|αυτοτραυματ|δεν θέλω να ζω|θέλω να πεθάν|θέλω να χαθώ|ήθελα να χαθώ|να χαθώ (από προσώπου|για πάντα|από τον κόσμο)|να τελειώσω (τα πάντα|με όλα|με τα πάντα|τη ζωή μου|με τη ζωή μου)|να τελειώσω όλα(?! (μου )?(τα|τις|τους|αυτά))|να τα τελειώσω όλα|δεν αντέχω άλλο|δεν βλέπω νόημα|δεν υπάρχει λόγος να συνεχίσω|δεν βλέπω λόγο να συνεχίσω|ίσως (ούτε )?η ζωή μου|δεν αξίζει (πια|πλέον)|τι νόημα έχει πια|κουράστηκα να (προσπαθώ|υπάρχω|αγωνίζομαι|συνεχίζω|ζω)|δώσω τέλος|να δώσω ένα τέλος|βάλω (ένα )?τέλος|να μην ξυπνήσω|να μην είμαι εδώ|δεν θέλω να είμαι (πια |πλέον )?εδώ|δεν έχει νόημα να (συνεχίζω|συνεχίσω|ζω)|να εξαφανιστώ|καλύτερα νεκρ|θα ήταν καλύτερα χωρίς εμένα|κακό στον εαυτό μου|βλάψω τον εαυτό μου|να φύγω από τη ζωή|δεν έχω λόγο να ζω|τελειώνω με όλα)/i,
   ];
   const distress = [
     /\b(grief|bereaved|bereavement|trauma|traumatic|abuse|abused|assault|crisis|breakdown|panic attack)\b/i,
