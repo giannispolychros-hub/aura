@@ -181,9 +181,12 @@ if (typeof D === 'function') {
   assert('the DISTRESS pattern is byte-identical',
     CODE.includes('/(πένθος|τραύμα|κατάρρευση|κρίση|κακοποίηση|απώλεια αγαπημένου)/i,') &&
     CODE.includes('/\\b(grief|bereaved|bereavement|trauma|traumatic|abuse|abused|assault|crisis|breakdown|panic attack)\\b/i,'));
-  assert('the helpline line is untouched in the code (10306, appended only in SUPPORTIVE mode)',
-    CODE.includes('let displayText = (currentMode === "SUPPORTIVE" && !/10306/.test(text))') &&
-    CODE.includes('? text + "\\n\\nΑν ποτέ φτάσεις σε εκείνη τη στιγμή, υπάρχει η γραμμή 10306 — είναι εκεί."'));
+  // UPDATED 2026-10-02: this assertion used to pin the OLD unconditional «…10306 — είναι εκεί.» append as untouched, while the
+  // founder confirmed the number. He then approved the two-tier design (test_crisis_tiers.js): the old inline append is
+  // REPLACED by buildCrisisLine (1018 + 112 for tier A, 10306 once for tier B). It is still appended only in SUPPORTIVE mode.
+  assert('the helpline line is still appended only in SUPPORTIVE mode, now through buildCrisisLine (old inline append gone)',
+    /if \(currentMode === "SUPPORTIVE"\) \{\s*const _crisisLine = buildCrisisLine\(/.test(CODE) &&
+    !CODE.includes('let displayText = (currentMode === "SUPPORTIVE" && !/10306/.test(text))'));
   assert('the helpline line is untouched in the prompt',
     PROMPT.includes('"Αν ποτέ φτάσεις σε εκείνη τη στιγμή, υπάρχει η γραμμή 10306 — είναι εκεί."'));
   assert('the English CRISIS pattern is untouched',

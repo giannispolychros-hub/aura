@@ -1507,6 +1507,33 @@ function detectSafetySignal(text) {
   if (distress.some(p => p.test(text))) return "DISTRESS";
   return null;
 }
+// CRISIS TIERS (founder decision, 2026-10-02; see auratests/test_crisis_tiers.js). The CRISIS list mixes two things: SUICIDAL
+// thoughts or self-harm, and general despair. They need different numbers: 1018 is a suicide-intervention line, 10306 is
+// the Psychosocial Support Line (both confirmed by the founder). TIER A = suicidal thoughts and EVERY ambiguous phrase
+// (a missed suicidal message costs more than a surplus line). TIER B = despair with no stated self-harm. Decided without
+// repeating the vocabulary: first ask detectSafetySignal whether this is CRISIS at all, then remove the few tier-B phrases
+// and ask it AGAIN — still CRISIS means A, otherwise B — so A ∪ B is exactly CRISIS by construction. A tier-B phrase
+// followed by «να ζω / να συνεχίσω / …» is not tier B ("δεν αντέχω άλλο να ζω"). Returns "A", "B" or null. DISTRESS (grief,
+// trauma, panic, «κρίση») is not CRISIS and gets null: no number from code, as before.
+function classifyCrisisTier(text) {
+  if (typeof text !== "string" || detectSafetySignal(text) !== "CRISIS") return null;
+  const folded = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const rest = folded.replace(/(?:δεν αντεχω αλλο|δεν βλεπω νοημα|δεν αξιζει (?:πια|πλεον)|τι νοημα εχει πια|κουραστηκα να (?:προσπαθω|αγωνιζομαι))(?! να (?:ζω|ζησω|συνεχ|υπαρχ|ειμαι))/g, " ");
+  return detectSafetySignal(rest) === "CRISIS" ? "A" : "B";
+}
+// THE LINE APPENDED TO A CRISIS REPLY — pure, so it is testable. Tier A: the 1018 + 112 line on EVERY tier-A message,
+// unless the model's own text already contains "1018". Tier B: the 10306 line ONCE per session (`supportLineShown`), and
+// never when the model already said "10306" (that counts as shown). An unknown tier is treated as A. `supportShown` in
+// the result is the new value of the once-per-session flag: it is only ever turned ON by tier B. The texts are
+// founder-approved: statements only, no advice, and no promise about what happens when someone calls.
+function buildCrisisLine(tier, modelText, supportLineShown) {
+  const said = typeof modelText === "string" ? modelText : "";
+  if (tier === "B") {
+    if (supportLineShown || /10306/.test(said)) return { line: "", supportShown: true };
+    return { line: "Υπάρχει η Γραμμή Ψυχοκοινωνικής Υποστήριξης, 10306 — δωρεάν και ανώνυμη.", supportShown: true };
+  }
+  return { line: /1018/.test(said) ? "" : "Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.", supportShown: !!supportLineShown };
+}
 
 // ─────────────────────────────────────────────
 // MEMORY — Pattern Storage / Interpretation separation
@@ -5149,6 +5176,7 @@ export default function AURAv2() {
   const compressionCount = useRef(0);
   // Counts replies where AURA presented a set of options and not one of them came from the user.
   // Observation only, per the staged plan: telemetry decides whether this ever gates a reply.
+  const supportLineShown = useRef(false); // the 10306 line (tier B) is shown at most once per session; reset in resetSession
   const unsourcedOptionOffers = useRef(0);
   // Claims about the user (No-Evaluation / Κ5). Counts only, same shape as the counter above.
   const claimsAboutUser   = useRef(0);
@@ -6150,9 +6178,14 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       }
 
       // Deterministic safety enforcement: detection = enforced behavior, not a suggestion left to the model.
-      let displayText = (currentMode === "SUPPORTIVE" && !/10306/.test(text))
-        ? text + "\n\nΑν ποτέ φτάσεις σε εκείνη τη στιγμή, υπάρχει η γραμμή 10306 — είναι εκεί."
-        : text;
+      // The line depends on the TIER of the message that triggered this turn: 1018 + 112 for suicidal thoughts (every
+      // time), 10306 once per session for general despair. See buildCrisisLine / auratests/test_crisis_tiers.js.
+      let displayText = text;
+      if (currentMode === "SUPPORTIVE") {
+        const _crisisLine = buildCrisisLine(classifyCrisisTier(lastUserMsg), text, supportLineShown.current);
+        if (_crisisLine.line) displayText = text + "\n\n" + _crisisLine.line;
+        if (_crisisLine.supportShown) supportLineShown.current = true;
+      }
 
       // ROOT-CAUSE FIX (Clarity + Ownership Scale gate — real-transcript evidence: the user's
       // message "Θα το κάνω" correctly set concreteStepStated=true via detectsConcreteStep, but the
@@ -6942,8 +6975,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     // Safety check — gradient response (C8)
     const safetySignal = detectSafetySignal(userText);
     if (safetySignal === "CRISIS") {
-      // Level 3: full safety mode, supportive only
-      setSafetyMode(true);
+      // Level 3: full safety mode, supportive only — for tier A. Tier B (general despair, no stated self-harm) gets the
+      // same SUPPORTIVE reply turn but does NOT lock the session: safetyMode would stop it from ever closing.
+      const _crisisTier = classifyCrisisTier(userText);
+      if (_crisisTier !== "B") setSafetyMode(true);
       setFirstWhyPending(false); setFirstWhyMessage("");  // RT-fix #2: also clear stale message content, not just the flag
       setCurrentDomain(detectDomain(userText));  // RT-02: symmetric with DISTRESS branch
       const safeMsgs = [...messages, { id: nextMsgId(), role: "user", content: userText }];
@@ -7227,6 +7262,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     informationModeActive.current = false;
     methodFailureHint.current = false;
     unsourcedOptionOffers.current = 0;
+    supportLineShown.current = false;
     claimsAboutUser.current = 0;
     unverifiedFoundClaims.current = 0;
     explicitRequests.current = 0;
