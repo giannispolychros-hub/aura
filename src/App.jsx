@@ -4834,11 +4834,13 @@ async function callAura(messages, systemPrompt, retries = 1, onChunk = null) {
   // previously sent at full price every time) gets marked and SYSTEM_SUPPORTIVE (~851 chars, far
   // below the floor) correctly does not.
   //
-  // TTL is deliberately NOT uniform. CORE keeps 1h because a genuine thinking pause mid-session
-  // would otherwise expire it; the static non-CORE prompts take the 5-minute default, whose write
-  // is 1.25x instead of 2x, because the calls that use them arrive seconds apart. Whether 1h earns
-  // its doubled write price on CORE is an open question — the usage counters logged below are what
-  // will answer it, rather than another guess.
+  // TTL — every block now takes the 5-minute default (founder decision, 2026-10-03; see
+  // ARCHITECTURE_DECISIONS.md). CORE used to carry ttl "1h", billed at 2x input price on the write
+  // (~$0.46 for ~77,000 tokens) against 1.25x (~$0.29) for the default. A 0.45€ balance ran out at
+  // the THIRD reply of a real session — the first reply's write was nearly all of it. Billing only:
+  // the model receives exactly the same text in the same blocks. The trade: a pause of more than
+  // 5 minutes between two messages lets CORE expire, and the next reply pays the 1.25x write again.
+  // cacheWrite > 0 on any turn after the first, in the usage counters logged below, is that event.
   //
   // RT-fix kept (real production crash — "t.startsWith is not a function"): the array branch is
   // defensive only. No call site passes an array any more.
@@ -4847,7 +4849,7 @@ async function callAura(messages, systemPrompt, retries = 1, onChunk = null) {
     ? systemPrompt
     : (typeof systemPrompt === "string" && systemPrompt.startsWith(AURA_CORE_PERSONALITY))
       ? [
-          { type: "text", text: AURA_CORE_PERSONALITY, cache_control: { type: "ephemeral", ttl: "1h" } },
+          { type: "text", text: AURA_CORE_PERSONALITY, cache_control: { type: "ephemeral" } },
           { type: "text", text: systemPrompt.slice(AURA_CORE_PERSONALITY.length) },
         ]
       : [
@@ -4925,8 +4927,10 @@ async function callAura(messages, systemPrompt, retries = 1, onChunk = null) {
     // The API already returns token usage on every response and the proxy passes it through
     // untouched; the client simply threw it away. That left the three questions the cost audit
     // could not answer — what the real cache hit rate is, how often a cold write actually happens,
-    // and therefore whether the 1-hour TTL's doubled write price earns itself — answerable only by
-    // guessing. cacheWrite > 0 means this turn paid a cold write; cacheRead > 0 means it hit.
+    // and therefore which TTL CORE should use — answerable only by guessing. (Decided 2026-10-03 for
+    // the 5-minute default; these counters are how that decision is checked and, if pauses over five
+    // minutes turn out common, reversed.) cacheWrite > 0 means this turn paid a cold write;
+    // cacheRead > 0 means it hit.
     // FOUR INTEGERS. Nothing about the conversation is read here, and nothing is written to
     // storage. __auraUsageLog exists because a phone has no console to read.
     try {

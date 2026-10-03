@@ -143,8 +143,12 @@ if (buildBlocks && mainPathSystem) {
     rejoined === LENS.CHALLENGE + '\n[CTX]' && !blocks[0].text.includes('test assumptions'));
   assert('The per-turn dynamic ctx is in the UNCACHED block, never in the cached one',
     blocks[blocks.length - 1].text.includes('[CTX]') && !blocks[0].text.includes('[CTX]'));
-  assert('The CORE block keeps its 1-hour TTL (this change does not decide the TTL question)',
-    blocks[0].cache_control && blocks[0].cache_control.ttl === '1h');
+  // RESTATED, NOT RELAXED (2026-10-03). This pinned ttl === '1h' with the note "this change does not
+  // decide the TTL question". The founder has now decided it — CORE takes the default 5-minute TTL
+  // (write 1.25x instead of 2x); see test_cache_ttl.js and ARCHITECTURE_DECISIONS.md. The assertion
+  // still pins an exact value, just the decided one.
+  assert('The CORE block uses the DEFAULT 5-minute TTL (founder decision 2026-10-03)',
+    blocks[0].cache_control && blocks[0].cache_control.type === 'ephemeral' && blocks[0].cache_control.ttl === undefined);
 
   // ── 2. SYSTEM_TERMINATION is cacheable and must be marked ─────────────────
   // ~19,400 chars / ~6,000 tokens of completely static text, used by three call sites at the end

@@ -15,7 +15,8 @@ const path = require('path');
 
 const MODEL = 'claude-sonnet-4-6';          // = api/aura.js, ALLOWED_MODEL
 // Τιμές ανά 1.000.000 tokens, από τον πίνακα της τεκμηρίωσης (cached 2026-09-25). ΕΛΕΓΞΕ τες πριν εμπιστευτείς το κόστος.
-const PRICE = { input: 3, output: 15, cacheWrite1h: 6, cacheRead: 0.30 };   // write 1h = 2x, read = 0.1x
+// Η AURA χρησιμοποιεί από 2026-10-03 cache 5 λεπτών (εγγραφή 1,25x) αντί για 1 ώρας (2x) — βλ. ARCHITECTURE_DECISIONS.md.
+const PRICE = { input: 3, output: 15, cacheWrite5m: 3.75, cacheRead: 0.30 };   // write 5m = 1.25x, read = 0.1x
 // ΥΠΟΘΕΣΕΙΣ για ό,τι δεν μετράται εδώ (αλλάξτες): uncached tokens ανά γύρο (ιστορικό ≤20.000 χαρακτήρες + ctx), έξοδος ανά γύρο.
 const ASSUME = { uncachedPerTurn: 6000, outPerTurn: 200, turns: 13, closingCalls: 2, closingInTokens: 12000, closingOutTokens: 300 };
 
@@ -57,17 +58,17 @@ async function count(system, userText) {
   console.log('\nΜΕΤΡΗΜΕΝΑ tokens του prompt (μοντέλο ' + MODEL + '):', P);
   console.log('Χαρακτήρες ανά token:', (PROMPT.length / P).toFixed(2));
   const M = 1e6, A = ASSUME;
-  const first = (P * PRICE.cacheWrite1h + A.uncachedPerTurn * PRICE.input + A.outPerTurn * PRICE.output) / M;
+  const first = (P * PRICE.cacheWrite5m + A.uncachedPerTurn * PRICE.input + A.outPerTurn * PRICE.output) / M;
   const later = (P * PRICE.cacheRead + A.uncachedPerTurn * PRICE.input + A.outPerTurn * PRICE.output) / M;
   const closing = A.closingCalls * (A.closingInTokens * PRICE.input + A.closingOutTokens * PRICE.output) / M;
   const cold = first + (A.turns - 1) * later + closing, warm = A.turns * later + closing;
   console.log('\nΣυνεδρία ' + A.turns + ' γύρων (υποθέσεις: ' + JSON.stringify(A) + '):');
-  console.log('  πρώτος γύρος (εγγραφή cache 1h): $' + first.toFixed(3));
+  console.log('  πρώτος γύρος (εγγραφή cache 5 λεπτών): $' + first.toFixed(3));
   console.log('  κάθε επόμενος γύρος (ανάγνωση cache): $' + later.toFixed(3));
   console.log('  συνεδρία με κρύα cache: $' + cold.toFixed(2) + '   |   με ζεστή cache: $' + warm.toFixed(2));
   const replayOne = first + (4 * A.turns - 1) * later + 4 * closing;
   const replayFour = 4 * first + (4 * A.turns - 4) * later + 4 * closing;
   console.log('\nReplay βαθμονόμησης (4 transcripts, 1 prompt, 1 επανάληψη):');
-  console.log('  ένα μετά το άλλο μέσα σε 1 ώρα (1 εγγραφή cache): $' + replayOne.toFixed(2));
+  console.log('  ένα μετά το άλλο, χωρίς παύση πάνω από 5 λεπτά (1 εγγραφή cache): $' + replayOne.toFixed(2));
   console.log('  4 ξεχωριστές κρύες εκκινήσεις: $' + replayFour.toFixed(2));
 })().catch(err => { console.error('Σφάλμα:', err.message); process.exit(1); });
