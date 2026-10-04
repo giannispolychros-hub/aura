@@ -156,9 +156,16 @@ assert('CLOSING: Part 2 is still told not to repeat the summary',
 // Replaces the denial with a true one (no verbatim transcript ever exists, memory on or off)
 // without revealing what the signal actually contains. +1068 characters, one cache invalidation,
 // paid knowingly.
+//
+// CHANGED AGAIN, DELIBERATELY, on 2026-10-04 (639e57faa7126041 → 0cb87ee3fd89266a). The PRIVACY
+// QUESTION line said API data «is deleted within days» — never verified. The founder confirmed the
+// real terms (Anthropic Privacy Center, updated 2026-07-01: as a rule deleted within 30 days, up to
+// 2 years if flagged for a policy violation; never used for training without express permission),
+// and the line now says what the memory panel says. +128 characters, one cache write, paid
+// knowingly. See test_transparency.js for what the line must contain.
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 639e57faa7126041…)',
-  PROMPT_SHA.slice(0, 16) === '639e57faa7126041');
+assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 0cb87ee3fd89266a…)',
+  PROMPT_SHA.slice(0, 16) === '0cb87ee3fd89266a');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',

@@ -32,7 +32,7 @@
 | **Branch** | `main` — δουλεύουμε κατευθείαν εδώ, το hardening έκλεισε |
 | **Deploy** | Vercel, αυτόματα σε κάθε push στο `main` |
 | **Live** | https://aura-ruddy-six.vercel.app |
-| **Tests** | 2.997 assertions σε 86 suites (3/10/2026), φάκελος `auratests/` |
+| **Tests** | 3.038 assertions σε 87 suites (4/10/2026), φάκελος `auratests/` |
 
 **Το `App.jsx` περιέχει τα πάντα:** το system prompt (~50%), τον κώδικα, το UI. Δεν είναι σπασμένο σε modules — και **δεν πρέπει να σπάσει**: το prompt caching εξαρτάται από σταθερό πρόθεμα, και τα tests εξάγουν συναρτήσεις με `indexOf('function X')`.
 
