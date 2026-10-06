@@ -269,7 +269,7 @@ assert('The extracted block is the real one — it still contains all three gate
 // has to supply every ref the real code reads, exactly as it already supplies the four gate flags —
 // without it the evaluated template throws ReferenceError and this whole suite silently produces no
 // output at all, which is how it first showed up: not as a failure, as an absent count.
-function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = false, anchors = false, stakes = false, roadPending = false, sharedSnapshot = null }) {
+function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = false, anchors = false, stakes = false, roadPending = false, sharedSnapshot = null, stageA = false }) {
   const msgs = [
     { role: 'user',      content: 'Έχω ένα δίλημμα με τη δουλειά μου και δεν ξεκαθαρίζει.' },
     { role: 'assistant', content: 'Τι σε κρατάει εκεί;' },
@@ -289,6 +289,9 @@ function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = 
   // clears the snapshot at the top. A fresh ref per call cannot go stale, so a mutation deleting the
   // clear survived every assertion until this existed.
   const gatesDueSnapshot   = sharedSnapshot || { current: { anchors: false, stakes: false, scale: false } };
+  // Stage A switch (SPEC_FREE_END §3.1, step 3.0) joined the refs this block reads on 2026-10-06 —
+  // same lesson as roadPending and gatesDueSnapshot above.
+  const stageAActive       = { current: stageA };
   const _text = eval(gatesTemplate);
   gatesTextWhen.lastSnapshot = gatesDueSnapshot.current;
   return _text;
@@ -314,6 +317,14 @@ assert('SNAPSHOT: with all three satisfied, nothing is recorded as due',
 gatesTextWhen({ msgCount: 5, concrete: true, scaleAsked: false, anchors: true, stakes: true, lastUserText: SUBSTANTIVE });
 assert('SNAPSHOT: the Scale is due exactly when a concrete step was stated and it was not asked',
   gatesTextWhen.lastSnapshot.scale === true);
+// STAGE A (step 3.0): with the switch open the Clarity + Ownership Scale is a step-stage measurement the
+// free part no longer reaches, so it is neither pushed nor recorded as due. Anchors/Stakes are untouched.
+{
+  const _sa = gatesTextWhen({ msgCount: 5, concrete: true, scaleAsked: false, anchors: false, stakes: true, lastUserText: SUBSTANTIVE, stageA: true });
+  assert('STAGE A: the Scale is not recorded as due with the switch open', gatesTextWhen.lastSnapshot.scale === false);
+  assert('STAGE A: and it is not in the reminder, while Anchors still is',
+    !/Clarity \+ Ownership Scale/.test(_sa) && /Decision Space Anchors/.test(_sa));
+}
 gatesTextWhen({ ...TWO_DUE, lastUserText: 'Θα το σκεφτώ. Κλείνουμε.' });
 assert('SNAPSHOT: a closing turn records nothing as due, so a withheld gate is never counted ignored',
   gatesTextWhen.lastSnapshot.anchors === false && gatesTextWhen.lastSnapshot.stakes === false);

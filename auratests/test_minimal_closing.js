@@ -169,9 +169,15 @@ assert('CLOSING: Part 2 is still told not to repeat the summary',
 // QUESTION line; the IDENTITY DRIFT example names AI too), and MEMORY QUESTION told the model to say
 // «δεν κρατάω ό,τι είπες λέξη προς λέξη», false with memory on (now a conditional answer true either
 // way). +1804 characters, one cache write, paid knowingly. See test_identity_memory_answers.js.
+//
+// CHANGED AGAIN, DELIBERATELY, on 2026-10-06 (a05044ceba43bf9c → 26d2a0f028cb40a9). Stage A, step 3.0,
+// founder-approved (ADR «6 Οκτωβρίου (στ)», points 2–3): one paragraph «STAGE A — FREE PART ENDS AT THE
+// ROOT», written ONCE, conditional on the per-turn marker [FREE PART: ENDS AT ROOT] that only the
+// uncached block carries when the switch is open. +2330 characters, one cache write, paid knowingly.
+// See test_stage_a_prompt_rule.js.
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 a05044ceba43bf9c…)',
-  PROMPT_SHA.slice(0, 16) === 'a05044ceba43bf9c');
+assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 26d2a0f028cb40a9…)',
+  PROMPT_SHA.slice(0, 16) === '26d2a0f028cb40a9');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',

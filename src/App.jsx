@@ -909,6 +909,8 @@ EXIT: only when genuine clarity reached.
 SUCCESS METRIC: clarity gain / decision confidence. Never session length.
 ════════════════════════════════════════
 
+STAGE A — FREE PART ENDS AT THE ROOT (founder's decision, 2026-10-06 — a time-limited experiment; ACTIVE ONLY WHEN the per-turn context of this message contains the exact marker [FREE PART: ENDS AT ROOT]. Without that marker this whole paragraph does not apply and every rule above works exactly as written.) When the marker is present, this free part of AURA ends when the user names the root; what to do about it belongs to a later, separate part that the app itself offers. For as long as the marker is present: (1) SUSPENDED: THE ONE NAMED EXCEPTION — PATH GENERATION (both activation paths), ROAD DISCOVERY and the road-map format (ΔΡΟΜΟΣ / ΚΕΡΔΙΖΕΙΣ / ΚΟΣΤΙΖΕΙ / ΑΓΝΩΣΤΟ), LANDING QUESTION, LAST HALF-STEP OF CLOSURE, PROBLEM BRIEF EXTENSION, and any question about a step, a first move, an obstacle to acting, or a date. The marker takes precedence over any other note in this message that points toward roads, a map, options or a step. (2) Never propose roads, steps, ways, methods or techniques, and never build a plan out of what the user mentioned. THE PRINCIPLE: never raise the certainty or the structure of a thought beyond what the user gave. You may mirror their own options in their own words — ✓ "Ανέφερες δύο πράγματα: να μείνεις όπως είσαι, ή να το πεις στον αδερφό σου." ❌ "Ανέφερες δύο δρόμους…" (it adds structure: their "things" became "roads"). Other violations of the same principle: costs or gains per option; ordering or comparing options; a new option they did not name; details added to something they said; words that raise certainty ("ξεκάθαρα", "στην ουσία έχεις αποφασίσει") or structure ("επιλογή Α / Β", "το πρώτο είναι… το δεύτερο…") when they did not give it that way. (3) If the user asks what to do, say honestly, once per request and without apology, that here we first find what really concerns them and that it comes after the root — e.g. "Εδώ βρίσκουμε πρώτα τι πραγματικά σε απασχολεί· το «τι κάνω» έρχεται μετά τη ρίζα." (vary the wording, never the meaning) — then ask ONE question toward the root (ONE REPLY, NOT A PROCEDURE). (4) If the user brings a step of their own, do not evaluate, develop or add to it; mirror it in their own words only if that helps the root become visible. (5) ROOT RE-FOCUS and its readiness question stay fully active: they are how the root is reached.
+
 <critical_invariants>
 FINAL REINFORCEMENT (positional-audit addition — the three principles below are already stated in full above; this is a brief recency-anchor, not a new or competing definition, added because nothing this critical is restated anywhere in the back 85% of this prompt. RELATIONSHIP TO PRE-FLIGHT CHECKLIST above, clarified via deeper audit — real gap found: both say "before composing any reply" but never referenced each other. These run together, not as two separate checklists: this one is the constant, always-present safety anchor; PRE-FLIGHT CHECKLIST is the fuller, situational sequence. Think of this as its permanent step -1, always active regardless of which of PRE-FLIGHT CHECKLIST's other steps apply this turn): before composing any reply, hold these three, briefly — CONTRACT: identify patterns, never decide which interpretation is correct, every finding returns as a genuine question. MIRROR RULE: never name the user's thought as certain, never add a conclusion they have not evidenced. NO ADVICE: the user owns every conclusion — AURA's task ends at clarity, not at telling them what to do.
 ONE CONCRETE PAIR (kept to a single, already-evidenced example — not a growing library, this block stays a brief anchor): ❌ "Άρα το πραγματικό πρόβλημα είναι Χ." (a conclusion stated as fact) ✓ "Ακούω κάτι σαν Χ — σου φαίνεται κι εσένα έτσι;" (the same observation, returned as a genuine question).
@@ -1584,6 +1586,18 @@ function isStageAActive(search) {
 function isRemoteTelemetryActive(search) {
   if (!REMOTE_TELEMETRY_ENABLED) return false;
   try { return new URLSearchParams(search).get("debug") !== "1"; } catch (e) { return false; }
+}
+// STAGE A — step 3.0 (SPEC_FREE_END.md §3.1). The rule lives ONCE in AURA_CORE_PERSONALITY and is
+// conditional on this marker; only the uncached per-turn part ever carries it, so the switch never
+// touches the cached prompt. Closed switch → "" → the per-turn text is byte-identical to before.
+function buildStageAMarker(active) {
+  return active === true ? "\n[FREE PART: ENDS AT ROOT]\n" : "";
+}
+// Violation check only (never a success measure): did a reply defer «τι κάνω» to after the root?
+function detectsRootDeferral(text) {
+  if (typeof text !== "string" || !text) return false;
+  const f = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return /(?:μετα|αφου βρουμε)\s+(?:απο\s+)?τη(?:ν)?\s+ριζα/.test(f) && /(?:ερχεται|ερχονται|πρωτα)/.test(f);
 }
 
 // ─────────────────────────────────────────────
@@ -5284,6 +5298,11 @@ export default function AURAv2() {
   const debugMode = useRef(typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1');
   // Stage A gate (step 0.1) — read once per visit, like debugMode. Closed on main; nothing reads it yet.
   const stageAActive = useRef(typeof window !== 'undefined' && isStageAActive(window.location.search));
+  // STAGE A counters (step 3.0) — violation checks only, never success measures (ADR «6 Οκτωβρίου (στ)»).
+  const freeActionOffered     = useRef(0);     // a reply gave a map / advice cascade while Stage A was open
+  const freeDeferral          = useRef(0);     // a reply deferred «τι κάνω» to after the root, on a request turn
+  const askedActionBeforeRoot = useRef(false); // the user asked for action before the root card ever opened
+  const rootCardOpenedOnce    = useRef(false); // set when the root card first opens (step 3.5)
   // RT-hardening: replaces text-based detection ("does the model's reply say 'το κρατάω'?")
   // with a plain count of how many replies have happened during the brand-new-user window —
   // works regardless of the model's exact phrasing.
@@ -5533,6 +5552,7 @@ export default function AURAv2() {
       if (_lastUserForReq) {
         if (detectsExplicitProductionRequest(_lastUserForReq.content || "")) {
           explicitRequests.current += 1;
+          if (stageAActive.current && !rootCardOpenedOnce.current) askedActionBeforeRoot.current = true;
           requestStreak.current += 1;
           if (requestStreak.current > requestStreakMax.current) requestStreakMax.current = requestStreak.current;
         } else {
@@ -5882,7 +5902,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // because it is computed in code and injected fresh at the end of the prompt, while ROAD
         // DISCOVERY is prompt text 31% in. The scale is not removed — it is sequenced after, which
         // is also the natural order: see what you actually have, then rate how clear it is.
-        if (concreteStepStated.current && !outcomeScaleAsked.current) due.push('Clarity + Ownership Scale ("τώρα, πόσο ξεκάθαρο είναι τι θέλεις να κάνεις... και πόσο αισθάνεσαι ότι είναι δική σου σκέψη ή επιλογή, 1-10;") — BUT ONLY AFTER the decision space itself has been made visible: if the user has just named genuinely distinct directions, ROAD DISCOVERY comes first and this scale waits for the turn after. Rating clarity before showing them what they actually have is backwards.');
+        if (!stageAActive.current && concreteStepStated.current && !outcomeScaleAsked.current) due.push('Clarity + Ownership Scale ("τώρα, πόσο ξεκάθαρο είναι τι θέλεις να κάνεις... και πόσο αισθάνεσαι ότι είναι δική σου σκέψη ή επιλογή, 1-10;") — BUT ONLY AFTER the decision space itself has been made visible: if the user has just named genuinely distinct directions, ROAD DISCOVERY comes first and this scale waits for the turn after. Rating clarity before showing them what they actually have is backwards.');
         if (!anchorsInvited.current) due.push('Decision Space Anchors ("ποιες λέξεις ή σύντομες φράσεις...")');
         if (!stakesAsked.current) due.push('Stakes Question ("αν αυτή η απόφαση μείνει θολή για άλλον έναν χρόνο...")');
         // The snapshot is taken here, from the same three conditions the reminder is built from, so
@@ -5890,7 +5910,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         gatesDueSnapshot.current = {
           anchors: !anchorsInvited.current,
           stakes: !stakesAsked.current,
-          scale: (concreteStepStated.current && !outcomeScaleAsked.current),
+          scale: (!stageAActive.current && concreteStepStated.current && !outcomeScaleAsked.current),
         };
         if (due.length === 0) return '';
         // Fresh, end-of-prompt placement — not a new rule, a reminder of already-declared rules
@@ -5982,11 +6002,14 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // beneath seven softer, advisory signals that arrived after it. Reordered into three tiers,
       // weakest-to-strongest, so hard constraints occupy the final, highest-attention position:
       // (1) informational background, (2) situational signals, (3) hard constraints last.
+      // STAGE A (step 3.0): with the switch open, the marker goes LAST (hard-constraint tier) and the two
+      // notes whose only job is the map are not sent. Closed switch: marker "", same notes, same order.
+      const stageAMarkerCtx = buildStageAMarker(stageAActive.current);
       const dynamicSuffix = [
         memCtx, profileCtx, materialEvidenceCtx, goalObstacleStakesCtx, masterPriorityStageCtx, lastFiredFamilyCtx, coverageReportCtx, demoCtx, informationModeCtx, explicitPauseCtx,
-        coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, roadQuestionCtx,
-        postMapCloseCtx,
-        gatesCtx, closingDriftCtx, firstReplyFloorCtx,
+        coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, stageAActive.current ? '' : roadQuestionCtx,
+        stageAActive.current ? '' : postMapCloseCtx,
+        gatesCtx, closingDriftCtx, firstReplyFloorCtx, stageAMarkerCtx,
       ].filter(Boolean).join('\n');
       // PROTOCOL COLLISION LOGGER (red-team gap: nothing recorded when two or more families fired on
       // the same turn, or which one won — so arbitration was asserted by the rules and never observed.
@@ -6122,6 +6145,15 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         if (detectsClaimAboutUser(_clean)) {
           claimsAboutUser.current += 1;
           console.warn('[AURA VIOLATION] USER_CLAIM | turn', msgCount, '|', _clean.trim().slice(0, 130));
+        }
+        // STAGE A (step 3.0) — violation checks for the free-part rule, only while the switch is open.
+        if (stageAActive.current) {
+          const _saText = _clean;
+          if ((parseRoadMap(_saText) || []).length > 0 || detectOutputViolation(_saText, { roadDiscoveryDue: false }) === "ADVICE_CASCADE") {
+            freeActionOffered.current += 1;
+            console.warn('[AURA VIOLATION] STAGE_A_FREE_ACTION | turn', msgCount);
+          }
+          if (requestStreak.current > 0 && detectsRootDeferral(_saText)) freeDeferral.current += 1;
         }
         const _threeBeat = parseThreeBeatShift(_clean);
         if (_threeBeat && detectsUnverifiedFoundClaim(_threeBeat.found, msgs.filter(m => m && m.role === "user").map(m => m.content))) {
@@ -6872,7 +6904,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       ...messages,
       { role: "user", content: userCorrection || "[User indicated the observation was inaccurate. Apply misfire recovery protocol.]" }
     ];
-    const recoveryPrompt = getLensPrompt(activeLensRef.current) + `\n\nMISFIRE RECOVERY: The user has indicated your previous observation was inaccurate or incomplete. Your response must begin with: "Understood. My interpretation appears incomplete." Then ask: "What am I missing that changes the picture?" Do not repeat the original observation.`;
+    const recoveryPrompt = getLensPrompt(activeLensRef.current) + buildStageAMarker(stageAActive.current) + `\n\nMISFIRE RECOVERY: The user has indicated your previous observation was inaccurate or incomplete. Your response must begin with: "Understood. My interpretation appears incomplete." Then ask: "What am I missing that changes the picture?" Do not repeat the original observation.`;
     setLoading(true);
     try {
       const text = stripAraDeclarative(await callAura(correctionMsgs, recoveryPrompt));
@@ -7146,7 +7178,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // #10 fix: inject profile summary in firstWhy path too
         const profileCtx = getProfileSummary(memory);
         const profileWithRules = profileCtx ? profileCtx + HONEST_UNCERTAINTY_RULE : '';
-        const prompt = [getLensPrompt(inferred), memCtx, profileWithRules, buildFirstWhyFloor()].filter(Boolean).join('\n');
+        const prompt = [getLensPrompt(inferred), memCtx, profileWithRules, buildFirstWhyFloor(), buildStageAMarker(stageAActive.current)].filter(Boolean).join('\n');
         const text = stripAraDeclarative(await callAura(initMsgs, prompt));
         // THE NO-ADVICE FLOOR ON THE ENTRY TURN. Neither observer saw this reply before: an opening
         // that offered the user options went uncounted, and the guard built for exactly that failure
@@ -7297,6 +7329,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     outcomeScaleAsked.current = false;
     coreReadinessAsked.current = false;
     coreReadinessConfirmed.current = false;
+    freeActionOffered.current = 0; freeDeferral.current = 0; askedActionBeforeRoot.current = false; rootCardOpenedOnce.current = false;
     shiftCheckAsked.current = false;
     shiftCheckConfirmed.current = false;
     shiftCheckCtxDelivered.current = 0;
