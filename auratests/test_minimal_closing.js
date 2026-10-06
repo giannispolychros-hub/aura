@@ -86,7 +86,12 @@ assert('A1: and it is never rendered as text anywhere',
 // ══ A2 — PART 1 STOPS NARRATING ════════════════════════════════════════════
 const TRIG = (() => {
   const i = CODE.indexOf('const triggerTermination');
-  return i < 0 ? '' : CODE.slice(i, CODE.indexOf('}, [safetyMode, memory, deliverFinalClosure]);', i));
+  // END MARKER CORRECTED (2026-10-06): the old marker '}, [safetyMode, memory, deliverFinalClosure]);' stopped
+  // matching when appendClosingMessage joined the deps, so indexOf returned -1 and this sliced to the END OF THE
+  // FILE — every count below was really "from here to the end". It surfaced when Stage A added its own word
+  // question after this function. The slice now ends at triggerTermination's own deps line.
+  const j = CODE.indexOf('}, [safetyMode, memory, deliverFinalClosure, appendClosingMessage]);', i);
+  return i < 0 || j < 0 ? '' : CODE.slice(i, j);
 })();
 assert('A2: triggerTermination was located', TRIG.length > 500);
 assert('A2: no trigger asks for the Reflection Summary any more',

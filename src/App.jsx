@@ -1720,6 +1720,115 @@ function stageARootButtonVisible(st) {
   const o = st || {};
   return o.active === true && o.assistantReplies >= 1 && !o.loading && o.riskKind !== 1 && !o.closingStarted && !o.rootPhase && !o.sessionEnded;
 }
+// STAGE A — the whole flow as one pure step function (SPEC_FREE_END.md §1.5, §2.1, §2.1α, §2.2, §4, §6.1).
+// phase: null (conversation) · "ask" (door 1's fixed question) · "card" · "correct" · "offer" · "notReady" ·
+// "clarity" · "word" · "done". Every transition the screen can make goes through here, so the order of §2.1α is
+// enforced by code and every counter of §6.1 changes in exactly one place. An event that does not fit the
+// current phase returns the state unchanged.
+function initialStageAState() {
+  return {
+    phase: null, door: 0, found: "", knew: null, knewTruncated: false, riskOffer: false,
+    stats: {
+      rootDoor: 0, rootShown: 0, rootConfirmed: 0, rootCorrections: 0, rootBack: 0, rootButtonPressed: 0, rootAtReply: 0,
+      coachOfferShown: 0, coachOfferClicked: 0, coachOfferDeclined: 0, coachOfferSuppressed: 0, suppressedBy: 0,
+      rootSuppressedA: 0, coachHelpChoice: 0, lateClarity: 0, wordSameAsRoot: 0, knewHidden: 0, stageReached: 0,
+    },
+  };
+}
+function stageAStep(state, ev) {
+  const s = state || initialStageAState();
+  const e = ev || {};
+  const st = { ...s.stats };
+  const reach = n => { if (st.stageReached < n) st.stageReached = n; };
+  const next = (patch) => ({ ...s, ...patch, stats: st });
+  switch (e.type) {
+    case "press":
+      if (s.phase) return s;
+      st.rootButtonPressed += 1; reach(1);
+      return next({ phase: "ask", door: 1 });
+    case "open": {
+      if (s.phase && s.phase !== "ask") return s;
+      if (e.riskKind === 1) { st.rootSuppressedA = 1; return next({ phase: null, door: 0 }); }
+      const found = typeof e.found === "string" ? e.found.trim() : "";
+      if (!found) return s;
+      if (!st.rootShown) { st.rootDoor = e.door || 0; st.rootAtReply = Math.min(9999, e.assistantReplies || 0); }
+      st.rootShown = 1; st.knewHidden = e.knew ? 0 : 1; reach(3);
+      return next({ phase: "card", door: e.door || 0, found, knew: e.knew || null, knewTruncated: !!e.knewTruncated });
+    }
+    case "back":
+      if (s.phase !== "ask" && s.phase !== "card" && s.phase !== "correct") return s;
+      st.rootBack += 1;
+      return next({ phase: null, door: 0 });
+    case "cancel":
+      if (s.phase !== "ask" && s.phase !== "correct" && s.phase !== "card") return s;
+      return next({ phase: null, door: 0 });
+    case "correctStart":
+      if (s.phase !== "card") return s;
+      return next({ phase: "correct" });
+    case "correctDone": {
+      if (s.phase !== "correct") return s;
+      const found = typeof e.found === "string" ? e.found.trim() : "";
+      if (!found) return s;
+      st.rootCorrections += 1;
+      return next({ phase: "card", found });
+    }
+    case "yes": {
+      if (s.phase !== "card") return s;
+      st.rootConfirmed = 1; reach(4);
+      if (e.riskKind === 2 || e.riskKind === 3) {
+        st.coachOfferSuppressed = 1; st.suppressedBy = e.riskKind;
+        return next({ phase: "clarity", riskOffer: true });
+      }
+      st.coachOfferShown = 1; reach(5);
+      return next({ phase: "offer", riskOffer: false });
+    }
+    case "want":
+      if (s.phase !== "offer") return s;
+      st.coachOfferClicked = 1;
+      return next({ phase: "notReady" });
+    case "notNow":
+      if (s.phase !== "offer") return s;
+      st.coachOfferDeclined = 1;
+      return next({ phase: "clarity" });
+    case "help":
+      if (s.phase !== "notReady") return s;
+      if (e.choice === 1 || e.choice === 2 || e.choice === 3) st.coachHelpChoice = e.choice;
+      return next({ phase: "clarity" });
+    case "clarity":
+      if (s.phase !== "clarity" || !Number.isInteger(e.value) || e.value < 1 || e.value > 10) return s;
+      st.lateClarity = e.value;
+      return next({ phase: "word" });
+    case "word":
+      if (s.phase !== "word") return s;
+      st.wordSameAsRoot = e.same ? 1 : 0;
+      return next({ phase: "done" });
+    default:
+      return s;
+  }
+}
+// The input box is hidden while the user answers with buttons; it is shown for door 1's question,
+// for «Διόρθωσε», and for the word.
+function stageAInputHidden(phase) {
+  return phase === "card" || phase === "offer" || phase === "notReady" || phase === "clarity";
+}
+// A text typed into the Stage A flow (door 1's answer, door 2's capture, «Διόρθωσε») is NOT sent to the
+// model, so the crisis check runs on it here. ANY crisis tier closes the flow and the message goes through
+// the normal path — tier A for the crisis protocol, tier B so the 10306 support line is never skipped.
+function stageACaptureAllowed(text) {
+  return detectSafetySignal(text) !== "CRISIS";
+}
+// session_completed fields for Stage A (§6.1, §6.1α): integers only, so recordTelemetry keeps every one.
+function stageATelemetry(stats, extra) {
+  const o = {};
+  const st = stats || {};
+  Object.keys(initialStageAState().stats).forEach(k => { o[k] = Math.min(9999, Number.isInteger(st[k]) ? st[k] : 0); });
+  const x = extra || {};
+  o.freeActionOffered = Math.min(9999, x.freeActionOffered || 0);
+  o.freeDeferral = Math.min(9999, x.freeDeferral || 0);
+  o.askedActionBeforeRoot = x.askedActionBeforeRoot ? 1 : 0;
+  o.stageA = 1;
+  return o;
+}
 // Violation check only (never a success measure): did a reply defer «τι κάνω» to after the root?
 function detectsRootDeferral(text) {
   if (typeof text !== "string" || !text) return false;
@@ -5431,6 +5540,30 @@ export default function AURAv2() {
   const askedActionBeforeRoot = useRef(false); // the user asked for action before the root card ever opened
   const rootCardOpenedOnce    = useRef(false); // set when the root card first opens (step 3.5)
   const riskSignalKind        = useRef(0);     // §4 latch: 0 none · 1 crisis A · 2 crisis B · 3 DISTRESS (heaviest kept)
+  // STAGE A flow (steps 3.3–3.10): the ref is the source of truth, the phase state re-renders it.
+  const stageARef             = useRef(initialStageAState());
+  const stageARootArmed       = useRef(false); // door 2: the readiness answer arrived — capture the NEXT message
+  const [stageAPhase, setStageAPhase] = useState(null);
+  const [stageACopyText, setStageACopyText] = useState(null); // clipboard fallback: the text, shown to select
+  const [stageACopied, setStageACopied] = useState(false);
+  const stageADispatch = useCallback((ev) => {
+    stageARef.current = stageAStep(stageARef.current, ev);
+    setStageAPhase(stageARef.current.phase);
+  }, []);
+  // Opens the root card (§1.5): only with the user's own text, «Τι ήξερες» from their first messages, and the
+  // risk latch deciding (tier A → no card, counted).
+  const stageAOpen = useCallback((door, found, msgsNow) => {
+    const _users = (msgsNow || []).filter(m => m && m.role === "user").map(m => String(m.content || ""));
+    if (!isVerbatimUserText(found, _users)) return;
+    const _knew = pickKnewSnippet((msgsNow || []).filter(m => m && m.role === "user").map(m => String(m.content || "")));
+    stageADispatch({
+      type: "open", door, found,
+      knew: _knew ? _knew.text : null, knewTruncated: !!(_knew && _knew.truncated),
+      assistantReplies: (msgsNow || []).filter(m => m && m.role === "assistant" && m.msgMode !== "STAGE_A").length,
+      riskKind: riskSignalKind.current,
+    });
+    if (stageARef.current.phase === "card") rootCardOpenedOnce.current = true;
+  }, [stageADispatch]);
   // RT-hardening: replaces text-based detection ("does the model's reply say 'το κρατάω'?")
   // with a plain count of how many replies have happened during the brand-new-user window —
   // works regardless of the model's exact phrasing.
@@ -5623,6 +5756,8 @@ export default function AURAv2() {
         roadRawLabelTurns: roadTraceTotals.current.rawLabels,
         roadRawMapTurns: roadTraceTotals.current.rawMap,
         roadStrippedMapTurns: roadTraceTotals.current.strippedMap,
+        // STAGE A (§6.1, §6.1α) — counts only, and only with the switch open.
+        ...(stageAActive.current ? stageATelemetry(stageARef.current.stats, { freeActionOffered: freeActionOffered.current, freeDeferral: freeDeferral.current, askedActionBeforeRoot: askedActionBeforeRoot.current }) : {}),
       });
     } catch (e) { /* instrumentation must never affect a session */ }
   }, [sessionEnded]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -6555,6 +6690,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         outcomeScaleAsked.current = true;
         lateReliefJustAsked.current = true;
       }
+      const _saReadyBefore = coreReadinessConfirmed.current;
       if (!coreReadinessConfirmed.current) {
         const lastUserMsgForReadiness = [...msgs].reverse().find(m => m.role === "user");
         // SPONTANEOUS PATH FIRST (fixes real gap — check this before requiring the fixed
@@ -6568,6 +6704,15 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         } else if (detectsCoreReadinessAsked(text)) {
           coreReadinessAsked.current = true;
         }
+      }
+      // STAGE A — door 2 (§1.4, §1.5). The readiness latch flipped on THIS turn: if the user recognised the root
+      // in their own words, that message opens the card now (door 3); after a «ναι» to the readiness question,
+      // the NEXT message they write is captured as «Τι βρήκες» (door 2).
+      if (stageAActive.current && !_saReadyBefore && coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1) {
+        const _saLastUser = [...msgs].reverse().find(m => m.role === "user");
+        const _saSpont = !!_saLastUser && detectsSpontaneousCoreRecognition(_saLastUser.content);
+        if (_saSpont) stageAOpen(3, _saLastUser.content, msgs);
+        else stageARootArmed.current = true;
       }
       if (!shiftCheckConfirmed.current) {
         const lastUserMsgForShift = [...msgs].reverse().find(m => m.role === "user");
@@ -6725,6 +6870,11 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         outcomeScaleBlockUsed.current = true;
         return;
       }
+      // STAGE A — the root flow outranks the old closing. A bare «Ναι» to the readiness question counts as a
+      // closing word for decideTermination (matchesClosingWord), so on exactly the turn door 2 is armed — or
+      // door 3 opened the card — the «πριν κλείσουμε» card would open on top of it and lead to the old closing.
+      // Found in a browser run, 2026-10-06. Switch closed: this line is never true and nothing changes.
+      if (stageAActive.current && (stageARootArmed.current || stageARef.current.phase) && (decision === "confirm" || decision === "terminate")) return;
       if (decision === "confirm" || decision === "terminate") {
         // CODE-LEVEL FIX, CORRECTED (real bug found via a third real transcript: the version below
         // that only checked matchesClosingWord(text) was TOO BROAD — it suppressed the card even
@@ -7177,6 +7327,28 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setError(null);
     // STAGE A §4 — the session's risk latch sees EVERY submitted message, before any branch below.
     if (stageAActive.current) riskSignalKind.current = mergeRiskKind(riskSignalKind.current, detectSafetySignal(userText), classifyCrisisTier(userText));
+    // STAGE A — typed answers (door 1's question, door 2's capture, «Διόρθωσε»). These are never sent to the
+    // model, so the crisis check runs here: ANY crisis closes the flow and the message takes the normal path below.
+    const _saPhase = stageARef.current.phase;
+    const _saArmed = stageARootArmed.current && !_saPhase && riskSignalKind.current !== 1 && !reflectionDelivered.current && !awaitingRememberedWord;
+    if (stageAActive.current && (_saPhase === "ask" || _saPhase === "correct" || _saArmed)) {
+      if (!stageACaptureAllowed(userText)) {
+        stageARootArmed.current = false;
+        stageADispatch({ type: "cancel" });
+      } else if (_saPhase === "correct") {
+        stageADispatch({ type: "correctDone", found: userText });
+        return;
+      } else {
+        const _saDoor = _saPhase === "ask" ? 1 : 2;
+        stageARootArmed.current = false;
+        const _saAdded = _saDoor === 1
+          ? [{ id: nextMsgId(), role: "assistant", content: STAGE_A_TEXTS.ask, msgMode: "STAGE_A" }, { id: nextMsgId(), role: "user", content: userText }]
+          : [{ id: nextMsgId(), role: "user", content: userText }];
+        setMessages(prev => [...prev, ..._saAdded]);
+        stageAOpen(_saDoor, userText, [...messages, ..._saAdded]);
+        return;
+      }
+    }
 
     // Word-to-remember: save as a real anchor (code-level, deterministic), then finish closure Part 2
     // RT-fix: still check for safety signals even here — a crisis phrase must never be silently missed
@@ -7192,7 +7364,13 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       setMemory(withAnchor);
       const willPersist = memory.storageEnabled;
       if (willPersist) saveMemory(withAnchor, true);
-      await deliverFinalClosure([...messages, { role: "user", content: userText }], { word: userText, count: priorEchoCount });
+      // STAGE A §2.1α step 5: a word equal to «Τι βρήκες» was already shown once, on the card — no echo of it.
+      let _saSame = false;
+      if (stageAActive.current && stageARef.current.phase === "word") {
+        _saSame = sameAsRootText(userText, stageARef.current.found);
+        stageADispatch({ type: "word", same: _saSame });
+      }
+      await deliverFinalClosure([...messages, { role: "user", content: userText }], { word: userText, count: _saSame ? 0 : priorEchoCount });
       return;
     }
 
@@ -7415,6 +7593,36 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     }
   }, [input, loading, sessionEnded, messages, mode, generateResponse, awaitingRememberedWord, deliverFinalClosure, memory, currentDomain]);
 
+  // STAGE A handlers (§1.5, §2.1, §2.1α). Fixed texts only; the model is called only by «back» from door 2's card,
+  // so the captured answer gets the reply it would have had — the conversation continues, nothing is lost.
+  const handleStageAPress = useCallback(() => {
+    if (loading) return;
+    stageADispatch({ type: "press" });
+  }, [loading, stageADispatch]);
+  const handleStageABack = useCallback(() => {
+    const _ph = stageARef.current.phase, _door = stageARef.current.door;
+    stageADispatch({ type: "back" });
+    if (_ph === "card" && _door === 2) {
+      turnCount.current += 1;
+      generateResponse(messages, mode);
+    }
+  }, [messages, mode, generateResponse, stageADispatch]);
+  const handleStageAYes = useCallback(() => {
+    if (stageARef.current.phase !== "card") return;
+    const _riskOffer = riskSignalKind.current === 2 || riskSignalKind.current === 3;
+    setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: buildRootEndLines(stageARef.current.found, _riskOffer).join("\n"), msgMode: "STAGE_A" }]);
+    stageADispatch({ type: "yes", riskKind: riskSignalKind.current });
+  }, [stageADispatch]);
+  const handleStageAClarity = useCallback((n) => {
+    if (stageARef.current.phase !== "clarity") return;
+    stageADispatch({ type: "clarity", value: n });
+    wordQuestionDelivered.current = true;
+    reflectionDelivered.current = true;
+    appendClosingMessage(STAGE_A_TEXTS.word);
+    setAwaitingRememberedWord(true);
+  }, [stageADispatch, appendClosingMessage]);
+  const stageAView = stageARef.current;
+
   const handleKey = (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
   };
@@ -7461,6 +7669,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     coreReadinessConfirmed.current = false;
     freeActionOffered.current = 0; freeDeferral.current = 0; askedActionBeforeRoot.current = false; rootCardOpenedOnce.current = false;
     riskSignalKind.current = 0;
+    stageARef.current = initialStageAState(); stageARootArmed.current = false; setStageAPhase(null);
+    setStageACopyText(null); setStageACopied(false);
     shiftCheckAsked.current = false;
     shiftCheckConfirmed.current = false;
     shiftCheckCtxDelivered.current = 0;
@@ -8236,6 +8446,100 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
 
 
 
+          {/* STAGE A UI — BEGIN */}
+          {stageAActive.current && (
+            <>
+              {stageAPhase === "ask" && (
+                <div className="warning-card">
+                  <div className="warning-text">{STAGE_A_TEXTS.ask}</div>
+                  <div className="choice-btns">
+                    <button className="choice-btn" onClick={handleStageABack}>{STAGE_A_TEXTS.back}</button>
+                  </div>
+                </div>
+              )}
+              {(stageAPhase === "card" || stageAPhase === "correct") && (
+                <div className="warning-card">
+                  {stageAView.knew && (
+                    <div className="warning-text" style={{marginBottom:"8px"}}>
+                      <span className="warning-label">{STAGE_A_TEXTS.knewLabel}</span><br/>«{stageAView.knew}{stageAView.knewTruncated ? "…" : ""}»
+                    </div>
+                  )}
+                  <div className="warning-text" style={{marginBottom:"10px"}}>
+                    <span className="warning-label">{STAGE_A_TEXTS.foundLabel}</span><br/>«{stageAView.found}»
+                  </div>
+                  {stageAPhase === "card" ? (
+                    <>
+                      <div className="warning-text" style={{fontSize:"12px",opacity:0.8}}>{buildRootCardLine(riskSignalKind.current === 2 || riskSignalKind.current === 3)}</div>
+                      <div className="choice-btns">
+                        <button className="choice-btn" onClick={() => stageADispatch({ type: "correctStart" })}>{STAGE_A_TEXTS.correct}</button>
+                        <button className="choice-btn prim" onClick={handleStageAYes}>{STAGE_A_TEXTS.yes}</button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="warning-text">{STAGE_A_TEXTS.correctAsk}</div>
+                  )}
+                  <div className="choice-btns">
+                    <button className="choice-btn" style={{opacity:0.75}} onClick={handleStageABack}>{STAGE_A_TEXTS.back}</button>
+                  </div>
+                </div>
+              )}
+              {stageAPhase === "offer" && (
+                <div className="choice-btns">
+                  <button className="choice-btn" onClick={() => stageADispatch({ type: "notNow" })}>{STAGE_A_TEXTS.notNow}</button>
+                  <button className="choice-btn prim" onClick={() => stageADispatch({ type: "want" })}>{STAGE_A_TEXTS.wantMore}</button>
+                </div>
+              )}
+              {stageAPhase === "notReady" && (
+                <div className="warning-card">
+                  <div className="warning-text" style={{marginBottom:"10px"}}>{STAGE_A_TEXTS.notReady}</div>
+                  <div className="warning-text">{STAGE_A_TEXTS.helpQ}</div>
+                  <div className="choice-btns" style={{flexDirection:"column",alignItems:"stretch"}}>
+                    <button className="choice-btn" onClick={() => stageADispatch({ type: "help", choice: 1 })}>{STAGE_A_TEXTS.help1}</button>
+                    <button className="choice-btn" onClick={() => stageADispatch({ type: "help", choice: 2 })}>{STAGE_A_TEXTS.help2}</button>
+                    <button className="choice-btn" onClick={() => stageADispatch({ type: "help", choice: 3 })}>{STAGE_A_TEXTS.help3}</button>
+                    <button className="choice-btn" style={{opacity:0.75}} onClick={() => stageADispatch({ type: "help", choice: 0 })}>{STAGE_A_TEXTS.helpSkip}</button>
+                  </div>
+                </div>
+              )}
+              {stageAPhase === "clarity" && (
+                <div className="warning-card">
+                  <div className="warning-text">{STAGE_A_TEXTS.clarityQ}</div>
+                  <div className="choice-btns" style={{flexWrap:"wrap"}}>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                      <button key={n} className="choice-btn" style={{minWidth:"38px"}} onClick={() => handleStageAClarity(n)}>{n}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {stageAView.stats.rootConfirmed === 1 && (
+                <div style={{display:"flex",gap:"8px",flexWrap:"wrap",margin:"10px 0"}}>
+                  <button className="choice-btn" onClick={() => {
+                    const _txt = buildRootCopyText(stageAView.knew, stageAView.found, new Date().toISOString().slice(0, 10));
+                    try {
+                      navigator.clipboard.writeText(_txt).then(() => setStageACopied(true), () => setStageACopyText(_txt));
+                    } catch (e) { setStageACopyText(_txt); }
+                  }}>{stageACopied ? STAGE_A_TEXTS.copied : STAGE_A_TEXTS.copy}</button>
+                  <button className="choice-btn" onClick={() => {
+                    const _date = new Date().toISOString().slice(0, 10);
+                    const _txt = buildRootCopyText(stageAView.knew, stageAView.found, _date);
+                    try {
+                      const _url = URL.createObjectURL(new Blob([_txt], { type: "text/plain;charset=utf-8" }));
+                      const _a = document.createElement("a");
+                      _a.href = _url; _a.download = "aura-riza-" + _date + ".txt";
+                      document.body.appendChild(_a); _a.click(); _a.remove();
+                      setTimeout(() => URL.revokeObjectURL(_url), 1000);
+                    } catch (e) { setStageACopyText(_txt); }
+                  }}>{STAGE_A_TEXTS.download}</button>
+                  {stageACopyText && (
+                    <textarea readOnly value={stageACopyText} rows={4} onFocus={e => e.target.select()}
+                      style={{width:"100%",background:"transparent",color:"inherit",border:"1px solid rgba(201,168,76,0.3)",padding:"8px",fontSize:"12px"}}/>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+          {/* STAGE A UI — END */}
+
           {/* Typing */}
           {loading && <div className="typing"><div className="t-dot"/><div className="t-dot"/><div className="t-dot"/></div>}
 
@@ -8261,7 +8565,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               gave you +5 clarity, so it's worth 6€" framing, ever. The numbers are shown; the price
               is shown; nothing connects them causally in the copy. Do not add such a connection in
               future edits. */}
-          {sessionEnded && !loading && finalDistillation && !valueUnlocked && (
+          {!stageAActive.current && sessionEnded && !loading && finalDistillation && !valueUnlocked && (
             <div style={{border:"1px solid rgba(201,168,76,0.3)",borderRadius:"4px",padding:"18px 20px",margin:"14px 0",maxWidth:"440px"}}>
               {earlyReliefValue !== null && lateReliefValue !== null ? (
                 <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.7,marginBottom:"16px"}}>
@@ -8294,7 +8598,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             <div className="end-wrap">
               <div className="end-label">η συνομιλία σταμάτησε εδώ</div>
               <div className="end-note">Επίστρεψε όταν υπάρχει κάτι νέο να δούμε.</div>
-              {(!finalDistillation || valueUnlocked) && <button className="new-btn" onClick={resetSession}>Νέα συνεδρία</button>}
+              {(!finalDistillation || valueUnlocked || stageAActive.current) && <button className="new-btn" onClick={resetSession}>Νέα συνεδρία</button>}
               {valueUnlocked && finalDistillation && (
                 <button className="new-btn" style={{marginLeft:"8px"}} onClick={() => {
                   // The kept word drives the recurring lookup; the unknown comes from the most
@@ -8366,8 +8670,21 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         </div>
 
         {/* ── Input ── */}
-        {!sessionEnded && !layerGatePending && !pivotPending && !memoryPromptPending && !warningPending && !closureConfirmPending && !misfirePending && sessionStarted && (
+        {!sessionEnded && !layerGatePending && !pivotPending && !memoryPromptPending && !warningPending && !closureConfirmPending && !misfirePending && !stageAInputHidden(stageAPhase) && sessionStarted && (
           <div className={`input-area${input.trim() || loading ? " active" : ""}`}>
+            {/* STAGE A BUTTON — BEGIN */}
+            {stageARootButtonVisible({
+              active: stageAActive.current,
+              assistantReplies: messages.filter(m => m.role === "assistant" && m.msgMode !== "STAGE_A").length,
+              loading,
+              riskKind: riskSignalKind.current,
+              closingStarted: reflectionDelivered.current || awaitingRememberedWord || closureConfirmPending || warningPending,
+              rootPhase: stageAPhase,
+              sessionEnded,
+            }) && (
+              <button className="choice-btn" style={{alignSelf:"flex-start",margin:"0 0 8px 0"}} onClick={handleStageAPress}>{STAGE_A_TEXTS.button}</button>
+            )}
+            {/* STAGE A BUTTON — END */}
             <div className="input-row" style={{flexDirection:"column",gap:"4px",alignItems:"stretch"}}>
               <textarea
                 ref={textareaRef}
