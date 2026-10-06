@@ -43,7 +43,7 @@ function extractBlock(startToken) {
   }
   return null;
 }
-const NAMES = ['isVerbatimUserText', 'pickKnewSnippet', 'sameAsRootText', 'buildRootEndLines', 'buildRootCardLine',
+const NAMES = ['isVerbatimUserText', 'pickKnewSnippet', 'rootTextHasSubstance', 'substanceOfSentence', 'splitSentences', 'sameAsRootText', 'buildRootEndLines', 'buildRootCardLine',
   'mergeRiskKind', 'stageARootButtonVisible', 'buildRootCopyText', 'normalizeVerbatim'];
 const srcs = NAMES.map(n => extractBlock('function ' + n + '(') || `function ${n}(){return undefined}`);
 const textsSrc = extractBlock('const STAGE_A_TEXTS = ') || 'const STAGE_A_TEXTS = {};';
@@ -59,7 +59,8 @@ const APPROVED = {
   foundLabel: 'Τι βρήκες',
   yes: 'Ναι, αυτό είναι',
   correct: 'Διόρθωσε',
-  correctAsk: 'Πώς θα το έλεγες εσύ;',
+  correctAsk: 'Γράψε τη ρίζα όπως θα την έλεγες εσύ, ολόκληρη.',
+  retry: "Γράψ' το λίγο πιο ολοκληρωμένα",
   cardLine: 'Με το "Ναι" ολοκληρώνεται το δωρεάν κομμάτι και σου δείχνω το επόμενο.',
   cardLineRisk: 'Με το "Ναι" ολοκληρώνεται αυτό το κομμάτι.',
   endSecond: 'Το πρώτο βήμα κάθε προβλήματος είναι ο πραγματικός ορισμός του — και τον βρήκες εσύ, χωρίς συμβουλές.',
@@ -124,6 +125,25 @@ for (const pre of ['', 'Ναι ', 'Ε, ναι, ', 'Κι όμως ', 'Όχι ακ
 }
 assert('KNEW: whatever it returns is still verbatim user text', !!kl && F.isVerbatimUserText(kl.text, [longS]) === true);
 assert('KNEW: non-array → null, never throws', K(null) === null && K([null, 5]) === null);
+
+// ── rootTextHasSubstance (6/10 phone test: «Περίπου δηλαδή» became the whole root) ──
+// THE SAME RULE as «Τι ήξερες» (founder): greeting stripped, no content-free introduction, not about AURA,
+// at least 4 substance words — in at least one sentence of the text.
+const H = x => F.rootTextHasSubstance(x);
+assert('ROOT TEXT: «Περίπου δηλαδή» (talking to AURA, not a root) is rejected', H('Περίπου δηλαδή') === false);
+assert('ROOT TEXT: «Ναι, αυτό» rejected', H('Ναι, αυτό') === false);
+assert('ROOT TEXT: «Γεια σου» rejected', H('Γεια σου') === false);
+assert('ROOT TEXT: a content-free introduction is rejected', H('Θέλω να μιλήσω για κάτι') === false);
+assert('ROOT TEXT: a question about AURA is rejected', H('Τι είσαι εσύ και πώς δουλεύεις ακριβώς εδώ μέσα;') === false);
+assert('ROOT TEXT: a whole root passes', H('Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.') === true);
+assert('ROOT TEXT: one substantial sentence among short ones is enough', H('Ναι. Ότι μένω στη δουλειά από φόβο και όχι επειδή το θέλω.') === true);
+assert('ROOT TEXT: the same rule as «Τι ήξερες» — a text passes exactly when pickKnewSnippet would accept it',
+  ['Περίπου δηλαδή', 'Φοβάμαι πολύ την αλλαγή δουλειάς.', 'Φοβάμαι πολύ την αλλαγή δουλειάς τώρα.', 'Καλησπέρα, θέλω να μιλήσω για κάτι', 'Ότι μένω από φόβο, όχι επειδή το θέλω.']
+    .every(x => H(x) === (F.pickKnewSnippet([x]) !== null)));
+assert('ROOT TEXT: non-strings never throw', H(null) === false && H(undefined) === false && H('') === false);
+assert('ONE RULE: pickKnewSnippet and rootTextHasSubstance both go through substanceOfSentence (no second copy of the rule)',
+  /substanceOfSentence\(/.test(CODE.slice(CODE.indexOf('function pickKnewSnippet('), CODE.indexOf('function pickKnewSnippet(') + 3000)) &&
+  /substanceOfSentence\(/.test(CODE.slice(CODE.indexOf('function rootTextHasSubstance('), CODE.indexOf('function rootTextHasSubstance(') + 800)));
 
 // ── sameAsRootText ───────────────────────────────────────────────────────────
 assert('SAME: case, accents, edge punctuation and spaces ignored', F.sameAsRootText('  Φόβος! ', 'φοβος') === true);

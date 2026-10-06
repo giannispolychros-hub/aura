@@ -148,6 +148,11 @@ assert('SCENARIOS: the bare-yes one says a bare «Ναι» before any root step'
 assert('SCENARIOS: the thanks one says «Ευχαριστώ» before any root step', (() => { const s = S.find(x => x.risk === 'thanks'); const i = s ? s.steps.findIndex(t => /^Ευχαριστώ/.test(t.say || '')) : -1; const j = s ? s.steps.findIndex(t => t.press) : -1; return i >= 0 && (j < 0 || i < j); })());
 assert('SCENARIOS: door 2 answers the readiness question with «Ναι» and presses «Δεν το βρήκα ακόμα» on the card',
   (() => { const s = S.find(x => x.risk === 'door2back'); return !!s && s.steps.some(t => t.untilReadiness) && s.steps.some(t => t.card === 'back'); })());
+assert('SCENARIOS: every root typed into the flow passes the app\'s own substance rule (else the card would never open)',
+  attempt(() => { const src = SRC; const s = src.indexOf('function substanceOfSentence('); const r = src.indexOf('function rootTextHasSubstance('); const sp = src.indexOf('function splitSentences(');
+    const blk = i => { let d = 0, st = false; for (let k = src.indexOf('{', i); ; k++) { if (src[k] === '{') { d++; st = true; } else if (src[k] === '}') { d--; if (st && d === 0) return src.slice(i, k + 1); } } };
+    const H = new Function(blk(s) + '\n' + blk(sp) + '\n' + blk(r) + '\nreturn rootTextHasSubstance;')();
+    return S.every(sc => sc.steps.every(t => !t.root || H(t.root))); }, false));
 assert('SCENARIOS: no synthetic message trips the crisis detector (it would end in the crisis path, not the test)',
   attempt(() => S.every(s => s.steps.every(t => ['say', 'root', 'word'].every(k => !t[k] || app.fns.detectSafetySignal(t[k]) === null))), false));
 

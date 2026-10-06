@@ -1606,7 +1606,8 @@ const STAGE_A_TEXTS = {
   foundLabel: "Τι βρήκες",
   yes: "Ναι, αυτό είναι",
   correct: "Διόρθωσε",
-  correctAsk: "Πώς θα το έλεγες εσύ;",
+  correctAsk: "Γράψε τη ρίζα όπως θα την έλεγες εσύ, ολόκληρη.",
+  retry: "Γράψ' το λίγο πιο ολοκληρωμένα",
   cardLine: "Με το \"Ναι\" ολοκληρώνεται το δωρεάν κομμάτι και σου δείχνω το επόμενο.",
   cardLineRisk: "Με το \"Ναι\" ολοκληρώνεται αυτό το κομμάτι.",
   endSecond: "Το πρώτο βήμα κάθε προβλήματος είναι ο πραγματικός ορισμός του — και τον βρήκες εσύ, χωρίς συμβουλές.",
@@ -1639,40 +1640,47 @@ function isVerbatimUserText(snippet, userMessages) {
   if (!s || !Array.isArray(userMessages)) return false;
   return userMessages.some(m => typeof m === "string" && normalizeVerbatim(m).includes(s));
 }
-// §1.2 — «Τι ήξερες»: the first sentence with substance from the first 3 user messages, greetings and
-// introductions stripped from its start. Whatever survives is still a verbatim substring. Returns
-// { text, truncated } or null (the line is hidden — never invented).
-function pickKnewSnippet(userMessages) {
-  if (!Array.isArray(userMessages)) return null;
-  const fold = x => x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+// §1.2 — THE SUBSTANCE RULE, one copy: greetings/introductions stripped from the start of ONE sentence (what
+// survives is still a verbatim substring), then rejected if it is a content-free introduction, a question about
+// AURA, or has fewer than 4 substance words. Returns the stripped sentence, or null. Used by «Τι ήξερες» AND by
+// every root text typed into the flow (ADR «6 Οκτωβρίου (κ)»: «Περίπου δηλαδή» became a whole root on a phone).
+function substanceOfSentence(raw) {
+  if (typeof raw !== "string") return null;
+  const fold = x => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const GREET = ["γεια χαρα", "γεια σου", "γεια σας", "καλημερα", "καλησπερα", "καληνυχτα", "χαιρετε", "hello", "γεια", "λοιπον", "καλα", "hi", "ε"];
   const STOP = new Set(["και", "για", "που", "την", "της", "τον", "των", "τους", "στο", "στη", "στην", "στον", "στα", "απο", "μου", "σου", "του", "μας", "σας",
     "ενα", "μια", "ενας", "δεν", "μην", "οτι", "πως", "αυτο", "αυτα", "εγω", "εσυ", "ειμαι", "ειναι", "εχω", "εχει", "κατι", "πολυ", "οχι", "ναι", "αλλα", "ομως"]);
   const INTRO = [/^θελω να (?:σου |σας )?μιλησω(?: για (?:κατι|ενα θεμα))?$/, /^εχω (?:ενα |μια )?(?:θεμα|προβλημα|ερωτηση|απορια)$/,
     /^μπορω να σε ρωτησω(?: κατι)?$/, /^(?:δοκιμη|test)(?: (?:δοκιμη|test))*$/, /^τι κανεις$/];
   const ABOUT_AURA = /(?:τι εισαι|ποιος εισαι|ποια εισαι|πως δουλευεις|τι κανει η εφαρμογη|τι κανεις εσυ εδω)/;
-  const stripLead = sent => {
-    let t = sent;
-    for (let guard = 0; guard < 6; guard++) {
-      const f = fold(t);
-      const g = GREET.find(w => f.startsWith(w) && (f.length === w.length || /[\s,.!·:;\-]/.test(f[w.length])));
-      if (!g) break;
-      let k = 1;
-      while (k <= t.length && fold(t.slice(0, k)) !== g) k++;
-      t = t.slice(k).replace(/^[\s,.!·:;\-]+/, "");
-    }
-    return t;
-  };
+  let t = raw.trim();
+  for (let guard = 0; guard < 6; guard++) {
+    const f = fold(t);
+    const g = GREET.find(w => f.startsWith(w) && (f.length === w.length || /[\s,.!·:;\-]/.test(f[w.length])));
+    if (!g) break;
+    let k = 1;
+    while (k <= t.length && fold(t.slice(0, k)) !== g) k++;
+    t = t.slice(k).replace(/^[\s,.!·:;\-]+/, "");
+  }
+  t = t.trim();
+  if (!t) return null;
+  const f = fold(t).replace(/[,.!·:;\-]+$/, "").trim();
+  if (INTRO.some(r => r.test(f)) || ABOUT_AURA.test(f)) return null;
+  const words = (f.match(/[a-zα-ω]+/g) || []).filter(w => w.length >= 3 && !STOP.has(w));
+  return words.length < 4 ? null : t;
+}
+function splitSentences(text) {
+  return String(text || "").split(/[.;\u037e!?\n]+/).map(x => x.trim()).filter(Boolean);
+}
+// «Τι ήξερες»: the first sentence with substance from the first 3 user messages. Returns { text, truncated }
+// or null (the line is hidden — never invented). Mechanical cut at a word boundary ≤ 200.
+function pickKnewSnippet(userMessages) {
+  if (!Array.isArray(userMessages)) return null;
   const users = userMessages.filter(m => typeof m === "string").slice(0, 3);
   for (const msg of users) {
-    const sentences = msg.split(/[.;\u037e!?\n]+/).map(x => x.trim()).filter(Boolean);
-    for (const raw of sentences) {
-      const t = stripLead(raw).trim();
+    for (const raw of splitSentences(msg)) {
+      const t = substanceOfSentence(raw);
       if (!t) continue;
-      const f = fold(t).replace(/[,.!·:;\-]+$/, "").trim();
-      if (INTRO.some(r => r.test(f)) || ABOUT_AURA.test(f)) continue;
-      const words = (f.match(/[a-zα-ω]+/g) || []).filter(w => w.length >= 3 && !STOP.has(w));
-      if (words.length < 4) continue;
       if (t.length <= 200) return { text: t, truncated: false };
       const cut = t.slice(0, 201);
       const sp = cut.lastIndexOf(" ");
@@ -1681,9 +1689,15 @@ function pickKnewSnippet(userMessages) {
   }
   return null;
 }
+// A root typed into the flow (door 1's answer, «Διόρθωσε») becomes the root only if at least one of its sentences
+// passes the same rule. The root itself stays WHOLE (decision «(στ)» 1) — the rule only decides yes/no.
+function rootTextHasSubstance(text) {
+  if (typeof text !== "string") return false;
+  return splitSentences(text).some(raw => substanceOfSentence(raw) !== null);
+}
 // §2.1α step 5 — «λέξη που κρατάς» equal to «Τι βρήκες»: lower case, no accents, no edge punctuation/space.
 function sameAsRootText(a, b) {
-  const n = x => (typeof x === "string" ? x : "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+  const n = x => (typeof x === "string" ? x : "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
     .replace(/^[\s.,;!?·:«»"'\-]+|[\s.,;!?·:«»"'\-]+$/g, ""); // NFD already turns the Greek ; into ASCII ;
   const A = n(a), B = n(b);
   return !!A && A === B;
@@ -1727,11 +1741,11 @@ function stageARootButtonVisible(st) {
 // current phase returns the state unchanged.
 function initialStageAState() {
   return {
-    phase: null, door: 0, found: "", knew: null, knewTruncated: false, riskOffer: false,
+    phase: null, door: 0, found: "", knew: null, knewTruncated: false, riskOffer: false, retry: false,
     stats: {
       rootDoor: 0, rootShown: 0, rootConfirmed: 0, rootCorrections: 0, rootBack: 0, rootButtonPressed: 0, rootAtReply: 0,
       coachOfferShown: 0, coachOfferClicked: 0, coachOfferDeclined: 0, coachOfferSuppressed: 0, suppressedBy: 0,
-      rootSuppressedA: 0, coachHelpChoice: 0, lateClarity: 0, wordSameAsRoot: 0, knewHidden: 0, stageReached: 0,
+      rootSuppressedA: 0, coachHelpChoice: 0, lateClarity: 0, wordSameAsRoot: 0, knewHidden: 0, stageReached: 0, rootTooShort: 0,
     },
   };
 }
@@ -1753,15 +1767,20 @@ function stageAStep(state, ev) {
       if (!found) return s;
       if (!st.rootShown) { st.rootDoor = e.door || 0; st.rootAtReply = Math.min(9999, e.assistantReplies || 0); }
       st.rootShown = 1; st.knewHidden = e.knew ? 0 : 1; reach(3);
-      return next({ phase: "card", door: e.door || 0, found, knew: e.knew || null, knewTruncated: !!e.knewTruncated });
+      return next({ phase: "card", door: e.door || 0, found, knew: e.knew || null, knewTruncated: !!e.knewTruncated, retry: false });
     }
     case "back":
       if (s.phase !== "ask" && s.phase !== "card" && s.phase !== "correct") return s;
       st.rootBack += 1;
-      return next({ phase: null, door: 0 });
+      return next({ phase: null, door: 0, retry: false });
     case "cancel":
       if (s.phase !== "ask" && s.phase !== "correct" && s.phase !== "card") return s;
-      return next({ phase: null, door: 0 });
+      return next({ phase: null, door: 0, retry: false });
+    // A root text without substance (§1.2 rule): the flow stays where it is and keeps the previous root.
+    case "tooShort":
+      if (s.phase !== "ask" && s.phase !== "correct") return s;
+      st.rootTooShort += 1;
+      return next({ retry: true });
     case "correctStart":
       if (s.phase !== "card") return s;
       return next({ phase: "correct" });
@@ -1770,7 +1789,7 @@ function stageAStep(state, ev) {
       const found = typeof e.found === "string" ? e.found.trim() : "";
       if (!found) return s;
       st.rootCorrections += 1;
-      return next({ phase: "card", found });
+      return next({ phase: "card", found, retry: false });
     }
     case "yes": {
       if (s.phase !== "card") return s;
@@ -5296,7 +5315,7 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
     : msg.content;
 
   return (
-    <div className={`turn ${isUser ? "turn-user" : "turn-aura"}`}>
+    <div className={`turn ${isUser ? "turn-user" : "turn-aura"}`} data-stage-a-end={msg.stageAEnd ? "1" : undefined}>
       {!isUser && <div className="msg-label">aura</div>}
       {(() => {
         // Structured road map — rendered as a map, not as prose. Same principle as the three-beat:
@@ -5664,6 +5683,14 @@ export default function AURAv2() {
   const stopListening = useCallback(() => { isListeningRef.current=false; recognitionRef.current?.stop(); setIsListeningSync(false); }, [setIsListeningSync]);
 
   useEffect(() => {
+    // STAGE A (phone test 6/10): after «Ναι» the screen showed the price at the bottom, not «Η ρίζα σου». When the
+    // newest message is the Stage A end text, scroll to its START. Switch closed: never true, same bottom scroll.
+    const _saEnd = stageAActive.current && messages.length && messages[messages.length - 1].stageAEnd
+      ? document.querySelector('[data-stage-a-end="1"]') : null;
+    if (_saEnd) {
+      _saEnd.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
     // FIX 4: block:"end" is more reliable than smooth on iOS Safari
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, loading, pivotPending, layerGatePending, memoryPromptPending, warningPending, closureConfirmPending, misfirePending, firstWhyPending]);
@@ -7335,6 +7362,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       if (!stageACaptureAllowed(userText)) {
         stageARootArmed.current = false;
         stageADispatch({ type: "cancel" });
+      } else if ((_saPhase === "ask" || _saPhase === "correct") && !rootTextHasSubstance(userText)) {
+        stageADispatch({ type: "tooShort" });
+        return;
       } else if (_saPhase === "correct") {
         stageADispatch({ type: "correctDone", found: userText });
         return;
@@ -7610,7 +7640,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
   const handleStageAYes = useCallback(() => {
     if (stageARef.current.phase !== "card") return;
     const _riskOffer = riskSignalKind.current === 2 || riskSignalKind.current === 3;
-    setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: buildRootEndLines(stageARef.current.found, _riskOffer).join("\n"), msgMode: "STAGE_A" }]);
+    setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: buildRootEndLines(stageARef.current.found, _riskOffer).join("\n"), msgMode: "STAGE_A", stageAEnd: true }]);
     stageADispatch({ type: "yes", riskKind: riskSignalKind.current });
   }, [stageADispatch]);
   const handleStageAClarity = useCallback((n) => {
@@ -8452,6 +8482,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               {stageAPhase === "ask" && (
                 <div className="warning-card">
                   <div className="warning-text">{STAGE_A_TEXTS.ask}</div>
+                  {stageAView.retry && <div className="warning-text" style={{opacity:0.85}}>{STAGE_A_TEXTS.retry}</div>}
                   <div className="choice-btns">
                     <button className="choice-btn" onClick={handleStageABack}>{STAGE_A_TEXTS.back}</button>
                   </div>
@@ -8476,7 +8507,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                       </div>
                     </>
                   ) : (
-                    <div className="warning-text">{STAGE_A_TEXTS.correctAsk}</div>
+                    <>
+                      <div className="warning-text">{STAGE_A_TEXTS.correctAsk}</div>
+                      {stageAView.retry && <div className="warning-text" style={{opacity:0.85}}>{STAGE_A_TEXTS.retry}</div>}
+                    </>
                   )}
                   <div className="choice-btns">
                     <button className="choice-btn" style={{opacity:0.75}} onClick={handleStageABack}>{STAGE_A_TEXTS.back}</button>

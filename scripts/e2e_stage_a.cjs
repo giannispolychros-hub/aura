@@ -109,6 +109,9 @@ async function runMock() {
     await page.getByRole('button', { name: 'Νομίζω βρήκα τι με απασχολεί' }).click();
     ok('A: the fixed question shows', await page.getByText('Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;').count() >= 1);
     const callsBefore = calls.length;
+    // Phone test 6/10: a reply without substance must not become the root.
+    await send(page, 'Περίπου δηλαδή');
+    ok('A: «Περίπου δηλαδή» is NOT accepted as a root — the app asks for more, no card', await page.getByText("Γράψ' το λίγο πιο ολοκληρωμένα").count() === 1 && await page.getByRole('button', { name: 'Ναι, αυτό είναι' }).count() === 0);
     await send(page, 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.');
     ok('A: the answer is NOT sent to the model', calls.length === callsBefore);
     ok('A: the card shows «Τι βρήκες» verbatim', await page.getByText('«Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.»').count() === 1);
@@ -116,8 +119,21 @@ async function runMock() {
     ok('A: the line above «Ναι»', await page.getByText('Με το "Ναι" ολοκληρώνεται το δωρεάν κομμάτι και σου δείχνω το επόμενο.').count() === 1);
     ok('A: the input box is hidden while the card is open', await page.locator('textarea.textarea').count() === 0);
     await page.screenshot({ path: path.join(OUT, 'stageA-2-card.png'), fullPage: false });
+    // Correction with no substance: the previous root stays, the app asks for more; then a whole correction.
+    await page.getByRole('button', { name: 'Διόρθωσε' }).click();
+    ok('A: the correction asks for the whole root', await page.getByText('Γράψε τη ρίζα όπως θα την έλεγες εσύ, ολόκληρη.').count() === 1);
+    await send(page, 'Περίπου δηλαδή');
+    ok('A: «Περίπου δηλαδή» as a correction is refused and the previous root is kept', await page.getByText("Γράψ' το λίγο πιο ολοκληρωμένα").count() === 1 && await page.getByText('«Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.»').count() === 1);
+    await send(page, 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.');
+    // A SHORT phone screen, where the end text does not fit — the case the founder saw (the previous code left
+    // «Η ρίζα σου» about 90px ABOVE the screen at this size).
+    await page.setViewportSize({ width: 390, height: 520 });
     await page.getByRole('button', { name: 'Ναι, αυτό είναι' }).click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(900);
+    { const top = await page.evaluate(() => { const el = document.querySelector('[data-stage-a-end="1"]'); return el ? el.getBoundingClientRect().top : null; });
+      ok('A: after «Ναι», on a short phone screen, «Η ρίζα σου» is visible at the top (not scrolled away for the price)', top !== null && top >= 0 && top < 250); }
+    await page.setViewportSize({ width: 400, height: 860 });
+    await page.screenshot({ path: path.join(OUT, 'stageA-2b-after-yes.png'), fullPage: false });
     ok('A: «Η ρίζα σου» line with the whole root', await page.getByText('Η ρίζα σου: "Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.".').count() === 1);
     ok('A: price line', await page.getByText('AURA Coach · €6, μία φορά.').count() === 1);
     ok('A: offer buttons', await page.getByRole('button', { name: 'Θέλω να συνεχίσω' }).count() === 1 && await page.getByRole('button', { name: 'Όχι τώρα' }).count() === 1);
@@ -189,7 +205,7 @@ async function runMock() {
     if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, 'Γιατί δεν μπορώ να συγκεντρωθώ πουθενά.');
     await page.waitForTimeout(400);
     await page.getByRole('button', { name: 'Νομίζω βρήκα τι με απασχολεί' }).click();
-    await send(page, 'Ότι δεν έχω επιτρέψει στον εαυτό μου να πενθήσει.');
+    await send(page, 'Ότι δεν έχω επιτρέψει στον εαυτό μου να πενθήσει τη μητέρα μου.');
     ok('D: risk variant of the card line', await page.getByText('Με το "Ναι" ολοκληρώνεται αυτό το κομμάτι.').count() === 1);
     await page.getByRole('button', { name: 'Ναι, αυτό είναι' }).click();
     await page.waitForTimeout(300);

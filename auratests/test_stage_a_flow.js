@@ -45,7 +45,7 @@ const F = new Function(textsSrc + '\n' + NAMES.map(n => extractBlock('function '
 const S0 = F.initialStageAState() || { stats: {} };
 const step = (s, e) => F.stageAStep(s, e) || { stats: {} };
 const run = (evs, s = S0) => evs.reduce((acc, e) => step(acc, e), s);
-assert('INIT: no phase, every counter 0', S0.phase === null && Object.values(S0.stats || {}).every(v => v === 0) && Object.keys(S0.stats || {}).length === 18);
+assert('INIT: no phase, every counter 0', S0.phase === null && Object.values(S0.stats || {}).every(v => v === 0) && Object.keys(S0.stats || {}).length === 19 && S0.retry === false);
 
 // door 1
 const sAsk = step(S0, { type: 'press' }) || {};
@@ -79,6 +79,15 @@ const sCor2 = step(sCor, { type: 'correctDone', found: ' Ότι φοβάμαι �
 assert('CORRECT: the user\'s own text replaces «Τι βρήκες», back to the card, counted', sCor2.phase === 'card' && sCor2.found === 'Ότι φοβάμαι να του το πω' && sCor2.stats.rootCorrections === 1);
 assert('CORRECT: no limit on corrections', run([{ type: 'correctStart' }, { type: 'correctDone', found: 'α β' }, { type: 'correctStart' }, { type: 'correctDone', found: 'γ δ' }], sCard).stats.rootCorrections === 2);
 assert('CORRECT: empty text changes nothing', step(sCor, { type: 'correctDone', found: '  ' }) === sCor);
+
+// too-short root text (6/10 phone test): the flow stays where it is, the previous root is kept, counted
+const sAskR = step(sAsk, { type: 'tooShort' }) || {};
+assert('TOO SHORT (door 1): stays on the question, retry shown, counted', sAskR.phase === 'ask' && sAskR.retry === true && sAskR.stats.rootTooShort === 1 && sAskR.found === '');
+const sCorR = step(sCor, { type: 'tooShort' }) || {};
+assert('TOO SHORT (correction): stays in the correction, the PREVIOUS root is kept, counted', sCorR.phase === 'correct' && sCorR.found === sCor.found && sCorR.retry === true && sCorR.stats.rootTooShort === 1);
+assert('TOO SHORT: only in the two typed phases', step(sCard, { type: 'tooShort' }) === sCard && step(S0, { type: 'tooShort' }) === S0);
+assert('RETRY: cleared once a root is accepted (open / correctDone) or the user goes back', step(sAskR, OPEN).retry === false &&
+  step(sCorR, { type: 'correctDone', found: 'Ότι φοβάμαι να του το πω ευθέως' }).retry === false && step(sAskR, { type: 'back' }).retry === false);
 
 // «Ναι» → offer → …
 const sOffer = step(sCard, { type: 'yes', riskKind: 0 }) || {};
@@ -137,7 +146,7 @@ const outsideTexts = CODE.replace(R, '').replace(B, '');
 const jsxStart = CODE.indexOf('  return (\n    <>');
 assert('UI: no Stage A text is rendered outside the two gated regions',
   !/STAGE_A_TEXTS\./.test(outsideTexts.slice(outsideTexts.indexOf('  return (\n    <>'))));
-['ask', 'back', 'knewLabel', 'foundLabel', 'yes', 'correct', 'correctAsk', 'wantMore', 'notNow', 'notReady', 'helpQ', 'help1', 'help2', 'help3', 'helpSkip', 'clarityQ', 'copy', 'download']
+['ask', 'back', 'knewLabel', 'foundLabel', 'yes', 'correct', 'correctAsk', 'retry', 'wantMore', 'notNow', 'notReady', 'helpQ', 'help1', 'help2', 'help3', 'helpSkip', 'clarityQ', 'copy', 'download']
   .forEach(k => assert(`UI: «${k}» is on screen`, R.includes('STAGE_A_TEXTS.' + k)));
 assert('UI: the card line comes from buildRootCardLine with the risk latch (B/DISTRESS variant)',
   /buildRootCardLine\(riskSignalKind\.current === 2 \|\| riskSignalKind\.current === 3\)/.test(R));
@@ -164,6 +173,16 @@ assert('CLOSING: while door 2 is armed or the card is open, the old «πριν �
 assert('SUBMIT: only with the switch open', /if \(stageAActive\.current && \(_saPhase === "ask" \|\| _saPhase === "correct" \|\| _saArmed\)\) \{/.test(HS));
 assert('SUBMIT: crisis in the typed text → the flow cancels and the message continues on the normal path',
   /if \(!stageACaptureAllowed\(userText\)\) \{\s*stageARootArmed\.current = false;\s*stageADispatch\(\{ type: "cancel" \}\);\s*\}/.test(HS));
+assert('SUBMIT: door 1 and correction text must pass the «Τι ήξερες» substance rule; otherwise retry, no capture, no model call',
+  /if \(\(_saPhase === "ask" \|\| _saPhase === "correct"\) && !rootTextHasSubstance\(userText\)\) \{\s*stageADispatch\(\{ type: "tooShort" \}\);\s*return;\s*\}/.test(HS) &&
+  HS.indexOf('!stageACaptureAllowed(userText)') < HS.indexOf('rootTextHasSubstance(userText)'));
+assert('UI: the retry line shows in the question card and in the correction card', (R.match(/stageAView\.retry && /g) || []).length === 2);
+assert('SCROLL (6/10 phone test): after «Ναι» the end message is scrolled to its START (the root line), not the bottom',
+  /stageAActive\.current && messages\.length && messages\[messages\.length - 1\]\.stageAEnd/.test(CODE) &&
+  /_saEnd\.scrollIntoView\(\{ behavior: "smooth", block: "start" \}\);\s*return;/.test(CODE) &&
+  /msgMode: "STAGE_A", stageAEnd: true \}/.test(CODE) && /data-stage-a-end=\{msg\.stageAEnd \? "1" : undefined\}/.test(CODE));
+assert('SCROLL: with the switch closed nothing changes — the same bottom scroll, same dependencies',
+  /bottomRef\.current\?\.scrollIntoView\(\{ behavior: "smooth", block: "end" \}\);\s*\}, \[messages, loading, pivotPending, layerGatePending, memoryPromptPending, warningPending, closureConfirmPending, misfirePending, firstWhyPending\]\);/.test(CODE));
 assert('SUBMIT: «Διόρθωσε» text replaces «Τι βρήκες», no model call', /stageADispatch\(\{ type: "correctDone", found: userText \}\);\s*return;/.test(HS));
 assert('SUBMIT: door 1 adds the fixed question and the answer to the transcript; door 2 only the answer; no model call',
   /const _saAdded = _saDoor === 1\s*\? \[\{ id: nextMsgId\(\), role: "assistant", content: STAGE_A_TEXTS\.ask, msgMode: "STAGE_A" \}, \{ id: nextMsgId\(\), role: "user", content: userText \}\]\s*: \[\{ id: nextMsgId\(\), role: "user", content: userText \}\];/.test(HS) &&
