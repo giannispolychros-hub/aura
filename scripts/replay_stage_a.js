@@ -1,3 +1,7 @@
+// ⚠ ΔΕΝ ΧΡΗΣΙΜΟΠΟΙΕΙΤΑΙ ΓΙΑ ΑΠΟΦΑΣΕΙΣ (John, 6/10). Στέλνει μόνο το μεγάλο prompt, τον φακό SIMPLIFY και τη σήμανση —
+// ΟΧΙ τα context ανά γύρο, το First-WHY, τις αλλαγές φακού ή το κλείσιμο της εφαρμογής — άρα είναι αισιόδοξο. Η δοκιμή που
+// μετράει είναι η scripts/e2e_stage_a.cjs --real, πάνω στην ίδια την εφαρμογή.
+//
 // Δοκιμή του κανόνα «όχι δρόμοι, βήματα, τρόποι» (Στάδιο Α, SPEC_FREE_END.md 3.1.4 σημείο 3) με το ΠΡΑΓΜΑΤΙΚΟ μοντέλο.
 // Εγκρίθηκε από τον John (ADR «6 Οκτωβρίου (στ)», σημείο 4): ~6 συνθετικές συνεδρίες, εκτίμηση $4–6 (μάλλον λιγότερο).
 //
@@ -18,13 +22,16 @@ const os = require('os');
 const path = require('path');
 
 const MODEL = 'claude-sonnet-4-6';          // = api/aura.js
-const MARKER = '\n[FREE PART: ENDS AT ROOT]\n';
 const raw = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
 const ci = raw.indexOf('const AURA_CORE_PERSONALITY');
 const CORE = raw.slice(raw.indexOf('`', ci) + 1, raw.indexOf('`;', raw.indexOf('`', ci) + 1));
 const li = raw.indexOf('const SYSTEM_LENS_SIMPLIFY = AURA_CORE_PERSONALITY + `');
 const LENS = raw.slice(raw.indexOf('`', li) + 1, raw.indexOf('`;', raw.indexOf('`', li) + 1));
 if (!CORE.includes('STAGE A — FREE PART ENDS AT THE ROOT')) { console.error('Ο κανόνας του Σταδίου Α δεν βρέθηκε στο prompt.'); process.exit(1); }
+// Η σήμανση διαβάζεται από το App.jsx (buildStageAMarker), όπως και το μεγάλο prompt — όχι αντίγραφο.
+const markerSrc = raw.slice(raw.indexOf('function buildStageAMarker('), raw.indexOf('\n}\n', raw.indexOf('function buildStageAMarker(')) + 2);
+const MARKER = new Function(markerSrc + '\nreturn buildStageAMarker;')()(true);
+if (!MARKER.includes('[FREE PART: ENDS AT ROOT]')) { console.error('Δεν βρέθηκε η σήμανση του Σταδίου Α στο App.jsx.'); process.exit(1); }
 const deferralSrc = raw.slice(raw.indexOf('function detectsRootDeferral('), raw.indexOf('\n}\n', raw.indexOf('function detectsRootDeferral(')) + 2);
 const detectsRootDeferral = new Function(deferralSrc + '\nreturn detectsRootDeferral;')();
 

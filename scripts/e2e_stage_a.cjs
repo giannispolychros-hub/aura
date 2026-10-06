@@ -1,18 +1,69 @@
-// Δοκιμή του Σταδίου Α σε ΠΡΑΓΜΑΤΙΚΟ browser, με ΨΕΥΤΙΚΕΣ απαντήσεις του μοντέλου (καμία κλήση στο API, κανένα κόστος).
-// Δεν είναι μέρος των auratests (θέλει Playwright και τον vite dev server). Χρήση από τον φάκελο του repo:
-//   1. npx vite --port 5199          (σε ένα παράθυρο)
-//   2. node scripts/e2e_stage_a.cjs http://localhost:5199 <φάκελος για τα στιγμιότυπα>
-// Σενάρια: A ολόκληρη η ροή (κουμπί → κάρτα → «Ναι» → πρόταση → ερώτηση → σαφήνεια → λέξη → τέλος, χωρίς 6€),
-// B κλειστός διακόπτης (τίποτα από το Στάδιο Α, καμία σήμανση), C πόρτα 2 (ερώτηση ετοιμότητας) και «πίσω»,
-// D DISTRESS (κάρτα ναι, πρόταση όχι), E πρόταση κρίσης ως απάντηση (η ροή κλείνει, γραμμή 1018).
+// Δοκιμή του Σταδίου Α σε ΠΡΑΓΜΑΤΙΚΟ browser, πάνω στην ίδια την εφαρμογή (ίδιο src/App.jsx, ίδιο api/aura.js).
+// ΜΟΝΟ κώδικας δοκιμής — τίποτα εδώ δεν αλλάζει τη συμπεριφορά της εφαρμογής. Δεν είναι μέρος των auratests (θέλει
+// Playwright)· οι καθαρές συναρτήσεις του είναι στο scripts/e2e_stage_a_lib.cjs και ελέγχονται από το
+// auratests/test_e2e_harness.js.
+//
+// Το script χτίζει την εφαρμογή όπως το Vercel (vite build, χωρίς το vite.config.js, άρα χωρίς τον proxy του dev
+// server) σε φάκελο του %TEMP% και τη σερβίρει με vite preview. Κάθε κλήση της εφαρμογής στο /api/aura την πιάνει ο
+// Playwright· στις λειτουργίες με ψεύτικο μοντέλο απαντά ο ίδιος, στην --real την περνά στο ΙΔΙΟ το api/aura.js του
+// repo, που καλεί την Anthropic με το κλειδί της μεταβλητής ANTHROPIC_API_KEY. Κανένας άλλος δρόμος προς την Anthropic.
+//
+// ΛΕΙΤΟΥΡΓΙΕΣ (από τον φάκελο του repo):
+//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: 5 σενάρια ελέγχου της ροής (A–E), χωρίς κόστος
+//   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
+//   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
+//   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>
+// Αρχεία εξόδου (αναφορά, στιγμιότυπα) ΜΟΝΟ στον προσωρινό φάκελο. Το κλειδί δεν γράφεται ποτέ σε έξοδο.
+'use strict';
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const LIB = require('./e2e_stage_a_lib.cjs');
 const { chromium } = (() => { try { return require('playwright'); } catch (e) { return require(require('child_process').execSync('npm root -g').toString().trim() + '/playwright'); } })();
-const BASE = process.argv[2] || 'http://localhost:5199';
-const OUT = process.argv[3] || '/tmp';
+
+const REPO = path.join(__dirname, '..');
+const ARGS = process.argv.slice(2);
+const has = f => ARGS.includes(f);
+const opt = (f, d) => { const i = ARGS.indexOf(f); return i >= 0 && ARGS[i + 1] ? ARGS[i + 1] : d; };
+const MODE = has('--real') ? 'real' : has('--engine-check') ? 'engine-check' : 'mock';
+const STAMP = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+const OUT = LIB.outDirInTemp(opt('--out', path.join(os.tmpdir(), 'aura_e2e_' + MODE + '_' + STAMP)), os.tmpdir());
+const KEY = process.env.ANTHROPIC_API_KEY || '';
+const APP = LIB.loadApp(fs.readFileSync(path.join(REPO, 'src', 'App.jsx'), 'utf8'));
+let BASE = opt('--url', null);
+
+async function launch() {
+  return chromium.launch().catch(() => chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }));
+}
+// Build + preview like production. configFile:false → no dev proxy anywhere: a request the test does not
+// intercept gets a 404, never a second path to Anthropic.
+async function startApp() {
+  if (BASE) return { url: BASE, close: async () => {} };
+  const vite = await import('vite');
+  const react = (await import('@vitejs/plugin-react')).default;
+  const buildDir = path.join(os.tmpdir(), 'aura_e2e_build_' + STAMP);
+  await vite.build({ configFile: false, root: REPO, logLevel: 'warn', plugins: [react()], build: { outDir: buildDir, emptyOutDir: true } });
+  const server = await vite.preview({ configFile: false, root: REPO, logLevel: 'warn', build: { outDir: buildDir }, preview: { port: 5299, strictPort: false } });
+  const url = (server.resolvedUrls && server.resolvedUrls.local && server.resolvedUrls.local[0] || 'http://localhost:5299/').replace(/\/$/, '');
+  return { url, close: async () => { await new Promise(r => server.httpServer.close(r)); fs.rmSync(buildDir, { recursive: true, force: true }); } };
+}
+function writeOut(name, text) {
+  const t = LIB.redact(text, KEY);
+  LIB.assertNoSecret(t, KEY);
+  fs.mkdirSync(OUT, { recursive: true });
+  fs.writeFileSync(path.join(OUT, name), t);
+}
+
+// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — 5 σενάρια ελέγχου της ροής (A–E) ═════════════════════
+// A ολόκληρη η ροή (κουμπί → κάρτα → «Ναι» → πρόταση → ερώτηση → σαφήνεια → λέξη → τέλος, χωρίς 6€), B κλειστός
+// διακόπτης (τίποτα από το Στάδιο Α, καμία σήμανση), C πόρτα 2 και «πίσω», D DISTRESS (κάρτα ναι, πρόταση όχι),
+// E πρόταση κρίσης ως απάντηση (η ροή κλείνει, γραμμή 1018).
 const results = [];
 const ok = (label, cond) => { results.push((cond ? 'PASS' : 'FAIL') + ' — ' + label); };
 
 async function session(query, script) {
-  const browser = await chromium.launch().catch(() => chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }));
+  const browser = await launch();
   const page = await browser.newPage({ viewport: { width: 400, height: 860 } });
   const calls = [];
   let n = 0;
@@ -35,7 +86,8 @@ async function send(page, text) {
 }
 const systemText = b => (b.system || []).map(x => x.text).join('');
 
-(async () => {
+
+async function runMock() {
   // ── A: switch open for this visit ─────────────────────────────────────────
   {
     const { browser, page, calls } = await session('?stageA=1', [
@@ -50,7 +102,10 @@ const systemText = b => (b.system || []).map(x => x.text).join('');
     ok('A: the root button appears after the first AURA reply', await page.getByRole('button', { name: 'Νομίζω βρήκα τι με απασχολεί' }).count() === 1);
     ok('A: the first request carries the marker in the UNCACHED block', calls.length >= 1 && (calls[0].system || []).length === 2 && calls[0].system[1].text.includes('[FREE PART: ENDS AT ROOT]') && !calls[0].system[0].text.includes('[FREE PART: ENDS AT ROOT]\n'));
     ok('A: the cached block is identical to the core prompt start (cache_control on block 0 only)', calls.length >= 1 && !!calls[0].system[0].cache_control && !calls[0].system[1].cache_control);
-    await page.screenshot({ path: OUT + '/stageA-1-button.png', fullPage: false });
+    { const c0 = LIB.classifyRequest(calls[0], APP);
+      ok('A: the harness reads the first request as First-WHY, with the Stage A marker and the First-WHY floor', c0.kind === 'firstWhy' && c0.marker === true && c0.ctx.includes('firstWhyFloor') && c0.ctx.includes('stageAMarkerCtx'));
+      ok('A: no unknown bracketed block in the first request', c0.unknown.length === 0); }
+    await page.screenshot({ path: path.join(OUT, 'stageA-1-button.png'), fullPage: false });
     await page.getByRole('button', { name: 'Νομίζω βρήκα τι με απασχολεί' }).click();
     ok('A: the fixed question shows', await page.getByText('Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;').count() >= 1);
     const callsBefore = calls.length;
@@ -60,17 +115,17 @@ const systemText = b => (b.system || []).map(x => x.text).join('');
     ok('A: the card shows «Τι ήξερες» from the first message, greeting stripped', await page.getByText('«Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα»').count() === 1);
     ok('A: the line above «Ναι»', await page.getByText('Με το "Ναι" ολοκληρώνεται το δωρεάν κομμάτι και σου δείχνω το επόμενο.').count() === 1);
     ok('A: the input box is hidden while the card is open', await page.locator('textarea.textarea').count() === 0);
-    await page.screenshot({ path: OUT + '/stageA-2-card.png', fullPage: false });
+    await page.screenshot({ path: path.join(OUT, 'stageA-2-card.png'), fullPage: false });
     await page.getByRole('button', { name: 'Ναι, αυτό είναι' }).click();
     await page.waitForTimeout(300);
     ok('A: «Η ρίζα σου» line with the whole root', await page.getByText('Η ρίζα σου: "Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.".').count() === 1);
     ok('A: price line', await page.getByText('AURA Coach · €6, μία φορά.').count() === 1);
     ok('A: offer buttons', await page.getByRole('button', { name: 'Θέλω να συνεχίσω' }).count() === 1 && await page.getByRole('button', { name: 'Όχι τώρα' }).count() === 1);
     ok('A: copy / download available after «Ναι»', await page.getByRole('button', { name: 'Αντίγραψε τη ρίζα' }).count() === 1 && await page.getByRole('button', { name: 'Κατέβασε τη ρίζα' }).count() === 1);
-    await page.screenshot({ path: OUT + '/stageA-3-offer.png', fullPage: true });
+    await page.screenshot({ path: path.join(OUT, 'stageA-3-offer.png'), fullPage: true });
     await page.getByRole('button', { name: 'Θέλω να συνεχίσω' }).click();
     ok('A: not-ready text + the one-tap question', await page.getByText('Το AURA Coach δεν είναι ακόμα έτοιμο.').count() === 1 && await page.getByText('Τι θα σε βοηθούσε περισσότερο;').count() === 1);
-    await page.screenshot({ path: OUT + '/stageA-4-notready.png', fullPage: false });
+    await page.screenshot({ path: path.join(OUT, 'stageA-4-notready.png'), fullPage: false });
     await page.getByRole('button', { name: 'Να κρατάω τη ρίζα και τα βήματά μου' }).click();
     ok('A: clarity question with 10 buttons', await page.getByText('Τώρα, πόσο ξεκάθαρο είναι ποιο ακριβώς είναι το πρόβλημα, από το 1 έως το 10;').count() === 1 && await page.getByRole('button', { name: '10', exact: true }).count() === 1);
     await page.getByRole('button', { name: '7', exact: true }).click();
@@ -84,7 +139,7 @@ const systemText = b => (b.system || []).map(x => x.text).join('');
     ok('A: «Νέα συνεδρία» is there', await page.getByRole('button', { name: 'Νέα συνεδρία' }).count() === 1);
     const tel = await page.evaluate(() => (window.__auraTelemetry || []).filter(r => r.ev === 'session_completed').pop() || null);
     ok('A: telemetry: stageA, door 1, shown, confirmed, offer clicked, help 3, clarity 7', !!tel && tel.stageA === 1 && tel.rootDoor === 1 && tel.rootShown === 1 && tel.rootConfirmed === 1 && tel.coachOfferClicked === 1 && tel.coachHelpChoice === 3 && tel.lateClarity === 7 && tel.stageReached === 5);
-    await page.screenshot({ path: OUT + '/stageA-5-end.png', fullPage: true });
+    await page.screenshot({ path: path.join(OUT, 'stageA-5-end.png'), fullPage: true });
     await browser.close();
   }
   // ── B: switch closed (no parameter) ───────────────────────────────────────
@@ -97,6 +152,10 @@ const systemText = b => (b.system || []).map(x => x.text).join('');
     ok('B: closed switch → no marker anywhere in what is sent', calls.length >= 1 && calls.every(c => !systemText(c).includes('[FREE PART: ENDS AT ROOT]\n')));
     await send(page, 'Η σταθερότητα κυρίως.');
     ok('B: closed switch → the conversation continues normally', calls.length >= 2);
+    { const cs = calls.map(c => LIB.classifyRequest(c, APP));
+      ok('B: the harness sees NO marker in any request with the switch closed', cs.length >= 2 && cs.every(c => c.marker === false));
+      ok('B: the harness names the per-turn contexts of a main-path request (firstReplyFloorCtx or more)', cs.some(c => c.kind === 'main' && c.ctx.length >= 1));
+      ok('B: no unknown bracketed block in any request', cs.every(c => c.unknown.length === 0)); }
     await browser.close();
   }
 
@@ -156,6 +215,228 @@ const systemText = b => (b.system || []).map(x => x.text).join('');
     ok('E: tier A → the root button stays hidden', await page.getByRole('button', { name: 'Νομίζω βρήκα τι με απασχολεί' }).count() === 0);
     await browser.close();
   }
-  console.log(results.join('\n'));
-  console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
-})().catch(e => { console.error('E2E ERROR', e); process.exit(2); });
+}
+
+// ═══ ΤΑ 6 ΣΕΝΑΡΙΑ (ψεύτικο ή πραγματικό μοντέλο) ═════════════════════════════
+function fakeModel() {
+  let mainCalls = 0;
+  return async (body, cls, scen) => {
+    let text = 'Τι είναι αυτό που σε κρατάει εκεί;';
+    if (cls.kind === 'termination') text = cls.closing && cls.closing.part === 'Part 2' ? 'Η σκέψη σου παραμένει δική σου.' : 'Πριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.';
+    else if (cls.kind === 'supportive') text = 'Είμαι εδώ. Θέλεις να μου πεις λίγο περισσότερο;';
+    else {
+      mainCalls += 1;
+      if (scen.risk === 'door2back' && mainCalls === 2) text = 'Νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+      else if (scen.risk === 'door2back' && mainCalls === 3) text = 'Πες το μου με δικά σου λόγια: τι είναι αυτό που σε κρατάει;';
+    }
+    return { status: 200, data: { content: [{ type: 'text', text }], usage: { input_tokens: 10, output_tokens: 10 } } };
+  };
+}
+async function realModel() {
+  const src = fs.readFileSync(path.join(REPO, 'api', 'aura.js'), 'utf8');
+  const handler = (await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'))).default;
+  // api/aura.js allows 20 requests/minute per IP, and here every call shares the IP «unknown». At least 3.4 s
+  // between calls keeps the test under that limit, so a 429 can never be mistaken for app behaviour.
+  let lastCall = 0;
+  return async (body) => {
+    const wait = lastCall + 3400 - Date.now();
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    lastCall = Date.now();
+    return callHandler(body);
+  };
+  function callHandler(body) { return new Promise(resolve => {
+    const raw = JSON.stringify(body);
+    let status = 200;
+    const res = {
+      status(c) { status = c; return res; },
+      json(d) { resolve({ status, data: d }); },
+      writeHead(c) { status = c; }, write() {}, end() { resolve({ status, data: null }); },
+    };
+    Promise.resolve(handler({ method: 'POST', headers: { 'content-length': String(Buffer.byteLength(raw)) }, body }, res))
+      .catch(() => resolve({ status: 502, data: { error: 'handler error' } }));
+  }); }
+}
+
+async function runScenario(scen, model, budget) {
+  const T = APP.texts;
+  const browser = await launch();
+  const page = await browser.newPage({ viewport: { width: 400, height: 860 } });
+  const sess = { name: scen.name, risk: scen.risk, rootShown: false, rootConfirmed: false, ending: null, cost: 0, turns: [], notes: [], requests: [] };
+  let stepReqs = [];
+  let aborted = false;
+  await page.route('**/api/aura', async route => {
+    let body = {};
+    try { body = JSON.parse(route.request().postData() || '{}'); } catch (e) { body = {}; }
+    const cls = LIB.classifyRequest(body, APP);
+    stepReqs.push(cls); sess.requests.push(cls);
+    if (!budget.canSpend()) { aborted = true; return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"budget"}' }); }
+    const r = await model(body, cls, scen);
+    if (r.data && r.data.usage) { budget.add(r.data.usage); sess.cost += LIB.costOf(r.data.usage); }
+    return route.fulfill({ status: r.status, contentType: 'application/json', body: JSON.stringify(r.data || {}) });
+  });
+  await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+  await page.goto(BASE + '/?stageA=1');
+  await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+
+  const btn = name => page.getByRole('button', { name, exact: true });
+  const count = async loc => { try { return await loc.count(); } catch (e) { return 0; } };
+  const auraTexts = async () => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+  const screen = async () => ({
+    closureCard: await count(btn('Δείξε μου')) > 0, warningCard: await count(btn('Σταμάτα εδώ')) > 0,
+    memCard: await count(page.getByText('Θέλεις να το κρατήσω')) > 0, rootCard: await count(btn(T.yes)) > 0,
+    button: await count(btn(T.button)) > 0, ended: await count(page.getByText('η συνομιλία σταμάτησε εδώ')) > 0,
+    input: await count(page.locator('textarea.textarea')) > 0, promise: await count(btn('Δες την πορεία')) > 0,
+  });
+  const waitIdle = async (prev) => {
+    const t0 = Date.now();
+    await page.waitForTimeout(400);
+    while (Date.now() - t0 < 60000) {
+      const typing = await count(page.locator('.typing'));
+      const s = await screen();
+      if (!typing && ((await auraTexts()).length > prev || s.closureCard || s.warningCard || s.ended || s.rootCard)) break;
+      if (!typing && Date.now() - t0 > 3000) break;
+      await page.waitForTimeout(300);
+    }
+  };
+  let threeBeatSeen = false, stop = false, lastUser = '';
+  const lastMainCtx = () => { const m = [...sess.requests].reverse().find(q => q.kind !== 'termination'); return m ? m.ctx : []; };
+  const record = async (user, action) => {
+    const prev = (await auraTexts()).length;
+    stepReqs = [];
+    await action();
+    await waitIdle(prev);
+    const now = await auraTexts();
+    const fresh = now.slice(prev);
+    // Only text the MODEL wrote is checked: a step with no request shows the app's own fixed texts.
+    const flags = stepReqs.length ? [...new Set(fresh.flatMap(t => LIB.flagReply(t, user, APP)))] : [];
+    if (flags.some(f => f.startsWith('ΗΡΘΕΣ'))) threeBeatSeen = true;
+    const s = await screen();
+    if (s.rootCard) sess.rootShown = true;
+    const turn = { user, aura: fresh.join('\n—\n'), flags, requests: stepReqs.slice(), cardVisible: s.rootCard, yes: false, ending: '' };
+    sess.turns.push(turn);
+    return { turn, s };
+  };
+  const type = async (text) => { await page.locator('textarea.textarea').fill(text); await btn('Go').click(); };
+  // The old closing, whenever it shows up: record which trigger the screen points to, then let it finish.
+  const interrupts = async () => {
+    for (let k = 0; k < 4 && !stop; k++) {
+      const s = await screen();
+      if (s.memCard) { await page.getByText('Θέλεις να το κρατήσω').locator('xpath=ancestor::div[contains(@class,"card") or contains(@class,"warning")][1]').getByRole('button', { name: 'Όχι', exact: true }).click().catch(async () => { await btn('Όχι').first().click(); }); sess.notes.push('εμφανίστηκε η ερώτηση μνήμης — απαντήθηκε «Όχι»'); continue; }
+      if (s.ended) { stop = true; break; }
+      if (s.warningCard || s.closureCard) {
+        const ending = LIB.inferEnding({ warningCard: s.warningCard, closureCard: s.closureCard, lastUser, threeBeatSeen, lastCtx: lastMainCtx() }, APP);
+        sess.ending = ending;
+        await page.screenshot({ path: path.join(OUT, scen.risk + '-old-closing.png'), fullPage: true });
+        const label = s.warningCard ? 'Σταμάτα εδώ' : 'Δείξε μου';
+        const r = await record('[πάτησε «' + label + '»]', () => btn(label).click());
+        r.turn.ending = ending.label;
+        const s2 = await screen();
+        if (!s2.ended && s2.input) await record(scen.word, () => type(scen.word));
+        stop = true; break;
+      }
+      break;
+    }
+  };
+
+  const steps = scen.steps;
+  let skipDoor2 = false;
+  for (let i = 0; i < steps.length && !stop && !aborted; i++) {
+    const st = steps[i];
+    if (st.door2 && skipDoor2) continue;
+    const s = await screen();
+    if (st.say !== undefined || st.root !== undefined || st.word !== undefined) {
+      const text = st.say !== undefined ? st.say : st.root !== undefined ? st.root : st.word;
+      if (!s.input) { sess.notes.push('δεν υπήρχε πεδίο γραφής για «' + text + '» — η συνεδρία σταματά εδώ'); break; }
+      lastUser = text;
+      const r = await record(text, () => type(text));
+      if (st.door2 && !r.s.rootCard) sess.notes.push('η πόρτα 2 ΔΕΝ άνοιξε την κάρτα μετά το «Ναι» στην ερώτηση ετοιμότητας');
+      if (i === 0 && r.turn.requests.length === 0 && await count(page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;'))) {
+        lastUser = scen.why; await record(scen.why, () => type(scen.why));
+      }
+      if (st.word !== undefined) { const e = await screen(); if (e.ended) stop = true; }
+    } else if (st.untilReadiness) {
+      let asked = false;
+      for (const filler of [null, ...st.fillers]) {
+        const last = (await auraTexts()).slice(-1)[0] || '';
+        if (APP.fns.detectsCoreReadinessAsked(last)) { asked = true; break; }
+        if (filler === null) continue;
+        if (!(await screen()).input) break;
+        lastUser = filler; await record(filler, () => type(filler)); await interrupts(); if (stop) break;
+      }
+      if (asked && !stop) { lastUser = 'Ναι'; await record('Ναι', () => type('Ναι')); }
+      else if (!stop) { skipDoor2 = true; sess.notes.push('η AURA δεν έκανε την ερώτηση ετοιμότητας σε ' + st.fillers.length + ' γύρους — η πόρτα 2 δεν δοκιμάστηκε'); }
+    } else if (st.press) {
+      if (!s.button) { sess.notes.push('το κουμπί «' + T.button + '» δεν φαινόταν όταν το χρειάστηκε'); break; }
+      await record('[πάτησε «' + T.button + '»]', () => btn(T.button).click());
+    } else if (st.card) {
+      const name = st.card === 'yes' ? T.yes : T.back;
+      if (!(await count(btn(name)))) { sess.notes.push('το κουμπί «' + name + '» δεν φαινόταν'); if (st.card === 'yes') break; continue; }
+      const r = await record('[πάτησε «' + name + '»]', () => btn(name).click());
+      if (st.card === 'yes') { sess.rootConfirmed = true; r.turn.yes = true; await page.screenshot({ path: path.join(OUT, scen.risk + '-root-yes.png'), fullPage: true }); }
+    } else if (st.offer) {
+      const name = st.offer === 'want' ? T.wantMore : T.notNow;
+      if (!(await count(btn(name)))) { sess.notes.push('δεν εμφανίστηκε πρόταση Coach (π.χ. σήμα κινδύνου)'); continue; }
+      await record('[πάτησε «' + name + '»]', () => btn(name).click());
+    } else if (st.help !== undefined) {
+      const name = st.help ? T['help' + st.help] : T.helpSkip;
+      if (await count(btn(name))) await record('[πάτησε «' + name + '»]', () => btn(name).click());
+    } else if (st.clarity) {
+      if (await count(btn(String(st.clarity)))) await record('[σαφήνεια ' + st.clarity + ']', () => btn(String(st.clarity)).click());
+      else sess.notes.push('δεν εμφανίστηκε η κλίμακα σαφήνειας');
+    }
+    await interrupts();
+  }
+  if (aborted) sess.notes.push('ΣΤΑΜΑΤΗΣΕ: έφτασε το όριο δαπάνης');
+  if (!sess.ending) sess.ending = LIB.inferEnding({ rootConfirmed: sess.rootConfirmed, rootShown: sess.rootShown }, APP);
+  if (sess.turns.length) sess.turns[sess.turns.length - 1].ending = sess.turns[sess.turns.length - 1].ending || sess.ending.label;
+  await page.screenshot({ path: path.join(OUT, scen.risk + '-end.png'), fullPage: true }).catch(() => {});
+  await browser.close();
+  return { sess, aborted };
+}
+
+async function runScenarios(makeModel, budget) {
+  const sessions = [];
+  for (const scen of LIB.SCENARIOS) {
+    console.log('… ' + scen.name);
+    const { sess, aborted } = await runScenario(scen, await makeModel(), budget);
+    sessions.push(sess);
+    console.log('   ρίζα επιβεβαιώθηκε: ' + (sess.rootConfirmed ? 'ΝΑΙ' : 'ΟΧΙ') + ' | ' + sess.ending.label + ' | κόστος $' + sess.cost.toFixed(2));
+    if (aborted) break;
+  }
+  return sessions;
+}
+
+(async () => {
+  if (MODE === 'real' && has('--dry')) {
+    console.log('ΠΡΑΓΜΑΤΙΚΗ ΔΟΚΙΜΗ — ΣΧΕΔΙΟ (καμία κλήση, κανένα build)');
+    console.log('Όριο δαπάνης: $' + Number(opt('--budget', '6')).toFixed(2) + ' | αρχεία στο: ' + OUT);
+    console.log('Κλειδί στη μεταβλητή ANTHROPIC_API_KEY: ' + (KEY ? 'βρέθηκε' : 'ΔΕΝ βρέθηκε'));
+    console.log('Context που αναγνωρίζονται από το App.jsx: ' + Object.keys(APP.catalog).filter(n => APP.catalog[n].length).join(', '));
+    console.log('Χωρίς υπογραφή (δεν φαίνονται): ' + (APP.unsignedCtx.join(', ') || '—'));
+    LIB.SCENARIOS.forEach(s => console.log('\n' + s.name + '\n  ' + s.steps.map(t => JSON.stringify(t)).join('\n  ')));
+    return;
+  }
+  if (MODE === 'real' && !has('--yes')) { console.log('Δεν έτρεξε τίποτα. Πρώτα: --real --dry. Για να τρέξει (και να ξοδέψει): --real --yes'); return; }
+  if (MODE === 'real' && !KEY) { console.error('Δεν βρέθηκε ANTHROPIC_API_KEY. PowerShell: $env:ANTHROPIC_API_KEY = "<το κλειδί σου>"'); process.exit(2); }
+  fs.mkdirSync(OUT, { recursive: true });
+  const app = await startApp();
+  BASE = app.url;
+  try {
+    if (MODE === 'mock') {
+      await runMock();
+      writeOut('mock-results.txt', results.join('\n') + '\n');
+      console.log(results.join('\n'));
+      console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
+    } else {
+      const budget = LIB.makeBudget(MODE === 'real' ? Number(opt('--budget', '6')) : 1e9);
+      // A fresh model per scenario: the fake one counts calls, and that count must start at 0 in every session.
+      const sessions = await runScenarios(MODE === 'real' ? realModel : fakeModel, budget);
+      const meta = { mode: MODE === 'real' ? 'πραγματικό μοντέλο' : 'ψεύτικο μοντέλο (έλεγχος μηχανισμού)', budget: MODE === 'real' ? Number(opt('--budget', '6')) : 0, spent: MODE === 'real' ? budget.spent() : 0 };
+      writeOut('report.md', LIB.buildReport(sessions, meta));
+      writeOut('report.json', JSON.stringify(sessions, null, 2));
+      console.log('\nΚόστος: $' + (MODE === 'real' ? budget.spent() : 0).toFixed(2) + '\nΑναφορά: ' + path.join(OUT, 'report.md'));
+    }
+  } finally {
+    await app.close();
+  }
+})().catch(e => { console.error('E2E ERROR', LIB.redact(e && e.stack || String(e), KEY)); process.exit(2); });
