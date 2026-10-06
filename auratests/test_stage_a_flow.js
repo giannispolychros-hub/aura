@@ -45,7 +45,7 @@ const F = new Function(textsSrc + '\n' + NAMES.map(n => extractBlock('function '
 const S0 = F.initialStageAState() || { stats: {} };
 const step = (s, e) => F.stageAStep(s, e) || { stats: {} };
 const run = (evs, s = S0) => evs.reduce((acc, e) => step(acc, e), s);
-assert('INIT: no phase, every counter 0', S0.phase === null && Object.values(S0.stats || {}).every(v => v === 0) && Object.keys(S0.stats || {}).length === 19 && S0.retry === false);
+assert('INIT: no phase, every counter 0', S0.phase === null && Object.values(S0.stats || {}).every(v => v === 0) && Object.keys(S0.stats || {}).length === 20 && S0.retry === false && S0.leaving === false);
 
 // door 1
 const sAsk = step(S0, { type: 'press' }) || {};
@@ -185,7 +185,7 @@ assert('SCROLL: with the switch closed nothing changes — the same bottom scrol
   /bottomRef\.current\?\.scrollIntoView\(\{ behavior: "smooth", block: "end" \}\);\s*\}, \[messages, loading, pivotPending, layerGatePending, memoryPromptPending, warningPending, closureConfirmPending, misfirePending, firstWhyPending\]\);/.test(CODE));
 assert('SUBMIT: «Διόρθωσε» text replaces «Τι βρήκες», no model call', /stageADispatch\(\{ type: "correctDone", found: userText \}\);\s*return;/.test(HS));
 assert('SUBMIT: door 1 adds the fixed question and the answer to the transcript; door 2 only the answer; no model call',
-  /const _saAdded = _saDoor === 1\s*\? \[\{ id: nextMsgId\(\), role: "assistant", content: STAGE_A_TEXTS\.ask, msgMode: "STAGE_A" \}, \{ id: nextMsgId\(\), role: "user", content: userText \}\]\s*: \[\{ id: nextMsgId\(\), role: "user", content: userText \}\];/.test(HS) &&
+  /const _saAdded = _saDoor === 1\s*\? \[\{ id: nextMsgId\(\), role: "assistant", content: stageARef\.current\.leaving \? STAGE_A_TEXTS\.askLeaving : STAGE_A_TEXTS\.ask, msgMode: "STAGE_A" \}, \{ id: nextMsgId\(\), role: "user", content: userText \}\]\s*: \[\{ id: nextMsgId\(\), role: "user", content: userText \}\];/.test(HS) &&
   /stageAOpen\(_saDoor, userText, \[\.\.\.messages, \.\.\._saAdded\]\);\s*return;/.test(HS));
 assert('SUBMIT: the word path records «same as root» and skips the echo when it is', /if \(stageAActive\.current && stageARef\.current\.phase === "word"\) \{[\s\S]{0,300}sameAsRootText\(userText, stageARef\.current\.found\)/.test(HS));
 const OPENFN = extractBlock('const stageAOpen = useCallback((door, found, msgsNow) => ') || '';

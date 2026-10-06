@@ -47,7 +47,11 @@ const NAMES = ['isVerbatimUserText', 'pickKnewSnippet', 'rootTextHasSubstance', 
   'mergeRiskKind', 'stageARootButtonVisible', 'buildRootCopyText', 'normalizeVerbatim'];
 const srcs = NAMES.map(n => extractBlock('function ' + n + '(') || `function ${n}(){return undefined}`);
 const textsSrc = extractBlock('const STAGE_A_TEXTS = ') || 'const STAGE_A_TEXTS = {};';
-const F = new Function(textsSrc + '\n' + srcs.join('\n') + '\nreturn {STAGE_A_TEXTS,' + NAMES.join(',') + '};')();
+const constsSrc = ['KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_MIN_SUBSTANCE_WORDS', 'ROOT_FILLER_WORDS'].map(n => {
+  const a = CODE.indexOf('const ' + n + ' = ');
+  return a < 0 ? `const ${n} = undefined;` : CODE.slice(a, CODE.indexOf(';\n', a) + 1);
+}).join('\n');
+const F = new Function(textsSrc + '\n' + constsSrc + '\n' + srcs.join('\n') + '\nreturn {STAGE_A_TEXTS,' + NAMES.join(',') + '};')();
 
 // ── STAGE_A_TEXTS: verbatim as approved ──────────────────────────────────────
 const T = F.STAGE_A_TEXTS || {};
@@ -127,8 +131,9 @@ assert('KNEW: whatever it returns is still verbatim user text', !!kl && F.isVerb
 assert('KNEW: non-array → null, never throws', K(null) === null && K([null, 5]) === null);
 
 // ── rootTextHasSubstance (6/10 phone test: «Περίπου δηλαδή» became the whole root) ──
-// THE SAME RULE as «Τι ήξερες» (founder): greeting stripped, no content-free introduction, not about AURA,
-// at least 4 substance words — in at least one sentence of the text.
+// THE SAME RULE as «Τι ήξερες» (greeting stripped, no content-free introduction, not about AURA), with the root's
+// own limit since ADR «6 Οκτωβρίου (λ)»: at least 2 substance words, filler words not counted — in at least one
+// sentence of the text. «Τι ήξερες» keeps 4 (test_stage_a_leaving_door.js, H).
 const H = x => F.rootTextHasSubstance(x);
 assert('ROOT TEXT: «Περίπου δηλαδή» (talking to AURA, not a root) is rejected', H('Περίπου δηλαδή') === false);
 assert('ROOT TEXT: «Ναι, αυτό» rejected', H('Ναι, αυτό') === false);
@@ -137,9 +142,12 @@ assert('ROOT TEXT: a content-free introduction is rejected', H('Θέλω να μ
 assert('ROOT TEXT: a question about AURA is rejected', H('Τι είσαι εσύ και πώς δουλεύεις ακριβώς εδώ μέσα;') === false);
 assert('ROOT TEXT: a whole root passes', H('Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.') === true);
 assert('ROOT TEXT: one substantial sentence among short ones is enough', H('Ναι. Ότι μένω στη δουλειά από φόβο και όχι επειδή το θέλω.') === true);
-assert('ROOT TEXT: the same rule as «Τι ήξερες» — a text passes exactly when pickKnewSnippet would accept it',
-  ['Περίπου δηλαδή', 'Φοβάμαι πολύ την αλλαγή δουλειάς.', 'Φοβάμαι πολύ την αλλαγή δουλειάς τώρα.', 'Καλησπέρα, θέλω να μιλήσω για κάτι', 'Ότι μένω από φόβο, όχι επειδή το θέλω.']
-    .every(x => H(x) === (F.pickKnewSnippet([x]) !== null)));
+assert('ROOT TEXT: the two limits differ only in the word count — whatever «Τι ήξερες» accepts, a root accepts too (no filler in it)',
+  ['Φοβάμαι πολύ την αλλαγή δουλειάς τώρα.', 'Ότι μένω από φόβο, όχι επειδή το θέλω.', 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου ξανά.']
+    .every(x => F.pickKnewSnippet([x]) !== null && H(x) === true));
+assert('ROOT TEXT: two substance words are a root but not a «Τι ήξερες»', H('Φοβάμαι την αλλαγή.') === true && F.pickKnewSnippet(['Φοβάμαι την αλλαγή.']) === null);
+assert('ROOT TEXT: the greeting / introduction / about-AURA rejections still apply to a root',
+  H('Καλησπέρα, θέλω να μιλήσω για κάτι') === false && H('Γεια σου, καλημέρα') === false);
 assert('ROOT TEXT: non-strings never throw', H(null) === false && H(undefined) === false && H('') === false);
 assert('ONE RULE: pickKnewSnippet and rootTextHasSubstance both go through substanceOfSentence (no second copy of the rule)',
   /substanceOfSentence\(/.test(CODE.slice(CODE.indexOf('function pickKnewSnippet('), CODE.indexOf('function pickKnewSnippet(') + 3000)) &&

@@ -180,9 +180,15 @@ assert('CLOSING: Part 2 is still told not to repeat the summary',
 // ROOT», written ONCE, conditional on the per-turn marker [FREE PART: ENDS AT ROOT] that only the
 // uncached block carries when the switch is open. +2330 characters, one cache write, paid knowingly.
 // See test_stage_a_prompt_rule.js.
+//
+// CHANGED AGAIN, DELIBERATELY, on 2026-10-06 (26d2a0f028cb40a9 → 2f229a4077b57d19). Stage A, founder-approved
+// (ADR «6 Οκτωβρίου (λ)», point 4): ONE sentence pair appended as item (6) INSIDE the same conditional paragraph —
+// no farewell and no «session complete» while the root is unconfirmed; a short reply, no closing, if the user
+// wants to stop. Inert without the marker. +187 characters, one cache write, paid knowingly.
+// See test_stage_a_leaving_door.js (F).
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 26d2a0f028cb40a9…)',
-  PROMPT_SHA.slice(0, 16) === '26d2a0f028cb40a9');
+assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 2f229a4077b57d19…)',
+  PROMPT_SHA.slice(0, 16) === '2f229a4077b57d19');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',

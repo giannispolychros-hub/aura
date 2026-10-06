@@ -227,8 +227,13 @@ assert('the pair is still pushed when the message is a real answer — the guard
 // PRIORITY RULE stage this turn is in) — it withholds nothing and suppresses nothing on its own,
 // it only feeds prompt text. Still additive to the same OR pattern as every other site, so the
 // count moves with the real number rather than being silently left stale.
-assert('exactly ten call sites are wired, matching the current stated scope',
-  (raw.match(/declaresClosing\s*\(/g) || []).length === 11); // 10 call sites + the definition
+//
+// UPDATED AGAIN (2026-10-06, ADR «6 Οκτωβρίου (λ)»): an 11th call site joined inside stageALeavingDoorOpens —
+// `isExplicitClosure(u) || declaresClosing(u)`, the SAME two detectors as userDeclaredExit, so «Πριν φύγεις:»
+// opens for exactly the explicit closings (T2) the old closing already recognises. Stage A only (switch closed:
+// never reached). Additive, replaces nothing.
+assert('exactly eleven call sites are wired, matching the current stated scope',
+  (raw.match(/declaresClosing\s*\(/g) || []).length === 12); // 11 call sites + the definition
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);

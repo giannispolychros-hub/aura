@@ -9,7 +9,7 @@
 // repo, που καλεί την Anthropic με το κλειδί της μεταβλητής ANTHROPIC_API_KEY. Κανένας άλλος δρόμος προς την Anthropic.
 //
 // ΛΕΙΤΟΥΡΓΙΕΣ (από τον φάκελο του repo):
-//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: 5 σενάρια ελέγχου της ροής (A–E), χωρίς κόστος
+//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: 10 σενάρια ελέγχου της ροής (A–I), χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
@@ -55,10 +55,11 @@ function writeOut(name, text) {
   fs.writeFileSync(path.join(OUT, name), t);
 }
 
-// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — 5 σενάρια ελέγχου της ροής (A–E) ═════════════════════
+// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — 10 σενάρια ελέγχου της ροής (A–I) ════════════════════
 // A ολόκληρη η ροή (κουμπί → κάρτα → «Ναι» → πρόταση → ερώτηση → σαφήνεια → λέξη → τέλος, χωρίς 6€), B κλειστός
 // διακόπτης (τίποτα από το Στάδιο Α, καμία σήμανση), C πόρτα 2 και «πίσω», D DISTRESS (κάρτα ναι, πρόταση όχι),
-// E πρόταση κρίσης ως απάντηση (η ροή κλείνει, γραμμή 1018).
+// E πρόταση κρίσης ως απάντηση (η ροή κλείνει, γραμμή 1018), F/F2 «Πριν φύγεις:» (T2 μία φορά, μετά το παλιό κλείσιμο·
+// απάντηση-ρίζα και μέτρηση), G T1 «Ναι» χωρίς πόρτα, H T2 με κρίση επιπέδου Α χωρίς πόρτα, I κλειστός διακόπτης.
 const results = [];
 const ok = (label, cond) => { results.push((cond ? 'PASS' : 'FAIL') + ' — ' + label); };
 
@@ -231,6 +232,84 @@ async function runMock() {
     ok('E: tier A → the root button stays hidden', await page.getByRole('button', { name: 'Νομίζω βρήκα τι με απασχολεί' }).count() === 0);
     await browser.close();
   }
+  // ── F: «Ευχαριστώ.» before the root (T2) → «Πριν φύγεις:» once; «Δεν το βρήκα ακόμα»; a 2nd T2 → the old closing ─
+  const LEAVING = 'Πριν φύγεις: πες το με μία φράση — τι είναι αυτό που σε απασχολεί;';
+  {
+    const { browser, page, calls } = await session('?stageA=1', ['Τι είναι αυτό που σε κρατάει εκεί;', 'Και τι σε τραβάει αλλού;', 'Τι θα σήμαινε αυτό για σένα;', 'Εντάξει. Είμαι εδώ αν θέλεις να συνεχίσουμε.', 'Εντάξει. Είμαι εδώ αν θέλεις να συνεχίσουμε.']);
+    // NB: a BARE «Εντάξει.» to the first «Ευχαριστώ.» would make the existing «mutual close» rule of decideTermination
+    // (assistantAlreadyClosed) hold back the old card at the second closing — reported, old closing not touched.
+    await send(page, 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.');
+    if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.');
+    await send(page, 'Η σταθερότητα κυρίως.');
+    await send(page, 'Μάλλον φοβάμαι την αλλαγή.');
+    await send(page, 'Ευχαριστώ.');
+    ok('F: first T2 → «Πριν φύγεις:» with «Δεν το βρήκα ακόμα», NOT the old closing card', await page.getByText(LEAVING).count() === 1 &&
+      await page.getByRole('button', { name: 'Δεν το βρήκα ακόμα, συνέχισε' }).count() === 1 && await page.getByRole('button', { name: 'Δείξε μου' }).count() === 0);
+    ok('F: the model\'s reply to «Ευχαριστώ.» is still on screen above it', await page.getByText('Τι θα σήμαινε αυτό για σένα;').count() === 1);
+    await page.screenshot({ path: path.join(OUT, 'stageA-6-leaving.png'), fullPage: false });
+    await page.getByRole('button', { name: 'Δεν το βρήκα ακόμα, συνέχισε' }).click();
+    ok('F: «Δεν το βρήκα ακόμα» → the conversation continues, the button is back', await page.getByText(LEAVING).count() === 0 && await page.getByRole('button', { name: 'Νομίζω βρήκα τι με απασχολεί' }).count() === 1);
+    await send(page, 'Ευχαριστώ, κλείνουμε εδώ.');
+    ok('F: second T2 → the old closing card, no second «Πριν φύγεις:» (no loop)', await page.getByRole('button', { name: 'Δείξε μου' }).count() === 1 && await page.getByText(LEAVING).count() === 0);
+    await browser.close();
+  }
+  // ── F2: «Πριν φύγεις:» answered with a root → the same card as door 1; telemetry counts it apart from the button ─
+  {
+    const { browser, page, calls } = await session('?stageA=1', ['Τι είναι αυτό που σε κρατάει εκεί;', 'Και τι σε τραβάει αλλού;', 'Τι θα σήμαινε αυτό για σένα;', 'Η σκέψη σου παραμένει δική σου.']);
+    await send(page, 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.');
+    if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.');
+    await send(page, 'Η σταθερότητα κυρίως.');
+    await send(page, 'Ευχαριστώ.');
+    const before = calls.length;
+    await send(page, 'Η αμφιβολία');
+    ok('F2: «Η αμφιβολία» is not a root (asks for more)', await page.getByText("Γράψ' το λίγο πιο ολοκληρωμένα").count() === 1 && await page.getByRole('button', { name: 'Ναι, αυτό είναι' }).count() === 0);
+    await send(page, 'Φοβάμαι την απόρριψη');
+    ok('F2: «Φοβάμαι την απόρριψη» is a root → the card, nothing sent to the model', await page.getByText('«Φοβάμαι την απόρριψη»').count() === 1 && calls.length === before);
+    await page.getByRole('button', { name: 'Ναι, αυτό είναι' }).click();
+    await page.getByRole('button', { name: 'Όχι τώρα' }).click();
+    await page.getByRole('button', { name: '6', exact: true }).click();
+    await page.waitForTimeout(300);
+    await send(page, 'απόρριψη');
+    await page.waitForTimeout(800);
+    const tel = await page.evaluate(() => (window.__auraTelemetry || []).filter(r => r.ev === 'session_completed').pop() || null);
+    ok('F2: telemetry — rootDoorFromClosing 1, rootButtonPressed 0, door 1, confirmed', !!tel && tel.rootDoorFromClosing === 1 && tel.rootButtonPressed === 0 && tel.rootDoor === 1 && tel.rootConfirmed === 1);
+    await browser.close();
+  }
+  // ── G: T1 «Ναι» → no door ─────────────────────────────────────────────────
+  {
+    const { browser, page, calls } = await session('?stageA=1', ['Τι είναι αυτό που σε κρατάει εκεί;', 'Και τι σε τραβάει αλλού;', 'Είναι η σταθερότητα αυτό που σε κρατάει;', 'Εντάξει.']);
+    await send(page, 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.');
+    if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.');
+    await send(page, 'Η σταθερότητα κυρίως.');
+    await send(page, 'Μάλλον φοβάμαι την αλλαγή.');
+    await send(page, 'Ναι');
+    ok('G: T1 «Ναι» → no «Πριν φύγεις:»', await page.getByText(LEAVING).count() === 0);
+    await browser.close();
+  }
+  // ── H: T2 with a tier-A crisis signal → the safety path, no door ──────────
+  {
+    const { browser, page, calls } = await session('?stageA=1', ['Τι είναι αυτό που σε κρατάει εκεί;', 'Και τι σε τραβάει αλλού;', 'Είμαι εδώ μαζί σου. Είσαι ασφαλής αυτή τη στιγμή;']);
+    await send(page, 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.');
+    if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.');
+    await send(page, 'Η σταθερότητα κυρίως.');
+    await send(page, 'Κλείνουμε εδώ, δεν θέλω να ζω άλλο.');
+    await page.waitForTimeout(500);
+    ok('H: tier-A crisis T2 → the crisis line, no «Πριν φύγεις:», no root button', await page.getByText(/1018/).count() >= 1 && await page.getByText(LEAVING).count() === 0 &&
+      await page.getByRole('button', { name: 'Νομίζω βρήκα τι με απασχολεί' }).count() === 0);
+    await browser.close();
+  }
+  // ── I: switch closed, «Ευχαριστώ.» → the old closing exactly as before ─────
+  {
+    const { browser, page, calls } = await session('', ['Τι είναι αυτό που σε κρατάει εκεί;', 'Και τι σε τραβάει αλλού;', 'Τι θα σήμαινε αυτό για σένα;']);
+    await send(page, 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.');
+    if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.');
+    await send(page, 'Η σταθερότητα κυρίως.');
+    await send(page, 'Μάλλον φοβάμαι την αλλαγή.');
+    await send(page, 'Ευχαριστώ.');
+    ok('I: closed switch → «Ευχαριστώ.» opens the old closing card, no «Πριν φύγεις:»', await page.getByRole('button', { name: 'Δείξε μου' }).count() === 1 && await page.getByText(LEAVING).count() === 0);
+    ok('I: closed switch → no marker in any request', calls.every(c => !systemText(c).includes('[FREE PART: ENDS AT ROOT]\n')));
+    await browser.close();
+  }
 }
 
 // ═══ ΤΑ 6 ΣΕΝΑΡΙΑ (ψεύτικο ή πραγματικό μοντέλο) ═════════════════════════════
@@ -302,6 +381,7 @@ async function runScenario(scen, model, budget) {
     memCard: await count(page.getByText('Θέλεις να το κρατήσω')) > 0, rootCard: await count(btn(T.yes)) > 0,
     button: await count(btn(T.button)) > 0, ended: await count(page.getByText('η συνομιλία σταμάτησε εδώ')) > 0,
     input: await count(page.locator('textarea.textarea')) > 0, promise: await count(btn('Δες την πορεία')) > 0,
+    leaving: await count(page.getByText(T.askLeaving)) > 0,
   });
   const waitIdle = async (prev) => {
     const t0 = Date.now();
@@ -381,6 +461,11 @@ async function runScenario(scen, model, budget) {
       }
       if (asked && !stop) { lastUser = 'Ναι'; await record('Ναι', () => type('Ναι')); }
       else if (!stop) { skipDoor2 = true; sess.notes.push('η AURA δεν έκανε την ερώτηση ετοιμότητας σε ' + st.fillers.length + ' γύρους — η πόρτα 2 δεν δοκιμάστηκε'); }
+    } else if (st.leaving) {
+      // ADR «6 Οκτωβρίου (λ)»: after an explicit closing before the root the app asks «Πριν φύγεις:» itself.
+      if (s.leaving) { sess.notes.push('μετά το «' + lastUser + '» εμφανίστηκε το «Πριν φύγεις:» (πόρτα 1 αντί για το παλιό κλείσιμο)'); }
+      else if (s.button) { sess.notes.push('ΔΕΝ εμφανίστηκε το «Πριν φύγεις:» — πατήθηκε το κουμπί για να συνεχίσει η δοκιμή'); await record('[πάτησε «' + T.button + '»]', () => btn(T.button).click()); }
+      else { sess.notes.push('ΔΕΝ εμφανίστηκε το «Πριν φύγεις:» ούτε το κουμπί — η συνεδρία σταματά εδώ'); break; }
     } else if (st.press) {
       if (!s.button) { sess.notes.push('το κουμπί «' + T.button + '» δεν φαινόταν όταν το χρειάστηκε'); break; }
       await record('[πάτησε «' + T.button + '»]', () => btn(T.button).click());

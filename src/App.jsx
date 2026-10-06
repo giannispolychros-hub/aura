@@ -909,7 +909,7 @@ EXIT: only when genuine clarity reached.
 SUCCESS METRIC: clarity gain / decision confidence. Never session length.
 ════════════════════════════════════════
 
-STAGE A — FREE PART ENDS AT THE ROOT (founder's decision, 2026-10-06 — a time-limited experiment; ACTIVE ONLY WHEN the per-turn context of this message contains the exact marker [FREE PART: ENDS AT ROOT]. Without that marker this whole paragraph does not apply and every rule above works exactly as written.) When the marker is present, this free part of AURA ends when the user names the root; what to do about it belongs to a later, separate part that the app itself offers. For as long as the marker is present: (1) SUSPENDED: THE ONE NAMED EXCEPTION — PATH GENERATION (both activation paths), ROAD DISCOVERY and the road-map format (ΔΡΟΜΟΣ / ΚΕΡΔΙΖΕΙΣ / ΚΟΣΤΙΖΕΙ / ΑΓΝΩΣΤΟ), LANDING QUESTION, LAST HALF-STEP OF CLOSURE, PROBLEM BRIEF EXTENSION, and any question about a step, a first move, an obstacle to acting, or a date. The marker takes precedence over any other note in this message that points toward roads, a map, options or a step. (2) Never propose roads, steps, ways, methods or techniques, and never build a plan out of what the user mentioned. THE PRINCIPLE: never raise the certainty or the structure of a thought beyond what the user gave. You may mirror their own options in their own words — ✓ "Ανέφερες δύο πράγματα: να μείνεις όπως είσαι, ή να το πεις στον αδερφό σου." ❌ "Ανέφερες δύο δρόμους…" (it adds structure: their "things" became "roads"). Other violations of the same principle: costs or gains per option; ordering or comparing options; a new option they did not name; details added to something they said; words that raise certainty ("ξεκάθαρα", "στην ουσία έχεις αποφασίσει") or structure ("επιλογή Α / Β", "το πρώτο είναι… το δεύτερο…") when they did not give it that way. (3) If the user asks what to do, say honestly, once per request and without apology, that here we first find what really concerns them and that it comes after the root — e.g. "Εδώ βρίσκουμε πρώτα τι πραγματικά σε απασχολεί· το «τι κάνω» έρχεται μετά τη ρίζα." (vary the wording, never the meaning) — then ask ONE question toward the root (ONE REPLY, NOT A PROCEDURE). (4) If the user brings a step of their own, do not evaluate, develop or add to it; mirror it in their own words only if that helps the root become visible. (5) ROOT RE-FOCUS and its readiness question stay fully active: they are how the root is reached.
+STAGE A — FREE PART ENDS AT THE ROOT (founder's decision, 2026-10-06 — a time-limited experiment; ACTIVE ONLY WHEN the per-turn context of this message contains the exact marker [FREE PART: ENDS AT ROOT]. Without that marker this whole paragraph does not apply and every rule above works exactly as written.) When the marker is present, this free part of AURA ends when the user names the root; what to do about it belongs to a later, separate part that the app itself offers. For as long as the marker is present: (1) SUSPENDED: THE ONE NAMED EXCEPTION — PATH GENERATION (both activation paths), ROAD DISCOVERY and the road-map format (ΔΡΟΜΟΣ / ΚΕΡΔΙΖΕΙΣ / ΚΟΣΤΙΖΕΙ / ΑΓΝΩΣΤΟ), LANDING QUESTION, LAST HALF-STEP OF CLOSURE, PROBLEM BRIEF EXTENSION, and any question about a step, a first move, an obstacle to acting, or a date. The marker takes precedence over any other note in this message that points toward roads, a map, options or a step. (2) Never propose roads, steps, ways, methods or techniques, and never build a plan out of what the user mentioned. THE PRINCIPLE: never raise the certainty or the structure of a thought beyond what the user gave. You may mirror their own options in their own words — ✓ "Ανέφερες δύο πράγματα: να μείνεις όπως είσαι, ή να το πεις στον αδερφό σου." ❌ "Ανέφερες δύο δρόμους…" (it adds structure: their "things" became "roads"). Other violations of the same principle: costs or gains per option; ordering or comparing options; a new option they did not name; details added to something they said; words that raise certainty ("ξεκάθαρα", "στην ουσία έχεις αποφασίσει") or structure ("επιλογή Α / Β", "το πρώτο είναι… το δεύτερο…") when they did not give it that way. (3) If the user asks what to do, say honestly, once per request and without apology, that here we first find what really concerns them and that it comes after the root — e.g. "Εδώ βρίσκουμε πρώτα τι πραγματικά σε απασχολεί· το «τι κάνω» έρχεται μετά τη ρίζα." (vary the wording, never the meaning) — then ask ONE question toward the root (ONE REPLY, NOT A PROCEDURE). (4) If the user brings a step of their own, do not evaluate, develop or add to it; mirror it in their own words only if that helps the root become visible. (5) ROOT RE-FOCUS and its readiness question stay fully active: they are how the root is reached. (6) Όσο η ρίζα δεν έχει επιβεβαιωθεί από τον χρήστη, μην αποχαιρετάς και μην παρουσιάζεις τη συνεδρία ως ολοκληρωμένη. Αν ο χρήστης θέλει να σταματήσει, απάντησε σύντομα, χωρίς κλείσιμο.
 
 <critical_invariants>
 FINAL REINFORCEMENT (positional-audit addition — the three principles below are already stated in full above; this is a brief recency-anchor, not a new or competing definition, added because nothing this critical is restated anywhere in the back 85% of this prompt. RELATIONSHIP TO PRE-FLIGHT CHECKLIST above, clarified via deeper audit — real gap found: both say "before composing any reply" but never referenced each other. These run together, not as two separate checklists: this one is the constant, always-present safety anchor; PRE-FLIGHT CHECKLIST is the fuller, situational sequence. Think of this as its permanent step -1, always active regardless of which of PRE-FLIGHT CHECKLIST's other steps apply this turn): before composing any reply, hold these three, briefly — CONTRACT: identify patterns, never decide which interpretation is correct, every finding returns as a genuine question. MIRROR RULE: never name the user's thought as certain, never add a conclusion they have not evidenced. NO ADVICE: the user owns every conclusion — AURA's task ends at clarity, not at telling them what to do.
@@ -1601,6 +1601,7 @@ function buildStageAMarker(active) {
 const STAGE_A_TEXTS = {
   button: "Νομίζω βρήκα τι με απασχολεί",
   ask: "Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;",
+  askLeaving: "Πριν φύγεις: πες το με μία φράση — τι είναι αυτό που σε απασχολεί;",
   back: "Δεν το βρήκα ακόμα, συνέχισε",
   knewLabel: "Τι ήξερες",
   foundLabel: "Τι βρήκες",
@@ -1642,9 +1643,13 @@ function isVerbatimUserText(snippet, userMessages) {
 }
 // §1.2 — THE SUBSTANCE RULE, one copy: greetings/introductions stripped from the start of ONE sentence (what
 // survives is still a verbatim substring), then rejected if it is a content-free introduction, a question about
-// AURA, or has fewer than 4 substance words. Returns the stripped sentence, or null. Used by «Τι ήξερες» AND by
+// AURA, or has fewer than minWords substance words. Returns the stripped sentence, or null. Used by «Τι ήξερες» AND by
 // every root text typed into the flow (ADR «6 Οκτωβρίου (κ)»: «Περίπου δηλαδή» became a whole root on a phone).
-function substanceOfSentence(raw) {
+// Two limits (ADR «6 Οκτωβρίου (λ)»): «Τι ήξερες» 4 words; a root 2, and the filler words below do not count for it.
+const KNEW_MIN_SUBSTANCE_WORDS = 4;
+const ROOT_MIN_SUBSTANCE_WORDS = 2;
+const ROOT_FILLER_WORDS = ["περιπου", "δηλαδη", "ναι", "οχι", "αυτο", "ισως", "οκ"];
+function substanceOfSentence(raw, minWords = KNEW_MIN_SUBSTANCE_WORDS, filler = []) {
   if (typeof raw !== "string") return null;
   const fold = x => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const GREET = ["γεια χαρα", "γεια σου", "γεια σας", "καλημερα", "καλησπερα", "καληνυχτα", "χαιρετε", "hello", "γεια", "λοιπον", "καλα", "hi", "ε"];
@@ -1666,8 +1671,8 @@ function substanceOfSentence(raw) {
   if (!t) return null;
   const f = fold(t).replace(/[,.!·:;\-]+$/, "").trim();
   if (INTRO.some(r => r.test(f)) || ABOUT_AURA.test(f)) return null;
-  const words = (f.match(/[a-zα-ω]+/g) || []).filter(w => w.length >= 3 && !STOP.has(w));
-  return words.length < 4 ? null : t;
+  const words = (f.match(/[a-zα-ω]+/g) || []).filter(w => w.length >= 3 && !STOP.has(w) && !filler.includes(w));
+  return words.length < minWords ? null : t;
 }
 function splitSentences(text) {
   return String(text || "").split(/[.;\u037e!?\n]+/).map(x => x.trim()).filter(Boolean);
@@ -1679,7 +1684,7 @@ function pickKnewSnippet(userMessages) {
   const users = userMessages.filter(m => typeof m === "string").slice(0, 3);
   for (const msg of users) {
     for (const raw of splitSentences(msg)) {
-      const t = substanceOfSentence(raw);
+      const t = substanceOfSentence(raw, KNEW_MIN_SUBSTANCE_WORDS);
       if (!t) continue;
       if (t.length <= 200) return { text: t, truncated: false };
       const cut = t.slice(0, 201);
@@ -1690,10 +1695,10 @@ function pickKnewSnippet(userMessages) {
   return null;
 }
 // A root typed into the flow (door 1's answer, «Διόρθωσε») becomes the root only if at least one of its sentences
-// passes the same rule. The root itself stays WHOLE (decision «(στ)» 1) — the rule only decides yes/no.
+// passes the same rule, with the root's limit. The root itself stays WHOLE (decision «(στ)» 1) — the rule only decides yes/no.
 function rootTextHasSubstance(text) {
   if (typeof text !== "string") return false;
-  return splitSentences(text).some(raw => substanceOfSentence(raw) !== null);
+  return splitSentences(text).some(raw => substanceOfSentence(raw, ROOT_MIN_SUBSTANCE_WORDS, ROOT_FILLER_WORDS) !== null);
 }
 // §2.1α step 5 — «λέξη που κρατάς» equal to «Τι βρήκες»: lower case, no accents, no edge punctuation/space.
 function sameAsRootText(a, b) {
@@ -1734,6 +1739,16 @@ function stageARootButtonVisible(st) {
   const o = st || {};
   return o.active === true && o.assistantReplies >= 1 && !o.loading && o.riskKind !== 1 && !o.closingStarted && !o.rootPhase && !o.sessionEnded;
 }
+// ADR «6 Οκτωβρίου (λ)» — «Πριν φύγεις:»: instead of the old closing, door 1 ONCE. Only where the old closing would
+// open now, only for an EXPLICIT closing (T2: the same two detectors decideTermination uses for userDeclaredExit —
+// never a short agreement, T1), before a confirmed root, with no closing started, never in tier A or safety mode.
+// A second explicit closing finds it used and the old closing runs as always: no loop.
+function stageALeavingDoorOpens(st) {
+  const o = st || {};
+  const u = typeof o.lastUserText === "string" ? o.lastUserText : "";
+  return o.active === true && (o.decision === "confirm" || o.decision === "terminate") && !o.used && !o.rootPhase && !o.armed &&
+    !o.rootConfirmed && !o.closingStarted && o.riskKind !== 1 && !o.safetyMode && (isExplicitClosure(u) || declaresClosing(u));
+}
 // STAGE A — the whole flow as one pure step function (SPEC_FREE_END.md §1.5, §2.1, §2.1α, §2.2, §4, §6.1).
 // phase: null (conversation) · "ask" (door 1's fixed question) · "card" · "correct" · "offer" · "notReady" ·
 // "clarity" · "word" · "done". Every transition the screen can make goes through here, so the order of §2.1α is
@@ -1741,11 +1756,12 @@ function stageARootButtonVisible(st) {
 // current phase returns the state unchanged.
 function initialStageAState() {
   return {
-    phase: null, door: 0, found: "", knew: null, knewTruncated: false, riskOffer: false, retry: false,
+    phase: null, door: 0, found: "", knew: null, knewTruncated: false, riskOffer: false, retry: false, leaving: false,
     stats: {
       rootDoor: 0, rootShown: 0, rootConfirmed: 0, rootCorrections: 0, rootBack: 0, rootButtonPressed: 0, rootAtReply: 0,
       coachOfferShown: 0, coachOfferClicked: 0, coachOfferDeclined: 0, coachOfferSuppressed: 0, suppressedBy: 0,
       rootSuppressedA: 0, coachHelpChoice: 0, lateClarity: 0, wordSameAsRoot: 0, knewHidden: 0, stageReached: 0, rootTooShort: 0,
+      rootDoorFromClosing: 0,
     },
   };
 }
@@ -1759,7 +1775,13 @@ function stageAStep(state, ev) {
     case "press":
       if (s.phase) return s;
       st.rootButtonPressed += 1; reach(1);
-      return next({ phase: "ask", door: 1 });
+      return next({ phase: "ask", door: 1, leaving: false });
+    // ADR «6 Οκτωβρίου (λ)» — the same door 1, opened by the app instead of the old closing (explicit closing, once).
+    // Counted apart from the button press.
+    case "leaving":
+      if (s.phase) return s;
+      st.rootDoorFromClosing += 1; reach(1);
+      return next({ phase: "ask", door: 1, leaving: true });
     case "open": {
       if (s.phase && s.phase !== "ask") return s;
       if (e.riskKind === 1) { st.rootSuppressedA = 1; return next({ phase: null, door: 0 }); }
@@ -1767,15 +1789,15 @@ function stageAStep(state, ev) {
       if (!found) return s;
       if (!st.rootShown) { st.rootDoor = e.door || 0; st.rootAtReply = Math.min(9999, e.assistantReplies || 0); }
       st.rootShown = 1; st.knewHidden = e.knew ? 0 : 1; reach(3);
-      return next({ phase: "card", door: e.door || 0, found, knew: e.knew || null, knewTruncated: !!e.knewTruncated, retry: false });
+      return next({ phase: "card", door: e.door || 0, found, knew: e.knew || null, knewTruncated: !!e.knewTruncated, retry: false, leaving: false });
     }
     case "back":
       if (s.phase !== "ask" && s.phase !== "card" && s.phase !== "correct") return s;
       st.rootBack += 1;
-      return next({ phase: null, door: 0, retry: false });
+      return next({ phase: null, door: 0, retry: false, leaving: false });
     case "cancel":
       if (s.phase !== "ask" && s.phase !== "correct" && s.phase !== "card") return s;
-      return next({ phase: null, door: 0, retry: false });
+      return next({ phase: null, door: 0, retry: false, leaving: false });
     // A root text without substance (§1.2 rule): the flow stays where it is and keeps the previous root.
     case "tooShort":
       if (s.phase !== "ask" && s.phase !== "correct") return s;
@@ -6901,6 +6923,20 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // closing word for decideTermination (matchesClosingWord), so on exactly the turn door 2 is armed — or
       // door 3 opened the card — the «πριν κλείσουμε» card would open on top of it and lead to the old closing.
       // Found in a browser run, 2026-10-06. Switch closed: this line is never true and nothing changes.
+      // STAGE A — «Πριν φύγεις:» (ADR «6 Οκτωβρίου (λ)»): an explicit closing before the root opens door 1 once,
+      // instead of the old closing. The model's reply is already on screen; the card appears under it.
+      const _saLast = msgs.length ? msgs[msgs.length - 1] : null;
+      if (stageALeavingDoorOpens({
+        active: stageAActive.current, decision,
+        lastUserText: _saLast && _saLast.role === "user" ? String(_saLast.content || "") : "",
+        used: stageARef.current.stats.rootDoorFromClosing > 0,
+        rootPhase: stageARef.current.phase, armed: stageARootArmed.current,
+        rootConfirmed: stageARef.current.stats.rootConfirmed === 1,
+        closingStarted: reflectionDelivered.current, riskKind: riskSignalKind.current, safetyMode,
+      })) {
+        stageADispatch({ type: "leaving" });
+        return;
+      }
       if (stageAActive.current && (stageARootArmed.current || stageARef.current.phase) && (decision === "confirm" || decision === "terminate")) return;
       if (decision === "confirm" || decision === "terminate") {
         // CODE-LEVEL FIX, CORRECTED (real bug found via a third real transcript: the version below
@@ -7372,7 +7408,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         const _saDoor = _saPhase === "ask" ? 1 : 2;
         stageARootArmed.current = false;
         const _saAdded = _saDoor === 1
-          ? [{ id: nextMsgId(), role: "assistant", content: STAGE_A_TEXTS.ask, msgMode: "STAGE_A" }, { id: nextMsgId(), role: "user", content: userText }]
+          ? [{ id: nextMsgId(), role: "assistant", content: stageARef.current.leaving ? STAGE_A_TEXTS.askLeaving : STAGE_A_TEXTS.ask, msgMode: "STAGE_A" }, { id: nextMsgId(), role: "user", content: userText }]
           : [{ id: nextMsgId(), role: "user", content: userText }];
         setMessages(prev => [...prev, ..._saAdded]);
         stageAOpen(_saDoor, userText, [...messages, ..._saAdded]);
@@ -8481,7 +8517,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             <>
               {stageAPhase === "ask" && (
                 <div className="warning-card">
-                  <div className="warning-text">{STAGE_A_TEXTS.ask}</div>
+                  <div className="warning-text">{stageAView.leaving ? STAGE_A_TEXTS.askLeaving : STAGE_A_TEXTS.ask}</div>
                   {stageAView.retry && <div className="warning-text" style={{opacity:0.85}}>{STAGE_A_TEXTS.retry}</div>}
                   <div className="choice-btns">
                     <button className="choice-btn" onClick={handleStageABack}>{STAGE_A_TEXTS.back}</button>
