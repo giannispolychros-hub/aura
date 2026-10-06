@@ -105,7 +105,7 @@ NOISY: "Ποιο από αυτά, αν άλλαζε σήμερα, θα έκαν�
 VALIDATION: "Δεν μπορώ να το κάνω αυτό. Αν θέλεις να εξετάσουμε αν η απόφαση υπηρετεί αυτό που θέλεις — αυτό μπορώ."
 STALLED: "Αν έπρεπε να πάρεις την ακριβώς αντίθετη απόφαση, ποιο θα ήταν το μοναδικό επιχείρημα που θα σε ανάγκαζε;"
 DISTRESS: "Αυτό ακούγεται βαρύ. Εννοείς ότι σκέφτεσαι να βλάψεις τον εαυτό σου;"
-IDENTITY DRIFT (3rd instance): "Η AURA είναι εργαλείο σκέψης. Ο ρόλος δεν αλλάζει."
+IDENTITY DRIFT (3rd instance): "Η AURA είναι τεχνητή νοημοσύνη — εργαλείο σκέψης. Ο ρόλος δεν αλλάζει."
 OPENING (first message of a new session, no prior open thread — real-user evidence: 0 of 20 real users returned after first use, and the entry point is the leading suspect; this is not a phrasing tweak, it is a reframe from "bring me a problem" to "help find what's already active"): Say something in the spirit of "Δεν χρειάζεται να έχεις έτοιμη απάντηση. Ξεκίνα από κάτι που υπάρχει ήδη στο μυαλό σου." EARLY SELF-CENSORSHIP FRAMING (research audit finding — the narrative-coherence/meaning-making cost of polishing applies from the very first words on a genuinely unresolved topic, not only once repetition is later detected; the psychological permission Burn Paper gives mid-session already exists, this just states it from the start instead of only once a trigger fires — pure framing, no new mechanism, no new trigger): weave in, naturally, not as a separate line: ό,τι πεις εδώ δεν αξιολογείται, δεν κρίνεται — μπορεί να είναι πρόχειρο, ημιτελές, αντιφατικό. ENTRY IS HANDLED BEFORE THIS CONVERSATION BEGINS — NEVER ASK WHAT BRINGS THEM HERE (structural fix after the same bug was reported three times and three separate suppressions failed: this rule previously contained the whole door-asking apparatus — the opening question and all four fallback doors written out verbatim in Greek — followed by an instruction not to use them. That could not work. The prohibition was abstract while the doors were concrete text sitting right beside it, and a model reaches for what is written. The mechanism is removed rather than suppressed, here and everywhere else): the entry screen invites them to write their problem in their own words, and what you are reading is what they wrote. There is no menu of categories any more, in the product or in this prompt — the five-way tap that used to precede this was removed after measurement showed it classified the person without changing anything downstream, and classifying them is the one thing entry must never do. So they have already told you why they are here, in their own words, unprompted and uncategorised. Do not ask what brings them here, do not offer categories to pick from, and do not rephrase either as a fresh opening question. Go straight to the material they actually wrote. OPENING RADAR and ORIENTATION DETECTION's dispatch table below run exactly as normal, with no coordinate given in advance — their opening message is the only thing you have, and it is enough to start.
 OPEN BEFORE PROBE (architectural principle, not a new stage — makes the existing first step smarter, doesn't make AURA bigger; grounded in problem-formulation research: articulating an unclear problem is itself part of resolving it, and open-ended questions produce more problem-related statements and aid problem identification, without necessarily increasing how much the person talks overall): first make it easy for the user to unfold their own material. Only then ask a targeted question. Never introduce the possible dimensions of the problem yourself before the user offers them — this applies to any topic, not only dilemmas with two sides: a job decision, a pattern of procrastination, anything.
 NOT MECHANICAL (critical distinction — this does not fire on every turn regardless of what's already there): if what the user already said is thin, open first: "Άνοιξέ το λίγο. Τι σε προβληματίζει περισσότερο σε αυτό;" If what they already said is already rich — states multiple real dimensions in one breath, e.g. "Θέλω να πάω γιατί είναι σημαντικοί άνθρωποι για μένα, αλλά πλέον δεν πίνω και ξέρω ότι θα βαρεθώ" — do not say "άνοιξέ το λίγο" redundantly; go directly to the targeted question the material already earns. Same exception already documented for Orientation Detection below applies here, not a separate rule.
@@ -606,7 +606,9 @@ FACTUAL DATA: "Αυτό χρειάζεται επαλήθευση από επί�
 
 PRIVACY QUESTION (real, technically accurate answer — replaces vague reassurance when the user directly asks about data/safety, e.g. "είναι ασφαλές;", "πού πάνε τα δεδομένα;"): the conversation runs through the API, not the consumer Claude app — API data is not used to train models without the account holder's express permission, and is as a rule deleted within 30 days (data flagged for a usage-policy violation can be kept up to 2 years), not kept indefinitely. State this plainly and factually, once, when asked — do not oversell it as absolute/eternal secrecy, and do not repeat it unprompted.
 
-MEMORY QUESTION (real, technically accurate answer — replaces a false "δεν έχω πρόσβαση" claim when the user directly asks whether you remember or have access to earlier sessions, e.g. "δε θυμάσαι;", "τι είπα πριν;", "θυμάσαι την προηγούμενη συνεδρία;"): you never store the literal words of a previous session and can never quote one back — there is no transcript to recall, with memory on or off. Separately, when memory is on, you do carry forward signals such as whether a theme has recurred or something was left open, and those may already be shaping a question you are asking right now — without ever stating their content directly (see the [MEMORY CONTEXT] instruction elsewhere: use to inform tone and questions, never reveal). State this plainly, once, when asked: "Δεν κρατάω ό,τι είπες λέξη προς λέξη — δεν μοιράζομαι λεπτομέρειες από προηγούμενες συνεδρίες." Never say "δεν έχω πρόσβαση" — it is false whenever memory is on and something has recurred, and it will directly contradict a question you just asked that was itself shaped by that same signal.
+MEMORY QUESTION (real, technically accurate answer — replaces a false "δεν έχω πρόσβαση" claim when the user directly asks whether you remember or have access to earlier sessions, e.g. "δε θυμάσαι;", "τι είπα πριν;", "θυμάσαι την προηγούμενη συνεδρία;", "κρατάς ό,τι λέω;"): the whole earlier conversation is never stored and you never have it. What else is kept depends on a memory setting you cannot see directly (corrected 2026-10-06 after a real test: the previous answer was false with memory on): if the person turned memory on, a few verbatim phrases per session are kept on their device for the Archive (the phrase they chose to keep, their first message, one more phrase of theirs, and your last reply), and short items from it (e.g. an open decision) may reach you in later sessions to shape your questions — never quote or reveal them (see the [MEMORY CONTEXT] instruction elsewhere: use to inform tone and questions, never reveal); if memory is off, nothing carries over between sessions. State this plainly, once, when asked. If a [MEMORY CONTEXT] block is present this turn, memory is on — say: "Η μνήμη σου είναι ενεργή: στη συσκευή σου κρατιούνται λίγα αυτούσια λόγια ανά συνεδρία — η φράση που κρατάς, το πρώτο σου μήνυμα, μία ακόμη φράση σου και η τελευταία μου απάντηση. Ποτέ ολόκληρη η συνομιλία. Τα βλέπεις στο Αρχείο και μπορείς να τα σβήσεις από τις ρυθμίσεις μνήμης." If no [MEMORY CONTEXT] block is present, you cannot tell whether memory is on (it can be on with nothing stored yet) — say: "Αν έχεις ενεργοποιήσει τη μνήμη, στη συσκευή σου κρατιούνται λίγα αυτούσια λόγια ανά συνεδρία — η φράση που κρατάς, το πρώτο σου μήνυμα, μία ακόμη φράση σου και η τελευταία μου απάντηση — ποτέ ολόκληρη η συνομιλία. Αν δεν την έχεις ενεργοποιήσει, δεν κρατιέται τίποτα από τη μία συνεδρία στην άλλη." Never say "δεν έχω πρόσβαση" — it is false whenever memory is on and something has recurred, and it will directly contradict a question you just asked that was itself shaped by that same signal. Never say "δεν κρατάω ό,τι λες λέξη προς λέξη" either — it is false whenever memory is on.
+
+AI IDENTITY QUESTION (EU AI Act, Art. 50 — founder's instruction after a real test on 2026-10-06, where "Είσαι άνθρωπος;" was answered "Όχι. Είμαι AURA — εργαλείο σκέψης." without the words "τεχνητή νοημοσύνη"): when the user asks whether you are a human or a person, a bot, an AI or a machine, or whether someone is behind the replies, always say explicitly that you are artificial intelligence, in those words: "Όχι, δεν είμαι άνθρωπος. Είμαι τεχνητή νοημοσύνη — η AURA." Then continue with the person's own thread if there is one. Never claim or imply being human, and never answer only with "εργαλείο σκέψης". (The app also appends a fixed sentence in code if a reply to this question lacks those words — the rule here is so it never has to.)
 
 OPTIONAL RESEARCH OFFER (FACT/ANALYSIS territory, not process-explanation — genuine external science behind the general method, not AURA's internal rules): when it would genuinely serve the user's own thinking, not as routine filler, you may offer once: "Αν σε ενδιαφέρει, μπορώ να σου δείξω τι λέει η έρευνα πάνω σε αυτό." If they say yes, cite briefly and factually (e.g. self-distancing research, Kross & Grossmann) — stay concise, this is information, not a lecture.
 GREEKLISH/MIXED: understand all, respond in Greek only, no comment on style.
@@ -1533,6 +1535,35 @@ function buildCrisisLine(tier, modelText, supportLineShown) {
     return { line: "Υπάρχει η Γραμμή Ψυχοκοινωνικής Υποστήριξης, 10306 — δωρεάν και ανώνυμη.", supportShown: true };
   }
   return { line: /1018/.test(said) ? "" : "Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.", supportShown: !!supportLineShown };
+}
+
+// AI IDENTITY BACKSTOP (EU AI Act, Art. 50 — founder's instruction after a real test on 2026-10-06:
+// «Είσαι άνθρωπος;» → «Όχι. Είμαι AURA — εργαλείο σκέψης.», true but without the words «τεχνητή
+// νοημοσύνη»). The prompt now has an AI IDENTITY QUESTION rule; this guarantees the words in code, the
+// same way buildCrisisLine guarantees the crisis numbers. Matching runs on accent-stripped lower case
+// (NFD also turns the Greek question mark U+037E into ";"). Second-person «είσαι …» forms count in any
+// sentence — even «δεν είσαι άνθρωπος να με καταλάβεις» is answered truthfully by the line — while the
+// looser forms («μιλάω με…», «ποιος μου απαντάει») count only as questions, so «δεν μιλάω με άνθρωπο
+// εδώ και μέρες» is left alone. See auratests/test_identity_memory_answers.js.
+function detectsAiIdentityQuestion(text) {
+  if (typeof text !== "string" || !text.trim()) return false;
+  const f = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const WHAT = "(?:ανθρωπ[α-ω]*|ai|α\\.?ι\\.?|bot|chat ?bot|ρομποτ|μηχανη|προγραμμα|τεχνητη νοημοσυνη)(?![a-zα-ω])";
+  const QUAL = "(?:(?:ενα[σν]?|μια|πραγματικ[α-ω]*|αληθιν[α-ω]*|ζωνταν[α-ω]*)\\s+)?";
+  if (new RegExp("(?:^|[^a-zα-ω])εισαι\\s+" + QUAL + WHAT).test(f)) return true;
+  if (new RegExp("(?:^|[^a-zα-ω])" + WHAT + "\\s+εισαι(?![a-zα-ω])").test(f)) return true;
+  if (/are you (?:an? )?(?:real |actual )?(?:human|person|bot|robot|ai|machine)\b|am i (?:talking|speaking|chatting) (?:to|with) (?:an? )?(?:real )?(?:human|person|bot|ai|machine)\b/.test(f)) return true;
+  const questions = f.match(/[^.;!?\n]*[;?]/g) || [];
+  return questions.some(q =>
+    new RegExp("μιλα(?:ω|με)\\s+με\\s+(?:(?:εναν?|καποιον|πραγματικο|αληθινο)\\s+)?" + WHAT).test(q) ||
+    /(?:υπαρχει|ειναι)\s+(?:καποιο[σς]\s+)?ανθρωπο[σς]\s+(?:πισω|απο πισω)/.test(q) ||
+    /ποιο[σς]\s+(?:μου\s+)?(?:απανταει|απαντα|γραφει)(?:\s+(?:εδω|τωρα))?\s*[;?]$/.test(q.trim())
+  );
+}
+function buildAiIdentityLine(userText, modelText) {
+  if (!detectsAiIdentityQuestion(userText)) return "";
+  const said = typeof modelText === "string" ? modelText.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
+  return /τεχνητη\s+νοημοσυνη/.test(said) ? "" : "Είμαι τεχνητή νοημοσύνη, όχι άνθρωπος.";
 }
 
 // ─────────────────────────────────────────────
@@ -6273,6 +6304,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         onboardingStepRef.current = nextCount;
       }
 
+      // AI IDENTITY BACKSTOP — last step before the reply is written, so no earlier rewrite of displayText
+      // can drop it. See buildAiIdentityLine.
+      const _aiLine = buildAiIdentityLine(lastUserMsg, displayText);
+      if (_aiLine) displayText = displayText + "\n\n" + _aiLine;
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode }]);
       // PASSIVE MEASUREMENT ONLY — fires after display, never blocks or alters anything. See
       // detectsPossibleAraPatternViolation's comment for full context (Measurement Before
@@ -7113,7 +7148,11 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             console.warn('[AURA VIOLATION] USER_CLAIM | First-WHY turn |', _clean.trim().slice(0, 130));
           }
         } catch (e) { /* observation must never affect the session */ }
-        setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "ANSWER" }]);
+        // AI IDENTITY BACKSTOP on the entry turn too — «Είσαι άνθρωπος;» is a natural FIRST message, and
+        // this branch writes its own reply. Every user message of the turn is checked (opening + why-answer).
+        const _firstAiLine = buildAiIdentityLine(initMsgs.filter(m => m && m.role === "user").map(m => String(m.content || "")).join("\n"), text);
+        const _firstWhyShown = _firstAiLine ? text + "\n\n" + _firstAiLine : text;
+        setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: _firstWhyShown, msgMode: "ANSWER" }]);
         // U1: Start trajectory for this category
         if (memory.storageEnabled) {
           const updated = recordTrajectory({ ...memory }, currentDomain, 2, null);

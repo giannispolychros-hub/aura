@@ -163,9 +163,15 @@ assert('CLOSING: Part 2 is still told not to repeat the summary',
 // 2 years if flagged for a policy violation; never used for training without express permission),
 // and the line now says what the memory panel says. +128 characters, one cache write, paid
 // knowingly. See test_transparency.js for what the line must contain.
+//
+// CHANGED AGAIN, DELIBERATELY, on 2026-10-06 (0cb87ee3fd89266a → a05044ceba43bf9c). A real phone test
+// found two untrue/incomplete answers: «Είσαι άνθρωπος;» got no «τεχνητή νοημοσύνη» (new AI IDENTITY
+// QUESTION line; the IDENTITY DRIFT example names AI too), and MEMORY QUESTION told the model to say
+// «δεν κρατάω ό,τι είπες λέξη προς λέξη», false with memory on (now a conditional answer true either
+// way). +1804 characters, one cache write, paid knowingly. See test_identity_memory_answers.js.
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 0cb87ee3fd89266a…)',
-  PROMPT_SHA.slice(0, 16) === '0cb87ee3fd89266a');
+assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 a05044ceba43bf9c…)',
+  PROMPT_SHA.slice(0, 16) === 'a05044ceba43bf9c');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',
