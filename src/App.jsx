@@ -1593,6 +1593,133 @@ function isRemoteTelemetryActive(search) {
 function buildStageAMarker(active) {
   return active === true ? "\n[FREE PART: ENDS AT ROOT]\n" : "";
 }
+// ─────────────────────────────────────────────
+// STAGE A — the root card (SPEC_FREE_END.md §1.2, §1.3, §1.5, §2.1, §2.1α, §2.2, §4). Every fixed text of the
+// Stage A flow lives in STAGE_A_TEXTS, verbatim as John approved it, so the experiment's end (ADR «6 Οκτωβρίου
+// (στ)», point 8: keep one flow, delete the other) is a mechanical removal.
+// ─────────────────────────────────────────────
+const STAGE_A_TEXTS = {
+  button: "Νομίζω βρήκα τι με απασχολεί",
+  ask: "Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;",
+  back: "Δεν το βρήκα ακόμα, συνέχισε",
+  knewLabel: "Τι ήξερες",
+  foundLabel: "Τι βρήκες",
+  yes: "Ναι, αυτό είναι",
+  correct: "Διόρθωσε",
+  correctAsk: "Πώς θα το έλεγες εσύ;",
+  cardLine: "Με το \"Ναι\" ολοκληρώνεται το δωρεάν κομμάτι και σου δείχνω το επόμενο.",
+  cardLineRisk: "Με το \"Ναι\" ολοκληρώνεται αυτό το κομμάτι.",
+  endSecond: "Το πρώτο βήμα κάθε προβλήματος είναι ο πραγματικός ορισμός του — και τον βρήκες εσύ, χωρίς συμβουλές.",
+  endThird: "Το επόμενο ερώτημα είναι: τι μπορείς να κάνεις γι' αυτό; Στο AURA Coach βλέπεις τι μπορείς να κάνεις, τι κοστίζει ο κάθε δρόμος, και ποιο είναι το πρώτο, μικρότερο βήμα.",
+  price: "AURA Coach · €6, μία φορά.",
+  wantMore: "Θέλω να συνεχίσω",
+  notNow: "Όχι τώρα",
+  notReady: "Το AURA Coach δεν είναι ακόμα έτοιμο.",
+  helpQ: "Τι θα σε βοηθούσε περισσότερο;",
+  help1: "Να βρω τώρα τι μπορώ να κάνω",
+  help2: "Να με ξαναρωτήσει σε λίγες μέρες τι έγινε",
+  help3: "Να κρατάω τη ρίζα και τα βήματά μου",
+  helpSkip: "Συνέχεια",
+  clarityQ: "Τώρα, πόσο ξεκάθαρο είναι ποιο ακριβώς είναι το πρόβλημα, από το 1 έως το 10;",
+  word: "Πριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.",
+  copy: "Αντίγραψε τη ρίζα",
+  copied: "Αντιγράφηκε",
+  download: "Κατέβασε τη ρίζα",
+};
+// NFC, one space for any whitespace run, outer quotes and spaces removed. The ONE normalisation both sides
+// of the verbatim check go through, so a snippet and a message can only compare equal if the user typed it.
+function normalizeVerbatim(t) {
+  if (typeof t !== "string") return "";
+  return t.normalize("NFC").replace(/\s+/g, " ").trim().replace(/^[«»"“”„'‘’\s]+|[«»"“”„'‘’\s]+$/g, "").trim();
+}
+// §1.3 — a card line is shown only if it is an EXACT substring of a user message. Not word overlap, not
+// similarity: that is what detectsUnverifiedFoundClaim measures, and finding Β4 showed why it is not enough.
+function isVerbatimUserText(snippet, userMessages) {
+  const s = normalizeVerbatim(snippet);
+  if (!s || !Array.isArray(userMessages)) return false;
+  return userMessages.some(m => typeof m === "string" && normalizeVerbatim(m).includes(s));
+}
+// §1.2 — «Τι ήξερες»: the first sentence with substance from the first 3 user messages, greetings and
+// introductions stripped from its start. Whatever survives is still a verbatim substring. Returns
+// { text, truncated } or null (the line is hidden — never invented).
+function pickKnewSnippet(userMessages) {
+  if (!Array.isArray(userMessages)) return null;
+  const fold = x => x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const GREET = ["γεια χαρα", "γεια σου", "γεια σας", "καλημερα", "καλησπερα", "καληνυχτα", "χαιρετε", "hello", "γεια", "λοιπον", "καλα", "hi", "ε"];
+  const STOP = new Set(["και", "για", "που", "την", "της", "τον", "των", "τους", "στο", "στη", "στην", "στον", "στα", "απο", "μου", "σου", "του", "μας", "σας",
+    "ενα", "μια", "ενας", "δεν", "μην", "οτι", "πως", "αυτο", "αυτα", "εγω", "εσυ", "ειμαι", "ειναι", "εχω", "εχει", "κατι", "πολυ", "οχι", "ναι", "αλλα", "ομως"]);
+  const INTRO = [/^θελω να (?:σου |σας )?μιλησω(?: για (?:κατι|ενα θεμα))?$/, /^εχω (?:ενα |μια )?(?:θεμα|προβλημα|ερωτηση|απορια)$/,
+    /^μπορω να σε ρωτησω(?: κατι)?$/, /^(?:δοκιμη|test)(?: (?:δοκιμη|test))*$/, /^τι κανεις$/];
+  const ABOUT_AURA = /(?:τι εισαι|ποιος εισαι|ποια εισαι|πως δουλευεις|τι κανει η εφαρμογη|τι κανεις εσυ εδω)/;
+  const stripLead = sent => {
+    let t = sent;
+    for (let guard = 0; guard < 6; guard++) {
+      const f = fold(t);
+      const g = GREET.find(w => f.startsWith(w) && (f.length === w.length || /[\s,.!·:;\-]/.test(f[w.length])));
+      if (!g) break;
+      let k = 1;
+      while (k <= t.length && fold(t.slice(0, k)) !== g) k++;
+      t = t.slice(k).replace(/^[\s,.!·:;\-]+/, "");
+    }
+    return t;
+  };
+  const users = userMessages.filter(m => typeof m === "string").slice(0, 3);
+  for (const msg of users) {
+    const sentences = msg.split(/[.;\u037e!?\n]+/).map(x => x.trim()).filter(Boolean);
+    for (const raw of sentences) {
+      const t = stripLead(raw).trim();
+      if (!t) continue;
+      const f = fold(t).replace(/[,.!·:;\-]+$/, "").trim();
+      if (INTRO.some(r => r.test(f)) || ABOUT_AURA.test(f)) continue;
+      const words = (f.match(/[a-zα-ω]+/g) || []).filter(w => w.length >= 3 && !STOP.has(w));
+      if (words.length < 4) continue;
+      if (t.length <= 200) return { text: t, truncated: false };
+      const cut = t.slice(0, 201);
+      const sp = cut.lastIndexOf(" ");
+      return { text: t.slice(0, sp > 0 ? sp : 200).trim(), truncated: true };
+    }
+  }
+  return null;
+}
+// §2.1α step 5 — «λέξη που κρατάς» equal to «Τι βρήκες»: lower case, no accents, no edge punctuation/space.
+function sameAsRootText(a, b) {
+  const n = x => (typeof x === "string" ? x : "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+    .replace(/^[\s.,;!?·:«»"'\-]+|[\s.,;!?·:«»"'\-]+$/g, ""); // NFD already turns the Greek ; into ASCII ;
+  const A = n(a), B = n(b);
+  return !!A && A === B;
+}
+// §2.1 — the app's text after «Ναι». «Τι βρήκες» is ALWAYS WHOLE (ADR «6 Οκτωβρίου (στ)», 1). With a risk
+// signal of tier B or DISTRESS only the first two lines: nothing about Coach or price.
+function buildRootEndLines(found, riskOffer) {
+  const head = [`Η ρίζα σου: "${String(found || "").trim()}".`, STAGE_A_TEXTS.endSecond];
+  return riskOffer ? head : [...head, STAGE_A_TEXTS.endThird, STAGE_A_TEXTS.price];
+}
+function buildRootCardLine(riskOffer) {
+  return riskOffer ? STAGE_A_TEXTS.cardLineRisk : STAGE_A_TEXTS.cardLine;
+}
+// §5 — what «Αντίγραψε / Κατέβασε τη ρίζα» carries: the two lines, whole, and the date. Nothing stored.
+function buildRootCopyText(knew, found, dateStr) {
+  const lines = [];
+  if (knew) lines.push(`${STAGE_A_TEXTS.knewLabel}: «${knew}»`);
+  lines.push(`${STAGE_A_TEXTS.foundLabel}: «${found}»`);
+  lines.push(String(dateStr || ""));
+  return lines.join("\n");
+}
+// §4 — the session's risk latch keeps the HEAVIEST signal seen: 1 crisis A · 2 crisis B · 3 DISTRESS · 0 none.
+// A CRISIS of unknown tier is treated as A (same rule as buildCrisisLine).
+function mergeRiskKind(prev, signal, tier) {
+  const p = typeof prev === "number" ? prev : 0;
+  const now = signal === "CRISIS" ? (tier === "B" ? 2 : 1) : signal === "DISTRESS" ? 3 : 0;
+  if (!now) return p;
+  if (!p) return now;
+  return Math.min(p, now);
+}
+// §1.5 — door 1, the button: after the first AURA reply; never in tier A, while loading, once the closing
+// has started (two closings must never run), while the ask/card flow is open, or after the session ended.
+function stageARootButtonVisible(st) {
+  const o = st || {};
+  return o.active === true && o.assistantReplies >= 1 && !o.loading && o.riskKind !== 1 && !o.closingStarted && !o.rootPhase && !o.sessionEnded;
+}
 // Violation check only (never a success measure): did a reply defer «τι κάνω» to after the root?
 function detectsRootDeferral(text) {
   if (typeof text !== "string" || !text) return false;
@@ -5303,6 +5430,7 @@ export default function AURAv2() {
   const freeDeferral          = useRef(0);     // a reply deferred «τι κάνω» to after the root, on a request turn
   const askedActionBeforeRoot = useRef(false); // the user asked for action before the root card ever opened
   const rootCardOpenedOnce    = useRef(false); // set when the root card first opens (step 3.5)
+  const riskSignalKind        = useRef(0);     // §4 latch: 0 none · 1 crisis A · 2 crisis B · 3 DISTRESS (heaviest kept)
   // RT-hardening: replaces text-based detection ("does the model's reply say 'το κρατάω'?")
   // with a plain count of how many replies have happened during the brand-new-user window —
   // works regardless of the model's exact phrasing.
@@ -7047,6 +7175,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     const userText = input.trim().replace(/\[\[(EXIT:(yes|no)|EARLY_WORD:yes)\]\]/gi, "(  $1  )");
     setInput("");
     setError(null);
+    // STAGE A §4 — the session's risk latch sees EVERY submitted message, before any branch below.
+    if (stageAActive.current) riskSignalKind.current = mergeRiskKind(riskSignalKind.current, detectSafetySignal(userText), classifyCrisisTier(userText));
 
     // Word-to-remember: save as a real anchor (code-level, deterministic), then finish closure Part 2
     // RT-fix: still check for safety signals even here — a crisis phrase must never be silently missed
@@ -7330,6 +7460,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     coreReadinessAsked.current = false;
     coreReadinessConfirmed.current = false;
     freeActionOffered.current = 0; freeDeferral.current = 0; askedActionBeforeRoot.current = false; rootCardOpenedOnce.current = false;
+    riskSignalKind.current = 0;
     shiftCheckAsked.current = false;
     shiftCheckConfirmed.current = false;
     shiftCheckCtxDelivered.current = 0;
