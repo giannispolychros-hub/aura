@@ -80,6 +80,7 @@ const EXCEPTIONS = {
   recognitionRef: 'mic hardware state, outside session scope',
   submittingRef: 'call guard, always released in a finally block — never left dangling across a session boundary',
   debugMode: 'URL-derived, read once — resetting it would break the debug panel on every new session',
+  stageAActive: 'Stage A switch (SPEC_FREE_END §8, step 0.1) — URL/constant-derived, read once per VISIT like debugMode; a new session in the same visit must keep the same gate',
   onboardingStepRef: 'harmless — permanently stuck at 0 because showDemo is hardcoded false (demo removed)',
   // Found while writing this test (not in the original 5-item list) — both are plain DOM refs
   // (`ref={bottomRef}` / `ref={textareaRef}` in the JSX), attached and detached by React itself.

@@ -1567,6 +1567,26 @@ function buildAiIdentityLine(userText, modelText) {
 }
 
 // ─────────────────────────────────────────────
+// STAGE A SWITCHES — SPEC_FREE_END.md §8 step 0.1, ADR «6 Οκτωβρίου (β)».
+// Founder decision: Stage A is built on main behind a switch that stays CLOSED until John says
+// otherwise; off-device telemetry has its own switch and turns on first, alone. Each constant is
+// read ONLY inside its function below (test_stage_a_switch.js counts the uses), so no code path
+// can bypass the gate. ?stageA=1 opens Stage A for one visit, for John's phone test, and is never
+// stored; it can never turn telemetry on. ?debug=1 marks a test device, which never sends.
+// Consent (step 2.3) will be added to isRemoteTelemetryActive, not beside it.
+// ─────────────────────────────────────────────
+const STAGE_A_ENABLED = false;
+const REMOTE_TELEMETRY_ENABLED = false;
+function isStageAActive(search) {
+  if (STAGE_A_ENABLED) return true;
+  try { return new URLSearchParams(search).get("stageA") === "1"; } catch (e) { return false; }
+}
+function isRemoteTelemetryActive(search) {
+  if (!REMOTE_TELEMETRY_ENABLED) return false;
+  try { return new URLSearchParams(search).get("debug") !== "1"; } catch (e) { return false; }
+}
+
+// ─────────────────────────────────────────────
 // MEMORY — Pattern Storage / Interpretation separation
 // Storage: automatic (with consent)
 // Interpretation: consent-gated per-event
@@ -5262,6 +5282,8 @@ export default function AURAv2() {
   const roadAnswersFinal  = useRef([]);
   // Debug panel gate — read once from the URL, never re-derived on later renders/navigation.
   const debugMode = useRef(typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1');
+  // Stage A gate (step 0.1) — read once per visit, like debugMode. Closed on main; nothing reads it yet.
+  const stageAActive = useRef(typeof window !== 'undefined' && isStageAActive(window.location.search));
   // RT-hardening: replaces text-based detection ("does the model's reply say 'το κρατάω'?")
   // with a plain count of how many replies have happened during the brand-new-user window —
   // works regardless of the model's exact phrasing.
