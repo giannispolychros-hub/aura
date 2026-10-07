@@ -205,8 +205,11 @@ assert('BUTTON: hidden after the session ended', V({ sessionEnded: true }) === f
 // ── Wiring that belongs to this step ─────────────────────────────────────────
 assert('LATCH: riskSignalKind ref exists and resets with the session',
   /const riskSignalKind\s*= useRef\(0\)/.test(CODE) && /riskSignalKind\.current = 0;/.test(CODE));
-assert('LATCH: every submitted user message updates it, only with Stage A open',
-  /if \(stageAActive\.current\) riskSignalKind\.current = mergeRiskKind\(riskSignalKind\.current, detectSafetySignal\(userText\), classifyCrisisTier\(userText\)\);/.test(CODE));
+// UPDATED (ADR «7 Οκτωβρίου (β)», 3): the latch is updated with the switch closed too — passive, read only by Stage A
+// and by the 6€ paywall (test_safety_collisions.js, 3).
+assert('LATCH: every submitted user message updates it, switch open or closed',
+  /\n    riskSignalKind\.current = mergeRiskKind\(riskSignalKind\.current, detectSafetySignal\(userText\), classifyCrisisTier\(userText\)\);/.test(CODE) &&
+  !/if \(stageAActive\.current\) riskSignalKind\.current = mergeRiskKind\(/.test(CODE));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);

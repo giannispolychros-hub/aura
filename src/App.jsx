@@ -5839,7 +5839,8 @@ export default function AURAv2() {
     // word question asked last turn, signaled via the [[EARLY_WORD:yes]] tag.
     if (awaitingEarlyWord.current) {
       const lastUserMsgForEarlyWord = [...msgs].reverse().find(m => m.role === "user");
-      if (lastUserMsgForEarlyWord) {
+      // ADR «7 Οκτωβρίου (β)», 4: never kept when the answer carries a safety signal — the word path's own check.
+      if (lastUserMsgForEarlyWord && !detectSafetySignal(lastUserMsgForEarlyWord.content)) {
         earlyCapturedWord.current = lastUserMsgForEarlyWord.content;
         // The same capture, now with provenance: linked to the asking it answers, or — if the
         // ledger holds no unanswered asking of that identity — not linked at all.
@@ -6872,7 +6873,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       }
 
       // Termination decision — extracted to decideTermination() for testability, same logic as before.
-      const decision = decideTermination(msgs, text, {
+      // ADR «7 Οκτωβρίου (β)», 2: on a supportive (crisis) turn no closing decision opens — no card, warning,
+      // «Πριν φύγεις:», T3 or T6. Read from THIS call's mode: safetyMode only updates after this call returns.
+      const decision = currentMode === "SUPPORTIVE" ? "none" : decideTermination(msgs, text, {
         safetyMode,
         currentMode,
         warningIssued: warningIssued.current,
@@ -7388,8 +7391,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     const userText = input.trim().replace(/\[\[(EXIT:(yes|no)|EARLY_WORD:yes)\]\]/gi, "(  $1  )");
     setInput("");
     setError(null);
-    // STAGE A §4 — the session's risk latch sees EVERY submitted message, before any branch below.
-    if (stageAActive.current) riskSignalKind.current = mergeRiskKind(riskSignalKind.current, detectSafetySignal(userText), classifyCrisisTier(userText));
+    // STAGE A §4 — the session's risk latch sees EVERY submitted message, before any branch below. Updated with the
+    // switch closed too (ADR «7 Οκτωβρίου (β)», 3): passive — read only by Stage A and by the 6€ paywall below.
+    riskSignalKind.current = mergeRiskKind(riskSignalKind.current, detectSafetySignal(userText), classifyCrisisTier(userText));
     // STAGE A — typed answers (door 1's question, door 2's capture, «Διόρθωσε»). These are never sent to the
     // model, so the crisis check runs here: ANY crisis closes the flow and the message takes the normal path below.
     const _saPhase = stageARef.current.phase;
@@ -7447,6 +7451,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // same SUPPORTIVE reply turn but does NOT lock the session: safetyMode would stop it from ever closing.
       const _crisisTier = classifyCrisisTier(userText);
       if (_crisisTier !== "B") setSafetyMode(true);
+      setAwaitingRememberedWord(false); // ADR «7 Οκτωβρίου (β)», 1: no word wait during a crisis
       setFirstWhyPending(false); setFirstWhyMessage("");  // RT-fix #2: also clear stale message content, not just the flag
       setCurrentDomain(detectDomain(userText));  // RT-02: symmetric with DISTRESS branch
       const safeMsgs = [...messages, { id: nextMsgId(), role: "user", content: userText }];
@@ -7458,6 +7463,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     if (safetySignal === "DISTRESS") {
       // Level 2: gentle clarity — skip First-WHY, softer tone, user still gets help
       setFirstWhyPending(false); setFirstWhyMessage("");  // RT-fix #2: also clear stale message content, not just the flag
+      setAwaitingRememberedWord(false); // ADR «7 Οκτωβρίου (β)», 1 — same as the crisis branch
       const distressMsgs = [...messages, { id: nextMsgId(), role: "user", content: userText }];
       setMessages(distressMsgs);
       setCurrentDomain(detectDomain(userText));  // BUG 9: set domain in distress path
@@ -8635,7 +8641,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               gave you +5 clarity, so it's worth 6€" framing, ever. The numbers are shown; the price
               is shown; nothing connects them causally in the copy. Do not add such a connection in
               future edits. */}
-          {!stageAActive.current && sessionEnded && !loading && finalDistillation && !valueUnlocked && (
+          {!stageAActive.current && riskSignalKind.current === 0 && sessionEnded && !loading && finalDistillation && !valueUnlocked && (
             <div style={{border:"1px solid rgba(201,168,76,0.3)",borderRadius:"4px",padding:"18px 20px",margin:"14px 0",maxWidth:"440px"}}>
               {earlyReliefValue !== null && lateReliefValue !== null ? (
                 <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.7,marginBottom:"16px"}}>
@@ -8668,7 +8674,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             <div className="end-wrap">
               <div className="end-label">η συνομιλία σταμάτησε εδώ</div>
               <div className="end-note">Επίστρεψε όταν υπάρχει κάτι νέο να δούμε.</div>
-              {(!finalDistillation || valueUnlocked || stageAActive.current) && <button className="new-btn" onClick={resetSession}>Νέα συνεδρία</button>}
+              {(!finalDistillation || valueUnlocked || stageAActive.current || riskSignalKind.current !== 0) && <button className="new-btn" onClick={resetSession}>Νέα συνεδρία</button>}
               {valueUnlocked && finalDistillation && (
                 <button className="new-btn" style={{marginLeft:"8px"}} onClick={() => {
                   // The kept word drives the recurring lookup; the unknown comes from the most

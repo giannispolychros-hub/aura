@@ -153,8 +153,10 @@ assert('UI: the card line comes from buildRootCardLine with the risk latch (B/DI
 assert('UI: clarity buttons are 1 to 10', /\[1, 2, 3, 4, 5, 6, 7, 8, 9, 10\]\.map\(n =>/.test(R));
 assert('UI: copy/download appear only after «Ναι»', /stageAView\.stats\.rootConfirmed === 1 &&/.test(R));
 assert('INPUT: hidden on the button-only phases', /!stageAInputHidden\(stageAPhase\) && sessionStarted && \(/.test(CODE));
-assert('PAYWALL: the 6€ block never shows in Stage A', /\{!stageAActive\.current && sessionEnded && !loading && finalDistillation && !valueUnlocked && \(/.test(CODE));
-assert('END: «Νέα συνεδρία» is always available in Stage A (no paywall to pass)', /\(!finalDistillation \|\| valueUnlocked \|\| stageAActive\.current\) && <button className="new-btn" onClick=\{resetSession\}>/.test(CODE));
+// UPDATED (ADR «7 Οκτωβρίου (β)», 3): the paywall also needs the risk latch at 0, and «Νέα συνεδρία» also shows when
+// the latch hid it. The Stage A part of both conditions is unchanged.
+assert('PAYWALL: the 6€ block never shows in Stage A', /\{!stageAActive\.current && riskSignalKind\.current === 0 && sessionEnded && !loading && finalDistillation && !valueUnlocked && \(/.test(CODE));
+assert('END: «Νέα συνεδρία» is always available in Stage A (no paywall to pass)', /\(!finalDistillation \|\| valueUnlocked \|\| stageAActive\.current \|\| riskSignalKind\.current !== 0\) && <button className="new-btn" onClick=\{resetSession\}>/.test(CODE));
 
 // state + dispatch
 assert('STATE: one ref holds the flow, one state re-renders it', /const stageARef\s*= useRef\(initialStageAState\(\)\);/.test(CODE) && /const \[stageAPhase, setStageAPhase\] = useState\(null\);/.test(CODE));

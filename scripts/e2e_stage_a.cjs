@@ -9,7 +9,7 @@
 // repo, που καλεί την Anthropic με το κλειδί της μεταβλητής ANTHROPIC_API_KEY. Κανένας άλλος δρόμος προς την Anthropic.
 //
 // ΛΕΙΤΟΥΡΓΙΕΣ (από τον φάκελο του repo):
-//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: 10 σενάρια ελέγχου της ροής (A–I), χωρίς κόστος
+//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: σενάρια ροής (A–I) και ασφάλειας (S), χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
@@ -55,7 +55,7 @@ function writeOut(name, text) {
   fs.writeFileSync(path.join(OUT, name), t);
 }
 
-// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — 10 σενάρια ελέγχου της ροής (A–I) ════════════════════
+// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — σενάρια ελέγχου της ροής (A–I) και της ασφάλειας (S) ═══════
 // A ολόκληρη η ροή (κουμπί → κάρτα → «Ναι» → πρόταση → ερώτηση → σαφήνεια → λέξη → τέλος, χωρίς 6€), B κλειστός
 // διακόπτης (τίποτα από το Στάδιο Α, καμία σήμανση), C πόρτα 2 και «πίσω», D DISTRESS (κάρτα ναι, πρόταση όχι),
 // E πρόταση κρίσης ως απάντηση (η ροή κλείνει, γραμμή 1018), F/F2 «Πριν φύγεις:» (T2 μία φορά, μετά το παλιό κλείσιμο·
@@ -309,6 +309,83 @@ async function runMock() {
     ok('I: closed switch → «Ευχαριστώ.» opens the old closing card, no «Πριν φύγεις:»', await page.getByRole('button', { name: 'Δείξε μου' }).count() === 1 && await page.getByText(LEAVING).count() === 0);
     ok('I: closed switch → no marker in any request', calls.every(c => !systemText(c).includes('[FREE PART: ENDS AT ROOT]\n')));
     await browser.close();
+  }  // ── S: SAFETY FIRST (ADR «7 Οκτωβρίου (β)») — the scenarios of the safety report, crisis A / B and DISTRESS,
+  // switch closed and open. Fixtures: A «Δεν θέλω να ζω άλλο.» · B «Απελπισία. Δεν βλέπω νόημα σε τίποτα πια.» ·
+  // DISTRESS «Το πένθος για τη μητέρα μου με έχει παραλύσει.»
+  {
+    const A = 'Δεν θέλω να ζω άλλο.', B = 'Απελπισία. Δεν βλέπω νόημα σε τίποτα πια.', D = 'Το πένθος για τη μητέρα μου με έχει παραλύσει.';
+    const OPEN = ['Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.', 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.', 'Η σταθερότητα κυρίως.', 'Μάλλον φοβάμαι την αλλαγή.'];
+    const WQ = 'ΗΡΘΕΣ ΜΕ: α\nΒΡΗΚΕΣ: β\nΦΕΥΓΕΙΣ ΜΕ: γ\n\nΠριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.';
+    const SUP = 'Είμαι εδώ μαζί σου. Είσαι ασφαλής αυτή τη στιγμή;';
+    const R4 = ['Τι σε κρατάει εκεί;', 'Και τι σε τραβάει αλλού;', 'Τι θα σήμαινε αυτό για σένα;', 'Εντάξει. Είμαι εδώ αν θέλεις να συνεχίσουμε.'];
+    const say = async (page, list) => { for (const m of list) { if (!(await page.locator('textarea.textarea').count())) return false; await send(page, m); } return true; };
+    const click = async (page, name) => { const b = page.getByRole('button', { name, exact: true }); if (!(await b.count())) return false; await b.first().click(); await page.waitForTimeout(1500); return true; };
+    const has = async (page, name) => (await page.getByRole('button', { name, exact: true }).count()) > 0;
+    const ended = async page => (await page.getByText('ξεκλείδωσε').count()) > 0 || await has(page, 'Νέα συνεδρία');
+    const stageAToWord = async page => { await say(page, OPEN.slice(0, 3)); await click(page, 'Νομίζω βρήκα τι με απασχολεί');
+      await send(page, 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.'); await click(page, 'Ναι, αυτό είναι'); await click(page, 'Όχι τώρα'); await click(page, '6'); };
+    // 1 — a crisis / DISTRESS message at the «μία λέξη» step: the next message is NOT the word, the session stays open
+    for (const [lvl, msg, reply] of [['A', A, SUP], ['DISTRESS', D, 'Είμαι εδώ. Θέλεις να μου πεις λίγο περισσότερο;']]) {
+      for (const sw of ['closed', 'open']) {
+        const { browser, page, calls } = await session(sw === 'open' ? '?stageA=1' : '',
+          sw === 'open' ? ['Τι σε κρατάει εκεί;', 'Και τι σε τραβάει αλλού;', reply, 'Πες μου τι γίνεται τώρα.'] : [...R4, WQ, reply, 'Πες μου τι γίνεται τώρα.']);
+        if (sw === 'open') await stageAToWord(page); else { await say(page, [...OPEN, 'Ευχαριστώ.']); await click(page, 'Δείξε μου'); }
+        const atWord = await page.getByText('Πριν φύγεις — μία λέξη').count() >= 1 && await page.locator('textarea.textarea').count() === 1;
+        await send(page, msg);
+        const before = calls.length;
+        await send(page, 'Όχι');
+        await page.waitForTimeout(900);
+        ok(`S1 (${lvl}, switch ${sw}): at the word step, after «${msg.slice(0, 22)}…» the next «Όχι» is a message, not the word — session open`,
+          atWord && !(await ended(page)) && calls.length === before + 1 && calls[calls.length - 1].messages.slice(-1)[0].content === 'Όχι' && await page.locator('textarea.textarea').count() === 1);
+        await browser.close();
+      }
+    }
+    // 2 — «ευχαριστώ / κλείνουμε» in the SAME message as a crisis: no closing decision on that turn
+    for (const [lvl, msg, line] of [['A', 'Κλείνουμε εδώ, δεν θέλω να ζω άλλο.', /1018/], ['B', 'Ευχαριστώ, κλείνουμε. Δεν βλέπω νόημα σε τίποτα πια.', /10306/]]) {
+      for (const sw of ['closed', 'open']) {
+        const { browser, page } = await session(sw === 'open' ? '?stageA=1' : '', [...R4.slice(0, 3), SUP]);
+        await say(page, [...OPEN, msg]);
+        await page.waitForTimeout(600);
+        ok(`S2 (${lvl}, switch ${sw}): crisis + closing in one message → the crisis line, and NO closing card, warning or «Πριν φύγεις:»`,
+          await page.getByText(line).count() >= 1 && !(await has(page, 'Δείξε μου')) && !(await has(page, 'Σταμάτα εδώ')) && await page.getByText('Πριν φύγεις:').count() === 0);
+        if (lvl === 'B' && sw === 'open') {
+          ok('S2 (B, switch open): the root button is still there on that turn', await has(page, 'Νομίζω βρήκα τι με απασχολεί'));
+          await click(page, 'Νομίζω βρήκα τι με απασχολεί');
+          await send(page, 'Ότι φοβάμαι να αφήσω τη σιγουριά της δουλειάς.');
+          ok('S2 (B, switch open): pressing it still works — the question, then the root card (risk line, as decided in (λ))',
+            await has(page, 'Ναι, αυτό είναι') && await page.getByText('Με το "Ναι" ολοκληρώνεται αυτό το κομμάτι.').count() === 1);
+        }
+        await browser.close();
+      }
+    }
+    // 3 — the 6€ paywall after a session with a risk signal (switch closed; with the switch open there is none)
+    for (const [lvl, msg] of [['B', B], ['DISTRESS', D], ['none', null]]) {
+      const { browser, page } = await session('', ['Τι σε κρατάει εκεί;', 'Είμαι εδώ. Θέλεις να μου πεις λίγο περισσότερο;', 'Τι θα σήμαινε αυτό για σένα;', 'Εντάξει. Είμαι εδώ αν θέλεις να συνεχίσουμε.', WQ, 'Η σκέψη σου παραμένει δική σου.']);
+      await say(page, [OPEN[0], OPEN[1], msg || 'Η σταθερότητα κυρίως.', OPEN[3], 'Ευχαριστώ.']);
+      await click(page, 'Δείξε μου');
+      await send(page, 'αλλαγή');
+      await page.waitForTimeout(900);
+      if (lvl === 'none') ok('S3 (no signal, switch closed): the paywall is still there exactly as before', await page.getByText('ξεκλείδωσε').count() === 1);
+      else ok(`S3 (${lvl}, switch closed): the session ends WITHOUT the 6€ paywall, and «Νέα συνεδρία» is there`,
+        await page.getByText('η συνομιλία σταμάτησε εδώ').count() + (await page.getByText('Η σκέψη σου παραμένει δική σου.').count()) >= 1 &&
+        await page.getByText('ξεκλείδωσε').count() === 0 && await has(page, 'Νέα συνεδρία'));
+      await browser.close();
+    }
+    // 4 — the early word: an answer with a safety signal is not kept, so the closing asks for the word normally
+    const EW = ['Τι σε κρατάει εκεί;', 'Αν κρατούσες μία λέξη για αυτό που νιώθεις τώρα, ποια θα ήταν; [[EARLY_WORD:yes]]', SUP, 'Και τι σε κρατάει;',
+      'Εντάξει. Είμαι εδώ αν θέλεις να συνεχίσουμε.', 'Εντάξει. Είμαι εδώ αν θέλεις να συνεχίσουμε.', WQ, 'Η σκέψη σου παραμένει δική σου.'];
+    for (const [lvl, msg] of [['B', B], ['DISTRESS', D]]) {
+      for (const sw of ['closed', 'open']) {
+        // The closing's Part 1 is the 6th request with the switch closed, the 7th with it open (one more turn).
+        const { browser, page } = await session(sw === 'open' ? '?stageA=1' : '', sw === 'open' ? EW : [...EW.slice(0, 5), WQ, EW[7]]);
+        await say(page, [OPEN[0], OPEN[1], OPEN[2], msg, OPEN[3], 'Ευχαριστώ.']);
+        if (sw === 'open') { await click(page, 'Δεν το βρήκα ακόμα, συνέχισε'); await send(page, 'Ευχαριστώ, κλείνουμε εδώ.'); }
+        await click(page, 'Δείξε μου');
+        ok(`S4 (${lvl}, switch ${sw}): the answer «${msg.slice(0, 22)}…» was not kept as the early word — the closing asks for the word, the session is still open`,
+          !(await ended(page)) && await page.getByText('Πριν φύγεις — μία λέξη').count() >= 1 && await page.locator('textarea.textarea').count() === 1);
+        await browser.close();
+      }
+    }
   }
 }
 
