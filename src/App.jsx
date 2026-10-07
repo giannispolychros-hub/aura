@@ -1791,6 +1791,12 @@ function stageAStep(state, ev) {
       st.rootShown = 1; st.knewHidden = e.knew ? 0 : 1; reach(3);
       return next({ phase: "card", door: e.door || 0, found, knew: e.knew || null, knewTruncated: !!e.knewTruncated, retry: false, leaving: false });
     }
+    // ADR «7 Οκτωβρίου (γ)» — door 2 or 3 brought a phrase without substance: door 1's existing question instead of a
+    // card. The door of origin is kept (the card it may open is credited to it); counted as a root text too short.
+    case "reask":
+      if (s.phase || (e.door !== 2 && e.door !== 3)) return s;
+      st.rootTooShort += 1; reach(1);
+      return next({ phase: "ask", door: e.door, leaving: false, retry: false });
     case "back":
       if (s.phase !== "ask" && s.phase !== "card" && s.phase !== "correct") return s;
       st.rootBack += 1;
@@ -6761,7 +6767,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       if (stageAActive.current && !_saReadyBefore && coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1) {
         const _saLastUser = [...msgs].reverse().find(m => m.role === "user");
         const _saSpont = !!_saLastUser && detectsSpontaneousCoreRecognition(_saLastUser.content);
-        if (_saSpont) stageAOpen(3, _saLastUser.content, msgs);
+        if (_saSpont && !stageACaptureAllowed(_saLastUser.content)) {
+          // ADR «7 Οκτωβρίου (γ)»: a crisis signal → no card, the same check as door 2; the crisis path is untouched.
+        } else if (_saSpont && rootTextHasSubstance(_saLastUser.content)) stageAOpen(3, _saLastUser.content, msgs);
+        else if (_saSpont) stageADispatch({ type: "reask", door: 3 });
         else stageARootArmed.current = true;
       }
       if (!shiftCheckConfirmed.current) {
@@ -7408,10 +7417,14 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       } else if (_saPhase === "correct") {
         stageADispatch({ type: "correctDone", found: userText });
         return;
-      } else {
-        const _saDoor = _saPhase === "ask" ? 1 : 2;
+      } else if (_saArmed && !rootTextHasSubstance(userText)) {
         stageARootArmed.current = false;
-        const _saAdded = _saDoor === 1
+        stageADispatch({ type: "reask", door: 2 });
+        return;
+      } else {
+        const _saDoor = _saPhase === "ask" ? (stageARef.current.door || 1) : 2;
+        stageARootArmed.current = false;
+        const _saAdded = _saPhase === "ask"
           ? [{ id: nextMsgId(), role: "assistant", content: stageARef.current.leaving ? STAGE_A_TEXTS.askLeaving : STAGE_A_TEXTS.ask, msgMode: "STAGE_A" }, { id: nextMsgId(), role: "user", content: userText }]
           : [{ id: nextMsgId(), role: "user", content: userText }];
         setMessages(prev => [...prev, ..._saAdded]);

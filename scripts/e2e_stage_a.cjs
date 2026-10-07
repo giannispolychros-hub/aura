@@ -9,7 +9,7 @@
 // repo, που καλεί την Anthropic με το κλειδί της μεταβλητής ANTHROPIC_API_KEY. Κανένας άλλος δρόμος προς την Anthropic.
 //
 // ΛΕΙΤΟΥΡΓΙΕΣ (από τον φάκελο του repo):
-//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: σενάρια ροής (A–I) και ασφάλειας (S), χωρίς κόστος
+//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: σενάρια ροής (A–I), ασφάλειας (S), πορτών 2–3 (T), χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
@@ -55,7 +55,7 @@ function writeOut(name, text) {
   fs.writeFileSync(path.join(OUT, name), t);
 }
 
-// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — σενάρια ελέγχου της ροής (A–I) και της ασφάλειας (S) ═══════
+// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — σενάρια ροής (A–I), ασφάλειας (S), ουσίας στις πόρτες 2–3 (T) ══
 // A ολόκληρη η ροή (κουμπί → κάρτα → «Ναι» → πρόταση → ερώτηση → σαφήνεια → λέξη → τέλος, χωρίς 6€), B κλειστός
 // διακόπτης (τίποτα από το Στάδιο Α, καμία σήμανση), C πόρτα 2 και «πίσω», D DISTRESS (κάρτα ναι, πρόταση όχι),
 // E πρόταση κρίσης ως απάντηση (η ροή κλείνει, γραμμή 1018), F/F2 «Πριν φύγεις:» (T2 μία φορά, μετά το παλιό κλείσιμο·
@@ -385,6 +385,70 @@ async function runMock() {
           !(await ended(page)) && await page.getByText('Πριν φύγεις — μία λέξη').count() >= 1 && await page.locator('textarea.textarea').count() === 1);
         await browser.close();
       }
+    }
+  }  // ── T: doors 2 and 3 pass the root-substance rule (ADR «7 Οκτωβρίου (γ)») ──────────────────────────────
+  {
+    const F1 = 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.', WHY = 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.';
+    const RQ = 'Νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+    const ASK = 'Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;';
+    const LONG = 'Τώρα κατάλαβα: φοβάμαι ότι αν φύγω από την τράπεζα θα απογοητεύσω τον πατέρα μου, που πάντα ήθελε να έχω σιγουριά.';
+    const SUPR = 'Είμαι εδώ μαζί σου. Είσαι ασφαλής αυτή τη στιγμή;';
+    const card = async page => (await page.getByRole('button', { name: 'Ναι, αυτό είναι', exact: true }).count()) > 0;
+    const askShown = async page => (await page.getByText(ASK).count()) >= 1 && (await page.getByRole('button', { name: 'Δεν το βρήκα ακόμα, συνέχισε', exact: true }).count()) === 1;
+    const door2 = async (phrase) => {
+      const s = await session('?stageA=1', ['Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;', RQ, 'Πες μου με δικά σου λόγια τι είναι αυτό που σε κρατάει.', 'Και τι θα σήμαινε αυτό για σένα;', SUPR]);
+      await send(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, WHY);
+      await send(s.page, 'Η σταθερότητα, αλλά νιώθω ότι κάτι άλλο παίζει.'); await send(s.page, 'Ναι');
+      s.before = s.calls.length; await send(s.page, phrase); return s;
+    };
+    const door3 = async (phrase) => {
+      const s = await session('?stageA=1', ['Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;', 'Τι αλλάζει για σένα τώρα που το λες;', SUPR]);
+      await send(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, WHY);
+      s.before = s.calls.length; await send(s.page, phrase); await s.page.waitForTimeout(500); return s;
+    };
+    for (const p of ['Δεν ξέρω', 'Ναι', 'Ναι, αυτό ακριβώς είναι!', 'Περίπου δηλαδή']) {
+      const s = await door2(p);
+      ok(`T door 2 «${p}»: no card — door 1's question with «Δεν το βρήκα ακόμα», nothing sent to the model`, !(await card(s.page)) && await askShown(s.page) && s.calls.length === s.before);
+      if (p === 'Δεν ξέρω') {
+        if (await s.page.locator('textarea.textarea').count()) await send(s.page, 'Φοβάμαι την απόρριψη');
+        ok('T door 2: answering that question opens the card with the answer', await card(s.page) && await s.page.getByText('«Φοβάμαι την απόρριψη»').count() === 1 && s.calls.length === s.before);
+      }
+      if (p === 'Ναι') {
+        await s.page.getByRole('button', { name: 'Δεν το βρήκα ακόμα, συνέχισε', exact: true }).first().click(); await s.page.waitForTimeout(500);
+        ok('T door 2: «Δεν το βρήκα ακόμα» closes the question, no model call, the button is back', s.calls.length === s.before && !(await askShown(s.page)) &&
+          await s.page.getByRole('button', { name: 'Νομίζω βρήκα τι με απασχολεί', exact: true }).count() === 1);
+      }
+      await s.browser.close();
+    }
+    {
+      const s = await door2('Φοβάμαι την απόρριψη');
+      ok('T door 2 «Φοβάμαι την απόρριψη»: the card, with that phrase', await card(s.page) && await s.page.getByText('«Φοβάμαι την απόρριψη»').count() === 1 && s.calls.length === s.before);
+      await s.browser.close();
+    }
+    {
+      const s = await door2('Δεν θέλω να ζω άλλο.');
+      ok('T door 2, crisis in place of the phrase: the crisis path, no card, no question', !(await card(s.page)) && !(await askShown(s.page)) && await s.page.getByText(/1018/).count() >= 1 && s.calls.length === s.before + 1);
+      await s.browser.close();
+    }
+    for (const p of ['Δεν ξέρω', 'Ναι', 'Περίπου δηλαδή']) {
+      const s = await door3(p);
+      ok(`T door 3 «${p}»: not a recognition at all — no card, no question, the normal reply (as today)`, !(await card(s.page)) && !(await askShown(s.page)) && s.calls.length === s.before + 1);
+      await s.browser.close();
+    }
+    {
+      const s = await door3('Ναι, αυτό ακριβώς είναι!');
+      ok('T door 3 «Ναι, αυτό ακριβώς είναι!»: no card — door 1\'s question (after the normal reply, no extra call)', !(await card(s.page)) && await askShown(s.page) && s.calls.length === s.before + 1);
+      await s.browser.close();
+    }
+    {
+      const s = await door3(LONG);
+      ok('T door 3, a long message with the root: the card with the WHOLE message, as today', await card(s.page) && await s.page.getByText('«' + LONG + '»').count() === 1);
+      await s.browser.close();
+    }
+    for (const [lvl, p, line] of [['A', 'Τώρα κατάλαβα, δεν θέλω να ζω άλλο.', /1018/], ['B', 'Τώρα κατάλαβα, δεν βλέπω νόημα σε τίποτα πια.', /10306/]]) {
+      const s = await door3(p);
+      ok(`T door 3, crisis ${lvl} in place of the phrase: the crisis path, no card, no question`, !(await card(s.page)) && !(await askShown(s.page)) && await s.page.getByText(line).count() >= 1);
+      await s.browser.close();
     }
   }
 }

@@ -186,8 +186,11 @@ assert('SCROLL (6/10 phone test): after «Ναι» the end message is scrolled t
 assert('SCROLL: with the switch closed nothing changes — the same bottom scroll, same dependencies',
   /bottomRef\.current\?\.scrollIntoView\(\{ behavior: "smooth", block: "end" \}\);\s*\}, \[messages, loading, pivotPending, layerGatePending, memoryPromptPending, warningPending, closureConfirmPending, misfirePending, firstWhyPending\]\);/.test(CODE));
 assert('SUBMIT: «Διόρθωσε» text replaces «Τι βρήκες», no model call', /stageADispatch\(\{ type: "correctDone", found: userText \}\);\s*return;/.test(HS));
+// UPDATED (ADR «7 Οκτωβρίου (γ)»): the question is recorded whenever it was the question that was answered (phase ask) —
+// it can now come from door 2 or 3 too, whose door is kept for the card.
 assert('SUBMIT: door 1 adds the fixed question and the answer to the transcript; door 2 only the answer; no model call',
-  /const _saAdded = _saDoor === 1\s*\? \[\{ id: nextMsgId\(\), role: "assistant", content: stageARef\.current\.leaving \? STAGE_A_TEXTS\.askLeaving : STAGE_A_TEXTS\.ask, msgMode: "STAGE_A" \}, \{ id: nextMsgId\(\), role: "user", content: userText \}\]\s*: \[\{ id: nextMsgId\(\), role: "user", content: userText \}\];/.test(HS) &&
+  /const _saDoor = _saPhase === "ask" \? \(stageARef\.current\.door \|\| 1\) : 2;/.test(HS) &&
+  /const _saAdded = _saPhase === "ask"\s*\? \[\{ id: nextMsgId\(\), role: "assistant", content: stageARef\.current\.leaving \? STAGE_A_TEXTS\.askLeaving : STAGE_A_TEXTS\.ask, msgMode: "STAGE_A" \}, \{ id: nextMsgId\(\), role: "user", content: userText \}\]\s*: \[\{ id: nextMsgId\(\), role: "user", content: userText \}\];/.test(HS) &&
   /stageAOpen\(_saDoor, userText, \[\.\.\.messages, \.\.\._saAdded\]\);\s*return;/.test(HS));
 assert('SUBMIT: the word path records «same as root» and skips the echo when it is', /if \(stageAActive\.current && stageARef\.current\.phase === "word"\) \{[\s\S]{0,300}sameAsRootText\(userText, stageARef\.current\.found\)/.test(HS));
 const OPENFN = extractBlock('const stageAOpen = useCallback((door, found, msgsNow) => ') || '';
@@ -197,8 +200,10 @@ assert('OPEN: riskKind from the latch; rootCardOpenedOnce set only when a card r
   /riskKind: riskSignalKind\.current/.test(OPENFN) && /if \(stageARef\.current\.phase === "card"\) rootCardOpenedOnce\.current = true;/.test(OPENFN));
 assert('DOOR 2: armed in the readiness latch only when it flips this turn, only with the switch open, no flow/closing, never in tier A',
   /if \(stageAActive\.current && !_saReadyBefore && coreReadinessConfirmed\.current && !stageARef\.current\.phase && !reflectionDelivered\.current && riskSignalKind\.current !== 1\) \{/.test(CODE));
+// UPDATED (ADR «7 Οκτωβρίου (γ)»): door 3 opens the card only for a recognising message that passes the crisis check and
+// the root-substance rule; otherwise door 1's question (test_stage_a_door23_substance.js).
 assert('DOOR 2 (spontaneous): the user\'s own recognising message opens the card at once (door 3)',
-  /if \(_saSpont\) stageAOpen\(3, _saLastUser\.content, msgs\);\s*else stageARootArmed\.current = true;/.test(CODE));
+  /else if \(_saSpont && rootTextHasSubstance\(_saLastUser\.content\)\) stageAOpen\(3, _saLastUser\.content, msgs\);\s*else if \(_saSpont\) stageADispatch\(\{ type: "reask", door: 3 \}\);\s*else stageARootArmed\.current = true;/.test(CODE));
 const BACK = extractBlock('const handleStageABack = useCallback(() => ') || '';
 assert('BACK: from door 2\'s card the captured answer gets its normal reply (the conversation continues, nothing lost)',
   /if \(_ph === "card" && _door === 2\) \{\s*turnCount\.current \+= 1;\s*generateResponse\(messages, mode\);\s*\}/.test(BACK));
