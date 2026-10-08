@@ -9,7 +9,7 @@
 // repo, που καλεί την Anthropic με το κλειδί της μεταβλητής ANTHROPIC_API_KEY. Κανένας άλλος δρόμος προς την Anthropic.
 //
 // ΛΕΙΤΟΥΡΓΙΕΣ (από τον φάκελο του repo):
-//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: σενάρια ροής (A–I), ασφάλειας (S), πορτών 2–3 (T), χωρίς κόστος
+//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
@@ -55,7 +55,7 @@ function writeOut(name, text) {
   fs.writeFileSync(path.join(OUT, name), t);
 }
 
-// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — σενάρια ροής (A–I), ασφάλειας (S), ουσίας στις πόρτες 2–3 (T) ══
+// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U) ══
 // A ολόκληρη η ροή (κουμπί → κάρτα → «Ναι» → πρόταση → ερώτηση → σαφήνεια → λέξη → τέλος, χωρίς 6€), B κλειστός
 // διακόπτης (τίποτα από το Στάδιο Α, καμία σήμανση), C πόρτα 2 και «πίσω», D DISTRESS (κάρτα ναι, πρόταση όχι),
 // E πρόταση κρίσης ως απάντηση (η ροή κλείνει, γραμμή 1018), F/F2 «Πριν φύγεις:» (T2 μία φορά, μετά το παλιό κλείσιμο·
@@ -376,8 +376,9 @@ async function runMock() {
       'Εντάξει. Είμαι εδώ αν θέλεις να συνεχίσουμε.', 'Εντάξει. Είμαι εδώ αν θέλεις να συνεχίσουμε.', WQ, 'Η σκέψη σου παραμένει δική σου.'];
     for (const [lvl, msg] of [['B', B], ['DISTRESS', D]]) {
       for (const sw of ['closed', 'open']) {
-        // The closing's Part 1 is the 6th request with the switch closed, the 7th with it open (one more turn).
-        const { browser, page } = await session(sw === 'open' ? '?stageA=1' : '', sw === 'open' ? EW : [...EW.slice(0, 5), WQ, EW[7]]);
+        // The closing's Part 1 is the 6th request either way: with the switch open the first «Ευχαριστώ.» no longer goes
+        // to the model (ADR «8 Οκτωβρίου»), the second closing does.
+        const { browser, page } = await session(sw === 'open' ? '?stageA=1' : '', [...EW.slice(0, 5), WQ, EW[7]]);
         await say(page, [OPEN[0], OPEN[1], OPEN[2], msg, OPEN[3], 'Ευχαριστώ.']);
         if (sw === 'open') { await click(page, 'Δεν το βρήκα ακόμα, συνέχισε'); await send(page, 'Ευχαριστώ, κλείνουμε εδώ.'); }
         await click(page, 'Δείξε μου');
@@ -448,6 +449,101 @@ async function runMock() {
     for (const [lvl, p, line] of [['A', 'Τώρα κατάλαβα, δεν θέλω να ζω άλλο.', /1018/], ['B', 'Τώρα κατάλαβα, δεν βλέπω νόημα σε τίποτα πια.', /10306/]]) {
       const s = await door3(p);
       ok(`T door 3, crisis ${lvl} in place of the phrase: the crisis path, no card, no question`, !(await card(s.page)) && !(await askShown(s.page)) && await s.page.getByText(line).count() >= 1);
+      await s.browser.close();
+    }
+  }  // ── U: phone test 7/10 (ADR «8 Οκτωβρίου») — the first closing opens «Πριν φύγεις:» BEFORE the model; the root
+  // question is scrolled into view at phone size. John's own transcript, with the model's own replies as the fake model.
+  {
+    const F1 = 'Δεν ξέρω αν πρέπει να αλλάξω δουλειά', W = 'Νιώθω ότι δεν πέτυχα όσα μπορούσα. Είμαι εκπαιδευτικός';
+    const JR = ['Τι σημαίνει για σένα "όσα μπορούσα" — τι συγκεκριμένα φαντάστηκες κάποτε ότι θα πετύχεις;',
+      'Και σήμερα — το πρόβλημα είναι ότι τα χρήματα δεν φτάνουν, ή ότι νιώθεις ότι άξιζες περισσότερα;',
+      'Το σήμα είναι ξεκάθαρο — κλείνουμε εδώ.\n\nΑν ένας φίλος σου έλεγε ακριβώς αυτό που είπες εσύ, τι θα του απαντούσας;',
+      'Αυτό που θα έλεγες στον φίλο σου — το επιτρέπεις και στον εαυτό σου;'];
+    const LEAVING = 'Πριν φύγεις: πες το με μία φράση — τι είναι αυτό που σε απασχολεί;';
+    const ASK = 'Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;';
+    const BACK = 'Δεν το βρήκα ακόμα, συνέχισε';
+    const btnN = (page, name) => page.getByRole('button', { name, exact: true });
+    const start = async (query, replies, vp) => {
+      const s = await session(query, replies);
+      if (vp) await s.page.setViewportSize(vp);
+      await send(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, W);
+      await send(s.page, 'Περισσότερα χρήματα'); return s;
+    };
+    {
+      const s = await start('?stageA=1', JR);
+      const before = s.calls.length;
+      await send(s.page, 'Ευχαριστώ');
+      ok('U1 (John): «Ευχαριστώ» → NO model call that turn, «Πριν φύγεις:» with «Δεν το βρήκα ακόμα»',
+        s.calls.length === before && await s.page.getByText(LEAVING).count() === 1 && await btnN(s.page, BACK).count() === 1);
+      ok('U1 (John): the model\'s closing reply («Το σήμα είναι ξεκάθαρο…», the friend question) never appears',
+        await s.page.getByText('Το σήμα είναι ξεκάθαρο').count() === 0 && await s.page.getByText('Αν ένας φίλος σου').count() === 0);
+      await send(s.page, 'Ίσως η κενοδοξια των χρημάτων');
+      ok('U1 (John): the answer to «Πριν φύγεις:» becomes the root card — nothing sent', s.calls.length === before &&
+        await btnN(s.page, 'Ναι, αυτό είναι').count() === 1 && await s.page.getByText('«Ίσως η κενοδοξια των χρημάτων»').count() === 1);
+      await s.browser.close();
+    }
+    {
+      const s = await start('?stageA=1', [JR[0], JR[1], 'Τι σε κρατάει εκεί;', 'Εντάξει. Είμαι εδώ αν θέλεις να συνεχίσουμε.']);
+      await send(s.page, 'Ευχαριστώ');
+      await btnN(s.page, BACK).click(); await s.page.waitForTimeout(500);
+      const b2 = s.calls.length;
+      await send(s.page, 'Ίσως η κενοδοξια των χρημάτων');
+      ok('U2: after «Δεν το βρήκα ακόμα» the conversation goes on — the next message gets its normal reply, no question opens by itself',
+        s.calls.length === b2 + 1 && await s.page.getByText(ASK).count() === 0 && await s.page.getByText(LEAVING).count() === 0);
+      const b3 = s.calls.length;
+      await send(s.page, 'Ευχαριστώ, κλείνουμε εδώ.');
+      ok('U2: the SECOND closing is unchanged — the model is called and the old closing card opens', s.calls.length === b3 + 1 && await btnN(s.page, 'Δείξε μου').count() === 1);
+      await s.browser.close();
+    }
+    for (const [lvl, msg, line] of [['B', 'Ευχαριστώ, κλείνουμε. Δεν βλέπω νόημα σε τίποτα πια.', /10306/], ['A', 'Κλείνουμε εδώ, δεν θέλω να ζω άλλο.', /1018/]]) {
+      const s = await start('?stageA=1', [JR[0], JR[1], 'Είμαι εδώ μαζί σου. Είσαι ασφαλής αυτή τη στιγμή;']);
+      const before = s.calls.length;
+      await send(s.page, msg); await s.page.waitForTimeout(500);
+      ok(`U3 (crisis ${lvl} + closing): the safety path as today — the model IS called, the crisis line, no door, no closing card`,
+        s.calls.length === before + 1 && await s.page.getByText(line).count() >= 1 && await s.page.getByText(LEAVING).count() === 0 && await btnN(s.page, 'Δείξε μου').count() === 0);
+      await s.browser.close();
+    }
+    {
+      const s = await start('?stageA=1', [JR[0], JR[1], 'Είμαι εδώ. Θέλεις να μου πεις λίγο περισσότερο;']);
+      const before = s.calls.length;
+      await send(s.page, 'Ευχαριστώ, κλείνουμε. Το πένθος για τη μητέρα μου με έχει παραλύσει.'); await s.page.waitForTimeout(500);
+      ok('U3 (DISTRESS + closing): the model IS called (no door before it) — after its reply, what happens today', s.calls.length === before + 1);
+      await s.browser.close();
+    }
+    {
+      const s = await start('', JR);
+      const before = s.calls.length;
+      await send(s.page, 'Ευχαριστώ');
+      ok('U4 (switch closed): «Ευχαριστώ» → the model is called and the old closing card opens, exactly as before',
+        s.calls.length === before + 1 && await btnN(s.page, 'Δείξε μου').count() === 1 && await s.page.getByText(LEAVING).count() === 0);
+      await s.browser.close();
+    }
+    // C — at phone size (and with the keyboard up) the root question and «Δεν το βρήκα ακόμα» are fully visible above the input.
+    // The question's own line and the «Δεν το βρήκα ακόμα» button under it must lie between the top of the screen and
+    // the top of the (sticky, transparent) input area.
+    const visible = async (page, text) => page.evaluate(([t, b]) => {
+      const q = [...document.querySelectorAll('.warning-card .warning-text')].find(x => x.innerText.includes(t));
+      const card = q && q.closest('.warning-card');
+      const U = x => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase(); // the buttons are shown in capitals, without accents
+      const btn = card && [...card.querySelectorAll('button')].find(x => U(x.innerText).startsWith(U(b).slice(0, 10)));
+      const inp = document.querySelector('.input-area');
+      if (!q || !btn || !inp) return false;
+      const top = inp.getBoundingClientRect().top, a = q.getBoundingClientRect(), r = btn.getBoundingClientRect();
+      return a.top >= 0 && a.bottom <= top && r.top >= 0 && r.bottom <= top;
+    }, [text, BACK]);
+    for (const vp of [{ width: 390, height: 700 }, { width: 390, height: 430 }]) {
+      const s = await start('?stageA=1', [JR[0], JR[1], 'Τι σε κρατάει εκεί;', JR[3]], vp);
+      await send(s.page, 'Ευχαριστώ'); await s.page.waitForTimeout(900);
+      ok(`U5 (phone ${vp.width}×${vp.height}): «Πριν φύγεις:» and «Δεν το βρήκα ακόμα» fully visible above the input`, await visible(s.page, 'Πριν φύγεις:'));
+      await btnN(s.page, BACK).click(); await s.page.waitForTimeout(500);
+      await send(s.page, 'Ίσως η κενοδοξια των χρημάτων');
+      await btnN(s.page, 'Νομίζω βρήκα τι με απασχολεί').click(); await s.page.waitForTimeout(900);
+      ok(`U5 (phone ${vp.width}×${vp.height}): after the button, «Πες το με μία φράση…» and «Δεν το βρήκα ακόμα» fully visible above the input (the phone test cut «απασχολεί;»)`,
+        await visible(s.page, 'Πες το με μία φράση'));
+      await send(s.page, 'Φοβάμαι ότι δεν αξίζω περισσότερα.');
+      await btnN(s.page, 'Διόρθωσε').click(); await s.page.waitForTimeout(900);
+      ok(`U5 (phone ${vp.width}×${vp.height}): after «Διόρθωσε» the correction question fully visible above the input`,
+        await visible(s.page, 'Γράψε τη ρίζα όπως θα την έλεγες εσύ'));
       await s.browser.close();
     }
   }

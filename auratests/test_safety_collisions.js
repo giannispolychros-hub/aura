@@ -27,6 +27,16 @@ function assert(label, cond) {
   if (cond) { passed++; console.log('PASS — ' + label); }
   else { failed++; console.log('FAIL — ' + label); }
 }
+// UPDATED (8/10): decideTermination's parameters contain braces, so extractBlock caught only its signature; the pin now
+// covers the whole function (verified identical to 8c4cb9c, before any Stage A closing work).
+function fullFnSrc(name) { // the WHOLE function — its parameters may themselves contain braces
+  const a = CODE.indexOf('function ' + name + '('); if (a < 0) return null;
+  let k = CODE.indexOf('(', a), depth = 0;
+  for (; k < CODE.length; k++) { if (CODE[k] === '(') depth++; else if (CODE[k] === ')') { depth--; if (depth === 0) break; } }
+  const b = CODE.indexOf('{', k); depth = 0;
+  for (let j = b; j < CODE.length; j++) { if (CODE[j] === '{') depth++; else if (CODE[j] === '}') { depth--; if (depth === 0) return CODE.slice(a, j + 1); } }
+  return null;
+}
 function extractBlock(startToken, from) {
   const a = CODE.indexOf(startToken, from || 0);
   if (a < 0) return null;
@@ -66,7 +76,7 @@ assert('2: the only supportive call is the crisis branch (so «supportive turn»
   // T1–T8 themselves are not touched: the same pins as test_stage_a_leaving_door.js (B).
   const fnSha = n => sha(extractBlock('function ' + n + '(') || '');
   assert('2: decideTermination, matchesClosingWord, isExplicitClosure, declaresClosing unchanged (byte for byte)',
-    fnSha('decideTermination') === '31270d891e4910e4' && fnSha('matchesClosingWord') === 'c3d044cc974bb7ac' &&
+    sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && fnSha('matchesClosingWord') === 'c3d044cc974bb7ac' &&
     fnSha('isExplicitClosure') === '09da70474755ef40' && fnSha('declaresClosing') === '45062068044c40b1');
 }
 {

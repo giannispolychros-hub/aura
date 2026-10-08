@@ -5722,6 +5722,12 @@ export default function AURAv2() {
     // FIX 4: block:"end" is more reliable than smooth on iOS Safari
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, loading, pivotPending, layerGatePending, memoryPromptPending, warningPending, closureConfirmPending, misfirePending, firstWhyPending]);
+  // STAGE A (phone test 7/10): the root question opens without a new message (the button, «Πριν φύγεις:» before the model,
+  // «Διόρθωσε»), so the scroll above never ran and the question sat behind the sticky input. Bring it into view.
+  useEffect(() => {
+    if (!stageAActive.current || (stageAPhase !== "ask" && stageAPhase !== "correct")) return;
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [stageAPhase]);
 
   // TELEMETRY — one measurement per ending, whichever path got there.
   //
@@ -7608,6 +7614,27 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         }
       } catch(e) { setError(e.message); }
       finally { setLoading(false); }
+      return;
+    }
+
+    // STAGE A — «Πριν φύγεις:» BEFORE the model (ADR «8 Οκτωβρίου»): the FIRST explicit closing before the root no
+    // longer goes to the model. Its reply carried the old closing (GRACEFUL EXIT stage + THIRD TRIGGER's friend question)
+    // stacked above the door. Same gate and same decision as after a reply; crisis and DISTRESS returned above (safety
+    // path as today); a second closing finds the door used and goes on as before. Switch closed: never true.
+    if (stageAActive.current && messages.some(m => m.role === "assistant" && m.msgMode !== "STAGE_A") && stageALeavingDoorOpens({
+      active: true,
+      decision: decideTermination([...messages, { role: "user", content: userText }], "", {
+        safetyMode, currentMode: mode, warningIssued: warningIssued.current, compressionCount: compressionCount.current,
+        modelJudgesEnd: false, concreteStepStated: concreteStepStated.current, outcomeScaleAsked: outcomeScaleAsked.current,
+        outcomeScaleBlockUsed: outcomeScaleBlockUsed.current, duringOnboarding: false, duringDeclineCooldown: closureDeclineCooldown.current > 0,
+      }),
+      lastUserText: userText,
+      used: stageARef.current.stats.rootDoorFromClosing > 0,
+      rootPhase: stageARef.current.phase, armed: stageARootArmed.current,
+      rootConfirmed: stageARef.current.stats.rootConfirmed === 1,
+      closingStarted: reflectionDelivered.current, riskKind: riskSignalKind.current, safetyMode,
+    })) {
+      stageADispatch({ type: "leaving" });
       return;
     }
 

@@ -27,6 +27,16 @@ function assert(label, cond) {
   if (cond) { passed++; console.log('PASS — ' + label); }
   else { failed++; console.log('FAIL — ' + label); }
 }
+// UPDATED (8/10): decideTermination's parameters contain braces, so extractBlock caught only its signature; the pin now
+// covers the whole function (verified identical to 8c4cb9c, before any Stage A closing work).
+function fullFnSrc(name) { // the WHOLE function — its parameters may themselves contain braces
+  const a = CODE.indexOf('function ' + name + '('); if (a < 0) return null;
+  let k = CODE.indexOf('(', a), depth = 0;
+  for (; k < CODE.length; k++) { if (CODE[k] === '(') depth++; else if (CODE[k] === ')') { depth--; if (depth === 0) break; } }
+  const b = CODE.indexOf('{', k); depth = 0;
+  for (let j = b; j < CODE.length; j++) { if (CODE[j] === '{') depth++; else if (CODE[j] === '}') { depth--; if (depth === 0) return CODE.slice(a, j + 1); } }
+  return null;
+}
 function extractBlock(startToken, from) {
   const a = CODE.indexOf(startToken, from || 0);
   if (a < 0) return null;
@@ -116,7 +126,7 @@ assert('UNCHANGED: the question text and the «Δεν το βρήκα ακόμα
   CODE.includes('ask: "Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;",') && CODE.includes('back: "Δεν το βρήκα ακόμα, συνέχισε",'));
 assert('UNCHANGED: the crisis capture rule and the root rule (byte for byte)',
   sha(extractBlock('function stageACaptureAllowed(')) === 'e45f98e42434f208' && sha(extractBlock('function rootTextHasSubstance(')) === '11d0cb226862ec80');
-assert('UNCHANGED: the closings (decideTermination byte for byte)', sha(extractBlock('function decideTermination(')) === '31270d891e4910e4');
+assert('UNCHANGED: the closings (decideTermination byte for byte)', sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);

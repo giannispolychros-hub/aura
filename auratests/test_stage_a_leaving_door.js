@@ -28,6 +28,17 @@ function assert(label, cond) {
   if (cond) { passed++; console.log('PASS — ' + label); }
   else { failed++; console.log('FAIL — ' + label); }
 }
+const sha = x => require('crypto').createHash('sha256').update(x || '', 'utf8').digest('hex').slice(0, 16);
+// UPDATED (8/10): decideTermination's parameters contain braces, so extractBlock caught only its signature; the pin now
+// covers the whole function (verified identical to 8c4cb9c, before any Stage A closing work).
+function fullFnSrc(name) { // the WHOLE function — its parameters may themselves contain braces
+  const a = CODE.indexOf('function ' + name + '('); if (a < 0) return null;
+  let k = CODE.indexOf('(', a), depth = 0;
+  for (; k < CODE.length; k++) { if (CODE[k] === '(') depth++; else if (CODE[k] === ')') { depth--; if (depth === 0) break; } }
+  const b = CODE.indexOf('{', k); depth = 0;
+  for (let j = b; j < CODE.length; j++) { if (CODE[j] === '{') depth++; else if (CODE[j] === '}') { depth--; if (depth === 0) return CODE.slice(a, j + 1); } }
+  return null;
+}
 function extractBlock(startToken) {
   const a = CODE.indexOf(startToken);
   if (a < 0) return null;
@@ -108,9 +119,10 @@ assert('B: the gate does not use the T1 detector (matchesClosingWord) or a new d
   !/matchesClosingWord|naturalExitReady/.test(extractBlock('function stageALeavingDoorOpens(') || 'matchesClosingWord'));
 // T1 and T2 themselves are untouched: the four functions that decide them are pinned to their text before this change.
 {
-  const sha = n => require('crypto').createHash('sha256').update(extractBlock('function ' + n + '(') || '', 'utf8').digest('hex').slice(0, 16);
+  const hash = x => require('crypto').createHash('sha256').update(x || '', 'utf8').digest('hex').slice(0, 16);
+  const sha = n => hash(extractBlock('function ' + n + '('));
   assert('B: T1/T2 unchanged — decideTermination, matchesClosingWord, isExplicitClosure, declaresClosing are byte-identical to before',
-    sha('decideTermination') === '31270d891e4910e4' && sha('matchesClosingWord') === 'c3d044cc974bb7ac' &&
+    hash(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && sha('matchesClosingWord') === 'c3d044cc974bb7ac' &&
     sha('isExplicitClosure') === '09da70474755ef40' && sha('declaresClosing') === '45062068044c40b1');
 }
 
