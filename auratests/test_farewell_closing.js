@@ -33,11 +33,17 @@ assert("statement NOT closing", matchesClosingWord("Σκέφτομαι να φύ
 assert("'καληνύχτα' inside a sentence NOT closing", matchesClosingWord("Δεν μπορώ να πω καληνύχτα ακόμα γιατί έχω θέμα") === false);
 
 // Combined logic (mirrors the render-time decision): farewell-aware emoji handling
+// UPDATED (8/10/2026, ADR «8 Οκτωβρίου (γ)»): the close is "Καλή συνέχεια." — "Καληνύχτα." read no clock and was chosen
+// for any closing word (e.g. «Ευχαριστώ» at noon). The rule itself is unchanged.
 function emojiAddition(lastUserMsg) {
-  return matchesClosingWord(lastUserMsg) ? "Καληνύχτα." : "Τι σκέφτεσαι τώρα;";
+  return matchesClosingWord(lastUserMsg) ? "Καλή συνέχεια." : "Τι σκέφτεσαι τώρα;";
 }
-assert("bare emoji after farewell → close, not reopen", emojiAddition("Καληνύχτα") === "Καληνύχτα.");
-assert("bare emoji after 'Επίσης' → close", emojiAddition("Επίσης") === "Καληνύχτα.");
+assert("bare emoji after farewell → close, not reopen", emojiAddition("Καληνύχτα") === "Καλή συνέχεια.");
+assert("bare emoji after 'Επίσης' → close", emojiAddition("Επίσης") === "Καλή συνέχεια.");
+assert("the mirror above matches App.jsx (same two sentences, same closing check)",
+  raw.includes('const userWasClosing = matchesClosingWord(lastUserMsg) || declaresClosing(lastUserMsg);') &&
+  raw.includes('const addition = userWasClosing ? "Καλή συνέχεια." : "Τι σκέφτεσαι τώρα;";') &&
+  !raw.includes('const addition = userWasClosing ? "Καληνύχτα."'));
 assert("bare emoji mid-conversation → forward question", emojiAddition("Σκέφτομαι κάτι") === "Τι σκέφτεσαι τώρα;");
 
 console.log("\n" + passed + " passed, " + failed + " failed");

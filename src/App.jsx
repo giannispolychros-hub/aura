@@ -6681,8 +6681,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // here is one sentence choice ("Καληνύχτα." vs "Τι σκέφτεσαι τώρα;"), reversible by the
         // user's very next message — never a card, never a termination — and this only fires when
         // AURA's OWN reply this turn is ALSO bare-emoji, a narrow double condition.
+        // CHANGED (8/10/2026, ADR «8 Οκτωβρίου (γ)»): "Καληνύχτα." → "Καλή συνέχεια." — the choice reads no clock and
+        // not whether the user said goodnight (any closing word picks it, e.g. «Ευχαριστώ» at noon). Rule otherwise unchanged.
         const userWasClosing = matchesClosingWord(lastUserMsg) || declaresClosing(lastUserMsg);
-        const addition = userWasClosing ? "Καληνύχτα." : "Τι σκέφτεσαι τώρα;";
+        const addition = userWasClosing ? "Καλή συνέχεια." : "Τι σκέφτεσαι τώρα;";
         displayText = (displayText.trim() ? displayText.trim() + " " : "") + addition;
       }
 

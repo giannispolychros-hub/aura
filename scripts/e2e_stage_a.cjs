@@ -9,11 +9,11 @@
 // repo, που καλεί την Anthropic με το κλειδί της μεταβλητής ANTHROPIC_API_KEY. Κανένας άλλος δρόμος προς την Anthropic.
 //
 // ΛΕΙΤΟΥΡΓΙΕΣ (από τον φάκελο του repo):
-//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), ετικέτες (V), χωρίς κόστος
+//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), ετικέτες (V), κρυφά σήματα (W), χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
-// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W (μόνο η W)
 // Αρχεία εξόδου (αναφορά, στιγμιότυπα) ΜΟΝΟ στον προσωρινό φάκελο. Το κλειδί δεν γράφεται ποτέ σε έξοδο.
 'use strict';
 const fs = require('fs');
@@ -55,7 +55,7 @@ function writeOut(name, text) {
   fs.writeFileSync(path.join(OUT, name), t);
 }
 
-// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), ετικέτες (V) ══
+// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), ετικέτες (V), κρυφά σήματα (W) ══
 // A ολόκληρη η ροή (κουμπί → κάρτα → «Ναι» → πρόταση → ερώτηση → σαφήνεια → λέξη → τέλος, χωρίς 6€), B κλειστός
 // διακόπτης (τίποτα από το Στάδιο Α, καμία σήμανση), C πόρτα 2 και «πίσω», D DISTRESS (κάρτα ναι, πρόταση όχι),
 // E πρόταση κρίσης ως απάντηση (η ροή κλείνει, γραμμή 1018), F/F2 «Πριν φύγεις:» (T2 μία φορά, μετά το παλιό κλείσιμο·
@@ -612,6 +612,76 @@ async function runMock() {
       }
     }
   }
+  await runMockW();
+}
+
+// ── W: the hidden tags still work after the label cleaning (founder's check of 6408fbf, ADR «8 Οκτωβρίου (γ)»), switch
+// closed and open. [[EXIT:yes]] at the end of a reply → the old closing card (T5); [[EXIT:no]] → none; [[EARLY_WORD:yes]]
+// → the next answer is kept as the word, and at the closing «Δείξε μου» ends the session at once, without asking for it
+// (two closing requests). W4 is the same session without the tag (the control). A tag never shows, on screen or in the
+// history. The proof: W passes the same way on the App.jsx before 6408fbf (9781710). Alone: --only W.
+async function runMockW() {
+  const F1 = 'Δεν ξέρω αν πρέπει να φύγω από την δουλειά μου', WHY = 'Νιώθω ότι δεν πέτυχα όσα άξιζα';
+  const NAMED = 'Αυτό που περιέγραψες έχει πια όνομα.';
+  const WORDQ = 'Αν κρατούσες μία λέξη από όλο αυτό, ποια θα ήταν;';
+  const WQ = 'ΗΡΘΕΣ ΜΕ: α\nΒΡΗΚΕΣ: β\nΦΕΥΓΕΙΣ ΜΕ: γ\n\nΠριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.';
+  const LEAVING = APP.texts.askLeaving;
+  const bubbles = async page => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+  const tagOnScreen = async page => (await page.locator('body').innerText()).includes('[[');
+  const tagInHistory = calls => calls.some(c => (c.messages || []).some(m => m.role === 'assistant' && String(m.content).includes('[[')));
+  const card = async page => (await page.getByRole('button', { name: 'Δείξε μου', exact: true }).count()) === 1;
+  const ended = async page => (await page.getByText('ξεκλείδωσε').count()) > 0 || (await page.getByRole('button', { name: 'Νέα συνεδρία' }).count()) > 0;
+  const closingCalls = calls => calls.filter(c => LIB.classifyRequest(c, APP).kind === 'termination');
+  const lastUser = c => [...((c && c.messages) || [])].reverse().find(m => m.role === 'user') || { content: '' };
+  const open = async (query, replies) => { const s = await session(query, replies); await s.page.setViewportSize({ width: 390, height: 700 });
+    await send(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, WHY); return s; };
+  for (const q of ['', '?stageA=1']) {
+    const sw = q ? 'open' : 'closed';
+    {
+      const s = await open(q, ['Τι εννοείς με το «άξιζα»;', NAMED + ' [[EXIT:yes]]', 'Και;']);
+      await send(s.page, 'Περισσότερα χρήματα.');
+      const b = await bubbles(s.page);
+      ok(`W1 (switch ${sw}): a reply ending in [[EXIT:yes]] → the old closing card «Δείξε μου» (T5); the reply shows without the tag`,
+        await card(s.page) && b[b.length - 1] === NAMED && !(await tagOnScreen(s.page)));
+      if (q) ok('W1 (switch open): T5 is the model\'s signal, not a closing by the user → no «Πριν φύγεις» door', await s.page.getByText(LEAVING).count() === 0);
+      await s.page.screenshot({ path: path.join(OUT, `W1-${sw}.png`), fullPage: false });
+      await s.browser.close();
+    }
+    {
+      const s = await open(q, ['Τι εννοείς με το «άξιζα»;', NAMED + ' [[EXIT:no]]', 'Και;']);
+      await send(s.page, 'Περισσότερα χρήματα.');
+      const b = await bubbles(s.page);
+      ok(`W2 (switch ${sw}): [[EXIT:no]] → no closing card, the conversation goes on, no tag shown`,
+        !(await card(s.page)) && b[b.length - 1] === NAMED && await s.page.locator('textarea.textarea').count() === 1 && !(await tagOnScreen(s.page)));
+      await s.browser.close();
+    }
+    for (const tagged of [true, false]) {
+      const W = tagged ? 'W3' : 'W4';
+      const s = await open(q, ['Τι εννοείς με το «άξιζα»;', WORDQ + (tagged ? ' [[EARLY_WORD:yes]]' : ''), NAMED + ' [[EXIT:yes]]',
+        tagged ? 'Κράτα το «ελευθερία».' : WQ, 'Η σκέψη σου παραμένει δική σου.']);
+      await send(s.page, 'Περισσότερα χρήματα.');
+      const b = await bubbles(s.page);
+      if (tagged) ok(`W3 (switch ${sw}): the question carrying [[EARLY_WORD:yes]] shows without the tag`, b[b.length - 1] === WORDQ && !(await tagOnScreen(s.page)));
+      await send(s.page, 'ελευθερία');
+      const hadCard = await card(s.page);
+      if (hadCard) { await s.page.getByRole('button', { name: 'Δείξε μου', exact: true }).click(); await s.page.waitForTimeout(1500); }
+      const cc = closingCalls(s.calls);
+      const parts = cc.map(c => (LIB.classifyRequest(c, APP).closing || {}).part).join(',');
+      if (tagged) {
+        ok(`W3 (switch ${sw}): the answer is kept as the word — «Δείξε μου» → Part 1 carries «ελευθερία» and is told not to ask again`,
+          hadCard && cc.length >= 1 && lastUser(cc[0]).content.includes('"ελευθερία"') && /do NOT ask for it again/.test(lastUser(cc[0]).content));
+        ok(`W3 (switch ${sw}): … then Part 2 at once — two closing requests, the session ends, the word is never asked`,
+          parts === 'Part 1,Part 2' && await ended(s.page) && await s.page.getByText('Πριν φύγεις — μία λέξη').count() === 0);
+        await s.page.screenshot({ path: path.join(OUT, `W3-${sw}.png`), fullPage: true });
+      } else {
+        ok(`W4 (switch ${sw}, control, no tag): «Δείξε μου» → one closing request (Part 1) that asks for the word, the session waits for it`,
+          hadCard && parts === 'Part 1' && !lastUser(cc[0]).content.includes('"ελευθερία"') && !(await ended(s.page)) &&
+          await s.page.getByText('Πριν φύγεις — μία λέξη').count() >= 1 && await s.page.locator('textarea.textarea').count() === 1);
+      }
+      ok(`${W} (switch ${sw}): no tag on screen and none in the history sent to the model`, !(await tagOnScreen(s.page)) && !tagInHistory(s.calls));
+      await s.browser.close();
+    }
+  }
 }
 
 // ═══ ΤΑ 6 ΣΕΝΑΡΙΑ (ψεύτικο ή πραγματικό μοντέλο) ═════════════════════════════
@@ -826,7 +896,7 @@ async function runScenarios(makeModel, budget) {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      await runMock();
+      if (opt('--only', '') === 'W') await runMockW(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

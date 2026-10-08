@@ -96,6 +96,37 @@ assert('WIRING: a closing message left empty is not shown', /const appendClosing
 assert('WIRING: misfire / compression / First-WHY replies left empty are not shown', (CODE.match(/if \(text\.trim\(\)\) setMessages\(prev => \[\.\.\.prev, \{ id: nextMsgId\(\), role: "assistant", content: text,/g) || []).length >= 2);
 assert('MEASURE: session_completed carries labelLeaks (a number, capped)', /labelLeaks: Math\.min\(9999, labelLeaks\.current\),/.test(CODE));
 assert('MEASURE: reset with a new session', /labelLeaks\.current = 0;/.test(extractBlock('const resetSession = () =>') || ''));
+// ── The hidden tags are READ before the cleaning removes them (founder's check, 8/10/2026, ADR «8 Οκτωβρίου (γ)») ─
+// stripInternalLabels removes [[EXIT:…]] and [[EARLY_WORD:yes]] too, so the order is the whole contract: the T5 closing
+// (modelJudgesEnd) and the early word (awaitingEarlyWord) must read the model's RAW reply, and only then is it cleaned.
+{
+  const at = GEN.indexOf('const exitTagMatch = rawTextWithTags.match(');
+  const end = GEN.indexOf('\n', GEN.indexOf('const text = stripAraDeclarative(cleanLabels(rawText.replace('));
+  const seg = at >= 0 && end > at ? GEN.slice(at, end) : '';
+  assert('TAGS BEFORE CLEANING: the raw reply comes straight from callAura — nothing cleans it on the way in',
+    /const rawTextWithTags = await callAura\(\[\.\.\.contextRefresh, \.\.\.msgs\], system\);/.test(GEN) &&
+    !/cleanLabels|stripInternalLabels/.test(extractBlock('async function callAura(') || 'cleanLabels'));
+  assert('TAGS BEFORE CLEANING: both tags are matched on rawTextWithTags, BEFORE the one line that cleans',
+    seg.length > 0 && /const exitTagMatch = rawTextWithTags\.match\(/.test(seg) && /const earlyWordTagMatch = rawTextWithTags\.match\(/.test(seg) &&
+    seg.indexOf('const earlyWordTagMatch') < seg.indexOf('cleanLabels(') && (seg.match(/cleanLabels\(/g) || []).length === 1 &&
+    GEN.slice(GEN.indexOf('const rawTextWithTags = await callAura('), at).indexOf('cleanLabels') < 0);
+  // The same lines, run: a fake raw reply in, what the app would read and show out.
+  const run = rawReply => { try {
+    return new Function('rawTextWithTags', 'cleanLabels', 'stripAraDeclarative', 'awaitingEarlyWord', 'declarationLedger', 'issueDeclaration', 'turnCount',
+      seg + '\nreturn { modelJudgesEnd, awaiting: awaitingEarlyWord.current, text };')(rawReply, t => S(t).text, t => t, { current: false }, { current: [] }, () => [], { current: 0 });
+  } catch (e) { return { error: e.message }; } };
+  const r1 = run('Αυτό που περιέγραψες έχει πια όνομα. [[EXIT:yes]]');
+  assert('TAGS BEFORE CLEANING (run): «… [[EXIT:yes]]» → the T5 signal is read, the text shown has no tag',
+    r1.modelJudgesEnd === true && r1.awaiting === false && r1.text === 'Αυτό που περιέγραψες έχει πια όνομα.');
+  const r2 = run('Αυτό που περιέγραψες έχει πια όνομα. [[EXIT:no]]');
+  assert('TAGS BEFORE CLEANING (run): «… [[EXIT:no]]» → no T5, no tag shown', r2.modelJudgesEnd === false && r2.text === 'Αυτό που περιέγραψες έχει πια όνομα.');
+  const r3 = run('Αν κρατούσες μία λέξη από όλο αυτό, ποια θα ήταν; [[EARLY_WORD:yes]]');
+  assert('TAGS BEFORE CLEANING (run): «… [[EARLY_WORD:yes]]» → the next answer will be kept as the word, no tag shown',
+    r3.awaiting === true && r3.modelJudgesEnd === false && r3.text === 'Αν κρατούσες μία λέξη από όλο αυτό, ποια θα ήταν;');
+  const r4 = run('[MASTER PRIORITY RULE — STAGE: GRACEFUL EXIT]\n\nΚαλή συνέχεια. [[EXIT:yes]]');
+  assert('TAGS BEFORE CLEANING (run): a label AND a tag in one reply → the tag still read, the label still removed',
+    r4.modelJudgesEnd === true && r4.text === 'Καλή συνέχεια.');
+}
 assert('NO PROMPT CHANGE: the prompt does not mention the cleaning', !raw.slice(_s, _e).includes('stripInternalLabels') && !raw.slice(_s, _e).includes('labelLeaks'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
