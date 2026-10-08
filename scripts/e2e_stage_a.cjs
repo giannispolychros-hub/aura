@@ -9,7 +9,7 @@
 // repo, που καλεί την Anthropic με το κλειδί της μεταβλητής ANTHROPIC_API_KEY. Κανένας άλλος δρόμος προς την Anthropic.
 //
 // ΛΕΙΤΟΥΡΓΙΕΣ (από τον φάκελο του repo):
-//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), ετικέτες (V), κρυφά σήματα (W), χωρίς κόστος
+//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), ετικέτες (V), κρυφά σήματα και «Καλή συνέχεια.» (W), χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
@@ -619,7 +619,8 @@ async function runMock() {
 // closed and open. [[EXIT:yes]] at the end of a reply → the old closing card (T5); [[EXIT:no]] → none; [[EARLY_WORD:yes]]
 // → the next answer is kept as the word, and at the closing «Δείξε μου» ends the session at once, without asking for it
 // (two closing requests). W4 is the same session without the tag (the control). A tag never shows, on screen or in the
-// history. The proof: W passes the same way on the App.jsx before 6408fbf (9781710). Alone: --only W.
+// history. The proof: W1–W4 pass the same way on the App.jsx before 6408fbf (9781710). W5: a reply with no words after a
+// closing gets «Καλή συνέχεια.», not «Καληνύχτα.» (founder's point 2, same ADR). Alone: --only W.
 async function runMockW() {
   const F1 = 'Δεν ξέρω αν πρέπει να φύγω από την δουλειά μου', WHY = 'Νιώθω ότι δεν πέτυχα όσα άξιζα';
   const NAMED = 'Αυτό που περιέγραψες έχει πια όνομα.';
@@ -679,6 +680,17 @@ async function runMockW() {
           await s.page.getByText('Πριν φύγεις — μία λέξη').count() >= 1 && await s.page.locator('textarea.textarea').count() === 1);
       }
       ok(`${W} (switch ${sw}): no tag on screen and none in the history sent to the model`, !(await tagOnScreen(s.page)) && !tagInHistory(s.calls));
+      await s.browser.close();
+    }
+    {
+      // W5: the model answers a closing with an emoji only → the existing rule adds «Καλή συνέχεια.». Switch open: the first
+      // «Ευχαριστώ» opens the door before the model, so the closing that reaches the model is the second one.
+      const s = await open(q, ['Τι εννοείς με το «άξιζα»;', '🙂', WQ]);
+      if (q) { await send(s.page, 'Ευχαριστώ'); await s.page.getByRole('button', { name: 'Δεν το βρήκα ακόμα, συνέχισε', exact: true }).click(); await s.page.waitForTimeout(500); }
+      await send(s.page, q ? 'Ευχαριστώ, κλείνουμε εδώ.' : 'Ευχαριστώ');
+      const b = await bubbles(s.page);
+      ok(`W5 (switch ${sw}): an emoji-only reply to a closing → «🙂 Καλή συνέχεια.» (no «Καληνύχτα»)`,
+        b[b.length - 1] === '🙂 Καλή συνέχεια.' && await s.page.getByText('Καληνύχτα').count() === 0);
       await s.browser.close();
     }
   }

@@ -144,6 +144,7 @@ if (typeof D === 'function') {
 //     already bare-emoji AND the user's message declares closing. INHERITS THE SAME KNOWN TRADE-OFF
 //     AS F015 (Tier A matches "τελειώσαμε" anywhere, even followed by "αλλά θέλω να πω κάτι ακόμα"):
 //     a false positive here picks "Καληνύχτα." instead of "Τι σκέφτεσαι τώρα;" — one sentence,
+//     [UPDATED 8/10/2026, ADR «8 Οκτωβρίου (γ)»: that sentence is now "Καλή συνέχεια.", same trade-off]
 //     reversible by the user's very next message, never a card, never a termination. Accepted
 //     explicitly for the same reason as F015: the narrower alternative (Tier B alone) would miss
 //     real closings this site exists to catch, for a theoretical edge case with no real-session
