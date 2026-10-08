@@ -99,7 +99,9 @@ const exitResult = checkTagContract(
   '\\[\\[EXIT:(yes|no)\\]\\]',
   'EXIT:(yes|no)|EARLY_WORD:yes'
 );
-assert('[[EXIT:yes|no]]: exactly the expected number of known code-side regex sites (6) — a change here means a site was added/removed, worth a second look, not necessarily a failure', exitResult.codeRegexCount === 6);
+// UPDATED (8/10, ADR «8 Οκτωβρίου (β)»): +1 combined site for each tag — stripInternalLabels removes a leftover tag from
+// anything shown, the same alternation as the tag-echo guard. Parsing is unchanged (it reads the raw reply first).
+assert('[[EXIT:yes|no]]: exactly the expected number of known code-side regex sites (7) — a change here means a site was added/removed, worth a second look, not necessarily a failure', exitResult.codeRegexCount === 7);
 
 // ── [[EARLY_WORD:yes]] contract ──
 // Prompt side: EARLY PERSONAL WORD CAPTURE section instructs the model to emit exactly
@@ -113,7 +115,7 @@ const earlyWordResult = checkTagContract(
   '\\[\\[EARLY_WORD:yes\\]\\]',
   'EARLY_WORD:yes)\\]\\]'
 );
-assert('[[EARLY_WORD:yes]]: exactly the expected number of known code-side regex sites (3) — a change here means a site was added/removed, worth a second look, not necessarily a failure', earlyWordResult.codeRegexCount === 3);
+assert('[[EARLY_WORD:yes]]: exactly the expected number of known code-side regex sites (4) — a change here means a site was added/removed, worth a second look, not necessarily a failure', earlyWordResult.codeRegexCount === 4);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

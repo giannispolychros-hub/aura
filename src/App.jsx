@@ -1601,7 +1601,7 @@ function buildStageAMarker(active) {
 const STAGE_A_TEXTS = {
   button: "Νομίζω βρήκα τι με απασχολεί",
   ask: "Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;",
-  askLeaving: "Πριν φύγεις: πες το με μία φράση — τι είναι αυτό που σε απασχολεί;",
+  askLeaving: "Αν κάτι σου ξεκαθάρισε, πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;",
   back: "Δεν το βρήκα ακόμα, συνέχισε",
   knewLabel: "Τι ήξερες",
   foundLabel: "Τι βρήκες",
@@ -1747,7 +1747,7 @@ function stageALeavingDoorOpens(st) {
   const o = st || {};
   const u = typeof o.lastUserText === "string" ? o.lastUserText : "";
   return o.active === true && (o.decision === "confirm" || o.decision === "terminate") && !o.used && !o.rootPhase && !o.armed &&
-    !o.rootConfirmed && !o.closingStarted && o.riskKind !== 1 && !o.safetyMode && (isExplicitClosure(u) || declaresClosing(u));
+    !o.rootConfirmed && !o.closingStarted && o.riskKind !== 1 && !o.safetyMode && !detectSafetySignal(u) && (isExplicitClosure(u) || declaresClosing(u));
 }
 // STAGE A — the whole flow as one pure step function (SPEC_FREE_END.md §1.5, §2.1, §2.1α, §2.2, §4, §6.1).
 // phase: null (conversation) · "ask" (door 1's fixed question) · "card" · "correct" · "offer" · "notReady" ·
@@ -4200,6 +4200,34 @@ function detectsPossibleAraPatternViolation(text) {
 // KNOWN, HONEST LIMITATION: does not catch a rarer variant using embedded Greek question marks
 // inside quotes with no period (e.g. reframing via quoted rhetorical questions) — the passive
 // detector above still fires for that case, so real frequency data keeps accumulating on it too.
+// INTERNAL LABELS (ADR «8 Οκτωβρίου (β)», every user): the heads of our own bracketed per-turn contexts and of the messages
+// the app sends in the user's place, plus the hidden [[…]] tags. A reply that echoes one (real phone test 8/10, switch
+// closed: «[MASTER PRIORITY RULE — STAGE: GRACEFUL EXIT]\n\nΚαλή συνέχεια.») loses it here — before the screen and before
+// the history. ONLY these known heads; any other text in brackets stays exactly as written. auratests/test_internal_labels.js
+// scans App.jsx so that a new bracketed context cannot be added without being covered here.
+const INTERNAL_LABEL_HEADS = [
+  "MASTER PRIORITY RULE", "STAGE:", "FREE PART", "CODE-VERIFIED", "SESSION COVERAGE", "STRUCTURAL EVIDENCE",
+  "MEMORY CONTEXT", "SILENT PROFILE", "SYSTEM CONTEXT REFRESH", "EXPLICIT PAUSE AVAILABLE", "INFORMATION MODE ACTIVE",
+  "FIRST REPLY OF THIS SESSION", "FIRST REPLY FLOOR", "ROAD QUESTION", "GATES DUE CHECK", "ESCALATION LEVEL", "AUTO-KILL",
+  "MISFIRE RECOVERY", "The user just confirmed", "The user just answered", "The user has now used", "Deliver Part",
+  "User indicated the observation", "Final compression pass", "Signal:",
+];
+function stripInternalLabels(raw) {
+  const s = typeof raw === "string" ? raw : "";
+  const heads = INTERNAL_LABEL_HEADS.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  let count = 0;
+  const hit = () => { count += 1; return ""; };
+  let t = s
+    // [HEAD …] up to its own closing bracket, never across a blank line; one following space goes with it
+    .replace(new RegExp("\\[[ \\t]*(?:" + heads + ")(?:[^\\]\\n]|\\n(?![ \\t]*\\n))*\\][ \\t]*", "g"), hit)
+    // an unclosed [HEAD … alone on its line
+    .replace(new RegExp("^[ \\t]*\\[[ \\t]*(?:" + heads + ")[^\\]\\n]*$\\n?", "gm"), hit)
+    // the hidden tags, anywhere
+    .replace(/[ \t]*\[\[(EXIT:(yes|no)|EARLY_WORD:yes)\]\]/gi, hit);
+  if (!count) return { text: s, count: 0 };
+  t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  return { text: t, count };
+}
 function stripAraDeclarative(text) {
   return (text || "")
     // CONTAINED TO ONE LINE (bug reproduced executably): [^.]* matches newlines in JS, and the
@@ -5586,13 +5614,15 @@ export default function AURAv2() {
   const freeDeferral          = useRef(0);     // a reply deferred «τι κάνω» to after the root, on a request turn
   const askedActionBeforeRoot = useRef(false); // the user asked for action before the root card ever opened
   const rootCardOpenedOnce    = useRef(false); // set when the root card first opens (step 3.5)
-  const riskSignalKind        = useRef(0);     // §4 latch: 0 none · 1 crisis A · 2 crisis B · 3 DISTRESS (heaviest kept)
+  const riskSignalKind        = useRef(0);
+  const labelLeaks            = useRef(0);     // ADR «8 Οκτωβρίου (β)»: internal labels removed from model replies (count only)     // §4 latch: 0 none · 1 crisis A · 2 crisis B · 3 DISTRESS (heaviest kept)
   // STAGE A flow (steps 3.3–3.10): the ref is the source of truth, the phase state re-renders it.
   const stageARef             = useRef(initialStageAState());
   const stageARootArmed       = useRef(false); // door 2: the readiness answer arrived — capture the NEXT message
   const [stageAPhase, setStageAPhase] = useState(null);
   const [stageACopyText, setStageACopyText] = useState(null); // clipboard fallback: the text, shown to select
   const [stageACopied, setStageACopied] = useState(false);
+  const cleanLabels = useCallback((t) => { const r = stripInternalLabels(t); if (r.count) labelLeaks.current += r.count; return r.text; }, []);
   const stageADispatch = useCallback((ev) => {
     stageARef.current = stageAStep(stageARef.current, ev);
     setStageAPhase(stageARef.current.phase);
@@ -5797,6 +5827,7 @@ export default function AURAv2() {
         unsourcedOptions: Math.min(9999, unsourcedOptionOffers.current),
         userClaims: Math.min(9999, claimsAboutUser.current),
         unverifiedFoundClaims: Math.min(9999, unverifiedFoundClaims.current),
+        labelLeaks: Math.min(9999, labelLeaks.current),
         // The per-category tally detectOutputViolation keeps in violationCounts, which until now only the
         // ?debug=1 panel and the console could see — so No-Evaluation / No-Advice, measured on every reply,
         // never reached the exported file. Counts only; the reply text is never read here.
@@ -6522,7 +6553,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           turnCount.current || 0);
       }
       const rawText = rawTextWithTags.replace(/\s*\[\[EARLY_WORD:yes\]\]\s*/gi, "\n").trim();
-      const text = stripAraDeclarative(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""));
+      const text = stripAraDeclarative(cleanLabels(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, "")));
 
       // If explicit pause was used, record it
       if (explicitPauseCtx && /(τρόπο που ψάχνεις|προτιμάς να φτάσουμε|απόφαση ή να καταλάβεις)/i.test(text)) {
@@ -6687,7 +6718,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // can drop it. See buildAiIdentityLine.
       const _aiLine = buildAiIdentityLine(lastUserMsg, displayText);
       if (_aiLine) displayText = displayText + "\n\n" + _aiLine;
-      setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode }]);
+      if (displayText.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode }]);
       // PASSIVE MEASUREMENT ONLY — fires after display, never blocks or alters anything. See
       // detectsPossibleAraPatternViolation's comment for full context (Measurement Before
       // Modification, heuristic proxy, visibility during real testing only). Deliberately logs
@@ -7024,6 +7055,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
   // premature. Stops at the first assistant turn found, and never touches a turn
   // that is itself part of the closing sequence.
   const appendClosingMessage = useCallback((content) => {
+    if (!String(content || "").trim()) return; // a closing reply left empty (e.g. only a label) is not shown
     setMessages(prev => {
       const next = prev.slice();
       for (let i = next.length - 1; i >= 0; i--) {
@@ -7050,7 +7082,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         content: `[Deliver Part 2 now: Perceptual Closure Layer, then Full Silence. No Ownership Statement, no Delayed Insight paragraph — those were removed as boilerplate that failed the 'does this change cognitive movement' test. Do not repeat the Reflection Summary or the word-question.${echoNote}]`
       }];
       const rawText = await callAura(finalMsgs, SYSTEM_TERMINATION);
-      const text = stripAraDeclarative(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""));
+      const text = stripAraDeclarative(cleanLabels(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, "")));
       // THE FILTER RUNS HERE, before anything is rendered — the trigger message above
       // already forbids repeating the word-question and the model did it anyway, which
       // is the whole reason this exists as code rather than as another sentence.
@@ -7207,7 +7239,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           content: `[Deliver Part 1 now. DO NOT write a reflection summary: the three-beat shift has already told this session's story once, and a second prose retelling of the same material is what this replaces. The user has ALSO already given their word/phrase to keep — do NOT ask for it again, do not repeat a word-question. So this reply is at most ONE short line handing the moment over, referencing what they already chose only if it fits naturally: "${capturedWord}". Do not continue to Ownership Statement.]`
         }];
         const rawText = await callAura(termMsgsEarly, SYSTEM_TERMINATION);
-        const text = stripAraDeclarative(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""));
+        const text = stripAraDeclarative(cleanLabels(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, "")));
         // The word was already asked and answered earlier in this session, so Part 2
         // must not produce one either — this branch arms the same flag as Part 1.
         wordQuestionDelivered.current = true;
@@ -7233,7 +7265,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         content: `[Deliver Part 1 now. DO NOT write a reflection summary: the three-beat shift has already told this session's story once, and a second prose retelling of the same material is what this replaces. This reply is the word-to-remember question and essentially nothing else — at most one short line before it if something genuinely needs handing over, never a recap of what was said.${wordContextNote} Then STOP. Do not continue to Ownership Statement — wait for the user's word.]`
       }];
       const rawText = await callAura(termMsgs, SYSTEM_TERMINATION);
-      const text = stripAraDeclarative(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""));
+      const text = stripAraDeclarative(cleanLabels(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, "")));
       wordQuestionDelivered.current = true;
       appendClosingMessage(text);
       setAwaitingRememberedWord(true);
@@ -7266,8 +7298,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     const recoveryPrompt = getLensPrompt(activeLensRef.current) + buildStageAMarker(stageAActive.current) + `\n\nMISFIRE RECOVERY: The user has indicated your previous observation was inaccurate or incomplete. Your response must begin with: "Understood. My interpretation appears incomplete." Then ask: "What am I missing that changes the picture?" Do not repeat the original observation.`;
     setLoading(true);
     try {
-      const text = stripAraDeclarative(await callAura(correctionMsgs, recoveryPrompt));
-      setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "AUDIT" }]);
+      const text = stripAraDeclarative(cleanLabels(await callAura(correctionMsgs, recoveryPrompt)));
+      if (text.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "AUDIT" }]);
     } catch(e) { setError(e.message); }
     finally { setLoading(false); }
     setMisfireType(null);
@@ -7306,8 +7338,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       ];
       setLoading(true);
       try {
-        const text = stripAraDeclarative(await callAura(pivotMsgs, SYSTEM_COMPRESSION));
-        setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "COMPRESSION", isInsight: true }]);
+        const text = stripAraDeclarative(cleanLabels(await callAura(pivotMsgs, SYSTEM_COMPRESSION)));
+        if (text.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "COMPRESSION", isInsight: true }]);
         // BUG 7: compressionCount incremented in generateResponse only — removed duplicate here
         // Visual: compression acceptance is a clarity moment
         triggerClaritySurge();
@@ -7578,7 +7610,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         const profileCtx = getProfileSummary(memory);
         const profileWithRules = profileCtx ? profileCtx + HONEST_UNCERTAINTY_RULE : '';
         const prompt = [getLensPrompt(inferred), memCtx, profileWithRules, buildFirstWhyFloor(), buildStageAMarker(stageAActive.current)].filter(Boolean).join('\n');
-        const text = stripAraDeclarative(await callAura(initMsgs, prompt));
+        const text = stripAraDeclarative(cleanLabels(await callAura(initMsgs, prompt)));
         // THE NO-ADVICE FLOOR ON THE ENTRY TURN. Neither observer saw this reply before: an opening
         // that offered the user options went uncounted, and the guard built for exactly that failure
         // was blind precisely here. Observation only, identical in kind to the main path — a count
@@ -7605,7 +7637,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // this branch writes its own reply. Every user message of the turn is checked (opening + why-answer).
         const _firstAiLine = buildAiIdentityLine(initMsgs.filter(m => m && m.role === "user").map(m => String(m.content || "")).join("\n"), text);
         const _firstWhyShown = _firstAiLine ? text + "\n\n" + _firstAiLine : text;
-        setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: _firstWhyShown, msgMode: "ANSWER" }]);
+        if (_firstWhyShown.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: _firstWhyShown, msgMode: "ANSWER" }]);
         // U1: Start trajectory for this category
         if (memory.storageEnabled) {
           const updated = recordTrajectory({ ...memory }, currentDomain, 2, null);
@@ -7635,6 +7667,17 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       closingStarted: reflectionDelivered.current, riskKind: riskSignalKind.current, safetyMode,
     })) {
       stageADispatch({ type: "leaving" });
+      return;
+    }
+    // STAGE A — door 3 without substance BEFORE the model (ADR «8 Οκτωβρίου (β)»): a recognising message too short to be
+    // a root («Ναι, αυτό ακριβώς είναι!») shows door 1's question INSTEAD of a reply — never a model question with the root
+    // question under it. Crisis and DISTRESS returned above (safety path as today). With substance, door 3 still opens
+    // the card after the reply. Switch closed: never true.
+    if (stageAActive.current && messages.some(m => m.role === "assistant" && m.msgMode !== "STAGE_A") &&
+        !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1 &&
+        detectsSpontaneousCoreRecognition(userText) && !rootTextHasSubstance(userText)) {
+      coreReadinessConfirmed.current = true; // the readiness latch flips exactly as it would have after the reply (door 3)
+      stageADispatch({ type: "reask", door: 3 });
       return;
     }
 
@@ -7780,7 +7823,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     coreReadinessAsked.current = false;
     coreReadinessConfirmed.current = false;
     freeActionOffered.current = 0; freeDeferral.current = 0; askedActionBeforeRoot.current = false; rootCardOpenedOnce.current = false;
-    riskSignalKind.current = 0;
+    riskSignalKind.current = 0; labelLeaks.current = 0;
     stageARef.current = initialStageAState(); stageARootArmed.current = false; setStageAPhase(null);
     setStageACopyText(null); setStageACopied(false);
     shiftCheckAsked.current = false;

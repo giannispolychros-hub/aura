@@ -9,7 +9,7 @@
 // repo, που καλεί την Anthropic με το κλειδί της μεταβλητής ANTHROPIC_API_KEY. Κανένας άλλος δρόμος προς την Anthropic.
 //
 // ΛΕΙΤΟΥΡΓΙΕΣ (από τον φάκελο του repo):
-//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), χωρίς κόστος
+//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), ετικέτες (V), χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
@@ -55,7 +55,7 @@ function writeOut(name, text) {
   fs.writeFileSync(path.join(OUT, name), t);
 }
 
-// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U) ══
+// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), ετικέτες (V) ══
 // A ολόκληρη η ροή (κουμπί → κάρτα → «Ναι» → πρόταση → ερώτηση → σαφήνεια → λέξη → τέλος, χωρίς 6€), B κλειστός
 // διακόπτης (τίποτα από το Στάδιο Α, καμία σήμανση), C πόρτα 2 και «πίσω», D DISTRESS (κάρτα ναι, πρόταση όχι),
 // E πρόταση κρίσης ως απάντηση (η ροή κλείνει, γραμμή 1018), F/F2 «Πριν φύγεις:» (T2 μία φορά, μετά το παλιό κλείσιμο·
@@ -233,7 +233,7 @@ async function runMock() {
     await browser.close();
   }
   // ── F: «Ευχαριστώ.» before the root (T2) → «Πριν φύγεις:» once; «Δεν το βρήκα ακόμα»; a 2nd T2 → the old closing ─
-  const LEAVING = 'Πριν φύγεις: πες το με μία φράση — τι είναι αυτό που σε απασχολεί;';
+  const LEAVING = APP.texts.askLeaving; // the app's own text (ADR «8 Οκτωβρίου (β)»: «Αν κάτι σου ξεκαθάρισε, …»)
   {
     const { browser, page, calls } = await session('?stageA=1', ['Τι είναι αυτό που σε κρατάει εκεί;', 'Και τι σε τραβάει αλλού;', 'Τι θα σήμαινε αυτό για σένα;', 'Εντάξει. Είμαι εδώ αν θέλεις να συνεχίσουμε.', 'Εντάξει. Είμαι εδώ αν θέλεις να συνεχίσουμε.']);
     // NB: a BARE «Εντάξει.» to the first «Ευχαριστώ.» would make the existing «mutual close» rule of decideTermination
@@ -347,7 +347,7 @@ async function runMock() {
         await say(page, [...OPEN, msg]);
         await page.waitForTimeout(600);
         ok(`S2 (${lvl}, switch ${sw}): crisis + closing in one message → the crisis line, and NO closing card, warning or «Πριν φύγεις:»`,
-          await page.getByText(line).count() >= 1 && !(await has(page, 'Δείξε μου')) && !(await has(page, 'Σταμάτα εδώ')) && await page.getByText('Πριν φύγεις:').count() === 0);
+          await page.getByText(line).count() >= 1 && !(await has(page, 'Δείξε μου')) && !(await has(page, 'Σταμάτα εδώ')) && await page.getByText(LEAVING).count() === 0);
         if (lvl === 'B' && sw === 'open') {
           ok('S2 (B, switch open): the root button is still there on that turn', await has(page, 'Νομίζω βρήκα τι με απασχολεί'));
           await click(page, 'Νομίζω βρήκα τι με απασχολεί');
@@ -395,7 +395,7 @@ async function runMock() {
     const LONG = 'Τώρα κατάλαβα: φοβάμαι ότι αν φύγω από την τράπεζα θα απογοητεύσω τον πατέρα μου, που πάντα ήθελε να έχω σιγουριά.';
     const SUPR = 'Είμαι εδώ μαζί σου. Είσαι ασφαλής αυτή τη στιγμή;';
     const card = async page => (await page.getByRole('button', { name: 'Ναι, αυτό είναι', exact: true }).count()) > 0;
-    const askShown = async page => (await page.getByText(ASK).count()) >= 1 && (await page.getByRole('button', { name: 'Δεν το βρήκα ακόμα, συνέχισε', exact: true }).count()) === 1;
+    const askShown = async page => (await page.getByText(ASK, { exact: true }).count()) >= 1 && (await page.getByRole('button', { name: 'Δεν το βρήκα ακόμα, συνέχισε', exact: true }).count()) === 1;
     const door2 = async (phrase) => {
       const s = await session('?stageA=1', ['Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;', RQ, 'Πες μου με δικά σου λόγια τι είναι αυτό που σε κρατάει.', 'Και τι θα σήμαινε αυτό για σένα;', SUPR]);
       await send(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, WHY);
@@ -438,7 +438,7 @@ async function runMock() {
     }
     {
       const s = await door3('Ναι, αυτό ακριβώς είναι!');
-      ok('T door 3 «Ναι, αυτό ακριβώς είναι!»: no card — door 1\'s question (after the normal reply, no extra call)', !(await card(s.page)) && await askShown(s.page) && s.calls.length === s.before + 1);
+      ok('T door 3 «Ναι, αυτό ακριβώς είναι!»: no card — door 1\'s question INSTEAD of a reply (no model call; ADR «8 Οκτωβρίου (β)»)', !(await card(s.page)) && await askShown(s.page) && s.calls.length === s.before);
       await s.browser.close();
     }
     {
@@ -459,7 +459,6 @@ async function runMock() {
       'Και σήμερα — το πρόβλημα είναι ότι τα χρήματα δεν φτάνουν, ή ότι νιώθεις ότι άξιζες περισσότερα;',
       'Το σήμα είναι ξεκάθαρο — κλείνουμε εδώ.\n\nΑν ένας φίλος σου έλεγε ακριβώς αυτό που είπες εσύ, τι θα του απαντούσας;',
       'Αυτό που θα έλεγες στον φίλο σου — το επιτρέπεις και στον εαυτό σου;'];
-    const LEAVING = 'Πριν φύγεις: πες το με μία φράση — τι είναι αυτό που σε απασχολεί;';
     const ASK = 'Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;';
     const BACK = 'Δεν το βρήκα ακόμα, συνέχισε';
     const btnN = (page, name) => page.getByRole('button', { name, exact: true });
@@ -473,8 +472,10 @@ async function runMock() {
       const s = await start('?stageA=1', JR);
       const before = s.calls.length;
       await send(s.page, 'Ευχαριστώ');
-      ok('U1 (John): «Ευχαριστώ» → NO model call that turn, «Πριν φύγεις:» with «Δεν το βρήκα ακόμα»',
+      ok('U1 (John): «Ευχαριστώ» → NO model call that turn, the closing\'s root question with «Δεν το βρήκα ακόμα»',
         s.calls.length === before && await s.page.getByText(LEAVING).count() === 1 && await btnN(s.page, BACK).count() === 1);
+      ok('U1: the new wording, exactly — «Αν κάτι σου ξεκαθάρισε, πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;»',
+        await s.page.getByText('Αν κάτι σου ξεκαθάρισε, πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;', { exact: true }).count() === 1);
       ok('U1 (John): the model\'s closing reply («Το σήμα είναι ξεκάθαρο…», the friend question) never appears',
         await s.page.getByText('Το σήμα είναι ξεκάθαρο').count() === 0 && await s.page.getByText('Αν ένας φίλος σου').count() === 0);
       await send(s.page, 'Ίσως η κενοδοξια των χρημάτων');
@@ -489,7 +490,7 @@ async function runMock() {
       const b2 = s.calls.length;
       await send(s.page, 'Ίσως η κενοδοξια των χρημάτων');
       ok('U2: after «Δεν το βρήκα ακόμα» the conversation goes on — the next message gets its normal reply, no question opens by itself',
-        s.calls.length === b2 + 1 && await s.page.getByText(ASK).count() === 0 && await s.page.getByText(LEAVING).count() === 0);
+        s.calls.length === b2 + 1 && await s.page.getByText(ASK, { exact: true }).count() === 0 && await s.page.getByText(LEAVING).count() === 0);
       const b3 = s.calls.length;
       await send(s.page, 'Ευχαριστώ, κλείνουμε εδώ.');
       ok('U2: the SECOND closing is unchanged — the model is called and the old closing card opens', s.calls.length === b3 + 1 && await btnN(s.page, 'Δείξε μου').count() === 1);
@@ -507,7 +508,17 @@ async function runMock() {
       const s = await start('?stageA=1', [JR[0], JR[1], 'Είμαι εδώ. Θέλεις να μου πεις λίγο περισσότερο;']);
       const before = s.calls.length;
       await send(s.page, 'Ευχαριστώ, κλείνουμε. Το πένθος για τη μητέρα μου με έχει παραλύσει.'); await s.page.waitForTimeout(500);
-      ok('U3 (DISTRESS + closing): the model IS called (no door before it) — after its reply, what happens today', s.calls.length === before + 1);
+      ok('U3 (DISTRESS + closing, switch open): the model IS called, NO door, the old closing card — as with the switch closed (ADR «8 Οκτωβρίου (β)»)',
+        s.calls.length === before + 1 && await s.page.getByText(LEAVING).count() === 0 && await btnN(s.page, 'Δείξε μου').count() === 1);
+      if (await btnN(s.page, 'Έχω κι άλλο να πω').count()) { await btnN(s.page, 'Έχω κι άλλο να πω').click(); await s.page.waitForTimeout(500); }
+      ok('U3 (DISTRESS + closing, switch open): after «Έχω κι άλλο να πω» the root button is available', await btnN(s.page, 'Νομίζω βρήκα τι με απασχολεί').count() === 1);
+      await s.browser.close();
+    }
+    {
+      const s = await start('', [JR[0], JR[1], 'Είμαι εδώ. Θέλεις να μου πεις λίγο περισσότερο;']);
+      const before = s.calls.length;
+      await send(s.page, 'Ευχαριστώ, κλείνουμε. Το πένθος για τη μητέρα μου με έχει παραλύσει.'); await s.page.waitForTimeout(500);
+      ok('U3 (DISTRESS + closing, switch closed): the reference — model called, old closing card', s.calls.length === before + 1 && await btnN(s.page, 'Δείξε μου').count() === 1);
       await s.browser.close();
     }
     {
@@ -534,7 +545,7 @@ async function runMock() {
     for (const vp of [{ width: 390, height: 700 }, { width: 390, height: 430 }]) {
       const s = await start('?stageA=1', [JR[0], JR[1], 'Τι σε κρατάει εκεί;', JR[3]], vp);
       await send(s.page, 'Ευχαριστώ'); await s.page.waitForTimeout(900);
-      ok(`U5 (phone ${vp.width}×${vp.height}): «Πριν φύγεις:» and «Δεν το βρήκα ακόμα» fully visible above the input`, await visible(s.page, 'Πριν φύγεις:'));
+      ok(`U5 (phone ${vp.width}×${vp.height}): the closing's root question and «Δεν το βρήκα ακόμα» fully visible above the input`, await visible(s.page, 'Αν κάτι σου ξεκαθάρισε'));
       await btnN(s.page, BACK).click(); await s.page.waitForTimeout(500);
       await send(s.page, 'Ίσως η κενοδοξια των χρημάτων');
       await btnN(s.page, 'Νομίζω βρήκα τι με απασχολεί').click(); await s.page.waitForTimeout(900);
@@ -545,6 +556,60 @@ async function runMock() {
       ok(`U5 (phone ${vp.width}×${vp.height}): after «Διόρθωσε» the correction question fully visible above the input`,
         await visible(s.page, 'Γράψε τη ρίζα όπως θα την έλεγες εσύ'));
       await s.browser.close();
+    }
+  }  // ── V: internal labels never reach the user (ADR «8 Οκτωβρίου (β)», every user, switch open or closed). Phone test 8/10,
+  // switch closed: «[MASTER PRIORITY RULE — STAGE: GRACEFUL EXIT]\n\nΚαλή συνέχεια.» was shown as the reply.
+  {
+    const F1 = 'Δεν ξέρω αν πρέπει να φύγω από την δουλειά μου', W = 'Νιώθω ότι δεν πέτυχα όσα άξιζα';
+    const LEAK = '[MASTER PRIORITY RULE — STAGE: GRACEFUL EXIT]\n\nΚαλή συνέχεια.';
+    const WQ = 'ΗΡΘΕΣ ΜΕ: α\nΒΡΗΚΕΣ: β\nΦΕΥΓΕΙΣ ΜΕ: γ\n\nΠριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.';
+    const bubbles = async page => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+    const open = async (query, replies) => { const s = await session(query, replies); await s.page.setViewportSize({ width: 390, height: 700 });
+      await send(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, W); return s; };
+    {
+      // switch closed, the phone test itself: the label goes, «Καλή συνέχεια.» stays — on screen and in what the model sees next
+      const s = await open('', ['Τι εννοείς με το «άξιζα»;', 'Τι σε κρατάει εκεί ακόμα;', LEAK, WQ, 'Η σκέψη σου παραμένει δική σου.']);
+      await send(s.page, 'Περισσότερα χρήματα. Είμαι εκπαιδευτικός.');
+      await send(s.page, 'Ευχαριστώ');
+      const b = await bubbles(s.page);
+      ok('V1 (switch closed, phone size): the reply shows «Καλή συνέχεια.» only — no «[MASTER PRIORITY RULE …]»',
+        b[b.length - 1] === 'Καλή συνέχεια.' && await s.page.getByText('MASTER PRIORITY').count() === 0);
+      // «Δείξε μου» → the closing's first request carries the whole history: the clean reply, no label
+      await s.page.getByRole('button', { name: 'Δείξε μου', exact: true }).click(); await s.page.waitForTimeout(1500);
+      const next = s.calls[s.calls.length - 1];
+      ok('V1: the history keeps the clean reply — the next request carries «Καλή συνέχεια.» and no label',
+        next.messages.some(m => m.role === 'assistant' && m.content === 'Καλή συνέχεια.') && !JSON.stringify(next.messages).includes('MASTER PRIORITY'));
+      if (await s.page.locator('textarea.textarea').count()) { await send(s.page, 'αμοιβή'); await s.page.waitForTimeout(1500); }
+      const tel = await s.page.evaluate(() => (window.__auraTelemetry || []).filter(r => r.ev === 'session_completed').pop() || null);
+      ok('V1: session_completed counts it (labelLeaks ≥ 1, a number only)', !!tel && Number.isInteger(tel.labelLeaks) && tel.labelLeaks >= 1);
+      await s.browser.close();
+    }
+    for (const q of ['', '?stageA=1']) {
+      const sw = q ? 'open' : 'closed';
+      {
+        const s = await open(q, ['Τι εννοείς με το «άξιζα»;', '[MASTER PRIORITY RULE — STAGE: GRACEFUL EXIT]', 'Τι σε κρατάει;']);
+        await send(s.page, 'Περισσότερα χρήματα.');
+        const b = await bubbles(s.page);
+        // Empty after cleaning: no empty bubble — the EXISTING rule for a reply with no words (bare emoji fix) adds its
+        // neutral question, as it would for any empty reply.
+        ok(`V2 (switch ${sw}): a reply that is only a label → no empty bubble, no label (the existing empty-reply rule answers)`,
+          b.every(t => t.length > 0) && b[b.length - 1] === 'Τι σκέφτεσαι τώρα;' && await s.page.getByText('MASTER PRIORITY').count() === 0);
+        await s.browser.close();
+      }
+      {
+        const s = await open(q, ['Τι εννοείς με το «άξιζα»;', 'Είπες [σε παρένθεση] «περισσότερα χρήματα» — [1] τι σημαίνει αυτό για σένα;', 'Και;']);
+        await send(s.page, 'Περισσότερα χρήματα.');
+        const b = await bubbles(s.page);
+        ok(`V3 (switch ${sw}): ordinary text in brackets stays exactly as written`, b[b.length - 1] === 'Είπες [σε παρένθεση] «περισσότερα χρήματα» — [1] τι σημαίνει αυτό για σένα;');
+        await s.browser.close();
+      }
+      {
+        const s = await open(q, ['Τι εννοείς με το «άξιζα»;', '[FREE PART: ENDS AT ROOT]\n[CODE-VERIFIED KNOWLEDGE STATE (observation only)]\nΤι σε κρατάει; [[EXIT:no]] Πες μου.', 'Και;']);
+        await send(s.page, 'Περισσότερα χρήματα.');
+        const b = await bubbles(s.page);
+        ok(`V4 (switch ${sw}): other labels and a hidden tag in the middle — gone, the words kept`, b[b.length - 1] === 'Τι σε κρατάει; Πες μου.');
+        await s.browser.close();
+      }
     }
   }
 }
@@ -699,10 +764,10 @@ async function runScenario(scen, model, budget) {
       if (asked && !stop) { lastUser = 'Ναι'; await record('Ναι', () => type('Ναι')); }
       else if (!stop) { skipDoor2 = true; sess.notes.push('η AURA δεν έκανε την ερώτηση ετοιμότητας σε ' + st.fillers.length + ' γύρους — η πόρτα 2 δεν δοκιμάστηκε'); }
     } else if (st.leaving) {
-      // ADR «6 Οκτωβρίου (λ)»: after an explicit closing before the root the app asks «Πριν φύγεις:» itself.
-      if (s.leaving) { sess.notes.push('μετά το «' + lastUser + '» εμφανίστηκε το «Πριν φύγεις:» (πόρτα 1 αντί για το παλιό κλείσιμο)'); }
-      else if (s.button) { sess.notes.push('ΔΕΝ εμφανίστηκε το «Πριν φύγεις:» — πατήθηκε το κουμπί για να συνεχίσει η δοκιμή'); await record('[πάτησε «' + T.button + '»]', () => btn(T.button).click()); }
-      else { sess.notes.push('ΔΕΝ εμφανίστηκε το «Πριν φύγεις:» ούτε το κουμπί — η συνεδρία σταματά εδώ'); break; }
+      // ADR «6 Οκτωβρίου (λ)» / «8 Οκτωβρίου (β)»: after an explicit closing before the root the app asks the root question itself.
+      if (s.leaving) { sess.notes.push('μετά το «' + lastUser + '» εμφανίστηκε η ερώτηση της ρίζας του κλεισίματος (πόρτα 1 αντί για το παλιό κλείσιμο)'); }
+      else if (s.button) { sess.notes.push('ΔΕΝ εμφανίστηκε η ερώτηση της ρίζας του κλεισίματος — πατήθηκε το κουμπί για να συνεχίσει η δοκιμή'); await record('[πάτησε «' + T.button + '»]', () => btn(T.button).click()); }
+      else { sess.notes.push('ΔΕΝ εμφανίστηκε η ερώτηση της ρίζας του κλεισίματος ούτε το κουμπί — η συνεδρία σταματά εδώ'); break; }
     } else if (st.press) {
       if (!s.button) { sess.notes.push('το κουμπί «' + T.button + '» δεν φαινόταν όταν το χρειάστηκε'); break; }
       await record('[πάτησε «' + T.button + '»]', () => btn(T.button).click());

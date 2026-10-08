@@ -111,7 +111,8 @@ assert('A: the gate after the reply is still there (second closing → old closi
 assert('A: the old closing itself is unchanged (decideTermination, the T1/T2 detectors byte for byte)',
   sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && sha(extractBlock('function isExplicitClosure(')) === '09da70474755ef40' &&
   sha(extractBlock('function declaresClosing(')) === '45062068044c40b1' && sha(extractBlock('function matchesClosingWord(')) === 'c3d044cc974bb7ac');
-assert('A: the gate function itself is unchanged', sha(extractBlock('function stageALeavingDoorOpens(')) === '02f8691f1077a5b2' &&
+assert('A: the gate function itself is unchanged', sha(extractBlock('function stageALeavingDoorOpens(')) === 'c14e923cd0166b66' && // UPDATED (8/10): + !detectSafetySignal(u), ADR «8 Οκτωβρίου (β)», 4
+  
   /\(isExplicitClosure\(u\) \|\| declaresClosing\(u\)\);/.test(extractBlock('function stageALeavingDoorOpens(') || ''));
 
 // ── C: the root question is scrolled into view when it opens ─────────────────

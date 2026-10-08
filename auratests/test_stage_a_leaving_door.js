@@ -70,7 +70,8 @@ const T2 = u => !!(F.isExplicitClosure(u) || F.declaresClosing(u));
 const base = (patch) => Object.assign({ active: true, decision: 'confirm', lastUserText: 'Ευχαριστώ.', used: false, rootPhase: null,
   armed: false, rootConfirmed: false, closingStarted: false, riskKind: 0, safetyMode: false }, patch || {});
 
-const LEAVING = 'Πριν φύγεις: πες το με μία φράση — τι είναι αυτό που σε απασχολεί;';
+// UPDATED (8/10, ADR «8 Οκτωβρίου (β)»): «Ευχαριστώ» meant «I found the root» in a real test, not «I am leaving».
+const LEAVING = 'Αν κάτι σου ξεκαθάρισε, πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;';
 const GEN = CODE.slice(CODE.indexOf('const generateResponse = useCallback('), CODE.indexOf('const handleSubmit = useCallback('));
 const SUB = CODE.slice(CODE.indexOf('const handleSubmit = useCallback('), CODE.indexOf('const handleStageAPress = useCallback('));
 const gateAt = GEN.indexOf('stageALeavingDoorOpens(');
@@ -152,8 +153,10 @@ assert('C: «Δεν το βρήκα ακόμα» is the existing button (no new 
   assert('D: tier A earlier in the session → still no door later', GATE(base({ riskKind: 1 })) === false);
   assert('D: safety mode on → no door', GATE(base({ safetyMode: true })) === false);
   const kB = F.mergeRiskKind(0, F.detectSafetySignal(msgB), F.classifyCrisisTier(msgB));
-  assert('D: tier B / DISTRESS → the door is allowed (card yes, offer no — as already decided)',
-    kB === 2 && GATE(base({ lastUserText: msgB, riskKind: kB })) === true && GATE(base({ riskKind: 3 })) === true);
+  // UPDATED (8/10, ADR «8 Οκτωβρίου (β)», 4): a closing message that ITSELF carries crisis B / DISTRESS opens no door (the old
+  // closing, as with the switch closed); a signal EARLIER in the session still allows it, as decided in (λ).
+  assert('D: the closing message itself carries crisis B → no door; a B / DISTRESS signal earlier in the session → the door is allowed',
+    kB === 2 && GATE(base({ lastUserText: msgB, riskKind: kB })) === false && GATE(base({ riskKind: 2 })) === true && GATE(base({ riskKind: 3 })) === true);
   assert('D: the risk latch is updated at the very start of handleSubmit, before the reply and the gate',
     SUB.indexOf('riskSignalKind.current = mergeRiskKind(') > 0 && SUB.indexOf('riskSignalKind.current = mergeRiskKind(') < SUB.indexOf('const safetySignal = detectSafetySignal(userText);'));
   assert('D: wiring passes the latch and safetyMode to the gate', /riskKind: riskSignalKind\.current/.test(GEN.slice(gateAt, gateAt + 900)) && /safetyMode,?\s/.test(GEN.slice(gateAt, gateAt + 900)));
