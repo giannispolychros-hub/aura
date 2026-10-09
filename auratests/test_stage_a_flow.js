@@ -160,7 +160,8 @@ assert('END: «Νέα συνεδρία» is always available in Stage A (no payw
 
 // state + dispatch
 assert('STATE: one ref holds the flow, one state re-renders it', /const stageARef\s*= useRef\(initialStageAState\(\)\);/.test(CODE) && /const \[stageAPhase, setStageAPhase\] = useState\(null\);/.test(CODE));
-assert('STATE: every change goes through stageAStep', /const stageADispatch = useCallback\(\(ev\) => \{\s*stageARef\.current = stageAStep\(stageARef\.current, ev\);/.test(CODE));
+// UPDATED (8/10/2026, ADR «8 Οκτωβρίου (δ)»): the state before the step is kept (`_prev`) so the one-tap question can be recorded the moment it happens.
+assert('STATE: every change goes through stageAStep', /const stageADispatch = useCallback\(\(ev\) => \{\s*const _prev = stageARef\.current;\s*stageARef\.current = stageAStep\(_prev, ev\);/.test(CODE));
 assert('RESET: the flow, the armed door and the phase reset with the session',
   /stageARef\.current = initialStageAState\(\); stageARootArmed\.current = false; setStageAPhase\(null\);/.test(CODE));
 
@@ -176,7 +177,8 @@ assert('SUBMIT: only with the switch open', /if \(stageAActive\.current && \(_sa
 assert('SUBMIT: crisis in the typed text → the flow cancels and the message continues on the normal path',
   /if \(!stageACaptureAllowed\(userText\)\) \{\s*stageARootArmed\.current = false;\s*stageADispatch\(\{ type: "cancel" \}\);\s*\}/.test(HS));
 assert('SUBMIT: door 1 and correction text must pass the «Τι ήξερες» substance rule; otherwise retry, no capture, no model call',
-  /if \(\(_saPhase === "ask" \|\| _saPhase === "correct"\) && !rootTextHasSubstance\(userText\)\) \{\s*stageADispatch\(\{ type: "tooShort" \}\);\s*return;\s*\}/.test(HS) &&
+  // UPDATED (8/10/2026, ADR «8 Οκτωβρίου (δ)», 5): the user's text is shown (not sent) before «tooShort» — one line, nothing else.
+  /if \(\(_saPhase === "ask" \|\| _saPhase === "correct"\) && !rootTextHasSubstance\(userText\)\) \{\s*addUiBubble\(userText, messages\.length\);[^\n]*\n\s*stageADispatch\(\{ type: "tooShort" \}\);\s*return;\s*\}/.test(HS) &&
   HS.indexOf('!stageACaptureAllowed(userText)') < HS.indexOf('rootTextHasSubstance(userText)'));
 assert('UI: the retry line shows in the question card and in the correction card', (R.match(/stageAView\.retry && /g) || []).length === 2);
 assert('SCROLL (6/10 phone test): after «Ναι» the end message is scrolled to its START (the root line), not the bottom',

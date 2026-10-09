@@ -184,7 +184,11 @@ const GR_AT = raw.indexOf('const generateResponse = useCallback');
 assert("generateResponse can be located, so the slice below is not vacuous", GR_AT > 0);
 const GR = raw.slice(GR_AT, raw.indexOf('\n  }, [', GR_AT));
 const FW_A = raw.lastIndexOf('const prompt = [getLensPrompt(inferred)');
-const FW = raw.slice(raw.lastIndexOf('if (firstWhyPending)', FW_A), raw.indexOf('const nextMsgs  = [...messages,', FW_A));
+// UPDATED (8/10/2026, ADR «8 Οκτωβρίου (δ)»): the slice ends where the First-WHY branch ends. It used to run to `nextMsgs`, which —
+// since the Stage A doors before the model were added between the two — also covered those doors. Door 2's «Ναι» calls
+// detectsCoreReadinessAsked there; that is not First-WHY wiring and must not count as the step being un-bypassed.
+const FW = raw.slice(raw.lastIndexOf('if (firstWhyPending)', FW_A), Math.min(raw.indexOf('const nextMsgs  = [...messages,', FW_A),
+  raw.indexOf('// STAGE A — «Πριν φύγεις:» BEFORE the model', FW_A) > 0 ? raw.indexOf('// STAGE A — «Πριν φύγεις:» BEFORE the model', FW_A) : Infinity));
 assert("both bodies were found and are non-trivial", GR.length > 10000 && FW.length > 500);
 assert("the First-WHY branch still calls the model directly, bypassing generateResponse",
   /callAura\(initMsgs, prompt\)/.test(FW) && !/generateResponse\(/.test(FW));

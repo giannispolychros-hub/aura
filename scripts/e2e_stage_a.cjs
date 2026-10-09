@@ -9,11 +9,11 @@
 // repo, που καλεί την Anthropic με το κλειδί της μεταβλητής ANTHROPIC_API_KEY. Κανένας άλλος δρόμος προς την Anthropic.
 //
 // ΛΕΙΤΟΥΡΓΙΕΣ (από τον φάκελο του repo):
-//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), ετικέτες (V), κρυφά σήματα και «Καλή συνέχεια.» (W), χωρίς κόστος
+//   node scripts/e2e_stage_a.cjs                      ψεύτικο μοντέλο: ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), ετικέτες (V), κρυφά σήματα και «Καλή συνέχεια.» (W), αποφάσεις 8/10 (δ) (X), χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
-// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W (μόνο η W)
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W | --only X (μόνο η W ή η X)
 // Αρχεία εξόδου (αναφορά, στιγμιότυπα) ΜΟΝΟ στον προσωρινό φάκελο. Το κλειδί δεν γράφεται ποτέ σε έξοδο.
 'use strict';
 const fs = require('fs');
@@ -55,7 +55,7 @@ function writeOut(name, text) {
   fs.writeFileSync(path.join(OUT, name), t);
 }
 
-// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), ετικέτες (V), κρυφά σήματα (W) ══
+// ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), ετικέτες (V), κρυφά σήματα (W), αποφάσεις του ADR «8 Οκτωβρίου (δ)» (X) ══
 // A ολόκληρη η ροή (κουμπί → κάρτα → «Ναι» → πρόταση → ερώτηση → σαφήνεια → λέξη → τέλος, χωρίς 6€), B κλειστός
 // διακόπτης (τίποτα από το Στάδιο Α, καμία σήμανση), C πόρτα 2 και «πίσω», D DISTRESS (κάρτα ναι, πρόταση όχι),
 // E πρόταση κρίσης ως απάντηση (η ροή κλείνει, γραμμή 1018), F/F2 «Πριν φύγεις:» (T2 μία φορά, μετά το παλιό κλείσιμο·
@@ -181,13 +181,16 @@ async function runMock() {
     const { browser, page, calls } = await session('?stageA=1', [
       'Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;',
       'Νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;',
-      'Πες μου με δικά σου λόγια τι είναι αυτό που σε κρατάει.',
+      // UPDATED (8/10, ADR «8 Οκτωβρίου (δ)», 1): the «Ναι» no longer calls the model (door 2 shows the root question at once), so the
+      // third reply is the one «back» gets; the old third reply («Πες μου με δικά σου λόγια…») used to answer the «Ναι».
       'Και τι θα σήμαινε αυτό για σένα;',
     ]);
     await send(page, 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.');
     if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.');
     await send(page, 'Η σταθερότητα, αλλά νιώθω ότι κάτι άλλο παίζει.');
+    const beforeYes = calls.length;
     await send(page, 'Ναι');
+    ok('C: door 2 — the «ναι» to the readiness question makes NO model call and shows the root question at once', calls.length === beforeYes && await page.getByText('Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;', { exact: true }).count() >= 1);
     const before = calls.length;
     await send(page, 'Ότι δεν θέλω να παραδεχτώ ότι διάλεξα λάθος σπουδές.');
     ok('C: door 2 — the message after the «ναι» opens the card and is NOT sent', calls.length === before && await page.getByText('«Ότι δεν θέλω να παραδεχτώ ότι διάλεξα λάθος σπουδές.»').count() === 1);
@@ -613,6 +616,7 @@ async function runMock() {
     }
   }
   await runMockW();
+  await runMockX();
 }
 
 // ── W: the hidden tags still work after the label cleaning (founder's check of 6408fbf, ADR «8 Οκτωβρίου (γ)»), switch
@@ -683,16 +687,295 @@ async function runMockW() {
       await s.browser.close();
     }
     {
-      // W5: the model answers a closing with an emoji only → the existing rule adds «Καλή συνέχεια.». Switch open: the first
-      // «Ευχαριστώ» opens the door before the model, so the closing that reaches the model is the second one.
+      // W5: the model answers a closing with an emoji only. UPDATED (8/10, ADR «8 Οκτωβρίου (δ)», 2): when the closing card opens on
+      // that same reply no farewell is added (a goodbye, then the card, then the real closing = two goodbyes) — the reply stays «🙂».
+      // Switch open: the first «Ευχαριστώ» opens the door before the model, so the closing that reaches the model is the second one.
       const s = await open(q, ['Τι εννοείς με το «άξιζα»;', '🙂', WQ]);
       if (q) { await send(s.page, 'Ευχαριστώ'); await s.page.getByRole('button', { name: 'Δεν το βρήκα ακόμα, συνέχισε', exact: true }).click(); await s.page.waitForTimeout(500); }
       await send(s.page, q ? 'Ευχαριστώ, κλείνουμε εδώ.' : 'Ευχαριστώ');
       const b = await bubbles(s.page);
-      ok(`W5 (switch ${sw}): an emoji-only reply to a closing → «🙂 Καλή συνέχεια.» (no «Καληνύχτα»)`,
-        b[b.length - 1] === '🙂 Καλή συνέχεια.' && await s.page.getByText('Καληνύχτα').count() === 0);
+      ok(`W5 (switch ${sw}): an emoji-only reply to a closing, the card opens on it → just «🙂», no farewell added (no «Καληνύχτα», no «Καλή συνέχεια.»)`,
+        b[b.length - 1] === '🙂' && await card(s.page) && await s.page.getByText('Καληνύχτα').count() === 0 && await s.page.getByText('Καλή συνέχεια').count() === 0);
       await s.browser.close();
     }
+  }
+}
+
+// ── X: ADR «8 Οκτωβρίου (δ)» — the decisions after the red-team of the last 15 pushes ─────────────────────────
+// X1 door 2: «Ναι» to the readiness question → no model call, the root question at once, the «Ναι» shown (not sent)
+// X2 a crisis / DISTRESS sentence in place of the «Ναι» → the safety path, no root question
+// X3 GRACEFUL EXIT before the root (switch open): not sent for a bare «Ναι»; sent when the old closing really opens (T1 with
+//    4+ messages, a second exit); switch closed: as today
+// X4 an emoji-only reply: no farewell when the closing card opens on it; the farewell stays when no card opens
+// X5 the user's message is shown (not sent) on every path where it goes nowhere: the first closing, door 1/2/3 and the
+//    correction without substance — in the transcript, in order, and in no request
+// X6 the one-tap question is recorded (asked / choice / none) in the device log and in the ?debug=1 export file
+async function runMockX() {
+  const F1 = 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.', WHY = 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.';
+  const RQ = 'Νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+  const SUP = 'Είμαι εδώ μαζί σου. Είσαι ασφαλής αυτή τη στιγμή;';
+  const T = APP.texts;
+  const ASK = T.ask, BACK = T.back, LEAVING = T.askLeaving;
+  const userBubbles = async page => (await page.locator('.turn-user').allInnerTexts()).map(t => t.replace(/\s+/g, ' ').trim());
+  const turnTexts = async page => (await page.locator('.turn').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').replace(/\s+/g, ' ').trim());
+  const sentUser = calls => calls.flatMap(c => (c.messages || []).filter(m => m.role === 'user').map(m => String(m.content)));
+  const graceful = c => systemText(c).includes('STAGE: GRACEFUL EXIT (code-verified');
+  const stageName = c => (systemText(c).match(/\[MASTER PRIORITY RULE — STAGE: ([A-Z ]+)/) || [])[1] || '';
+  const card = async page => (await page.getByRole('button', { name: 'Δείξε μου', exact: true }).count()) === 1;
+  const askShown = async page => (await page.getByText(ASK, { exact: true }).count()) >= 1 && (await page.getByRole('button', { name: BACK, exact: true }).count()) === 1;
+  // a missing button is a no-op click (the assertion that needed it then fails), never a crash — so the same section runs on old code too
+  const btn = (page, name) => { const loc = page.getByRole('button', { name, exact: true }); const go = async () => { if (await loc.count()) await loc.first().click({ timeout: 4000 }); };
+    return { count: () => loc.count(), click: go, first: () => ({ click: go }) }; };
+  const start = async (query, replies) => { const s = await session(query, replies); await s.page.setViewportSize({ width: 390, height: 700 });
+    await send(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, WHY); return s; };
+
+  // ── X1: door 2 ────────────────────────────────────────────────────────────
+  {
+    const s = await start('?stageA=1', ['Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;', RQ, 'Και τι σε τραβάει αλλού;', 'Η σκέψη σου παραμένει δική σου.']);
+    await send(s.page, 'Η σταθερότητα, αλλά νιώθω ότι κάτι άλλο παίζει.');
+    const n = s.calls.length;
+    ok('X1: the readiness question is on screen (2 model calls so far)', n === 2 && await s.page.getByText(RQ).count() === 1);
+    await send(s.page, 'Ναι');
+    ok('X1: «Ναι» → NO model call', s.calls.length === n);
+    ok('X1: door 1\'s question appears at once, with «Δεν το βρήκα ακόμα»', await askShown(s.page));
+    ok('X1: the user\'s «Ναι» stays on the screen as their bubble', (await userBubbles(s.page)).slice(-1)[0] === 'Ναι');
+    { const t = await turnTexts(s.page); const iq = t.findIndex(x => x.includes('Νιώθεις ότι έχει αρχίσει')); const iy = t.lastIndexOf('Ναι');
+      ok('X1: the bubble comes right after the question it answers', iq >= 0 && iy === iq + 1); }
+    await s.page.screenshot({ path: path.join(OUT, 'X1-door2-yes.png'), fullPage: false });
+    await send(s.page, 'Δεν ξέρω');
+    ok('X1: a short answer → «Γράψ\' το λίγο πιο ολοκληρωμένα», no card, no model call, the answer shown', await s.page.getByText(T.retry).count() === 1 &&
+      await btn(s.page, 'Ναι, αυτό είναι').count() === 0 && s.calls.length === n && (await userBubbles(s.page)).slice(-1)[0] === 'Δεν ξέρω');
+    await send(s.page, 'Φοβάμαι την απόρριψη');
+    ok('X1: an answer with substance → the card with it, no model call', await s.page.getByText('«Φοβάμαι την απόρριψη»').count() === 1 && await btn(s.page, 'Ναι, αυτό είναι').count() === 1 && s.calls.length === n);
+    await btn(s.page, BACK).first().click(); await s.page.waitForTimeout(1500);
+    ok('X1: «Δεν το βρήκα ακόμα» on the door-2 card → the model answers the captured phrase (one call)', s.calls.length === n + 1);
+    const last = s.calls[s.calls.length - 1];
+    const lastUser = [...last.messages].reverse().find(m => m.role === 'user');
+    ok('X1: that request ends with the phrase, carries the readiness question, and NEVER the «Ναι» or the short answer',
+      lastUser && lastUser.content === 'Φοβάμαι την απόρριψη' && last.messages.some(m => m.role === 'assistant' && String(m.content).includes('Νιώθεις ότι έχει αρχίσει')) &&
+      !sentUser(s.calls).includes('Ναι') && !sentUser(s.calls).includes('Δεν ξέρω'));
+    await s.browser.close();
+  }
+  // door 2 «Ναι» → «Δεν το βρήκα ακόμα» at the QUESTION (not the card): back to the conversation, nothing sent, the latch is spent
+  {
+    const s = await start('?stageA=1', ['Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;', RQ, 'Και τι σε τραβάει αλλού;']);
+    await send(s.page, 'Η σταθερότητα, αλλά νιώθω ότι κάτι άλλο παίζει.');
+    const n = s.calls.length;
+    await send(s.page, 'Ναι'); await btn(s.page, BACK).click(); await s.page.waitForTimeout(500);
+    ok('X1b: «Δεν το βρήκα ακόμα» at the question → the conversation goes on, no model call, the root button is back', s.calls.length === n && !(await askShown(s.page)) && await btn(s.page, 'Νομίζω βρήκα τι με απασχολεί').count() === 1);
+    // the readiness latch is spent (it flipped exactly as it would have after a reply): another affirmative, with the question still the
+    // last thing on screen, is an ordinary message now — the model answers it, the root question does not open a second time
+    await send(s.page, 'Νιώθω ότι ναι.');
+    ok('X1b: a second affirmative after «Δεν το βρήκα ακόμα» is an ordinary message (the model answers, no second root question)', s.calls.length === n + 1 && !(await askShown(s.page)));
+    await send(s.page, 'Πιο πολύ φοβάμαι ότι θα μετανιώσω.');
+    ok('X1b: only what was really said to the model was sent; the first «Ναι» is on screen but in no request',
+      s.calls.length === n + 2 && !sentUser(s.calls).includes('Ναι') && sentUser(s.calls).includes('Νιώθω ότι ναι.') && (await userBubbles(s.page)).includes('Ναι'));
+    await s.browser.close();
+  }
+  // the readiness question was asked EARLIER and is not the last thing on screen: a «Ναι» is not door 2 — the model answers it, as before
+  {
+    const s = await start('?stageA=1', ['Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;', RQ, 'Τι σημαίνει για σένα η σταθερότητα;', 'Και τι θα σήμαινε αυτό;']);
+    await send(s.page, 'Η σταθερότητα, αλλά νιώθω ότι κάτι άλλο παίζει.');
+    await send(s.page, 'Δεν ξέρω ακόμα.');
+    const n = s.calls.length;
+    await send(s.page, 'Ναι');
+    ok('X1d: the readiness question was asked two replies ago → a «Ναι» now is NOT door 2: the model is called as before, no root question', n === 3 && s.calls.length === n + 1 && !(await askShown(s.page)));
+    await s.browser.close();
+  }
+  // a «Ναι» to anything else is NOT door 2 (the readiness question was not the last thing asked) → the model answers, as before
+  {
+    const s = await start('?stageA=1', ['Είναι η σταθερότητα αυτό που σε κρατάει;', 'Και τι θα σήμαινε αυτό για σένα;']);
+    const n = s.calls.length;
+    await send(s.page, 'Ναι');
+    ok('X1c: a «Ναι» to an ordinary question → the model is called as before, no root question', s.calls.length === n + 1 && !(await askShown(s.page)));
+    await s.browser.close();
+  }
+
+  // ── X2: safety first — a crisis / DISTRESS sentence in place of the «Ναι» ───────
+  for (const [name, text, expect1018] of [['crisis A', 'Δεν θέλω να ζω άλλο.', true], ['DISTRESS', 'Το πένθος για τη μητέρα μου με έχει παραλύσει.', false]]) {
+    const s = await start('?stageA=1', ['Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;', RQ, SUP, 'Πες μου τι γίνεται τώρα.']);
+    await send(s.page, 'Η σταθερότητα, αλλά νιώθω ότι κάτι άλλο παίζει.');
+    const n = s.calls.length;
+    await send(s.page, text); await s.page.waitForTimeout(500);
+    ok(`X2 (${name}): in place of the «Ναι» → the safety path: the model is called, no root question, no card`, s.calls.length === n + 1 && !(await askShown(s.page)) && await btn(s.page, 'Ναι, αυτό είναι').count() === 0);
+    ok(`X2 (${name}): the message is on screen once — as a normal message, not as a bubble twice`, (await userBubbles(s.page)).filter(t => t === text).length === 1 && sentUser(s.calls).filter(t => t === text).length === 1);
+    if (expect1018) ok('X2 (crisis A): the crisis line is shown', await s.page.getByText(/1018/).count() >= 1);
+    await s.browser.close();
+  }
+
+  // ── X3: GRACEFUL EXIT before the root ────────────────────────────────────
+  {
+    const s = await start('?stageA=1', ['Είναι η σταθερότητα αυτό που σε κρατάει;', 'Και τι θα σήμαινε αυτό για σένα;']);
+    await send(s.page, 'Ναι');
+    ok('X3a (switch open): a bare «Ναι» before the root (3 user messages) → the request carries NO GRACEFUL EXIT, the normal-loop stage instead',
+      s.calls.length === 2 && !graceful(s.calls[1]) && stageName(s.calls[1]).startsWith('PERSPECTIVE SWAP') && systemText(s.calls[1]).includes('[FREE PART: ENDS AT ROOT]'));
+    await s.browser.close();
+  }
+  {
+    const s = await start('', ['Είναι η σταθερότητα αυτό που σε κρατάει;', 'Και τι θα σήμαινε αυτό για σένα;']);
+    await send(s.page, 'Ναι');
+    ok('X3d (switch CLOSED): the same «Ναι» → GRACEFUL EXIT is sent exactly as today', s.calls.length === 2 && graceful(s.calls[1]));
+    await s.browser.close();
+  }
+  {
+    const s = await start('?stageA=1', ['Τι σε κρατάει εκεί;', 'Και τι σε τραβάει αλλού;', 'Είναι η σταθερότητα αυτό που σε κρατάει;', 'Εντάξει.']);
+    await send(s.page, 'Η σταθερότητα κυρίως.'); await send(s.page, 'Μάλλον φοβάμαι την αλλαγή.');
+    await send(s.page, 'Ναι');
+    ok('X3b (switch open): a «Ναι» with 4+ user messages opens the old closing (T1) → GRACEFUL EXIT is sent, as today', s.calls.length === 4 && graceful(s.calls[3]) && await card(s.page));
+    await s.browser.close();
+  }
+  {
+    const s = await start('?stageA=1', ['Τι σε κρατάει εκεί;', 'Και τι σε τραβάει αλλού;', 'Τι θα σήμαινε αυτό για σένα;', 'Εντάξει. Είμαι εδώ αν θέλεις να συνεχίσουμε.']);
+    await send(s.page, 'Η σταθερότητα κυρίως.'); await send(s.page, 'Μάλλον φοβάμαι την αλλαγή.');
+    await send(s.page, 'Ευχαριστώ.');
+    ok('X3c: the first «Ευχαριστώ.» opens the door before the model (no call, bubble shown)', s.calls.length === 3 && await s.page.getByText(LEAVING).count() === 1 && (await userBubbles(s.page)).slice(-1)[0] === 'Ευχαριστώ.');
+    await btn(s.page, BACK).click(); await s.page.waitForTimeout(400);
+    await send(s.page, 'Ευχαριστώ, κλείνουμε εδώ.');
+    ok('X3c (switch open): a SECOND exit → the old closing opens → GRACEFUL EXIT is sent, as today, and the card opens', s.calls.length === 4 && graceful(s.calls[3]) && await card(s.page));
+    await s.browser.close();
+  }
+
+  // ── X4: no farewell when the closing card opens on an emoji-only reply; the farewell stays when it does not ──────
+  {
+    // closed switch; «Ευχαριστώ» → the card opens → «Έχω κι άλλο να πω» (decline → a 3-turn cooldown) → «Ευχαριστώ» again: no card, a bare 🙂 → the old farewell
+    const s = await start('', ['Τι εννοείς με το «άξιζα»;', 'Τι σημαίνει αυτό για σένα;', 'Εντάξει. Μπορούμε να συνεχίσουμε.', '🙂']);
+    await send(s.page, 'Περισσότερα χρήματα.');
+    await send(s.page, 'Ευχαριστώ.');
+    ok('X4: (setup) the old closing card opened on the first «Ευχαριστώ.»', await card(s.page));
+    await btn(s.page, 'Έχω κι άλλο να πω').click(); await s.page.waitForTimeout(400);
+    await send(s.page, 'Ευχαριστώ.');
+    const b = await s.page.locator('.turn-aura').allInnerTexts();
+    ok('X4: during the decline cooldown no card opens → the empty-reply rule still adds the farewell: «🙂 Καλή συνέχεια.»', !(await card(s.page)) && b.map(t => t.replace(/^\s*aura\s*\n/i, '').trim()).slice(-1)[0] === '🙂 Καλή συνέχεια.');
+    await s.browser.close();
+  }
+  {
+    // a bare 🙂 after a user who was NOT closing → «Τι σκέφτεσαι τώρα;», as before (switch open and closed)
+    for (const q of ['', '?stageA=1']) {
+      const s = await start(q, ['Τι εννοείς με το «άξιζα»;', '🙂']);
+      await send(s.page, 'Περισσότερα χρήματα.');
+      const b = (await s.page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+      ok(`X4 (switch ${q ? 'open' : 'closed'}): a bare 🙂 after an ordinary message → «🙂 Τι σκέφτεσαι τώρα;», as before`, b.slice(-1)[0] === '🙂 Τι σκέφτεσαι τώρα;');
+      await s.browser.close();
+    }
+  }
+
+  // ── X5: the bubble, on every path where the message goes nowhere ──────────────
+  const PATHS = [
+    { id: 'first closing («Ευχαριστώ.»)', text: 'Ευχαριστώ.', expect: async p => (await p.getByText(LEAVING).count()) === 1,
+      run: async s => { await send(s.page, 'Η σταθερότητα κυρίως.'); await send(s.page, 'Ευχαριστώ.'); } },
+    { id: 'door 1 without substance', text: 'Περίπου δηλαδή', expect: async p => (await p.getByText(T.retry).count()) === 1,
+      run: async s => { await send(s.page, 'Η σταθερότητα κυρίως.'); await btn(s.page, 'Νομίζω βρήκα τι με απασχολεί').click(); await s.page.waitForTimeout(400); await send(s.page, 'Περίπου δηλαδή'); } },
+    { id: 'door 2 «Ναι»', text: 'Ναι', expect: async p => askShown(p), replies: ['Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;', RQ, 'Και τι;'],
+      run: async s => { await send(s.page, 'Η σταθερότητα, αλλά νιώθω ότι κάτι άλλο παίζει.'); await send(s.page, 'Ναι'); } },
+    { id: 'door 2 without substance (after «Ναι»)', text: 'Δεν ξέρω', expect: async p => (await p.getByText(T.retry).count()) === 1, replies: ['Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;', RQ, 'Και τι;'],
+      run: async s => { await send(s.page, 'Η σταθερότητα, αλλά νιώθω ότι κάτι άλλο παίζει.'); await send(s.page, 'Ναι'); await send(s.page, 'Δεν ξέρω'); } },
+    { id: 'door 3 without substance', text: 'Ναι, αυτό ακριβώς είναι!', expect: async p => askShown(p), replies: ['Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;', 'Και τι;'],
+      run: async s => { await send(s.page, 'Ναι, αυτό ακριβώς είναι!'); } },
+    { id: 'correction without substance', text: 'Περίπου δηλαδή', expect: async p => (await p.getByText(T.retry).count()) === 1 && (await p.getByText('Φοβάμαι ότι δεν αξίζω περισσότερα').count()) >= 1,
+      run: async s => { await send(s.page, 'Η σταθερότητα κυρίως.'); await btn(s.page, 'Νομίζω βρήκα τι με απασχολεί').click(); await s.page.waitForTimeout(400);
+        await send(s.page, 'Φοβάμαι ότι δεν αξίζω περισσότερα'); await btn(s.page, 'Διόρθωσε').click(); await s.page.waitForTimeout(400); await send(s.page, 'Περίπου δηλαδή'); } },
+  ];
+  let k = 0;
+  for (const P of PATHS) {
+    k++;
+    const s = await start('?stageA=1', P.replies || ['Τι εννοείς με το «άξιζα»;', 'Και τι σε τραβάει αλλού;', 'Και τι θα σήμαινε αυτό;']);
+    const before = s.calls.length;
+    await P.run(s);
+    const nBubbles = (await userBubbles(s.page)).filter(t => t === P.text).length;
+    const calls0 = s.calls.length;
+    if (P.id === 'door 1 without substance' || P.id === 'correction without substance') {
+      await s.page.waitForTimeout(900); // the smooth scroll
+      const vis = await s.page.evaluate(() => { const t = [...document.querySelectorAll('.warning-text')].find(e => /Γράψ' το λίγο/.test(e.innerText)); const inp = document.querySelector('.input-area');
+        const lastU = [...document.querySelectorAll('.turn-user')].pop();
+        const r = el => el ? el.getBoundingClientRect() : null; const a = r(t), b = r(inp), u = r(lastU);
+        return a && b && u ? { retryAboveInput: a.bottom <= b.top + 1, bubbleOnScreen: u.top >= 0 && u.bottom <= innerHeight } : null; });
+      ok(`X5 «${P.id}»: on a phone screen the retry line is fully above the input box and the new bubble is on screen (the screen scrolled to it)`, !!vis && vis.retryAboveInput && vis.bubbleOnScreen);
+    }
+    ok(`X5 «${P.id}»: the user's message is on screen as a bubble`, nBubbles >= 1 && (await userBubbles(s.page)).includes(P.text));
+    ok(`X5 «${P.id}»: and the step it triggers is as before (the question / retry line / card), no new model call after the setup`, await P.expect(s.page));
+    // go on with the session: close the flow if open and send one ordinary message → the model is called, and no request ever carries the bubble text
+    if (await btn(s.page, BACK).count()) { const b0 = s.calls.length; await btn(s.page, BACK).first().click(); await s.page.waitForTimeout(1200); }
+    if (await s.page.locator('textarea.textarea').count()) { await send(s.page, 'Πιο πολύ φοβάμαι ότι θα μετανιώσω.'); await s.page.waitForTimeout(800); }
+    const sent = sentUser(s.calls);
+    ok(`X5 «${P.id}»: the bubble text is in NO request to the model (the history keeps only what was really said to it)`, !sent.includes(P.text));
+    ok(`X5 «${P.id}»: still on screen after the conversation went on (in order, before the next message)`, (await userBubbles(s.page)).includes(P.text) &&
+      (await userBubbles(s.page)).indexOf(P.text) < (await userBubbles(s.page)).lastIndexOf('Πιο πολύ φοβάμαι ότι θα μετανιώσω.'));
+    if (k === 1) await s.page.screenshot({ path: path.join(OUT, 'X5-first-closing.png'), fullPage: false });
+    await s.browser.close();
+  }
+
+  // ── X7: «Νέα συνεδρία» clears the UI-only bubbles — an old «Ευχαριστώ.» must not reappear in the next session ───
+  {
+    const s = await start('?stageA=1', ['Τι εννοείς με το «άξιζα»;', 'Και τι σε τραβάει αλλού;', 'Και τι θα σήμαινε αυτό;', 'Και τι άλλο;', 'Και μετά;']);
+    await send(s.page, 'Η σταθερότητα κυρίως.');
+    await send(s.page, 'Ευχαριστώ.');
+    await btn(s.page, BACK).click(); await s.page.waitForTimeout(400);
+    await btn(s.page, 'Νομίζω βρήκα τι με απασχολεί').click(); await s.page.waitForTimeout(400);
+    await send(s.page, 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.');
+    await btn(s.page, T.yes).click(); await s.page.waitForTimeout(400);
+    await btn(s.page, T.notNow).click(); await s.page.waitForTimeout(400);
+    await btn(s.page, '6').click(); await s.page.waitForTimeout(400);
+    await send(s.page, 'πατέρας'); await s.page.waitForTimeout(1200);
+    ok('X7 (setup): the first session ended, with the «Ευχαριστώ.» bubble on screen', (await userBubbles(s.page)).includes('Ευχαριστώ.') && await btn(s.page, 'Νέα συνεδρία').count() === 1);
+    await btn(s.page, 'Νέα συνεδρία').click(); await s.page.waitForTimeout(600);
+    if (await s.page.getByText('Ξεκίνα με το πρόβλημά σου').count()) await s.page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await send(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, WHY);
+    await send(s.page, 'Περισσότερα χρήματα.'); await send(s.page, 'Και λίγη ασφάλεια.'); await send(s.page, 'Και λίγη ελευθερία.');
+    ok('X7: in the next session no old UI-only bubble appears (only what was typed there)', !(await userBubbles(s.page)).includes('Ευχαριστώ.') && (await userBubbles(s.page)).length >= 4);
+    await s.browser.close();
+  }
+
+  // ── X6: the one-tap question, recorded ─────────────────────────────────────
+  const toQuestion = async () => {
+    const s = await start('?stageA=1&debug=1', ['Τι εννοείς με το «άξιζα»;', 'Και τι σε τραβάει αλλού;']);
+    await send(s.page, 'Η σταθερότητα κυρίως.');
+    await btn(s.page, 'Νομίζω βρήκα τι με απασχολεί').click(); await s.page.waitForTimeout(400);
+    await send(s.page, 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.');
+    await btn(s.page, T.yes).click(); await s.page.waitForTimeout(400);
+    await btn(s.page, T.wantMore).click(); await s.page.waitForTimeout(400);
+    return s;
+  };
+  const exported = async page => {
+    try {
+      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }), page.getByRole('button', { name: 'τηλεμετρία (.json)' }).click({ timeout: 4000 })]);
+      return JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
+    } catch (e) { return { events: [], error: String(e.message || e).slice(0, 80) }; }
+  };
+  for (const [label, name, choice] of [['option 1', T.help1, 1], ['option 2', T.help2, 2], ['option 3', T.help3, 3], ['no choice («Συνέχεια»)', T.helpSkip, 0], ['left without tapping', null, null]]) {
+    const s = await toQuestion();
+    ok(`X6 (${label}): the question is on screen`, await s.page.getByText(T.helpQ).count() === 1);
+    if (name) { await btn(s.page, name).click(); await s.page.waitForTimeout(500); }
+    // NOTHING ELSE: the session is NOT finished (no clarity, no word) — the user may close the app right here
+    const data = await exported(s.page);
+    const ev = data.events || [];
+    const asked = ev.filter(r => r.ev === 'coach_help_asked'), chosen = ev.filter(r => r.ev === 'coach_help_choice');
+    ok(`X6 (${label}): the export file shows the question was asked (once)`, asked.length === 1 && asked[0].asked === 1);
+    ok(`X6 (${label}): ` + (name ? `and the choice: choice = ${choice}` : 'and NO choice record — asked without an answer = left'),
+      name ? chosen.length === 1 && chosen[0].choice === choice : chosen.length === 0);
+    ok(`X6 (${label}): counts only — no text in any record, session not finished (no session_completed yet)`,
+      ev.every(r => Object.values(r).every(v => typeof v === 'number' || typeof v === 'boolean' || r.ev === v)) && !ev.some(r => r.ev === 'session_completed'));
+    const stored = await s.page.evaluate(() => JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'));
+    ok(`X6 (${label}): the device log (localStorage) has the same records the export shows`, JSON.stringify(stored.filter(r => String(r.ev).startsWith('coach_help'))) === JSON.stringify(ev.filter(r => String(r.ev).startsWith('coach_help'))));
+    if (label === 'option 2') await s.page.screenshot({ path: path.join(OUT, 'X6-after-choice.png'), fullPage: false });
+    await s.browser.close();
+  }
+  {
+    // the end of the session still carries coachHelpChoice (unchanged)
+    const s = await toQuestion();
+    await btn(s.page, T.help2).click(); await s.page.waitForTimeout(400);
+    await btn(s.page, '7').click(); await s.page.waitForTimeout(400);
+    await send(s.page, 'πατέρας'); await s.page.waitForTimeout(1200);
+    const tel = await s.page.evaluate(() => (window.__auraTelemetry || []).filter(r => r.ev === 'session_completed').pop() || null);
+    ok('X6: session_completed still carries coachHelpChoice 2 and coachOfferClicked 1 (unchanged)', !!tel && tel.coachHelpChoice === 2 && tel.coachOfferClicked === 1);
+    await s.browser.close();
+  }
+  {
+    // switch closed: no such record can exist
+    const s = await start('?debug=1', ['Τι εννοείς με το «άξιζα»;', 'Και τι σε τραβάει αλλού;']);
+    await send(s.page, 'Η σταθερότητα κυρίως.');
+    const data = await exported(s.page);
+    ok('X6 (switch closed): no coach_help record, no Stage A button', !(data.events || []).some(r => String(r.ev).startsWith('coach_help')) && await btn(s.page, 'Νομίζω βρήκα τι με απασχολεί').count() === 0);
+    await s.browser.close();
   }
 }
 
@@ -908,7 +1191,7 @@ async function runScenarios(makeModel, budget) {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'W') await runMockW(); else await runMock();
+      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

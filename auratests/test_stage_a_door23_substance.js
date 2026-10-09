@@ -99,8 +99,9 @@ assert('RULE: «Τι ήξερες» keeps its own limit of 4 (untouched)',
   const blk = at >= 0 ? SUB.slice(at, at + 2200) : '';
   assert('DOOR 2: the crisis check still comes FIRST (any crisis → cancel, the message takes the crisis path)',
     blk.indexOf('if (!stageACaptureAllowed(userText)) {') > 0 && blk.indexOf('if (!stageACaptureAllowed(userText)) {') < blk.indexOf('type: "reask", door: 2'));
-  assert('DOOR 2: a capture without substance → door 1\'s question, nothing sent, nothing added to the transcript',
-    /else if \(_saArmed && !rootTextHasSubstance\(userText\)\) \{\s*stageARootArmed\.current = false;\s*stageADispatch\(\{ type: "reask", door: 2 \}\);\s*return;\s*\}/.test(blk));
+  assert('DOOR 2: a capture without substance → door 1\'s question, nothing sent, nothing added to the transcript (the text is only SHOWN, see test_stage_a_ui_bubbles.js)',
+    // UPDATED (8/10/2026, ADR «8 Οκτωβρίου (δ)», 5): the user's text is shown (not sent) before «reask» — one line, nothing else.
+    /else if \(_saArmed && !rootTextHasSubstance\(userText\)\) \{\s*stageARootArmed\.current = false;\s*addUiBubble\(userText, messages\.length\);[^\n]*\n\s*stageADispatch\(\{ type: "reask", door: 2 \}\);\s*return;\s*\}/.test(blk));
   assert('DOOR 2: the answer to that question is recorded under the question shown, credited to the door of origin',
     /const _saDoor = _saPhase === "ask" \? \(stageARef\.current\.door \|\| 1\) : 2;/.test(blk) &&
     /const _saAdded = _saPhase === "ask"\s*\? \[\{ id: nextMsgId\(\), role: "assistant", content: stageARef\.current\.leaving \? STAGE_A_TEXTS\.askLeaving : STAGE_A_TEXTS\.ask, msgMode: "STAGE_A" \}, \{ id: nextMsgId\(\), role: "user", content: userText \}\]/.test(blk));

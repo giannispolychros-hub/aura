@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, memo } from "react";
+import { useState, useRef, useEffect, useCallback, memo, Fragment } from "react";
 
 
 
@@ -1749,6 +1749,25 @@ function stageALeavingDoorOpens(st) {
   return o.active === true && (o.decision === "confirm" || o.decision === "terminate") && !o.used && !o.rootPhase && !o.armed &&
     !o.rootConfirmed && !o.closingStarted && o.riskKind !== 1 && !o.safetyMode && !detectSafetySignal(u) && (isExplicitClosure(u) || declaresClosing(u));
 }
+// ADR «8 Οκτωβρίου (δ)», 1 — with the switch open and before a confirmed root, the MASTER PRIORITY RULE stage
+// GRACEFUL EXIT («this governs now») is sent only when the old closing really opens on this same turn. Before, a bare
+// «Ναι» got it too, in the same request as the Stage A rule «don't say goodbye before the root». `decision` is the
+// USER-side decision (decideTermination on the messages so far: no reply text, no model signal); `armed`/`rootPhase`/
+// `latchFlips` are the cases where door 2/3 suppresses the old closing after the reply. Switch closed, after the root,
+// safety mode and supportive (crisis) turns: as today (true).
+function stageAKeepsGracefulExit(st) {
+  const o = st || {};
+  if (o.active !== true || o.rootConfirmed === true || o.safetyMode === true || o.supportive === true) return true;
+  return (o.decision === "confirm" || o.decision === "terminate") && !o.armed && !o.rootPhase && !o.latchFlips;
+}
+// ADR «8 Οκτωβρίου (δ)», 2 — does the old closing card open on this reply? Then the empty-reply rule adds no farewell:
+// a goodbye, then the card, then the real closing is two goodbyes. Stage A with door 2 armed or a flow open: the app
+// returns before the card (see the guard after the leaving door), so no card.
+function closingCardOpensNow(st) {
+  const o = st || {};
+  if (o.decision !== "confirm" && o.decision !== "terminate") return false;
+  return !(o.active === true && (o.armed === true || !!o.rootPhase));
+}
 // STAGE A — the whole flow as one pure step function (SPEC_FREE_END.md §1.5, §2.1, §2.1α, §2.2, §4, §6.1).
 // phase: null (conversation) · "ask" (door 1's fixed question) · "card" · "correct" · "offer" · "notReady" ·
 // "clarity" · "word" · "done". Every transition the screen can make goes through here, so the order of §2.1α is
@@ -1797,6 +1816,12 @@ function stageAStep(state, ev) {
       if (s.phase || (e.door !== 2 && e.door !== 3)) return s;
       st.rootTooShort += 1; reach(1);
       return next({ phase: "ask", door: e.door, leaving: false, retry: false });
+    // ADR «8 Οκτωβρίου (δ)», 1 — door 2: a «Ναι» to the readiness question opens door 1's question at once, no model call.
+    // It is not a root text without substance (`rootTooShort` is NOT counted); the card it may open is credited to door 2.
+    case "ready":
+      if (s.phase) return s;
+      reach(1);
+      return next({ phase: "ask", door: 2, leaving: false, retry: false });
     case "back":
       if (s.phase !== "ask" && s.phase !== "card" && s.phase !== "correct") return s;
       st.rootBack += 1;
@@ -1875,6 +1900,15 @@ function stageATelemetry(stats, extra) {
   o.askedActionBeforeRoot = x.askedActionBeforeRoot ? 1 : 0;
   o.stageA = 1;
   return o;
+}
+// ADR «8 Οκτωβρίου (δ)», 6 — the one-tap question after «Θέλω να συνεχίσω» is the basic test of whether anyone would pay
+// for the Coach, so it is recorded the moment it happens, not only at the end of a session that may never end: the
+// question shown (`coach_help_asked`) and the choice (`coach_help_choice`, 0 = «Συνέχεια», no choice). Counts only.
+function stageAHelpTelemetry(prev, next, ev) {
+  if (!prev || !next || !ev) return null;
+  if (ev.type === "want" && prev.phase === "offer" && next.phase === "notReady") return { event: "coach_help_asked", fields: { asked: 1 } };
+  if (ev.type === "help" && prev.phase === "notReady" && next.phase === "clarity") return { event: "coach_help_choice", fields: { choice: ev.choice === 1 || ev.choice === 2 || ev.choice === 3 ? ev.choice : 0 } };
+  return null;
 }
 // Violation check only (never a success measure): did a reply defer «τι κάνω» to after the root?
 function detectsRootDeferral(text) {
@@ -5620,12 +5654,22 @@ export default function AURAv2() {
   const stageARef             = useRef(initialStageAState());
   const stageARootArmed       = useRef(false); // door 2: the readiness answer arrived — capture the NEXT message
   const [stageAPhase, setStageAPhase] = useState(null);
+  // ADR «8 Οκτωβρίου (δ)», 5 — where the user's message does not go to the model (the first closing, door 1/2/3 without
+  // substance, the «Ναι» of door 2, the correction without substance) it is still SHOWN. A UI-only list, NOT `messages`: no
+  // request, detector, counter or telemetry sees it. `at` = how many messages there were when it was typed.
+  const [uiBubbles, setUiBubbles] = useState([]);
+  const addUiBubble = useCallback((text, at) => {
+    setUiBubbles(prev => [...prev, { id: nextMsgId(), role: "user", content: String(text || ""), at: Number.isInteger(at) ? at : 0 }]);
+  }, []);
   const [stageACopyText, setStageACopyText] = useState(null); // clipboard fallback: the text, shown to select
   const [stageACopied, setStageACopied] = useState(false);
   const cleanLabels = useCallback((t) => { const r = stripInternalLabels(t); if (r.count) labelLeaks.current += r.count; return r.text; }, []);
   const stageADispatch = useCallback((ev) => {
-    stageARef.current = stageAStep(stageARef.current, ev);
+    const _prev = stageARef.current;
+    stageARef.current = stageAStep(_prev, ev);
     setStageAPhase(stageARef.current.phase);
+    const _tel = stageAHelpTelemetry(_prev, stageARef.current, ev); // ADR «8 Οκτωβρίου (δ)», 6: passive, counts only
+    if (_tel) recordTelemetry(_tel.event, _tel.fields);
   }, []);
   // Opens the root card (§1.5): only with the user's own text, «Τι ήξερες» from their first messages, and the
   // risk latch deciding (tier A → no card, counted).
@@ -5758,6 +5802,11 @@ export default function AURAv2() {
     if (!stageAActive.current || (stageAPhase !== "ask" && stageAPhase !== "correct")) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [stageAPhase]);
+  // ADR «8 Οκτωβρίου (δ)», 5: a UI-only bubble (the user's message that went nowhere) appears at the bottom — bring it into view.
+  useEffect(() => {
+    if (!uiBubbles.length) return;
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [uiBubbles.length]);
 
   // TELEMETRY — one measurement per ending, whichever path got there.
   //
@@ -6042,7 +6091,19 @@ A line missing above means only that one pattern was not matched — the absence
         const userMsgs = msgs.filter(m => m.role === "user");
         const lastUserText = userMsgs.length > 0 ? (userMsgs[userMsgs.length - 1].content || "") : "";
         const userSignalsClosing = isExplicitClosure(lastUserText) || declaresClosing(lastUserText) || matchesClosingWord(lastUserText);
-        const stage = computeMasterPriorityStage(safetyMode, msgCount, userSignalsClosing);
+        // ADR «8 Οκτωβρίου (δ)», 1: with the switch open, before the root, GRACEFUL EXIT only when the old closing really
+        // opens on this turn. The closing decision is the user-side one (this message, no reply text, no model signal).
+        const stage = computeMasterPriorityStage(safetyMode, msgCount, userSignalsClosing && (!stageAActive.current || stageAKeepsGracefulExit({
+          active: true, rootConfirmed: stageARef.current.stats.rootConfirmed === 1, safetyMode, supportive: currentMode === "SUPPORTIVE",
+          decision: decideTermination(msgs, "", {
+            safetyMode, currentMode, warningIssued: warningIssued.current, compressionCount: compressionCount.current, modelJudgesEnd: false,
+            concreteStepStated: concreteStepStated.current, outcomeScaleAsked: outcomeScaleAsked.current, outcomeScaleBlockUsed: outcomeScaleBlockUsed.current,
+            duringOnboarding: false, duringDeclineCooldown: closureDeclineCooldown.current > 0,
+          }),
+          armed: stageARootArmed.current, rootPhase: stageARef.current.phase,
+          latchFlips: !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1 &&
+            (detectsSpontaneousCoreRecognition(lastUserText) || (coreReadinessAsked.current && detectsAffirmativeShort(lastUserText))),
+        })));
         return describeMasterPriorityStageCtx(stage);
       })();
 
@@ -6685,7 +6746,18 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // not whether the user said goodnight (any closing word picks it, e.g. «Ευχαριστώ» at noon). Rule otherwise unchanged.
         const userWasClosing = matchesClosingWord(lastUserMsg) || declaresClosing(lastUserMsg);
         const addition = userWasClosing ? "Καλή συνέχεια." : "Τι σκέφτεσαι τώρα;";
-        displayText = (displayText.trim() ? displayText.trim() + " " : "") + addition;
+        // ADR «8 Οκτωβρίου (δ)», 2: when the closing card opens on this same reply, no farewell is added — a goodbye, then the
+        // card, then the real closing is two goodbyes. The decision is the one the real call below makes (same inputs, run early).
+        const _closingCardOpens = userWasClosing && closingCardOpensNow({
+          decision: currentMode === "SUPPORTIVE" ? "none" : decideTermination(msgs, text, {
+            safetyMode, currentMode, warningIssued: warningIssued.current, compressionCount: compressionCount.current,
+            modelJudgesEnd,
+            concreteStepStated: concreteStepStated.current, outcomeScaleAsked: outcomeScaleAsked.current, outcomeScaleBlockUsed: outcomeScaleBlockUsed.current,
+            duringOnboarding: showDemo, duringDeclineCooldown: closureDeclineCooldown.current > 0,
+          }),
+          active: stageAActive.current, armed: stageARootArmed.current, rootPhase: stageARef.current.phase,
+        });
+        if (!_closingCardOpens) displayText = (displayText.trim() ? displayText.trim() + " " : "") + addition;
       }
 
       // EXPLICIT STYLE PREFERENCE (real-user-requested feature — critical distinction from the
@@ -7452,6 +7524,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         stageARootArmed.current = false;
         stageADispatch({ type: "cancel" });
       } else if ((_saPhase === "ask" || _saPhase === "correct") && !rootTextHasSubstance(userText)) {
+        addUiBubble(userText, messages.length); // ADR «8 Οκτωβρίου (δ)», 5: shown, not sent
         stageADispatch({ type: "tooShort" });
         return;
       } else if (_saPhase === "correct") {
@@ -7459,6 +7532,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         return;
       } else if (_saArmed && !rootTextHasSubstance(userText)) {
         stageARootArmed.current = false;
+        addUiBubble(userText, messages.length); // ADR «8 Οκτωβρίου (δ)», 5: shown, not sent
         stageADispatch({ type: "reask", door: 2 });
         return;
       } else {
@@ -7668,6 +7742,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       rootConfirmed: stageARef.current.stats.rootConfirmed === 1,
       closingStarted: reflectionDelivered.current, riskKind: riskSignalKind.current, safetyMode,
     })) {
+      addUiBubble(userText, messages.length); // ADR «8 Οκτωβρίου (δ)», 5: the user's «Ευχαριστώ» stays on screen (shown, not sent)
       stageADispatch({ type: "leaving" });
       return;
     }
@@ -7678,8 +7753,23 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     if (stageAActive.current && messages.some(m => m.role === "assistant" && m.msgMode !== "STAGE_A") &&
         !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1 &&
         detectsSpontaneousCoreRecognition(userText) && !rootTextHasSubstance(userText)) {
+      addUiBubble(userText, messages.length); // ADR «8 Οκτωβρίου (δ)», 5: shown, not sent
       coreReadinessConfirmed.current = true; // the readiness latch flips exactly as it would have after the reply (door 3)
       stageADispatch({ type: "reask", door: 3 });
+      return;
+    }
+    // STAGE A — door 2 «Ναι» BEFORE the model (ADR «8 Οκτωβρίου (δ)», 1): a «Ναι» to the readiness question shows door 1's
+    // question INSTEAD of a model reply — a model reply could ask something else and the user's next answer would become the
+    // root. The latch flips exactly as it would have after the reply. The «Ναι» is shown, not sent. Crisis and DISTRESS
+    // returned above (safety path as today); a spontaneous recognition is door 3 (the order the latch always had). A «Ναι» to
+    // anything else, and tier A, go on as before. Switch closed: never true.
+    if (stageAActive.current && messages.some(m => m.role === "assistant" && m.msgMode !== "STAGE_A") &&
+        messages[messages.length - 1].role === "assistant" && detectsCoreReadinessAsked(messages[messages.length - 1].content) && coreReadinessAsked.current &&
+        !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1 &&
+        !detectsSpontaneousCoreRecognition(userText) && detectsAffirmativeShort(userText)) {
+      coreReadinessConfirmed.current = true; // the readiness latch flips exactly as it would have after the reply (door 2)
+      addUiBubble(userText, messages.length); // shown, not sent
+      stageADispatch({ type: "ready" });
       return;
     }
 
@@ -7827,6 +7917,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     freeActionOffered.current = 0; freeDeferral.current = 0; askedActionBeforeRoot.current = false; rootCardOpenedOnce.current = false;
     riskSignalKind.current = 0; labelLeaks.current = 0;
     stageARef.current = initialStageAState(); stageARootArmed.current = false; setStageAPhase(null);
+    setUiBubbles([]);
     setStageACopyText(null); setStageACopied(false);
     shiftCheckAsked.current = false;
     shiftCheckConfirmed.current = false;
@@ -8419,12 +8510,16 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               fixes because it is a plain div, not an intro-screen, so every structural check that
               counted intro-screen elements passed while the bug was live. */}
           {messages.map((msg, i) => (
+            <Fragment key={msg.id || i}>
             <MessageBubble
-              key={msg.id || i}
               msg={msg}
               onMisfire={() => { if (sessionEnded || layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending) return; setMisfireType(detectPattern(messages.slice(0, i+1)).type); setMisfirePending(true); }}
               onContinueToReflection={() => { if (sessionEnded || loading || layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending || reflectionDelivered.current) return; handleClosureConfirm(true); }}
             />
+            {uiBubbles.filter(g => Math.min(g.at, messages.length) === i + 1).map(g => (
+              <MessageBubble key={g.id} msg={g} onMisfire={() => {}} onContinueToReflection={() => {}} />
+            ))}
+            </Fragment>
           ))}
 
           {/* Misfire recovery — inline input */}
