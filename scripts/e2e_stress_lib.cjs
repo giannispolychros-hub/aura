@@ -138,15 +138,19 @@ function policyOf(p) { return Object.assign({}, BASE_POLICY, (p && p.policy) || 
 // Όρια ανά συνεδρία: το πολύ MAX_TYPED μηνύματα του χρήστη. Μετά από EXIT_AFTER μηνύματα χωρίς ρίζα ο χρήστης κλείνει μόνος του
 // («Ευχαριστώ, κλείνουμε εδώ.»), όπως θα έκανε ένας άνθρωπος που βαρέθηκε — έτσι κάθε συνεδρία τελειώνει και το κόστος έχει όριο.
 const MAX_TYPED = 12, EXIT_AFTER = 10, EXIT_TEXT = 'Ευχαριστώ, κλείνουμε εδώ.';
-// Η λίστα των συνεδριών: οι 1–8 δύο φορές. only = [id, …] για μέρος τους. Οι συνεδρίες ασφαλείας (σταθερά μηνύματα) τρέχουν
-// ΠΡΩΤΕΣ: αν το όριο δαπάνης σταματήσει τη δοκιμή νωρίς, η ασφάλεια έχει ήδη ελεγχθεί.
+// Η λίστα των συνεδριών: οι 1–8 δύο φορές. only = [«14», «1.1», …] για μέρος τους: ένας αριθμός = όλες οι συνεδρίες του χρήστη,
+// «1.1» = μόνο η πρώτη. Οι συνεδρίες ασφαλείας (σταθερά μηνύματα) τρέχουν ΠΡΩΤΕΣ: αν το όριο δαπάνης ή χρόνου σταματήσει τη
+// δοκιμή νωρίς, η ασφάλεια έχει ήδη ελεγχθεί.
 function planRuns(personas, only) {
   const list = [];
-  const want = Array.isArray(only) && only.length ? new Set(only.map(Number)) : null;
+  const want = Array.isArray(only) && only.length ? new Set(only.map(x => String(x).trim())) : null;
   const ps = (personas || PERSONAS).slice().sort((a, b) => (b.fixed ? 1 : 0) - (a.fixed ? 1 : 0) || a.id - b.id);
   for (const p of ps) {
-    if (want && !want.has(p.id)) continue;
-    for (let r = 1; r <= (p.runs || 1); r++) list.push({ persona: p, run: r, label: p.id + (p.runs > 1 ? '.' + r : '') });
+    for (let r = 1; r <= (p.runs || 1); r++) {
+      const label = p.id + (p.runs > 1 ? '.' + r : '');
+      if (want && !want.has(String(p.id)) && !want.has(label)) continue;
+      list.push({ persona: p, run: r, label });
+    }
   }
   return list;
 }
@@ -310,7 +314,9 @@ function telemetryIssues(events, acts) {
 // coreChars: μέγεθος του AURA_CORE_PERSONALITY σε χαρακτήρες. ~77.000 tokens για ~300.000 χαρακτήρες (AURA_COST_MEASUREMENT.md,
 // εκτίμηση, όχι μέτρηση) → 1 token ανά ~3,9 χαρακτήρες. Ανά κλήση: όλο το prompt από την cache, ~6.000 χωρίς cache, ~300 έξοδος.
 function estimateCost(plan, coreChars, o) {
-  const opt = Object.assign({ simCalls: 11, simCallsMax: MAX_TYPED + 3, fixedCalls: 6, cacheWrites: 4, cacheWritesMax: 10, userCallsPerAura: 1.4 }, o || {});
+  // cache writes: the prompt is written again only after 5 quiet minutes — about one per 8 sessions, at worst one per 3
+  const n = (plan || []).length;
+  const opt = Object.assign({ simCalls: 11, simCallsMax: MAX_TYPED + 3, fixedCalls: 6, cacheWrites: 1 + n / 8, cacheWritesMax: 2 + n / 3, userCallsPerAura: 1.4 }, o || {});
   const coreTok = Math.round((coreChars || 300000) / 3.9);
   const perCall = (coreTok * PRICES.aura.cacheRead + 6000 * PRICES.aura.input + 300 * PRICES.aura.output) / 1e6;
   const write = coreTok * (PRICES.aura.cacheWrite - PRICES.aura.cacheRead) / 1e6;

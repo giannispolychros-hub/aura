@@ -30,7 +30,8 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   assert('USERS: 1–8 run twice, 9–16 once — 24 sessions', P.every(p => (p.id <= 8 ? p.runs === 2 : p.runs === 1)) && (T('planRuns') || []).length === 24);
   const plan = T('planRuns') || [];
   assert('ORDER: the safety sessions (14, 15, 16) run FIRST — a budget stop never skips safety', plan.slice(0, 3).map(r => r.persona.id).join(',') === '14,15,16' && plan[3].label === '1.1');
-  assert('FILTER: --sessions picks only those users', (T('planRuns', P, [16, 3]) || []).map(r => r.label).join(',') === '16,3.1,3.2');
+  assert('FILTER: --sessions picks only those users; «1.1» picks one run of a user who runs twice', (T('planRuns', P, [16, 3]) || []).map(r => r.label).join(',') === '16,3.1,3.2' &&
+    (T('planRuns', P, ['14', '15', '16', '1.1']) || []).map(r => r.label).join(',') === '14,15,16,1.1');
   const detect = t => APP && APP.fns.detectSafetySignal ? APP.fns.detectSafetySignal(t) : 'n/a';
   const fixed = P.filter(p => p.fixed);
   assert('FIXED: exactly 14, 15, 16 are fixed messages (crisis and DISTRESS), every other user is simulated', fixed.map(p => p.id).join(',') === '14,15,16' && P.filter(p => !p.fixed).every(p => p.situation && p.hiddenRoot && p.behavior));
@@ -144,6 +145,8 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
     Math.abs(b2.spent() - 0.75) < 1e-9 && b2.canSpend('aura') === false && b2.canSpend('user') === true && S.WORST_CALL.aura > 0.3);
   const e = T('estimateCost', T('planRuns'), APP ? APP.consts.core.length : 300000) || {};
   assert('ESTIMATE: 24 sessions, a low and a high figure, the high one under the $25 cap', e.sessions === 24 && e.low > 3 && e.low < e.high && e.high < 25);
+  const small = T('estimateCost', T('planRuns', null, ['14', '15', '16', '1.1']), APP ? APP.consts.core.length : 300000) || {};
+  assert('ESTIMATE: the «μικρό» run (4 sessions) fits its $3 cap even at the high estimate', small.sessions === 4 && small.high < 3);
   assert('ESTIMATE: the prompt is ~77.000 tokens (AURA_COST_MEASUREMENT.md) and a warm call costs a few cents', e.coreTok > 70000 && e.coreTok < 90000 && e.perCall > 0.03 && e.perCall < 0.06 && e.write > 0.2 && e.write < 0.35);
 }
 
@@ -180,6 +183,45 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   assert('WIRING: the app opens with ?stageA=1&rec=1 at phone size (390×700)', RUNNER.includes("await page.goto(BASE + '/?stageA=1&rec=1');") && /viewport: \{ width: 390, height: 700 \}/.test(RUNNER.slice(RUNNER.indexOf('async function runStressSession('))));
   assert('WIRING: the reports go through writeOut (redaction + no-secret check) into the temp folder only',
     /writeOut\('stress-report\.md'/.test(RUNNER) && /writeOut\('stress-report\.json'/.test(RUNNER) && /LIB\.outDirInTemp\(/.test(RUNNER) && /LIB\.assertNoSecret\(t, KEY\)/.test(RUNNER));
+}
+
+// ── GitHub Actions (John, 10/10: tests and the stress test from the phone) ─────
+// The report also goes to the run's page (job summary), with the same redaction and no-secret check as every file.
+{
+  const ws = RUNNER.slice(RUNNER.indexOf('function writeSummary('), RUNNER.indexOf('function writeSummary(') + 900);
+  assert('SUMMARY: written only when GitHub gives a summary file, redacted and checked for the key BEFORE it is appended, size-capped',
+    /const f = process\.env\.GITHUB_STEP_SUMMARY;\s*if \(!f\) return;/.test(ws) && /let t = LIB\.redact\(String\(text \|\| ''\), KEY\);/.test(ws) && ws.indexOf('LIB.redact(') < ws.indexOf('LIB.assertNoSecret(') &&
+    ws.indexOf('LIB.assertNoSecret(') < ws.indexOf('fs.appendFileSync(f,') && /Buffer\.byteLength\(t\) > MAX/.test(ws));
+  const ms = RUNNER.slice(RUNNER.indexOf('async function mainStress('));
+  assert('SUMMARY: the dry plan (sessions, estimate, cap) and the full report both reach the summary',
+    /writeSummary\(dryMarkdown\(/.test(ms) && /writeSummary\(SL\.buildStressReport\(sessions, meta\)\)/.test(ms));
+  assert('TIME: --minutes N — no new session starts after N minutes, so the report is always written before the job is stopped',
+    /const minutes = Number\(opt\('--minutes', '0'\)\)/.test(ms) && /if \(minutes && Date\.now\(\) - t0 > minutes \* 60000\) \{ stopped = 'χρονικό όριο/.test(ms));
+}
+{
+  const W = f => { try { return fs.readFileSync(path.join(ROOT, '.github', 'workflows', f), 'utf8'); } catch (e) { return ''; } };
+  const ST = W('stress.yml'), TS = W('tests.yml'), T1 = W('test.yml');
+  const code = t => t.split('\n').filter(l => !/^\s*#/.test(l)).join('\n');
+  assert('STRESS: only by hand (workflow_dispatch) — no push, schedule, pull_request or any other trigger',
+    /^on:\s*\n\s+workflow_dispatch:/m.test(ST) && !/^\s+(push|pull_request|pull_request_target|schedule|workflow_run|repository_dispatch|issue_comment):/m.test(code(ST)));
+  assert('STRESS: the three choices, dry by default', /options:\s*\n\s+- dry\s*\n\s+- μικρό\s*\n\s+- πλήρες/.test(ST) && /default: dry/.test(ST));
+  assert('STRESS: μικρό = 14, 15, 16 and 1 (once) with $3; πλήρες = $25; dry = --dry', /--stress --real --dry/.test(ST) &&
+    /--stress --real --yes --sessions 14,15,16,1\.1 --budget 3 /.test(ST) && /--stress --real --yes --budget 25 /.test(ST));
+  assert('STRESS: 90 minutes for the job; the test itself stops starting sessions earlier, so the report is written', /timeout-minutes: 90/.test(ST) && /--budget 3 --minutes 7\d /.test(ST) && /--budget 25 --minutes 7\d /.test(ST));
+  const keyLines = code(ST).split('\n').filter(l => /secrets\./.test(l));
+  assert('KEY: read from the ANTHROPIC_API_KEY secret only, and only into env (once to test that it exists, once for the run)',
+    keyLines.length === 2 && /HAS_KEY: \$\{\{ secrets\.ANTHROPIC_API_KEY != '' \}\}/.test(ST) && /ANTHROPIC_API_KEY: \$\{\{ secrets\.ANTHROPIC_API_KEY \}\}/.test(ST));
+  // the shell never touches the value: only node reads it from the environment (the NAME may appear in a message)
+  assert('KEY: never echoed, never written to a file — no shell line uses its value at all', ST.length > 500 && !/\$\{?ANTHROPIC_API_KEY/.test(code(ST)) && !/(echo|printf|tee|cat)[^\n]*secrets\./.test(code(ST)));
+  assert('KEY: missing → a clear message and a stop, before anything is installed or run', /Λείπει το secret ANTHROPIC_API_KEY|Δεν υπάρχει το secret ANTHROPIC_API_KEY/.test(ST) && /exit 1/.test(ST) &&
+    ST.indexOf("HAS_KEY") < ST.indexOf('npm ci'));
+  assert('STRESS: the choice reaches the shell through env, never pasted into the script (no injection)', /MODE: \$\{\{ inputs\.mode \}\}/.test(ST) && !/run:[^\n]*\$\{\{ inputs\./.test(ST) && !/\n\s{10,}[^\n#]*\$\{\{ inputs\.mode \}\}[^\n]*;;/.test(ST));
+  assert('STRESS: the report folder (inside the runner\'s temp) is uploaded as an artifact, also after a failure; nothing else', /actions\/upload-artifact@v4/.test(ST) && /if: always\(\) && inputs\.mode != 'dry' && env\.AURA_STRESS_OUT != ''/.test(ST) &&
+    /path: \$\{\{ env\.AURA_STRESS_OUT \}\}/.test(ST) && /require\('os'\)\.tmpdir\(\)/.test(ST));
+  assert('STRESS: read-only token, one run at a time', /permissions:\s*\n\s+contents: read/.test(ST) && /concurrency:/.test(ST));
+  assert('TESTS: on every push to main, all suites through the one loop in test.yml, then the build — no secret at all',
+    /push:\s*\n\s+branches: \[main\]/.test(TS) && /uses: \.\/\.github\/workflows\/test\.yml/.test(TS) && /npm run build/.test(TS) && !/secrets/.test(TS) && /permissions:\s*\n\s+contents: read/.test(TS));
+  assert('TESTS: test.yml can be called (workflow_call) and no longer runs a second time on main', /workflow_call:/.test(T1) && /branches-ignore: \[main\]/.test(T1));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

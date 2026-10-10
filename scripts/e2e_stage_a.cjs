@@ -15,7 +15,8 @@
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
 // Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W | X | Y (μόνο η W, η X ή η Y)
 // ΣΤΡΕΣ ΤΕΣΤ (Μέρος Β, 10/10): --stress (ψεύτικα, κόστος 0) · --stress --real --dry (σχέδιο + εκτίμηση) · --stress --real --yes (ΠΡΑΓΜΑΤΙΚΟ,
-//   όριο --budget έως $25, προεπιλογή $25) · --sessions 14,15,1 (μόνο αυτοί). Δες την ενότητα «ΣΤΡΕΣ ΤΕΣΤ» πιο κάτω.
+//   όριο --budget έως $25, προεπιλογή $25) · --sessions 14,15,1 (μόνο αυτοί) · --minutes 75 (καμία νέα συνεδρία μετά). Τρέχει και από το
+//   GitHub (.github/workflows/stress.yml): η αναφορά γράφεται και στη σελίδα της εκτέλεσης. Δες την ενότητα «ΣΤΡΕΣ ΤΕΣΤ» πιο κάτω.
 // Αρχεία εξόδου (αναφορά, στιγμιότυπα) ΜΟΝΟ στον προσωρινό φάκελο. Το κλειδί δεν γράφεται ποτέ σε έξοδο.
 'use strict';
 const fs = require('fs');
@@ -1765,25 +1766,52 @@ async function judgeSession(s, user) {
   return r.data;
 }
 
+// GitHub Actions (John, 10/10): the report also goes to the run's page («job summary»), to be read from the phone. Same
+// redaction and no-secret check as every file; GitHub keeps up to 1 MiB per step, so a longer text is cut (the artifact has it all).
+function writeSummary(text) {
+  const f = process.env.GITHUB_STEP_SUMMARY;
+  if (!f) return;
+  let t = LIB.redact(String(text || ''), KEY);
+  LIB.assertNoSecret(t, KEY);
+  const MAX = 900000;
+  if (Buffer.byteLength(t) > MAX) t = t.slice(0, MAX / 2) + '\n\n…(κόπηκε εδώ — ολόκληρη η αναφορά είναι στο artifact)\n';
+  fs.appendFileSync(f, t + '\n');
+}
+function dryMarkdown(plan, e, want, lines) {
+  return ['## Στρες τεστ — σχέδιο (dry): καμία κλήση, κανένα κόστος', '',
+    ...lines.map(l => '- ' + l), '', '| Συνεδρία | Χρήστης | Πώς |', '|---|---|---|',
+    ...plan.map(r => '| ' + r.label + ' | ' + r.persona.name + ' | ' + (r.persona.fixed ? 'σταθερά μηνύματα' : 'Haiku') + ' |'), ''].join('\n');
+}
+
 async function mainStress() {
   const real = has('--real');
-  const only = (opt('--sessions', '') || '').split(',').map(Number).filter(Boolean);
+  const only = (opt('--sessions', '') || '').split(',').map(x => x.trim()).filter(Boolean);
   const plan = SL.planRuns(SL.PERSONAS, only.length ? only : null);
   const want = Number(opt('--budget', String(SL.BUDGET_CAP)));
   if (!(want > 0) || want > SL.BUDGET_CAP) { console.error('Το όριο δαπάνης πρέπει να είναι από 0 ως $' + SL.BUDGET_CAP + '.'); process.exit(2); }
   if (real && has('--dry')) {
     const e = SL.estimateCost(plan, APP.consts.core.length);
+    const head = [
+      'Κλειδί στη μεταβλητή ANTHROPIC_API_KEY: ' + (KEY ? 'βρέθηκε' : 'ΔΕΝ βρέθηκε'),
+      '@anthropic-ai/sdk (για τους χρήστες/κριτή): ' + (loadAnthropic() ? 'βρέθηκε' : 'ΔΕΝ βρέθηκε — npm install --no-save @anthropic-ai/sdk'),
+      'AURA: το api/aura.js του repo (claude-sonnet-4-6). Χρήστες και κριτής: ' + SL.USER_MODEL + '.',
+    ];
+    const tail = [
+      'Συνεδρίες: ' + e.sessions + ' (' + e.sims + ' με προσομοιωμένο χρήστη, ' + e.fixed + ' με σταθερά μηνύματα). Το πολύ ' + SL.MAX_TYPED + ' μηνύματα χρήστη ανά συνεδρία.',
+      'Κλήσεις AURA: ~' + e.calls + ' (το πολύ ~' + e.callsMax + '), ~$' + e.perCall.toFixed(3) + ' η καθεμία με ζεστή cache· εγγραφή cache ~$' + e.write.toFixed(2) + '.',
+      'Κλήσεις Haiku: ~' + e.userCalls + ' (σχεδόν δωρεάν).',
+      'ΕΚΤΙΜΗΣΗ (όχι μέτρηση): $' + e.low.toFixed(0) + '–$' + e.high.toFixed(0) + '. Όριο: $' + want.toFixed(2) + ' — η δοκιμή σταματά ΠΡΙΝ από κλήση που θα μπορούσε να το ξεπεράσει.',
+      'Διάρκεια: περίπου ' + Math.round(e.calls * 11 / 60) + '–' + Math.round(e.callsMax * 13 / 60) + ' λεπτά (για όλες τις συνεδρίες).',
+    ];
+    { const m = SL.estimateCost(SL.planRuns(SL.PERSONAS, ['14', '15', '16', '1.1']), APP.consts.core.length);
+      tail.push('Το «μικρό» (συνεδρίες 14, 15, 16, 1.1): ΕΚΤΙΜΗΣΗ $' + m.low.toFixed(1) + '–$' + m.high.toFixed(1) + ', όριο $3, περίπου ' + Math.round(m.calls * 11 / 60) + '–' + Math.round(m.callsMax * 13 / 60) + ' λεπτά.'); }
     console.log('ΣΤΡΕΣ ΤΕΣΤ — ΣΧΕΔΙΟ (καμία κλήση, κανένα build)');
-    console.log('Κλειδί στη μεταβλητή ANTHROPIC_API_KEY: ' + (KEY ? 'βρέθηκε' : 'ΔΕΝ βρέθηκε'));
-    console.log('@anthropic-ai/sdk (για τους χρήστες/κριτή): ' + (loadAnthropic() ? 'βρέθηκε' : 'ΔΕΝ βρέθηκε — npm install --no-save @anthropic-ai/sdk'));
-    console.log('AURA: το api/aura.js του repo (claude-sonnet-4-6). Χρήστες και κριτής: ' + SL.USER_MODEL + '.');
+    head.forEach(l => console.log(l));
     console.log('Αρχεία στο: ' + OUT + '\n');
     plan.forEach(r => console.log('  ' + r.label.padEnd(4) + ' ' + r.persona.name + (r.persona.fixed ? '  [σταθερά μηνύματα]' : '  [Haiku]')));
-    console.log('\nΣυνεδρίες: ' + e.sessions + ' (' + e.sims + ' με προσομοιωμένο χρήστη, ' + e.fixed + ' με σταθερά μηνύματα). Το πολύ ' + SL.MAX_TYPED + ' μηνύματα χρήστη ανά συνεδρία.');
-    console.log('Κλήσεις AURA: ~' + e.calls + ' (το πολύ ~' + e.callsMax + '), ~$' + e.perCall.toFixed(3) + ' η καθεμία με ζεστή cache· εγγραφή cache ~$' + e.write.toFixed(2) + '.');
-    console.log('Κλήσεις Haiku: ~' + e.userCalls + ' (σχεδόν δωρεάν).');
-    console.log('ΕΚΤΙΜΗΣΗ (όχι μέτρηση): $' + e.low.toFixed(0) + '–$' + e.high.toFixed(0) + '. Όριο: $' + want.toFixed(2) + ' — η δοκιμή σταματά ΠΡΙΝ από κλήση που θα μπορούσε να το ξεπεράσει.');
-    console.log('Διάρκεια: περίπου ' + Math.round(e.calls * 11 / 60) + '–' + Math.round(e.callsMax * 13 / 60) + ' λεπτά.');
+    console.log('');
+    tail.forEach(l => console.log(l));
+    writeSummary(dryMarkdown(plan, e, want, [...head, ...tail]));
     return;
   }
   if (real && !has('--yes')) { console.log('Δεν έτρεξε τίποτα. Πρώτα: --stress --real --dry. Για να τρέξει (και να ξοδέψει): --stress --real --yes'); return; }
@@ -1796,8 +1824,11 @@ async function mainStress() {
   BASE = app.url;
   const sessions = [];
   let stopped = null;
+  // --minutes N: no new session starts after N minutes — the report is then always written before a time limit stops the job
+  const minutes = Number(opt('--minutes', '0')) || 0, t0 = Date.now();
   try {
     for (const item of plan) {
+      if (minutes && Date.now() - t0 > minutes * 60000) { stopped = 'χρονικό όριο (' + minutes + ' λεπτά) — δεν ξεκίνησαν οι συνεδρίες από την ' + item.label; break; }
       console.log('… ' + item.label + ' — ' + item.persona.name);
       const r = await runStressSession(item, real ? await realModel() : stressFakeAura(), real ? stressUserReal(budget) : stressUserFake(item.persona), budget);
       sessions.push(r.sess);
@@ -1811,6 +1842,7 @@ async function mainStress() {
   }
   const meta = { mode: real ? 'πραγματικό μοντέλο' : 'ψεύτικο μοντέλο (έλεγχος μηχανισμού)', budget: want, spent: budget.spent(), by: budget.by(), stopped };
   writeOut('stress-report.md', SL.buildStressReport(sessions, meta));
+  writeSummary(SL.buildStressReport(sessions, meta));
   writeOut('stress-report.json', JSON.stringify({ meta, sessions }, null, 2));
   console.log('\nΚόστος: $' + budget.spent().toFixed(2) + ' (AURA $' + budget.by().aura.toFixed(2) + ', Haiku $' + budget.by().user.toFixed(2) + ')' +
     (stopped ? ' — ΣΤΑΜΑΤΗΣΕ: ' + stopped : '') + '\nΑναφορά: ' + path.join(OUT, 'stress-report.md'));

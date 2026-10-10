@@ -1,0 +1,87 @@
+name: AURA stress test (real model)
+
+# Το στρες τεστ του Σταδίου Α (ADR «10 Οκτωβρίου (β)»). ΜΟΝΟ χειροκίνητα, από το κουμπί «Run workflow» — ποτέ αυτόματα.
+# Το GitHub δείχνει και επιτρέπει το «Run workflow» μόνο σε όσους έχουν δικαίωμα γραφής στο repo.
+#   dry    = μόνο σχέδιο και εκτίμηση κόστους (καμία κλήση, κόστος 0)
+#   μικρό  = οι συνεδρίες 14, 15, 16 και 1 (μία φορά), όριο $3
+#   πλήρες = όλες οι 24 συνεδρίες, όριο $25
+# Το κλειδί έρχεται ΜΟΝΟ από το secret ANTHROPIC_API_KEY, μόνο ως μεταβλητή περιβάλλοντος του βήματος που το χρειάζεται.
+# Δεν τυπώνεται, δεν γράφεται σε αρχείο ή artifact (το script ελέγχει κάθε έξοδο, και το GitHub το κρύβει στα logs).
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry = σχέδιο και κόστος · μικρό = 14, 15, 16, 1 με όριο $3 · πλήρες = όλες με όριο $25'
+        type: choice
+        options:
+          - dry
+          - μικρό
+          - πλήρες
+        default: dry
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aura-stress
+  cancel-in-progress: false
+
+jobs:
+  stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Υπάρχει το κλειδί; (ελέγχεται χωρίς να διαβαστεί)
+        if: inputs.mode != 'dry'
+        env:
+          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "::error title=Λείπει το κλειδί::Δεν υπάρχει το secret ANTHROPIC_API_KEY. Settings → Secrets and variables → Actions → New repository secret."
+            {
+              echo "## ✗ Δεν έτρεξε"
+              echo ""
+              echo "Λείπει το secret **ANTHROPIC_API_KEY**. Πρόσθεσέ το στο Settings → Secrets and variables → Actions και ξανάτρεξε."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Εργαλεία της δοκιμής (δεν αλλάζουν κανένα αρχείο του έργου)
+        run: |
+          npm ci
+          npm install --no-save playwright@1.56.1 @anthropic-ai/sdk@0.133.0
+
+      - name: Browser (μόνο για μικρό / πλήρες)
+        if: inputs.mode != 'dry'
+        run: npx playwright install --with-deps chromium
+
+      - name: Στρες τεστ
+        timeout-minutes: 85
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          OUT="$(node -p "require('os').tmpdir()")/aura_stress"
+          echo "AURA_STRESS_OUT=$OUT" >> "$GITHUB_ENV"
+          case "$MODE" in
+            dry)    node scripts/e2e_stage_a.cjs --stress --real --dry --out "$OUT" ;;
+            μικρό)  node scripts/e2e_stage_a.cjs --stress --real --yes --sessions 14,15,16,1.1 --budget 3 --minutes 75 --out "$OUT" ;;
+            πλήρες) node scripts/e2e_stage_a.cjs --stress --real --yes --budget 25 --minutes 75 --out "$OUT" ;;
+            *)      echo "::error::Άγνωστη επιλογή"; exit 2 ;;
+          esac
+
+      - name: Η αναφορά ως artifact
+        if: always() && inputs.mode != 'dry' && env.AURA_STRESS_OUT != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-stress-report-${{ github.run_number }}
+          path: ${{ env.AURA_STRESS_OUT }}
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,35 @@
+name: AURA tests + build
+
+# Σε κάθε push στο main: όλα τα tests (ό,τι κάνει το auratests\RUN_ALL.bat) και το build της εφαρμογής.
+# Χωρίς κλειδί, χωρίς πραγματικό API: σε αυτή τη ροή δεν δίνεται κανένα secret.
+# Το αποτέλεσμα φαίνεται ως ✓ / ✗ δίπλα σε κάθε commit και στην καρτέλα «Actions».
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # «Run workflow» από το κινητό, για να ξανατρέξει χωρίς νέο push
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    # Ο βρόχος που τρέχει όλα τα tests είναι γραμμένος ΜΙΑ φορά, στο test.yml (τον φυλάει το test_runner_coverage):
+    # ανακαλύπτει τα αρχεία μόνος του, και ένα test που δεν αναφέρει αποτέλεσμα μετρά ως αποτυχία.
+    uses: ./.github/workflows/test.yml
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build (όπως το Vercel)
+        run: npm run build

@@ -1,8 +1,11 @@
 name: AURA tests
 
 on:
+  # On main this loop runs through tests.yml (tests + build), so it is not started a second time here.
   push:
+    branches-ignore: [main]
   pull_request:
+  workflow_call:
 
 jobs:
   test:
