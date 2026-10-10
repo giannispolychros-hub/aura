@@ -1778,7 +1778,7 @@ function writeSummary(text) {
   fs.appendFileSync(f, t + '\n');
 }
 function dryMarkdown(plan, e, want, lines) {
-  return ['## Στρες τεστ — σχέδιο (dry): καμία κλήση, κανένα κόστος', '',
+  return ['## Στρες τεστ — σχέδιο (dry): καμία χρεώσιμη κλήση, κανένα κόστος', '',
     ...lines.map(l => '- ' + l), '', '| Συνεδρία | Χρήστης | Πώς |', '|---|---|---|',
     ...plan.map(r => '| ' + r.label + ' | ' + r.persona.name + ' | ' + (r.persona.fixed ? 'σταθερά μηνύματα' : 'Haiku') + ' |'), ''].join('\n');
 }
@@ -1791,8 +1791,21 @@ async function mainStress() {
   if (!(want > 0) || want > SL.BUDGET_CAP) { console.error('Το όριο δαπάνης πρέπει να είναι από 0 ως $' + SL.BUDGET_CAP + '.'); process.exit(2); }
   if (real && has('--dry')) {
     const e = SL.estimateCost(plan, APP.consts.core.length);
+    // the key: only its SHAPE, then one free call (GET /v1/models/<id>, no tokens) to see whether Anthropic accepts it — never the key
+    const ks = SL.keyShape(process.env.ANTHROPIC_API_KEY || '');
+    const keyLine = 'Κλειδί στη μεταβλητή ANTHROPIC_API_KEY: ' + (ks.found ? 'βρέθηκε · ' + SL.KEY_KIND_TEXT[ks.kind] : 'ΔΕΝ βρέθηκε') +
+      (ks.spaces ? ' · ΠΡΟΣΟΧΗ: έχει κενό ή αλλαγή γραμμής στην αρχή ή στο τέλος' : '') + (ks.quotes ? ' · ΠΡΟΣΟΧΗ: έχει εισαγωγικά' : '');
+    const accept = [];
+    const Anthropic = loadAnthropic();
+    if (ks.found && Anthropic) {
+      const client = new Anthropic({ apiKey: KEY, maxRetries: 1 });
+      for (const id of ['claude-sonnet-4-6', SL.USER_MODEL]) {
+        try { await client.models.retrieve(id); accept.push('Το Anthropic δέχεται το κλειδί για το ' + id + ' (έλεγχος χωρίς κόστος).'); }
+        catch (e) { accept.push('Το Anthropic ΑΠΕΡΡΙΨΕ το κλειδί για το ' + id + ': ' + (e instanceof Anthropic.APIError ? 'HTTP ' + (e.status || '?') : 'σφάλμα σύνδεσης') + '.'); }
+      }
+    }
     const head = [
-      'Κλειδί στη μεταβλητή ANTHROPIC_API_KEY: ' + (KEY ? 'βρέθηκε' : 'ΔΕΝ βρέθηκε'),
+      keyLine, ...accept,
       '@anthropic-ai/sdk (για τους χρήστες/κριτή): ' + (loadAnthropic() ? 'βρέθηκε' : 'ΔΕΝ βρέθηκε — npm install --no-save @anthropic-ai/sdk'),
       'AURA: το api/aura.js του repo (claude-sonnet-4-6). Χρήστες και κριτής: ' + SL.USER_MODEL + '.',
     ];
@@ -1805,7 +1818,7 @@ async function mainStress() {
     ];
     { const m = SL.estimateCost(SL.planRuns(SL.PERSONAS, ['14', '15', '16', '1.1']), APP.consts.core.length);
       tail.push('Το «μικρό» (συνεδρίες 14, 15, 16, 1.1): ΕΚΤΙΜΗΣΗ $' + m.low.toFixed(1) + '–$' + m.high.toFixed(1) + ', όριο $3, περίπου ' + Math.round(m.calls * 11 / 60) + '–' + Math.round(m.callsMax * 13 / 60) + ' λεπτά.'); }
-    console.log('ΣΤΡΕΣ ΤΕΣΤ — ΣΧΕΔΙΟ (καμία κλήση, κανένα build)');
+    console.log('ΣΤΡΕΣ ΤΕΣΤ — ΣΧΕΔΙΟ (καμία χρεώσιμη κλήση, κανένα build)');
     head.forEach(l => console.log(l));
     console.log('Αρχεία στο: ' + OUT + '\n');
     plan.forEach(r => console.log('  ' + r.label.padEnd(4) + ' ' + r.persona.name + (r.persona.fixed ? '  [σταθερά μηνύματα]' : '  [Haiku]')));

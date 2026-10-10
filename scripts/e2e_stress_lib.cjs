@@ -310,6 +310,22 @@ function telemetryIssues(events, acts) {
   return out;
 }
 
+// ── Το κλειδί: μόνο η ΜΟΡΦΗ του, ποτέ το ίδιο (για το --dry: γιατί το Anthropic το απορρίπτει, αν το απορρίπτει) ──
+// Επιστρέφει μόνο σταθερές ετικέτες — κανένα κομμάτι του κλειδιού πέρα από το δημόσιο πρόθεμα του είδους του.
+function keyShape(key) {
+  if (typeof key !== 'string' || !key) return { found: false, kind: 'none', spaces: false, quotes: false };
+  const t = key.trim();
+  const kind = /^sk-ant-api/.test(t) ? 'api' : /^sk-ant-oat/.test(t) ? 'oauth' : /^sk-ant-admin/.test(t) ? 'admin' : /^sk-ant-/.test(t) ? 'other-ant' : 'unknown';
+  return { found: true, kind, spaces: t !== key, quotes: /^["'«]|["'»]$/.test(t) };
+}
+const KEY_KIND_TEXT = {
+  none: 'ΔΕΝ βρέθηκε', api: 'κλειδί API (αρχίζει από sk-ant-api) — σωστό είδος',
+  oauth: 'token OAuth (sk-ant-oat…) — ΔΕΝ είναι κλειδί API· χρειάζεται κλειδί από το console.anthropic.com',
+  admin: 'κλειδί Admin (sk-ant-admin…) — ΔΕΝ κάνει κλήσεις μοντέλου· χρειάζεται κλειδί API',
+  'other-ant': 'αρχίζει από sk-ant- αλλά όχι από sk-ant-api — μάλλον όχι κλειδί API',
+  unknown: 'δεν αρχίζει από sk-ant- — δεν μοιάζει με κλειδί της Anthropic',
+};
+
 // ── Εκτίμηση κόστους (--dry) ─────────────────────────────────────────────────
 // coreChars: μέγεθος του AURA_CORE_PERSONALITY σε χαρακτήρες. ~77.000 tokens για ~300.000 χαρακτήρες (AURA_COST_MEASUREMENT.md,
 // εκτίμηση, όχι μέτρηση) → 1 token ανά ~3,9 χαρακτήρες. Ανά κλήση: όλο το prompt από την cache, ~6.000 χωρίς cache, ~300 έξοδος.
@@ -393,5 +409,5 @@ module.exports = {
   USER_MODEL, PRICES, BUDGET_CAP, WORST_CALL, costOf, makeStressBudget, PERSONAS, BASE_POLICY, policyOf, planRuns, MAX_TYPED, EXIT_AFTER, EXIT_TEXT,
   USER_SCHEMA, CARD_SCHEMA, CLARITY_SCHEMA, personaSystem, personaPrompt, transcriptText, parseJsonReply, JUDGE_SCHEMA, JUDGE_SYSTEM, judgePrompt,
   fold, findLabels, FAREWELLS, findFarewells, normalizeVerbatim, rootIsUserWords, rootQuestionUnderModelQuestion,
-  ADVICE_VIOLATIONS, violationType, lastSessionEvents, telemetryIssues, estimateCost, CHECKS, sessionScore, buildStressReport,
+  ADVICE_VIOLATIONS, violationType, lastSessionEvents, telemetryIssues, estimateCost, CHECKS, sessionScore, buildStressReport, keyShape, KEY_KIND_TEXT,
 };

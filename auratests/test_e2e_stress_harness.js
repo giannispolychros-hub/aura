@@ -185,6 +185,20 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
     /writeOut\('stress-report\.md'/.test(RUNNER) && /writeOut\('stress-report\.json'/.test(RUNNER) && /LIB\.outDirInTemp\(/.test(RUNNER) && /LIB\.assertNoSecret\(t, KEY\)/.test(RUNNER));
 }
 
+// ── The key's SHAPE for --dry (why Anthropic would refuse it) — never the key itself ─────
+{
+  const fake = 'sk-ant-api03-SECRETPART-0123456789';
+  const sh = T('keyShape', fake) || {};
+  assert('KEY SHAPE: the kind and the stray spaces/quotes only — no part of the key in the result',
+    sh.found === true && sh.kind === 'api' && sh.spaces === false && !JSON.stringify(sh).includes('SECRETPART') &&
+    T('keyShape', ' ' + fake + '\n').spaces === true && T('keyShape', '"' + fake + '"').quotes === true &&
+    T('keyShape', 'sk-ant-oat01-x').kind === 'oauth' && T('keyShape', 'sk-ant-admin01-x').kind === 'admin' && T('keyShape', 'abc').kind === 'unknown' && T('keyShape', '').found === false);
+  const dry = RUNNER.slice(RUNNER.indexOf("if (real && has('--dry')) {", RUNNER.indexOf('async function mainStress(')));
+  assert('KEY CHECK: --dry asks Anthropic for the two models (free, no tokens) and reports only accepted / refused with the HTTP status',
+    /client\.models\.retrieve\(id\)/.test(dry) && /\['claude-sonnet-4-6', SL\.USER_MODEL\]/.test(dry) && /e instanceof Anthropic\.APIError \? 'HTTP '/.test(dry) &&
+    !/e\.message/.test(dry.slice(0, dry.indexOf('const head = ['))));
+}
+
 // ── GitHub Actions (John, 10/10: tests and the stress test from the phone) ─────
 // The report also goes to the run's page (job summary), with the same redaction and no-secret check as every file.
 {
