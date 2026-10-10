@@ -97,7 +97,8 @@ const step = (s, ev) => { const n = T('stageAStep', s, ev); return { next: n, te
 {
   const d = (CODE.match(/const stageADispatch = useCallback\(\(ev\) => \{[\s\S]*?\n  \}, \[\]\);/) || [''])[0];
   assert('WIRING: every Stage A step goes through stageADispatch; the record is made right there, from the state before and after',
-    /const _prev = stageARef\.current;\s*stageARef\.current = stageAStep\(_prev, ev\);\s*setStageAPhase\(stageARef\.current\.phase\);\s*const _tel = stageAHelpTelemetry\(_prev, stageARef\.current, ev\);[^\n]*\n\s*if \(_tel\) recordTelemetry\(_tel\.event, _tel\.fields\);/.test(d));
+    // UPDATED (10/10, ADR «10 Οκτωβρίου», 2): the flow events (card, answers, offer, clarity) are recorded on the line between.
+    /const _prev = stageARef\.current;\s*stageARef\.current = stageAStep\(_prev, ev\);\s*setStageAPhase\(stageARef\.current\.phase\);\s*for \(const _r of stageAFlowTelemetry\(_prev, stageARef\.current, ev\)\) recordTelemetry\(_r\.event, _r\.fields\);[^\n]*\n\s*const _tel = stageAHelpTelemetry\(_prev, stageARef\.current, ev\);[^\n]*\n\s*if \(_tel\) recordTelemetry\(_tel\.event, _tel\.fields\);/.test(d));
   const ui = CODE.slice(CODE.indexOf('{/* STAGE A UI — BEGIN */}'), CODE.indexOf('{/* STAGE A UI — END */}'));
   assert('SWITCH CLOSED: the buttons that make these steps exist only inside the Stage A UI, which renders only with the switch open',
     ui.includes('{stageAActive.current && (') && ui.includes('type: "want"') && ui.includes('type: "help", choice: 1') && ui.includes('type: "help", choice: 0') &&

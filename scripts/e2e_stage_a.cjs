@@ -13,7 +13,7 @@
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
-// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W | --only X (μόνο η W ή η X)
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W | X | Y (μόνο η W, η X ή η Y)
 // Αρχεία εξόδου (αναφορά, στιγμιότυπα) ΜΟΝΟ στον προσωρινό φάκελο. Το κλειδί δεν γράφεται ποτέ σε έξοδο.
 'use strict';
 const fs = require('fs');
@@ -42,7 +42,8 @@ async function startApp() {
   if (BASE) return { url: BASE, close: async () => {} };
   const vite = await import('vite');
   const react = (await import('@vitejs/plugin-react')).default;
-  const buildDir = path.join(os.tmpdir(), 'aura_e2e_build_' + STAMP);
+  // a fresh folder per run (not per second): two runs started in the same second must never share — or delete — one build
+  const buildDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aura_e2e_build_'));
   await vite.build({ configFile: false, root: REPO, logLevel: 'warn', plugins: [react()], build: { outDir: buildDir, emptyOutDir: true } });
   const server = await vite.preview({ configFile: false, root: REPO, logLevel: 'warn', build: { outDir: buildDir }, preview: { port: 5299, strictPort: false } });
   const url = (server.resolvedUrls && server.resolvedUrls.local && server.resolvedUrls.local[0] || 'http://localhost:5299/').replace(/\/$/, '');
@@ -617,6 +618,7 @@ async function runMock() {
   }
   await runMockW();
   await runMockX();
+  await runMockY();
 }
 
 // ── W: the hidden tags still work after the label cleaning (founder's check of 6408fbf, ADR «8 Οκτωβρίου (γ)»), switch
@@ -646,8 +648,12 @@ async function runMockW() {
       const s = await open(q, ['Τι εννοείς με το «άξιζα»;', NAMED + ' [[EXIT:yes]]', 'Και;']);
       await send(s.page, 'Περισσότερα χρήματα.');
       const b = await bubbles(s.page);
-      ok(`W1 (switch ${sw}): a reply ending in [[EXIT:yes]] → the old closing card «Δείξε μου» (T5); the reply shows without the tag`,
+      // UPDATED (10/10, ADR «10 Οκτωβρίου», 1): switch open, before the root, only the user's SECOND exit opens a closing —
+      // the model's [[EXIT:yes]] (T5) no longer does; the conversation goes on. Switch closed: the old card, as before.
+      if (!q) ok(`W1 (switch ${sw}): a reply ending in [[EXIT:yes]] → the old closing card «Δείξε μου» (T5); the reply shows without the tag`,
         await card(s.page) && b[b.length - 1] === NAMED && !(await tagOnScreen(s.page)));
+      else ok('W1 (switch open, before the root): a reply ending in [[EXIT:yes]] → NO closing card, the input stays, the reply shows without the tag',
+        !(await card(s.page)) && b[b.length - 1] === NAMED && await s.page.locator('textarea.textarea').count() === 1 && !(await tagOnScreen(s.page)));
       if (q) ok('W1 (switch open): T5 is the model\'s signal, not a closing by the user → no «Πριν φύγεις» door', await s.page.getByText(LEAVING).count() === 0);
       await s.page.screenshot({ path: path.join(OUT, `W1-${sw}.png`), fullPage: false });
       await s.browser.close();
@@ -662,12 +668,21 @@ async function runMockW() {
     }
     for (const tagged of [true, false]) {
       const W = tagged ? 'W3' : 'W4';
-      const s = await open(q, ['Τι εννοείς με το «άξιζα»;', WORDQ + (tagged ? ' [[EARLY_WORD:yes]]' : ''), NAMED + ' [[EXIT:yes]]',
+      // UPDATED (10/10, ADR «10 Οκτωβρίου», 1): switch open, the [[EXIT:yes]] after the word opens nothing before the root; the
+      // old closing comes only at the user's second exit («Ευχαριστώ» → door → «Δεν το βρήκα ακόμα» → «…κλείνουμε εδώ.»), one
+      // more model reply («Εντάξει.»). What W3/W4 check — the kept word, the two closing parts — is the same after that.
+      const s = await open(q, ['Τι εννοείς με το «άξιζα»;', WORDQ + (tagged ? ' [[EARLY_WORD:yes]]' : ''), NAMED + ' [[EXIT:yes]]', ...(q ? ['Εντάξει.'] : []),
         tagged ? 'Κράτα το «ελευθερία».' : WQ, 'Η σκέψη σου παραμένει δική σου.']);
       await send(s.page, 'Περισσότερα χρήματα.');
       const b = await bubbles(s.page);
       if (tagged) ok(`W3 (switch ${sw}): the question carrying [[EARLY_WORD:yes]] shows without the tag`, b[b.length - 1] === WORDQ && !(await tagOnScreen(s.page)));
       await send(s.page, 'ελευθερία');
+      if (q) {
+        ok(`${W} (switch open, before the root): the [[EXIT:yes]] reply opens no closing card`, !(await card(s.page)) && await s.page.locator('textarea.textarea').count() === 1);
+        await send(s.page, 'Ευχαριστώ');
+        await s.page.getByRole('button', { name: 'Δεν το βρήκα ακόμα, συνέχισε', exact: true }).click(); await s.page.waitForTimeout(500);
+        await send(s.page, 'Ευχαριστώ, κλείνουμε εδώ.');
+      }
       const hadCard = await card(s.page);
       if (hadCard) { await s.page.getByRole('button', { name: 'Δείξε μου', exact: true }).click(); await s.page.waitForTimeout(1500); }
       const cc = closingCalls(s.calls);
@@ -704,8 +719,8 @@ async function runMockW() {
 // ── X: ADR «8 Οκτωβρίου (δ)» — the decisions after the red-team of the last 15 pushes ─────────────────────────
 // X1 door 2: «Ναι» to the readiness question → no model call, the root question at once, the «Ναι» shown (not sent)
 // X2 a crisis / DISTRESS sentence in place of the «Ναι» → the safety path, no root question
-// X3 GRACEFUL EXIT before the root (switch open): not sent for a bare «Ναι»; sent when the old closing really opens (T1 with
-//    4+ messages, a second exit); switch closed: as today
+// X3 GRACEFUL EXIT before the root (switch open): not sent for a bare «Ναι»; sent when the old closing really opens (a second
+//    exit — since 10/10 the only one before the root; T1 with 4+ messages opens nothing); switch closed: as today
 // X4 an emoji-only reply: no farewell when the closing card opens on it; the farewell stays when no card opens
 // X5 the user's message is shown (not sent) on every path where it goes nowhere: the first closing, door 1/2/3 and the
 //    correction without substance — in the transcript, in order, and in no request
@@ -821,7 +836,9 @@ async function runMockX() {
     const s = await start('?stageA=1', ['Τι σε κρατάει εκεί;', 'Και τι σε τραβάει αλλού;', 'Είναι η σταθερότητα αυτό που σε κρατάει;', 'Εντάξει.']);
     await send(s.page, 'Η σταθερότητα κυρίως.'); await send(s.page, 'Μάλλον φοβάμαι την αλλαγή.');
     await send(s.page, 'Ναι');
-    ok('X3b (switch open): a «Ναι» with 4+ user messages opens the old closing (T1) → GRACEFUL EXIT is sent, as today', s.calls.length === 4 && graceful(s.calls[3]) && await card(s.page));
+    // UPDATED (10/10, ADR «10 Οκτωβρίου», 1): before the root only the user's second exit opens a closing — T1 no longer does.
+    ok('X3b (switch open): a «Ναι» with 4+ user messages → NO closing (T1 gated): no GRACEFUL EXIT, no card, the reply shows, the input stays',
+      s.calls.length === 4 && !graceful(s.calls[3]) && !(await card(s.page)) && (await turnTexts(s.page)).slice(-1)[0] === 'Εντάξει.' && await s.page.locator('textarea.textarea').count() === 1);
     await s.browser.close();
   }
   {
@@ -976,6 +993,276 @@ async function runMockX() {
     const data = await exported(s.page);
     ok('X6 (switch closed): no coach_help record, no Stage A button', !(data.events || []).some(r => String(r.ev).startsWith('coach_help')) && await btn(s.page, 'Νομίζω βρήκα τι με απασχολεί').count() === 0);
     await s.browser.close();
+  }
+}
+
+// ── Y: ADR «10 Οκτωβρίου» — the three exceptions to the freeze, on a phone screen (390×700). Alone: --only Y.
+// Y1 switch open, 5 user messages, then a bare «Ναι» → no closing card, a normal reply, the conversation goes on
+//    (switch closed: the old card — the control that proves the fixture really fires)
+// Y2 the same for T3 (the third question answered), T4 (the model's «Εντάξει.»), T5 ([[EXIT:yes]]), T6 (warning, then
+//    terminate) and T7 (the «Δες την πορεία» button) — each with its closed-switch control
+// Y3 first T2 → the root question; second T2 → the old closing (card → «Δείξε μου» → ΗΡΘΕΣ/ΒΡΗΚΕΣ/ΦΕΥΓΕΙΣ → the end);
+//    an answer to the first one → the card, door 4 (closing)
+// Y4 a crisis before the root → the safety path, as today
+// Y5 every event is written the moment it happens and stays when the user leaves right after (session_abandoned too)
+// Y6 ?rec=1: no panel; one whole session → the tester file holds the whole sequence, numbers only; the button on the end
+//    screen and on the start screen; no request but /api/aura; without ?rec=1 the requests and the screen are the same
+async function runMockY() {
+  const F1 = 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.', WHY = 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.';
+  const U3 = ['Περισσότερα χρήματα.', 'Και λίγη αναγνώριση.', 'Η σταθερότητα με κρατάει.'];
+  const Q4 = ['Τι εννοείς με το «άξιζα»;', 'Τι σημαίνει αυτό για σένα;', 'Από ποιον;', 'Τι σε κρατάει πιο πολύ;'];
+  const STATEMENT = 'Η σταθερότητα μετράει πολύ για σένα.', GO_ON = 'Και τι σε τραβάει αλλού;';
+  const FRIEND = 'Αν το έλεγε ένας φίλος σου, τι θα του έλεγες; Χρειάζεσαι κάτι παραπάνω από αυτό;';
+  const ROOT = 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.';
+  const WQ = 'ΗΡΘΕΣ ΜΕ: α\nΒΡΗΚΕΣ: β\nΦΕΥΓΕΙΣ ΜΕ: γ\n\nΠριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.';
+  const T = APP.texts;
+  const TT = { line: 'Μόνο αριθμοί — κανένα κείμενο της συζήτησης.', button: 'Στείλε τα στοιχεία της δοκιμής' };
+  // a missing input box is a no-op (the assertion that needed it then fails), never a crash — so the same section runs on old code too
+  const say = async (page, text) => { if (await page.locator('textarea.textarea').count()) await send(page, text); };
+  const auraTexts = async page => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+  const graceful = c => systemText(c).includes('STAGE: GRACEFUL EXIT (code-verified');
+  const btnCount = (page, name) => page.getByRole('button', { name, exact: true }).count();
+  const click = async (page, name) => { const b = page.getByRole('button', { name, exact: true }); if (await b.count()) await b.first().click({ timeout: 4000 }); await page.waitForTimeout(500); };
+  const closingCard = async page => (await btnCount(page, 'Δείξε μου')) === 1 || (await page.getByText('πριν κλείσουμε', { exact: true }).count()) > 0;
+  const warningCard = async page => (await btnCount(page, 'Σταμάτα εδώ')) === 1 || (await page.getByText('Παρατηρώ ότι επιστρέφουμε στο ίδιο σημείο').count()) > 0;
+  const ended = async page => (await page.getByText('η συνομιλία σταμάτησε εδώ').count()) > 0;
+  const input = async page => (await page.locator('textarea.textarea').count()) === 1;
+  const termCalls = calls => calls.filter(c => LIB.classifyRequest(c, APP).kind === 'termination');
+  const log = page => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return ['unreadable']; } });
+  // one browser context per test: the device storage (localStorage) is shared by its pages, so «leave and come back» is real
+  const sess = async (query, replies) => {
+    const browser = await launch();
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 700 }, acceptDownloads: true });
+    const calls = [], reqs = [];
+    const page = await ctx.newPage();
+    page.on('request', r => reqs.push({ url: r.url(), method: r.method() }));
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      calls.push(JSON.parse(route.request().postData() || '{}'));
+      const reply = replies[Math.min(n, replies.length - 1)]; n++;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: reply }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    return { browser, ctx, page, calls, reqs };
+  };
+  const begin = async s => {
+    await s.page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await say(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await say(s.page, WHY);
+  };
+  const five = async s => { await begin(s); for (const u of U3) await say(s.page, u); };   // 5 user messages, every reply a question
+  const download = async (page, name) => {
+    try {
+      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }), page.getByRole('button', { name, exact: true }).click({ timeout: 4000 })]);
+      const text = fs.readFileSync(await dl.path(), 'utf8');
+      return { text, data: JSON.parse(text), file: dl.suggestedFilename() };
+    } catch (e) { return { text: '', data: { events: [] }, file: '', error: String(e.message || e).slice(0, 80) }; }
+  };
+
+  // ── Y1 + Y2: no closing before the root, whatever opens it — only the user's second exit ─────────────
+  const CASES = [
+    // [name, the reply to the 4th question (index 3 of Q4), the user's message, the reply to it, what the closed switch shows]
+    ['T1 — a bare «Ναι» after 5 messages', Q4[3], 'Ναι', STATEMENT, 'card'],
+    ['T3 — the third question (friend + orientation) answered', FRIEND, 'Θα του έλεγα να το ψάξει λίγο ακόμα', STATEMENT, 'card'],
+    ['T4 — the model\'s own closing move («Εντάξει.»)', Q4[3], 'Μάλλον φοβάμαι την αλλαγή', 'Εντάξει.', 'card'],
+    ['T5 — the model\'s [[EXIT:yes]]', Q4[3], 'Μάλλον φοβάμαι την αλλαγή', STATEMENT + ' [[EXIT:yes]]', 'card'],
+    ['T6 — «the decision is yours», twice (warning, then terminate)', Q4[3], 'Μάλλον φοβάμαι την αλλαγή', 'Η απόφαση είναι δική σου.', 'warning'],
+    ['T7 — the «Δες την πορεία» offer', Q4[3], 'Μάλλον φοβάμαι την αλλαγή', 'Αν θέλεις, μπορώ να σου δείξω πώς έφτασες εδώ.', 'button'],
+  ];
+  for (const [name, q4, u, reply, closedShows] of CASES) {
+    for (const q of ['?stageA=1', '']) {
+      const sw = q ? 'open' : 'CLOSED';
+      const T6 = name.startsWith('T6');
+      const s = await sess(q, [...Q4.slice(0, 3), q4, reply, T6 ? reply : GO_ON, GO_ON]);
+      await five(s);
+      const n = s.calls.length;
+      await say(s.page, u); await s.page.waitForTimeout(400);
+      const shown = (await auraTexts(s.page)).slice(-1)[0] || '';
+      const promise = await btnCount(s.page, 'Δες την πορεία');
+      if (q) {
+        ok(`Y ${name} (switch open, before the root): the model was asked as usual (one call) and its reply shows, without a tag`,
+          s.calls.length === n + 1 && shown.startsWith(reply.replace(' [[EXIT:yes]]', '')) && !shown.includes('[['));
+        ok(`Y ${name} (switch open): NO closing card, NO warning, NO «Πριν φύγεις» door, the session goes on (input there, not ended)`,
+          !(await closingCard(s.page)) && !(await warningCard(s.page)) && await s.page.getByText(T.askLeaving).count() === 0 && await input(s.page) && !(await ended(s.page)));
+        ok(`Y ${name} (switch open): the request did not say «close now» (no GRACEFUL EXIT) and no closing request was made`, !graceful(s.calls[n]) && termCalls(s.calls).length === 0);
+        if (name.startsWith('T7')) ok('Y T7 (switch open): the «Δες την πορεία» button is not drawn before the root', promise === 0);
+        await say(s.page, T6 ? 'Δεν ξέρω ακόμα.' : 'Ίσως και κάτι άλλο.'); await s.page.waitForTimeout(400);
+        ok(`Y ${name} (switch open): the next message gets its normal reply — ` + (T6 ? 'the second «the decision is yours» still opens no warning and no terminate' : 'the conversation simply continues'),
+          s.calls.length === n + 2 && !(await closingCard(s.page)) && !(await warningCard(s.page)) && termCalls(s.calls).length === 0 && await input(s.page) && !(await ended(s.page)));
+        if (name.startsWith('T1')) await s.page.screenshot({ path: path.join(OUT, 'Y1-T1-no-card-phone.png'), fullPage: false });
+      } else {
+        const sees = closedShows === 'card' ? await closingCard(s.page) : closedShows === 'warning' ? await warningCard(s.page) : promise === 1;
+        ok(`Y ${name} (switch CLOSED, control): the same session shows the old ${closedShows === 'button' ? '«Δες την πορεία» button' : closedShows} — the fixture really fires; unchanged`, sees);
+      }
+      await s.browser.close();
+    }
+  }
+
+  // ── Y3: the user's own exit — the first one meets the root question, the second the old closing ─────────
+  {
+    const s = await sess('?stageA=1', [...Q4.slice(0, 3), 'Εντάξει. Είμαι εδώ αν θέλεις να συνεχίσουμε.', WQ, 'Η σκέψη σου παραμένει δική σου.']);
+    await five(s);
+    const n = s.calls.length;
+    await say(s.page, 'Ευχαριστώ.');
+    ok('Y3: first exit («Ευχαριστώ.») → the root question, no model call, no closing card', s.calls.length === n && await s.page.getByText(T.askLeaving).count() === 1 && !(await closingCard(s.page)));
+    await click(s.page, T.back);
+    await say(s.page, 'Ευχαριστώ, κλείνουμε εδώ.');
+    ok('Y3: second exit → one model call and the old closing card «Δείξε μου», GRACEFUL EXIT sent (as today)', s.calls.length === n + 1 && graceful(s.calls[n]) && await closingCard(s.page));
+    await click(s.page, 'Δείξε μου'); await s.page.waitForTimeout(800);
+    ok('Y3: «Δείξε μου» → the old closing request and ΗΡΘΕΣ / ΒΡΗΚΕΣ / ΦΕΥΓΕΙΣ on screen, the word asked', termCalls(s.calls).length === 1 && await s.page.getByText('ΗΡΘΕΣ ΜΕ: α').count() >= 1 && await input(s.page));
+    await say(s.page, 'ελευθερία'); await s.page.waitForTimeout(800);
+    ok('Y3: the word → the session ends, as before', await ended(s.page));
+    ok('Y3: no tester button without ?rec=1, and nothing written to the device log without ?rec=1 / ?debug=1',
+      await btnCount(s.page, TT.button) === 0 && (await log(s.page)).length === 0);
+    await s.page.screenshot({ path: path.join(OUT, 'Y3-second-exit-end-phone.png'), fullPage: false });
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1', [...Q4.slice(0, 3), GO_ON]);
+    await five(s);
+    await say(s.page, 'Ευχαριστώ.');
+    await say(s.page, ROOT);
+    const L = await log(s.page);
+    ok('Y3: an answer to the first exit\'s question → the card, and the card is recorded with door 4 (closing)',
+      await btnCount(s.page, T.yes) === 1 && L.filter(r => r.ev === 'root_card_shown').length === 1 && L.find(r => r.ev === 'root_card_shown').door === 4);
+    await click(s.page, T.back);
+    const L2 = await log(s.page);
+    ok('Y3: «Δεν το βρήκα ακόμα» on that card → root_answer 3 (not found) from the card (2)', (r => !!r && r.answer === 3 && r.from === 2)(L2.filter(r => r.ev === 'root_answer').pop()));
+    await s.browser.close();
+  }
+
+  // ── Y4: a crisis before the root — the safety path, as today ──────────────────────────────────────────
+  for (const [label, text] of [['crisis', 'Δεν θέλω να ζω άλλο.'], ['crisis with «κλείνουμε»', 'Ευχαριστώ, κλείνουμε εδώ. Δεν θέλω να ζω άλλο.']]) {
+    const s = await sess('?stageA=1', [...Q4.slice(0, 3), 'Είμαι εδώ μαζί σου. Είσαι ασφαλής αυτή τη στιγμή;', GO_ON]);
+    await five(s);
+    const n = s.calls.length;
+    await say(s.page, text); await s.page.waitForTimeout(400);
+    ok(`Y4 (${label}, before the root): the model is called, the crisis line is shown, no root question, no root card, no offer`,
+      s.calls.length === n + 1 && await s.page.getByText(/1018/).count() >= 1 && await s.page.getByText(T.askLeaving).count() === 0 && await s.page.getByText(T.ask, { exact: true }).count() === 0 &&
+      await btnCount(s.page, T.yes) === 0 && await btnCount(s.page, T.wantMore) === 0 && await s.page.getByText(T.price).count() === 0);
+    await s.browser.close();
+  }
+
+  // ── Y5: written the moment it happens, kept when the user leaves right after ─────────────────────────
+  {
+    // closed hard (no unload handler runs): what was written before is still there
+    const s = await sess('?stageA=1&rec=1', [Q4[0], GO_ON]);
+    await begin(s);
+    await click(s.page, T.button); await say(s.page, ROOT);
+    const L = await log(s.page);
+    ok('Y5: the card is on screen and root_card_shown (door 1) is ALREADY in the device log — written the moment it happened',
+      await btnCount(s.page, T.yes) === 1 && L.length > 0 && L[L.length - 1].ev === 'root_card_shown' && L[L.length - 1].door === 1);
+    await s.page.close();   // the tab is gone: no pagehide, no further step
+    const p2 = await s.ctx.newPage(); await p2.goto(BASE + '/?stageA=1&rec=1');
+    const K = await log(p2);
+    ok('Y5: the tab closed at once — the card record is still on the device', K.some(r => r.ev === 'root_card_shown' && r.door === 1) && K.some(r => r.ev === 'session_started'));
+    await s.browser.close();
+  }
+  {
+    // each answer on its own: left right after it → it is there, followed by session_abandoned (turns, stageReached)
+    const STEPS = [
+      ['«Ναι, αυτό είναι»', async p => { await click(p, T.yes); }, ['root_answer', 'coach_offer_shown'], r => r[0].answer === 1 && r[0].from === 2 && r[1].shown === 1],
+      ['«Διόρθωσε»', async p => { await click(p, T.correct); }, ['root_answer'], r => r[0].answer === 2 && r[0].from === 2],
+      ['«Δεν το βρήκα ακόμα»', async p => { await click(p, T.back); }, ['root_answer'], r => r[0].answer === 3 && r[0].from === 2],
+      ['«Όχι τώρα»', async p => { await click(p, T.yes); await click(p, T.notNow); }, ['coach_offer_answer'], r => r[0].want === 0],
+      ['«Θέλω να συνεχίσω»', async p => { await click(p, T.yes); await click(p, T.wantMore); }, ['coach_offer_answer', 'coach_help_asked'], r => r[0].want === 1 && r[1].asked === 1],
+      ['the clarity scale (8)', async p => { await click(p, T.yes); await click(p, T.notNow); await click(p, '8'); }, ['clarity_scale'], r => r[0].value === 8],
+    ];
+    for (const [label, act, evs, check] of STEPS) {
+      const s = await sess('?stageA=1&rec=1', [Q4[0], GO_ON, GO_ON]);
+      await begin(s);
+      await click(s.page, T.button); await say(s.page, ROOT);
+      const before = (await log(s.page)).length;
+      await act(s.page);
+      const now = (await log(s.page)).slice(before);
+      const got = evs.map(e => now.find(r => r.ev === e));
+      ok(`Y5 ${label}: recorded at once, before anything else happens (${evs.join(' + ')})`, got.every(Boolean) && check(got));
+      await s.page.goto('about:blank');                      // the user leaves right after
+      await s.page.goto(BASE + '/?stageA=1&rec=1');
+      const K = await log(s.page);
+      const ab = K.filter(r => r.ev === 'session_abandoned');
+      ok(`Y5 ${label}: after leaving it is still there, and session_abandoned is written once with turns and stageReached (numbers)`,
+        evs.every(e => K.some(r => r.ev === e)) && ab.length === 1 && Number.isInteger(ab[0].turns) && ab[0].turns >= 1 && Number.isInteger(ab[0].stageReached) && ab[0].stageReached >= 3 &&
+        Object.keys(ab[0]).every(k => ['ev', 'turns', 'stageReached', 't'].includes(k) || typeof ab[0][k] !== 'string'));
+      await s.browser.close();
+    }
+  }
+  {
+    // a finished session is not «abandoned»; neither is a page nobody started
+    const s = await sess('?stageA=1&rec=1', [Q4[0], 'Η σκέψη σου παραμένει δική σου.']);
+    await s.page.goto('about:blank'); await s.page.goto(BASE + '/?stageA=1&rec=1');
+    ok('Y5: a page left before «Ξεκίνα» → no session_abandoned', !(await log(s.page)).some(r => r.ev === 'session_abandoned'));
+    await begin(s);
+    await click(s.page, T.button); await say(s.page, ROOT); await click(s.page, T.yes); await click(s.page, T.notNow); await click(s.page, '7');
+    await say(s.page, 'πατέρας'); await s.page.waitForTimeout(800);
+    const fin = await ended(s.page);
+    await s.page.goto('about:blank'); await s.page.goto(BASE + '/?stageA=1&rec=1');
+    const K = await log(s.page);
+    ok('Y5: a session that reached its end → session_completed, and leaving afterwards writes NO session_abandoned', fin && K.some(r => r.ev === 'session_completed') && !K.some(r => r.ev === 'session_abandoned'));
+    await s.browser.close();
+  }
+
+  // ── Y6: ?rec=1 — the whole session in the tester file, numbers only ───────────────────────────────────
+  const whole = async q => {
+    const s = await sess(q, [Q4[0], 'Η σκέψη σου παραμένει δική σου.']);
+    await s.ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE }).catch(() => {});
+    await begin(s);
+    await click(s.page, T.button); await say(s.page, ROOT);
+    await click(s.page, T.yes); await click(s.page, T.wantMore); await click(s.page, T.help2); await click(s.page, '7');
+    await say(s.page, 'πατέρας'); await s.page.waitForTimeout(800);
+    return s;
+  };
+  {
+    const s = await whole('?stageA=1&rec=1');
+    const body = await s.page.locator('body').innerText();
+    ok('Y6 (?rec=1): no debug panel on screen (no «τηλεμετρία (.json)», no turn counter, no violations line)',
+      await btnCount(s.page, 'τηλεμετρία (.json)') === 0 && !/καμία παραβίαση|\bturn: \d/.test(body));
+    ok('Y6 (?rec=1): the session ended; the end screen shows the line and the small button', await ended(s.page) &&
+      await s.page.getByText(TT.line, { exact: true }).count() === 1 && await btnCount(s.page, TT.button) === 1);
+    await s.page.screenshot({ path: path.join(OUT, 'Y6-rec-end-phone.png'), fullPage: false });
+    const f = await download(s.page, TT.button);
+    const ev = f.data.events || [];
+    const ORDER = ['session_started', 'root_card_shown', 'root_answer', 'coach_offer_shown', 'coach_offer_answer', 'coach_help_asked', 'coach_help_choice', 'clarity_scale', 'session_completed'];
+    const idx = ORDER.map(e => ev.findIndex(r => r.ev === e));
+    ok('Y6: the button downloads a file (aura_dokimi_YYYY-MM-DD.json)', /^aura_dokimi_\d{4}-\d{2}-\d{2}\.json$/.test(f.file) && f.data.records === ev.length);
+    ok('Y6: the file holds the whole sequence, in order: ' + ORDER.join(' → '), idx.every(i => i >= 0) && idx.every((v, k) => k === 0 || v > idx[k - 1]));
+    { const g = e => ev.find(r => r.ev === e) || {};
+      ok('Y6: … with the right numbers: card door 1, «Ναι» (1, from the card), offer shown, «Θέλω να συνεχίσω» (1), choice 2, clarity 7',
+        g('root_card_shown').door === 1 && g('root_answer').answer === 1 && g('root_answer').from === 2 && g('coach_offer_shown').shown === 1 &&
+        g('coach_offer_answer').want === 1 && g('coach_help_choice').choice === 2 && g('clarity_scale').value === 7 && g('session_completed').lateClarity === 7); }
+    ok('Y6: numbers only — every value is a number or true/false (the event name aside), and not one Greek letter in the whole file',
+      ev.length > 0 && ev.every(r => Object.entries(r).every(([k, v]) => k === 'ev' || typeof v === 'number' || typeof v === 'boolean')) && !/[Ͱ-Ͽἀ-῿]/.test(f.text));
+    ok('Y6: no conversation text in the file — not the first message, the root, the word, or a model reply',
+      f.text.length > 0 && ![F1, WHY, ROOT, 'πατέρας', Q4[0], 'Η σκέψη σου', 'φοβάμαι', 'τράπεζα'].some(x => f.text.includes(x)));
+    const clip = await s.page.evaluate(() => navigator.clipboard.readText().catch(() => null)).catch(() => null);
+    ok('Y6: the same file is also copied (clipboard)', clip === null ? true : clip === f.text);
+    if (clip === null) results.push('NOTE — Y6: the clipboard could not be read in this browser; only the download was checked');
+    const own = new URL(BASE).origin;
+    const other = s.reqs.filter(r => !r.url.startsWith('blob:') && !r.url.startsWith('data:') && !r.url.startsWith('about:') && (new URL(r.url).origin !== own || (r.method !== 'GET' && new URL(r.url).pathname !== '/api/aura')));
+    const posts = s.reqs.filter(r => r.method !== 'GET');
+    ok('Y6: no network request but /api/aura — nothing else leaves the page (static files of the app aside), the button sends nothing',
+      other.length === 0 && posts.length === s.calls.length && posts.every(r => new URL(r.url).pathname === '/api/aura'));
+    // the start screen of the next visit: there is something stored → the same small button
+    const p2 = await s.ctx.newPage(); p2.on('request', r => s.reqs.push({ url: r.url(), method: r.method() }));
+    await p2.goto(BASE + '/?stageA=1&rec=1');
+    ok('Y6: the start screen (data stored) shows the line and the button', await p2.getByText(TT.line, { exact: true }).count() === 1 && await btnCount(p2, TT.button) === 1);
+    await p2.screenshot({ path: path.join(OUT, 'Y6-rec-start-phone.png'), fullPage: false });
+    const f2 = await download(p2, TT.button);
+    ok('Y6: … it downloads the same records', (f2.data.events || []).length === ev.length && JSON.stringify(f2.data.events) === JSON.stringify(ev));
+    const p3 = await s.ctx.newPage(); await p3.goto(BASE + '/?stageA=1');
+    ok('Y6: the same device without ?rec=1 → no button on the start screen', await btnCount(p3, TT.button) === 0 && await p3.getByText('Ξεκίνα με το πρόβλημά σου').count() === 1);
+    await s.browser.close();
+    // without ?rec=1 the session is the same: the same requests to the model, the same screen (the tester lines aside)
+    const t = await whole('?stageA=1');
+    const bodyNo = await t.page.locator('body').innerText();
+    // the button's label is drawn in capitals by the style (innerText returns «ΣΤΕΙΛΕ ΤΑ …»): compare without case or accents
+    const U = x => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    const strip = x => U(x).replace(U(TT.line), '').replace(U(TT.button), '').replace(/\s+/g, ' ').trim();
+    ok('Y6: without ?rec=1 the same session sends the same requests, byte for byte', JSON.stringify(t.calls) === JSON.stringify(s.calls));
+    ok('Y6: … and shows the same screen, the tester line and button aside (which do not exist without ?rec=1)',
+      strip(bodyNo) === strip(body) && await btnCount(t.page, TT.button) === 0 && await t.page.getByText(TT.line).count() === 0 && (await log(t.page)).length === 0);
+    if (strip(bodyNo) !== strip(body)) { writeOut('Y6-screen-rec.txt', body); writeOut('Y6-screen-norec.txt', bodyNo); }
+    await t.browser.close();
   }
 }
 
@@ -1191,7 +1478,7 @@ async function runScenarios(makeModel, budget) {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else await runMock();
+      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

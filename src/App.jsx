@@ -1585,7 +1585,8 @@ function isStageAActive(search) {
 }
 function isRemoteTelemetryActive(search) {
   if (!REMOTE_TELEMETRY_ENABLED) return false;
-  try { return new URLSearchParams(search).get("debug") !== "1"; } catch (e) { return false; }
+  // ADR «10 Οκτωβρίου», 3: a tester device (?rec=1) never sends either, like ?debug=1.
+  try { const p = new URLSearchParams(search); return p.get("debug") !== "1" && p.get("rec") !== "1"; } catch (e) { return false; }
 }
 // STAGE A — step 3.0 (SPEC_FREE_END.md §3.1). The rule lives ONCE in AURA_CORE_PERSONALITY and is
 // conditional on this marker; only the uncached per-turn part ever carries it, so the switch never
@@ -1768,6 +1769,19 @@ function closingCardOpensNow(st) {
   if (o.decision !== "confirm" && o.decision !== "terminate") return false;
   return !(o.active === true && (o.armed === true || !!o.rootPhase));
 }
+// ADR «10 Οκτωβρίου», 1 (an exception to the Stage A freeze) — with the switch open and before a confirmed root, the old
+// closing (the «πριν κλείσουμε» card, the warning, terminate, the outcome-scale hold) opens ONLY on an explicit exit by the
+// user (T2): the first one meets the root question (the door before the model), the second one the old closing. Every other
+// trigger — T1, T3–T8 — becomes "none": no card, the conversation goes on. Safety as today: safety mode and supportive turns
+// are already "none", and a T2 message that carries a safety signal keeps its old closing (8/10 (β), 4). Switch closed or
+// after the root: unchanged.
+function stageAPreRootDecision(decision, st) {
+  const o = st || {};
+  if (o.active !== true || o.rootConfirmed === true) return decision;
+  if (decision !== "confirm" && decision !== "terminate" && decision !== "warn" && decision !== "await_outcome_scale") return decision;
+  const u = typeof o.lastUserText === "string" ? o.lastUserText : "";
+  return isExplicitClosure(u) || declaresClosing(u) ? decision : "none";
+}
 // STAGE A — the whole flow as one pure step function (SPEC_FREE_END.md §1.5, §2.1, §2.1α, §2.2, §4, §6.1).
 // phase: null (conversation) · "ask" (door 1's fixed question) · "card" · "correct" · "offer" · "notReady" ·
 // "clarity" · "word" · "done". Every transition the screen can make goes through here, so the order of §2.1α is
@@ -1909,6 +1923,31 @@ function stageAHelpTelemetry(prev, next, ev) {
   if (ev.type === "want" && prev.phase === "offer" && next.phase === "notReady") return { event: "coach_help_asked", fields: { asked: 1 } };
   if (ev.type === "help" && prev.phase === "notReady" && next.phase === "clarity") return { event: "coach_help_choice", fields: { choice: ev.choice === 1 || ev.choice === 2 || ev.choice === 3 ? ev.choice : 0 } };
   return null;
+}
+// ADR «10 Οκτωβρίου», 2 (SPEC 2.2, an exception to the freeze) — every step of the root flow is recorded the moment it
+// happens, device only, numbers only: the card shown and from which door (1 the button · 2 readiness · 3 spontaneous · 4 the
+// first closing), the answer to it (1 «Ναι, αυτό είναι» · 2 «Διόρθωσε» · 3 «Δεν το βρήκα ακόμα»; from 1 the question · 2 the
+// card · 3 the correction), the €6 offer shown, its answer (want 1 «Θέλω να συνεχίσω» / 0 «Όχι τώρα»), the clarity value.
+// A list, in the order things happened. Built from the step and the state — never from the root text.
+function stageAFlowTelemetry(prev, next, ev) {
+  const out = [];
+  if (!prev || !next || !ev) return out;
+  const FROM = { ask: 1, card: 2, correct: 3 };
+  if (ev.type === "open" && next.phase === "card" && prev.phase !== "card") {
+    out.push({ event: "root_card_shown", fields: { door: prev.leaving ? 4 : (next.door === 1 || next.door === 2 || next.door === 3 ? next.door : 0) } });
+  } else if (ev.type === "yes" && prev.phase === "card" && next.phase !== "card") {
+    out.push({ event: "root_answer", fields: { answer: 1, from: 2 } });
+    if (next.phase === "offer") out.push({ event: "coach_offer_shown", fields: { shown: 1 } });
+  } else if (ev.type === "correctStart" && prev.phase === "card" && next.phase === "correct") {
+    out.push({ event: "root_answer", fields: { answer: 2, from: 2 } });
+  } else if (ev.type === "back" && FROM[prev.phase] && next.phase === null) {
+    out.push({ event: "root_answer", fields: { answer: 3, from: FROM[prev.phase] } });
+  } else if ((ev.type === "want" || ev.type === "notNow") && prev.phase === "offer" && next.phase !== "offer") {
+    out.push({ event: "coach_offer_answer", fields: { want: ev.type === "want" ? 1 : 0 } });
+  } else if (ev.type === "clarity" && prev.phase === "clarity" && next.phase === "word") {
+    out.push({ event: "clarity_scale", fields: { value: next.stats.lateClarity } });
+  }
+  return out;
 }
 // Violation check only (never a success measure): did a reply defer «τι κάνω» to after the root?
 function detectsRootDeferral(text) {
@@ -3107,7 +3146,8 @@ function recordTelemetry(event, fields) {
       (window.__auraTelemetry = window.__auraTelemetry || []).push(rec);
       console.log("[AURA telemetry]", JSON.stringify(rec));
       try {
-        if (new URLSearchParams(window.location.search).get("debug") === "1") {
+        // ADR «10 Οκτωβρίου», 3: the tester mode (?rec=1) keeps the same device log as ?debug=1 (no panel, no network).
+        if (["debug", "rec"].some(k => new URLSearchParams(window.location.search).get(k) === "1")) {
           const store = window.localStorage;
           let log = [];
           try { log = JSON.parse(store.getItem("aura_telemetry_log") || "[]"); } catch (e2) { log = []; }
@@ -3478,6 +3518,49 @@ function exportTelemetry() {
   const a    = document.createElement("a");
   a.href = url; a.download = "aura_telemetry.json"; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ADR «10 Οκτωβρίου», 3 — TESTER MODE (?rec=1). The two lines are the only new text on screen (John, 10/10/2026).
+const TESTER_TEXTS = { line: "Μόνο αριθμοί — κανένα κείμενο της συζήτησης.", button: "Στείλε τα στοιχεία της δοκιμής" };
+// What the tester sends: the device log, filtered AGAIN here — each record keeps its event name and its numbers / booleans,
+// nothing else. recordTelemetry already drops text; this makes sure no text can leave even if a bad record ever got in.
+function buildTesterExport(rows, exportedAt) {
+  const events = (Array.isArray(rows) ? rows : []).map(r => {
+    if (!r || typeof r !== "object" || typeof r.ev !== "string" || !/^[a-z_]{1,32}$/.test(r.ev)) return null;
+    const o = { ev: r.ev };
+    for (const k of Object.keys(r)) {
+      if (k === "ev") continue;
+      const v = r[k];
+      if (typeof v === "boolean" || (typeof v === "number" && Number.isFinite(v))) o[k] = v;
+    }
+    return o;
+  }).filter(Boolean);
+  return { exportedAt: String(exportedAt || ""), note: "AURA tester log — counts and flags only, never anything a person typed.", records: events.length, events };
+}
+// How many records the device log holds (the start screen shows the button only when there is something to send).
+function storedTelemetryCount() {
+  try {
+    const rows = JSON.parse(window.localStorage.getItem("aura_telemetry_log") || "[]");
+    return Array.isArray(rows) ? rows.length : 0;
+  } catch (e) { return 0; }
+}
+// «Στείλε τα στοιχεία της δοκιμής»: the file is downloaded AND copied, so the tester can attach or paste it. Nothing is sent.
+function exportTesterData() {
+  let rows = [];
+  try {
+    const stored = JSON.parse(window.localStorage.getItem("aura_telemetry_log") || "[]");
+    if (Array.isArray(stored)) rows = stored;
+  } catch (e) { rows = []; }
+  const now = new Date().toISOString();
+  const text = JSON.stringify(buildTesterExport(rows, now), null, 2);
+  try { if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {}); } catch (e) { /* no clipboard — the download still runs */ }
+  try {
+    const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "aura_dokimi_" + now.slice(0, 10) + ".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) { /* no download — the copy above may still have worked */ }
 }
 
 function exportMemory(mem) {
@@ -5380,7 +5463,7 @@ async function callAura(messages, systemPrompt, retries = 1, onChunk = null) {
 // ─────────────────────────────────────────────
 // MESSAGE BUBBLE (A1: memoized — avoids re-render of entire history on new message)
 // ─────────────────────────────────────────────
-const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueToReflection }) {
+const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueToReflection, hideReflection }) {
   const isUser        = msg.role === "user";
   const isInsight     = msg.isInsight;
   const isTermination = msg.isTermination;
@@ -5454,7 +5537,7 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
           content itself (συμπίεση, διαύγεια). The isTermination styling already visually
           distinguishes this content without needing an explicit meta-label. */}
       {isSafe        && <div className="msg-badge safe"><span style={{width:3,height:3,borderRadius:"50%",background:"var(--red)",display:"inline-block"}}/>υποστήριξη</div>}
-      {isPromiseMsg && (
+      {isPromiseMsg && !hideReflection && (
         <button className="choice-btn" style={{marginTop:"10px"}} onClick={onContinueToReflection}>
           Δες την πορεία
         </button>
@@ -5641,6 +5724,8 @@ export default function AURAv2() {
   const roadAnswersFinal  = useRef([]);
   // Debug panel gate — read once from the URL, never re-derived on later renders/navigation.
   const debugMode = useRef(typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1');
+  // ADR «10 Οκτωβρίου», 3 — tester mode: ?rec=1 keeps the device log like ?debug=1, with no panel; read once per visit.
+  const recMode = useRef(typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('rec') === '1');
   // Stage A gate (step 0.1) — read once per visit, like debugMode. Closed on main; nothing reads it yet.
   const stageAActive = useRef(typeof window !== 'undefined' && isStageAActive(window.location.search));
   // STAGE A counters (step 3.0) — violation checks only, never success measures (ADR «6 Οκτωβρίου (στ)»).
@@ -5668,6 +5753,7 @@ export default function AURAv2() {
     const _prev = stageARef.current;
     stageARef.current = stageAStep(_prev, ev);
     setStageAPhase(stageARef.current.phase);
+    for (const _r of stageAFlowTelemetry(_prev, stageARef.current, ev)) recordTelemetry(_r.event, _r.fields); // ADR «10 Οκτωβρίου», 2: at once
     const _tel = stageAHelpTelemetry(_prev, stageARef.current, ev); // ADR «8 Οκτωβρίου (δ)», 6: passive, counts only
     if (_tel) recordTelemetry(_tel.event, _tel.fields);
   }, []);
@@ -5807,6 +5893,26 @@ export default function AURAv2() {
     if (!uiBubbles.length) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [uiBubbles.length]);
+  // ADR «10 Οκτωβρίου», 2 — session_abandoned (SPEC §6.1): a session left before its end — the page closed or hidden — is
+  // recorded ONCE, at that moment, with turns and (switch open) stageReached. Numbers only, device only.
+  const abandonMark = useRef({ started: false, ended: false, done: false });
+  useEffect(() => { abandonMark.current.started = sessionStarted || messages.length > 0; }, [sessionStarted, messages.length]);
+  useEffect(() => { abandonMark.current.ended = sessionEnded; }, [sessionEnded]);
+  useEffect(() => {
+    const _onLeave = () => {
+      const _a = abandonMark.current;
+      if (!_a.started || _a.ended || _a.done) return;
+      _a.done = true;
+      recordTelemetry("session_abandoned", { turns: Math.min(9999, turnCount.current || 0), ...(stageAActive.current ? { stageReached: stageARef.current.stats.stageReached || 0 } : {}) });
+    };
+    const _onVis = () => { if (document.visibilityState === "hidden") _onLeave(); };
+    window.addEventListener("pagehide", _onLeave);
+    document.addEventListener("visibilitychange", _onVis);
+    return () => {
+      window.removeEventListener("pagehide", _onLeave);
+      document.removeEventListener("visibilitychange", _onVis);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // TELEMETRY — one measurement per ending, whichever path got there.
   //
@@ -6095,11 +6201,11 @@ A line missing above means only that one pattern was not matched — the absence
         // opens on this turn. The closing decision is the user-side one (this message, no reply text, no model signal).
         const stage = computeMasterPriorityStage(safetyMode, msgCount, userSignalsClosing && (!stageAActive.current || stageAKeepsGracefulExit({
           active: true, rootConfirmed: stageARef.current.stats.rootConfirmed === 1, safetyMode, supportive: currentMode === "SUPPORTIVE",
-          decision: decideTermination(msgs, "", {
+          decision: stageAPreRootDecision(decideTermination(msgs, "", {
             safetyMode, currentMode, warningIssued: warningIssued.current, compressionCount: compressionCount.current, modelJudgesEnd: false,
             concreteStepStated: concreteStepStated.current, outcomeScaleAsked: outcomeScaleAsked.current, outcomeScaleBlockUsed: outcomeScaleBlockUsed.current,
             duringOnboarding: false, duringDeclineCooldown: closureDeclineCooldown.current > 0,
-          }),
+          }), { active: true, rootConfirmed: stageARef.current.stats.rootConfirmed === 1, lastUserText }),
           armed: stageARootArmed.current, rootPhase: stageARef.current.phase,
           latchFlips: !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1 &&
             (detectsSpontaneousCoreRecognition(lastUserText) || (coreReadinessAsked.current && detectsAffirmativeShort(lastUserText))),
@@ -6749,15 +6855,18 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // ADR «8 Οκτωβρίου (δ)», 2: when the closing card opens on this same reply, no farewell is added — a goodbye, then the
         // card, then the real closing is two goodbyes. The decision is the one the real call below makes (same inputs, run early).
         const _closingCardOpens = userWasClosing && closingCardOpensNow({
-          decision: currentMode === "SUPPORTIVE" ? "none" : decideTermination(msgs, text, {
+          decision: stageAPreRootDecision(currentMode === "SUPPORTIVE" ? "none" : decideTermination(msgs, text, {
             safetyMode, currentMode, warningIssued: warningIssued.current, compressionCount: compressionCount.current,
             modelJudgesEnd,
             concreteStepStated: concreteStepStated.current, outcomeScaleAsked: outcomeScaleAsked.current, outcomeScaleBlockUsed: outcomeScaleBlockUsed.current,
             duringOnboarding: showDemo, duringDeclineCooldown: closureDeclineCooldown.current > 0,
-          }),
+          }), { active: stageAActive.current, rootConfirmed: stageARef.current.stats.rootConfirmed === 1, lastUserText: lastUserMsg }),
           active: stageAActive.current, armed: stageARootArmed.current, rootPhase: stageARef.current.phase,
         });
-        if (!_closingCardOpens) displayText = (displayText.trim() ? displayText.trim() + " " : "") + addition;
+        // ADR «10 Οκτωβρίου», 1: switch open, before the root, a closing word that opens no closing is not a goodbye — the
+        // conversation goes on, so the empty reply gets the existing «Τι σκέφτεσαι τώρα;» (no new text).
+        const _saNoGoodbye = stageAActive.current && stageARef.current.stats.rootConfirmed !== 1 && userWasClosing && !_closingCardOpens;
+        if (!_closingCardOpens) displayText = (displayText.trim() ? displayText.trim() + " " : "") + (_saNoGoodbye ? "Τι σκέφτεσαι τώρα;" : addition);
       }
 
       // EXPLICIT STYLE PREFERENCE (real-user-requested feature — critical distinction from the
@@ -6995,7 +7104,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // Termination decision — extracted to decideTermination() for testability, same logic as before.
       // ADR «7 Οκτωβρίου (β)», 2: on a supportive (crisis) turn no closing decision opens — no card, warning,
       // «Πριν φύγεις:», T3 or T6. Read from THIS call's mode: safetyMode only updates after this call returns.
-      const decision = currentMode === "SUPPORTIVE" ? "none" : decideTermination(msgs, text, {
+      // ADR «10 Οκτωβρίου», 1: switch open, before the root — only an explicit exit (T2) keeps a closing decision.
+      const _saLastText = msgs.length && msgs[msgs.length - 1].role === "user" ? String(msgs[msgs.length - 1].content || "") : "";
+      const decision = stageAPreRootDecision(currentMode === "SUPPORTIVE" ? "none" : decideTermination(msgs, text, {
         safetyMode,
         currentMode,
         warningIssued: warningIssued.current,
@@ -7006,7 +7117,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         outcomeScaleBlockUsed: outcomeScaleBlockUsed.current,
         duringOnboarding: showDemo,
         duringDeclineCooldown: closureDeclineCooldown.current > 0,
-      });
+      }), { active: stageAActive.current, rootConfirmed: stageARef.current.stats.rootConfirmed === 1, lastUserText: _saLastText });
       if (closureDeclineCooldown.current > 0) closureDeclineCooldown.current -= 1;
 
       // ROAD QUESTIONS — EMIT. Placed after the termination decision so an early exit is visible
@@ -7918,6 +8029,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     riskSignalKind.current = 0; labelLeaks.current = 0;
     stageARef.current = initialStageAState(); stageARootArmed.current = false; setStageAPhase(null);
     setUiBubbles([]);
+    abandonMark.current = { started: false, ended: false, done: false };
     setStageACopyText(null); setStageACopied(false);
     shiftCheckAsked.current = false;
     shiftCheckConfirmed.current = false;
@@ -8286,6 +8398,12 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                 style={{display:"block",width:"100%",background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.35)",color:"rgba(201,168,76,0.85)",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",cursor:"pointer",borderRadius:"4px"}}>
                 Ξεκίνα με το πρόβλημά σου
               </button>
+              {recMode.current && storedTelemetryCount() > 0 && (
+                <div style={{marginTop:"22px",textAlign:"left"}}>
+                  <div style={{fontSize:"11px",color:"#8a8680",lineHeight:1.5,marginBottom:"6px"}}>{TESTER_TEXTS.line}</div>
+                  <button onClick={exportTesterData} style={{background:"transparent",border:"1px solid rgba(201,168,76,0.3)",color:"rgba(201,168,76,0.75)",fontSize:"11px",padding:"6px 10px",cursor:"pointer"}}>{TESTER_TEXTS.button}</button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -8514,7 +8632,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             <MessageBubble
               msg={msg}
               onMisfire={() => { if (sessionEnded || layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending) return; setMisfireType(detectPattern(messages.slice(0, i+1)).type); setMisfirePending(true); }}
-              onContinueToReflection={() => { if (sessionEnded || loading || layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending || reflectionDelivered.current) return; handleClosureConfirm(true); }}
+              onContinueToReflection={() => { if (sessionEnded || loading || layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending || reflectionDelivered.current || (stageAActive.current && stageARef.current.stats.rootConfirmed !== 1)) return; handleClosureConfirm(true); }}
+              hideReflection={stageAActive.current && stageAView.stats.rootConfirmed !== 1}
             />
             {uiBubbles.filter(g => Math.min(g.at, messages.length) === i + 1).map(g => (
               <MessageBubble key={g.id} msg={g} onMisfire={() => {}} onContinueToReflection={() => {}} />
@@ -8855,6 +8974,12 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               <div className="end-label">η συνομιλία σταμάτησε εδώ</div>
               <div className="end-note">Επίστρεψε όταν υπάρχει κάτι νέο να δούμε.</div>
               {(!finalDistillation || valueUnlocked || stageAActive.current || riskSignalKind.current !== 0) && <button className="new-btn" onClick={resetSession}>Νέα συνεδρία</button>}
+              {recMode.current && (
+                <div style={{marginTop:"14px"}}>
+                  <div className="end-note" style={{fontSize:"11px",marginBottom:"6px"}}>{TESTER_TEXTS.line}</div>
+                  <button className="new-btn" style={{fontSize:"11px"}} onClick={exportTesterData}>{TESTER_TEXTS.button}</button>
+                </div>
+              )}
               {valueUnlocked && finalDistillation && (
                 <button className="new-btn" style={{marginLeft:"8px"}} onClick={() => {
                   // The kept word drives the recurring lookup; the unknown comes from the most

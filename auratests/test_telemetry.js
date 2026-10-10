@@ -163,8 +163,11 @@ if (SRC) {
     !/sessionStorage/.test(SRC));
   assert('The recorder writes exactly one storage key, its own',
     (SRC.match(/setItem\(/g) || []).length === 1 && /setItem\(\s*["']aura_telemetry_log["']/.test(SRC));
-  assert('Every write is gated — the debug check precedes the write in the body, never after it',
-    SRC.indexOf("get(\"debug\")") > -1 && SRC.indexOf("get(\"debug\")") < SRC.indexOf('setItem('));
+  // UPDATED (2026-10-10, ADR «10 Οκτωβρίου», 3): the gate is now «?debug=1 OR ?rec=1» (the tester mode keeps the same
+  // device log, without the panel). Still one gate, still before the only write.
+  assert('Every write is gated — the debug / tester check precedes the write in the body, never after it',
+    /\["debug", "rec"\]\.some\(k => new URLSearchParams\(window\.location\.search\)\.get\(k\) === "1"\)/.test(SRC) &&
+    SRC.indexOf('["debug", "rec"]') < SRC.indexOf('setItem('));
   assert('The recorder never calls the API', !/fetch\s*\(|callAura/.test(SRC));
   assert('The recorder is wrapped so it can never throw into a session', /try\s*{/.test(SRC));
 }

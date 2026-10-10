@@ -68,8 +68,10 @@ assert('1: the crisis tier and safetyMode rule are untouched (tier A locks, tier
 // ── 2. no closing decision on a supportive turn ──────────────────────────────
 assert('2: generateResponse receives this turn\'s mode as its own argument',
   /const generateResponse = useCallback\(async \(msgs, currentMode/.test(GEN));
+// UPDATED (2026-10-10, ADR «10 Οκτωβρίου», 1): the decision now passes through stageAPreRootDecision (switch open, before the
+// root: only T2 keeps a closing). The supportive rule is inside it, unchanged — a supportive turn still gives "none".
 assert('2: a supportive turn takes NO closing decision — read from this turn\'s mode, not from safetyMode',
-  /const decision = currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{/.test(GEN));
+  /const decision = stageAPreRootDecision\(currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{/.test(GEN));
 assert('2: the only supportive call is the crisis branch (so «supportive turn» = «crisis turn»)',
   (CODE.match(/generateResponse\([^)]*"SUPPORTIVE"\)/g) || []).length === 1 && CRISIS.includes('generateResponse(safeMsgs, "SUPPORTIVE")'));
 {
@@ -80,7 +82,7 @@ assert('2: the only supportive call is the crisis branch (so «supportive turn»
     fnSha('isExplicitClosure') === '09da70474755ef40' && fnSha('declaresClosing') === '45062068044c40b1');
 }
 {
-  const d = GEN.indexOf('const decision = currentMode === "SUPPORTIVE"');
+  const d = GEN.indexOf('const decision = stageAPreRootDecision(currentMode === "SUPPORTIVE"'); // UPDATED 10/10: see above
   const users = ['if (decision === "await_outcome_scale")', 'stageALeavingDoorOpens({', 'if (decision === "confirm" || decision === "terminate") {', 'if (decision === "warn") {'];
   assert('2: card, warning, «Πριν φύγεις:» and the outcome-scale block all read that one decision, after it',
     d > 0 && users.every(u => GEN.indexOf(u) > d));

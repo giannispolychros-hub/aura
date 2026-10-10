@@ -94,7 +94,7 @@ const SHORT = JOHN.slice(0, 4); // two user messages so far
   assert('1: wiring — switch closed → the old expression only (short-circuit), the gate runs only with the switch open',
     /const stage = computeMasterPriorityStage\(safetyMode, msgCount, userSignalsClosing && \(!stageAActive\.current \|\| stageAKeepsGracefulExit\(\{/.test(blk));
   assert('1: wiring — the decision is decideTermination on THIS message, no reply text, no model signal, same options as the real call',
-    /decision: decideTermination\(msgs, "", \{/.test(blk) && /modelJudgesEnd: false/.test(blk) && /duringDeclineCooldown: closureDeclineCooldown\.current > 0/.test(blk) &&
+    /decision: stageAPreRootDecision\(decideTermination\(msgs, "", \{/.test(blk) && /modelJudgesEnd: false/.test(blk) && /duringDeclineCooldown: closureDeclineCooldown\.current > 0/.test(blk) &&
     /safetyMode, currentMode, warningIssued: warningIssued\.current, compressionCount: compressionCount\.current/.test(blk));
   assert('1: wiring — after the root, safety mode and supportive turns are passed to the gate',
     /rootConfirmed: stageARef\.current\.stats\.rootConfirmed === 1/.test(blk) && /safetyMode,/.test(blk) && /supportive: currentMode === "SUPPORTIVE"/.test(blk));
@@ -165,13 +165,15 @@ const SHORT = JOHN.slice(0, 4); // two user messages so far
     blk.includes('const userWasClosing = matchesClosingWord(lastUserMsg) || declaresClosing(lastUserMsg);') &&
     blk.includes('const addition = userWasClosing ? "Καλή συνέχεια." : "Τι σκέφτεσαι τώρα;";'));
   assert('2: wiring — only when the user was closing, the same decision as the real call (this reply, the model signal), supportive → none',
-    /const _closingCardOpens = userWasClosing && closingCardOpensNow\(\{/.test(blk) && /decision: currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{/.test(blk) &&
+    // UPDATED (10/10, ADR «10 Οκτωβρίου», 1): the same decision now passes through the pre-root gate.
+    /const _closingCardOpens = userWasClosing && closingCardOpensNow\(\{/.test(blk) && /decision: stageAPreRootDecision\(currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{/.test(blk) &&
     /modelJudgesEnd,/.test(blk) && /duringOnboarding: showDemo, duringDeclineCooldown: closureDeclineCooldown\.current > 0/.test(blk) &&
     /active: stageAActive\.current, armed: stageARootArmed\.current, rootPhase: stageARef\.current\.phase/.test(blk));
   assert('2: wiring — no farewell is added when the card opens; otherwise the text is added exactly as before',
-    /if \(!_closingCardOpens\) displayText = \(displayText\.trim\(\) \? displayText\.trim\(\) \+ " " : ""\) \+ addition;/.test(blk));
+    // UPDATED (10/10, ADR «10 Οκτωβρίου», 1): before the root (switch open) a closing word that opens no closing gets the existing question
+    /if \(!_closingCardOpens\) displayText = \(displayText\.trim\(\) \? displayText\.trim\(\) \+ " " : ""\) \+ \(_saNoGoodbye \? "Τι σκέφτεσαι τώρα;" : addition\);/.test(blk));
   assert('2: the real decision after the reply is untouched (same call, same options)',
-    /const decision = currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{\s*safetyMode,\s*currentMode,/.test(GEN));
+    /const decision = stageAPreRootDecision\(currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{\s*safetyMode,\s*currentMode,/.test(GEN)); // UPDATED 10/10: the pre-root gate wraps it
 }
 
 // ── Not touched ──────────────────────────────────────────────────────────────
