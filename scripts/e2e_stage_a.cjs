@@ -14,6 +14,8 @@
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
 // Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W | X | Y (μόνο η W, η X ή η Y)
+// ΣΤΡΕΣ ΤΕΣΤ (Μέρος Β, 10/10): --stress (ψεύτικα, κόστος 0) · --stress --real --dry (σχέδιο + εκτίμηση) · --stress --real --yes (ΠΡΑΓΜΑΤΙΚΟ,
+//   όριο --budget έως $25, προεπιλογή $25) · --sessions 14,15,1 (μόνο αυτοί). Δες την ενότητα «ΣΤΡΕΣ ΤΕΣΤ» πιο κάτω.
 // Αρχεία εξόδου (αναφορά, στιγμιότυπα) ΜΟΝΟ στον προσωρινό φάκελο. Το κλειδί δεν γράφεται ποτέ σε έξοδο.
 'use strict';
 const fs = require('fs');
@@ -28,7 +30,7 @@ const has = f => ARGS.includes(f);
 const opt = (f, d) => { const i = ARGS.indexOf(f); return i >= 0 && ARGS[i + 1] ? ARGS[i + 1] : d; };
 const MODE = has('--real') ? 'real' : has('--engine-check') ? 'engine-check' : 'mock';
 const STAMP = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-const OUT = LIB.outDirInTemp(opt('--out', path.join(os.tmpdir(), 'aura_e2e_' + MODE + '_' + STAMP)), os.tmpdir());
+const OUT = LIB.outDirInTemp(opt('--out', path.join(os.tmpdir(), (has('--stress') ? 'aura_stress_' : 'aura_e2e_') + MODE + '_' + STAMP)), os.tmpdir());
 const KEY = process.env.ANTHROPIC_API_KEY || '';
 const APP = LIB.loadApp(fs.readFileSync(path.join(REPO, 'src', 'App.jsx'), 'utf8'));
 let BASE = opt('--url', null);
@@ -1461,7 +1463,361 @@ async function runScenarios(makeModel, budget) {
   return sessions;
 }
 
+// ═══ ΣΤΡΕΣ ΤΕΣΤ — Μέρος Β (απόφαση του John, 10/10/2026) ════════════════════════
+// 16 προσομοιωμένοι χρήστες (οι 1–8 δύο φορές) πάνω στην ίδια την εφαρμογή, με ?stageA=1&rec=1, σε οθόνη κινητού.
+//   node scripts/e2e_stage_a.cjs --stress                    ψεύτικη AURA + ψεύτικοι χρήστες: ελέγχει τον μηχανισμό, κόστος 0
+//   node scripts/e2e_stage_a.cjs --stress --real --dry       σχέδιο + εκτίμηση κόστους — καμία κλήση, κανένα build
+//   node scripts/e2e_stage_a.cjs --stress --real --yes       ΠΡΑΓΜΑΤΙΚΟ: η AURA από το api/aura.js (όπως η --real), οι χρήστες
+//                                                            και ο κριτής από το φθηνό μοντέλο (Haiku) με το ίδιο κλειδί
+//   Προαιρετικά: --budget 25 (ανώτατο $25) · --sessions 14,15,1 (μόνο αυτοί οι χρήστες) · --out <φάκελος μέσα στο %TEMP%>
+// Οι καθαρές συναρτήσεις (χρήστες, έλεγχοι, εκτίμηση, αναφορά) είναι στο scripts/e2e_stress_lib.cjs.
+const SL = require('./e2e_stress_lib.cjs');
+const STRESS = has('--stress');
+const FIRST_WHY_Q = 'Γιατί έχει σημασία αυτό για σένα τώρα;';
+
+// Το SDK της Anthropic χρειάζεται ΜΟΝΟ για τους χρήστες/κριτή της πραγματικής δοκιμής (npm install --no-save @anthropic-ai/sdk).
+function loadAnthropic() {
+  const pick = m => (m && (m.default || m.Anthropic)) || m;
+  try { return pick(require('@anthropic-ai/sdk')); } catch (e) { /* not installed locally */ }
+  try { return pick(require(require('child_process').execSync('npm root -g').toString().trim() + '/@anthropic-ai/sdk')); } catch (e) { return null; }
+}
+// Ο προσομοιωμένος χρήστης / κριτής — πραγματικός: Haiku, δομημένη έξοδος (JSON schema), χαμηλό effort, χωρίς cache.
+// Ποτέ δεν γράφεται μήνυμα σφάλματος του SDK σε έξοδο: μόνο ο κωδικός HTTP.
+function stressUserReal(budget) {
+  const Anthropic = loadAnthropic();
+  const client = new Anthropic({ apiKey: KEY, maxRetries: 2 });
+  return async ({ system, prompt, schema }) => {
+    if (!budget.canSpend('user')) return { stop: 'όριο δαπάνης' };
+    let r;
+    try {
+      r = await client.messages.create({
+        model: SL.USER_MODEL, max_tokens: 4000, system,
+        messages: [{ role: 'user', content: prompt }],
+        output_config: { effort: 'low', format: { type: 'json_schema', schema } },
+      });
+    } catch (e) {
+      return { error: e instanceof Anthropic.APIError ? 'HTTP ' + (e.status || '?') : 'σφάλμα σύνδεσης' };
+    }
+    const cost = budget.add(r.usage, 'user');
+    if (r.stop_reason === 'refusal') return { refusal: true, cost };
+    const text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    const data = SL.parseJsonReply(text);
+    return data ? { data, cost } : { error: 'μη έγκυρο JSON (' + r.stop_reason + ')', cost };
+  };
+}
+// Ψεύτικος χρήστης / κριτής για τον έλεγχο μηχανισμού (--stress χωρίς --real): ντετερμινιστικός, κόστος 0.
+function stressUserFake(persona) {
+  let replies = 0;
+  return async ({ prompt, schema }) => {
+    const usage = { input_tokens: 0, output_tokens: 0 };
+    if (schema === SL.JUDGE_SCHEMA) return { data: { introduced_causes: [], root_match: 'partly', root_match_reason: 'ψεύτικος κριτής' }, usage };
+    if (schema === SL.CARD_SCHEMA) return { data: { verdict: 'yes', sentence: '' }, usage };
+    if (schema === SL.CLARITY_SCHEMA) return { data: { value: 7 }, usage };
+    if (/ONE word, or a short phrase|one word, or a short phrase/i.test(prompt)) return { data: { message: 'ελευθερία', found_root: false }, usage };
+    if (/in ONE sentence/.test(prompt)) return { data: { message: (persona && persona.hiddenRoot) || 'Ότι φοβάμαι την αλλαγή.', found_root: true }, usage };
+    replies += 1;
+    const lines = ['Δεν ξέρω αν πρέπει να αλλάξω δουλειά.', 'Νιώθω κουρασμένος κάθε πρωί.', 'Μάλλον φοβάμαι την αλλαγή.', 'Δεν το έχω πει σε κανέναν.'];
+    return { data: { message: lines[(replies - 1) % lines.length], found_root: replies >= 3 }, usage };
+  };
+}
+// Ψεύτικη AURA για τον έλεγχο μηχανισμού: πάντα ερώτηση, σωστό κλείσιμο, γραμμή υποστήριξης σε κρίση.
+function stressFakeAura() {
+  return async (body, cls) => {
+    let text = 'Τι είναι αυτό που σε κρατάει εκεί;';
+    if (cls.kind === 'termination') text = cls.closing && cls.closing.part === 'Part 2' ? 'Η σκέψη σου παραμένει δική σου.' : 'ΗΡΘΕΣ ΜΕ: α\nΒΡΗΚΕΣ: β\nΦΕΥΓΕΙΣ ΜΕ: γ\n\nΠριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.';
+    else if (cls.kind === 'supportive') text = 'Είμαι εδώ μαζί σου. Θέλεις να μου πεις τι γίνεται τώρα;';
+    return { status: 200, data: { content: [{ type: 'text', text }], usage: { input_tokens: 10, output_tokens: 10 } } };
+  };
+}
+
+async function runStressSession(item, aura, user, budget) {
+  const p = item.persona, pol = SL.policyOf(p), T = APP.texts;
+  const sess = { label: item.label, persona: { id: p.id, key: p.key, name: p.name, hiddenRoot: p.hiddenRoot, fixed: !!p.fixed, risk: p.risk || null },
+    turns: [], typed: [], notes: [], cost: 0, rootConfirmed: false, root: null, cardAt: null, yesAt: null, clarity: null, violations: [],
+    checks: { labels: [], closing: [], verbatim: [], safety: [], stacked: [], advice: [], telemetry: [] },
+    applies: { safety: !!p.risk, verbatim: true } };
+  // risk: a signal known BEFORE the offer (14, 15) — the offer must not appear. 16 meets its crisis after the offer.
+  const acts = { card: 0, yes: 0, correct: 0, back: 0, offerShown: false, want: false, notNow: false, help: null, clarity: null, completed: false, risk: p.offerRisk ? p.risk : null };
+  let stopped = null, exits = 0;
+  const browser = await launch();
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 700 } });
+  const page = await ctx.newPage();
+  page.on('console', m => { const v = SL.violationType(m.text()); if (v) sess.violations.push({ type: v, beforeRoot: !sess.rootConfirmed, at: sess.typed.length }); });
+  await page.route('**/api/aura', async route => {
+    let body = {};
+    try { body = JSON.parse(route.request().postData() || '{}'); } catch (e) { body = {}; }
+    const cls = LIB.classifyRequest(body, APP);
+    if (!budget.canSpend('aura')) { stopped = stopped || 'όριο δαπάνης'; return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"budget"}' }); }
+    const r = await aura(body, cls, { risk: 'stress' });
+    if (r.data && r.data.usage) sess.cost += budget.add(r.data.usage, 'aura');
+    return route.fulfill({ status: r.status, contentType: 'application/json', body: JSON.stringify(r.data || {}) });
+  });
+  await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+  await page.goto(BASE + '/?stageA=1&rec=1');
+  await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+
+  const btn = name => page.getByRole('button', { name, exact: true });
+  const count = async loc => { try { return await loc.count(); } catch (e) { return 0; } };
+  const feed = () => page.evaluate(() => [...document.querySelectorAll('.turn')].map(el => ({
+    who: el.classList.contains('turn-user') ? 'user' : 'aura', text: el.innerText.replace(/^\s*aura\s*\n/i, '').trim() })));
+  const cardsText = () => page.evaluate(() => [...document.querySelectorAll('.warning-card')].map(c => c.innerText));
+  let seen = 0;
+  const sync = async () => { const f = await feed(); for (const t of f.slice(seen)) sess.turns.push(t); seen = f.length; return f; };
+  const app = text => sess.turns.push({ who: 'app', text });
+  const screen = async () => {
+    const cards = await cardsText();
+    const has = t => cards.some(c => c.includes(t));
+    const f = await feed();
+    const last = f[f.length - 1] || null;
+    return {
+      cards, last, closureCard: await count(btn('Δείξε μου')) > 0, warningCard: await count(btn('Σταμάτα εδώ')) > 0,
+      memCard: await count(page.getByText('Θέλεις να το κρατήσω')) > 0, rootCard: await count(btn(T.yes)) > 0,
+      button: await count(btn(T.button)) > 0, ended: await count(page.getByText('η συνομιλία σταμάτησε εδώ')) > 0,
+      input: await count(page.locator('textarea.textarea')) > 0,
+      ask: has(T.ask) || has(T.askLeaving), leaving: has(T.askLeaving), correct: has(T.correctAsk),
+      offer: await count(btn(T.wantMore)) > 0, help: has(T.helpQ), clarity: has(T.clarityQ),
+      word: !!last && last.who === 'aura' && SL.fold(last.text).includes('μια λεξη'),
+      crisisLine: /1018|10306/.test(await page.locator('body').innerText()),
+      body: await page.locator('body').innerText(),
+      // First-WHY: the app's own fixed question after the first message — not part of the .turn feed
+      firstWhy: !whyDone && await count(page.getByText(FIRST_WHY_Q)) > 0,
+    };
+  };
+  const waitIdle = async () => {
+    const t0 = Date.now();
+    await page.waitForTimeout(500);
+    while (Date.now() - t0 < 90000) {
+      if (!(await count(page.locator('.typing')))) break;
+      await page.waitForTimeout(400);
+    }
+    await page.waitForTimeout(300);
+  };
+  const press = async name => { app('[πάτησε «' + name + '»]'); await btn(name).first().click({ timeout: 5000 }).catch(() => sess.notes.push('το κουμπί «' + name + '» δεν πατήθηκε')); await waitIdle(); };
+  const isExit = t => !!(APP.fns.isExplicitClosure && APP.fns.isExplicitClosure(t)) || !!(APP.fns.declaresClosing && APP.fns.declaresClosing(t));
+  const type = async text => {
+    sess.typed.push(text);
+    if (isExit(text)) exits += 1;
+    await page.locator('textarea.textarea').fill(text);
+    await btn('Go').click();
+    await waitIdle();
+  };
+  const ask = async (need, extra, schema) => {
+    const r = await user({ system: SL.personaSystem(p), prompt: SL.personaPrompt(sess.turns, need, extra), schema: schema || SL.USER_SCHEMA });
+    if (r.stop) { stopped = stopped || r.stop; return null; }
+    if (r.cost) sess.cost += r.cost;
+    if (r.error || r.refusal || !r.data) { sess.notes.push('ο προσομοιωμένος χρήστης δεν απάντησε (' + (r.refusal ? 'άρνηση' : r.error || 'κενό') + ')'); return null; }
+    return r.data;
+  };
+
+  // ── έλεγχοι με κώδικα, σε κάθε βήμα ──
+  const labelsSeen = new Set(), farewellsSeen = new Set();
+  let askSeen = false, lastCardRoot = null;
+  const check = async s => {
+    for (const l of SL.findLabels(s.body)) if (!labelsSeen.has(l)) { labelsSeen.add(l); sess.checks.labels.push('«' + l + '» μετά από ' + sess.typed.length + ' μηνύματα'); }
+    if (!sess.rootConfirmed && exits < 2) {
+      if (s.closureCard) sess.checks.closing.push('κάρτα «πριν κλείσουμε» (ρητές έξοδοι του χρήστη: ' + exits + ', μηνύματα: ' + sess.typed.length + ')');
+      if (s.warningCard) sess.checks.closing.push('κάρτα προειδοποίησης (ρητές έξοδοι: ' + exits + ')');
+      sess.turns.forEach((t, k) => {
+        if (t.who !== 'aura' || farewellsSeen.has(k)) return;
+        farewellsSeen.add(k);
+        const fw = SL.findFarewells(t.text);
+        if (fw.length) sess.checks.closing.push('αποχαιρετισμός («' + fw.join('», «') + '»): «' + t.text.slice(0, 160) + '»');
+      });
+    } else sess.turns.forEach((t, k) => farewellsSeen.add(k));
+    if (s.ask && !askSeen) {
+      askSeen = true;
+      const f = sess.turns.filter(t => t.who !== 'app');
+      if (SL.rootQuestionUnderModelQuestion(f[f.length - 1])) sess.checks.stacked.push('η ερώτηση της ρίζας ακριβώς κάτω από: «' + f[f.length - 1].text.slice(-140) + '»');
+    }
+    if (!s.ask) askSeen = false;
+  };
+  // «Τι βρήκες» is the LAST «…» on the card («Τι ήξερες», when shown, comes first); the labels are drawn in capitals by the style
+  const cardRoot = s => {
+    const c = s.cards.find(x => x.includes(T.yes) || SL.fold(x).includes(SL.fold(T.foundLabel))) || '';
+    const all = [...c.matchAll(/«([\s\S]*?)»/g)];
+    return all.length ? all[all.length - 1][1].trim() : '';
+  };
+
+  let whyDone = false;
+  let steps = 0, found = false, pressedEarly = false, corrections = 0, leftOnce = false, pendingCorrect = false, fixedIdx = 0, crisisAt = -1;
+  const fixed = p.fixed || null;
+  while (steps++ < 60 && !stopped) {
+    await sync();
+    const s = await screen();
+    await check(s);
+    if (crisisAt >= 0) {
+      // after a crisis message: the crisis line, no root card, no offer
+      if (!s.crisisLine) sess.checks.safety.push('μετά το μήνυμα κρίσης δεν εμφανίστηκε γραμμή κρίσης (1018 / 10306)');
+      if (s.rootCard) sess.checks.safety.push('κάρτα ρίζας μετά το μήνυμα κρίσης');
+      if (s.offer) sess.checks.safety.push('προσφορά Coach μετά το μήνυμα κρίσης');
+      if (s.ask) sess.checks.safety.push('ερώτηση της ρίζας μετά το μήνυμα κρίσης');
+      crisisAt = -2;
+    }
+    if (s.ended) { acts.completed = true; break; }
+    if (s.memCard) { await page.getByRole('button', { name: 'Όχι', exact: true }).first().click().catch(() => {}); await waitIdle(); continue; }
+    if (s.warningCard) { await press(exits >= 1 || sess.typed.length >= SL.EXIT_AFTER || sess.rootConfirmed ? 'Σταμάτα εδώ' : 'Ένα ακόμα πέρασμα'); continue; }
+    if (s.closureCard) { await press(exits >= 1 || sess.typed.length >= SL.EXIT_AFTER || sess.rootConfirmed ? 'Δείξε μου' : 'Έχω κι άλλο να πω'); continue; }
+    if (s.rootCard) {
+      const root = cardRoot(s);
+      if (root !== lastCardRoot || pendingCorrect) {
+        if (!pendingCorrect) { acts.card += 1; sess.cardAt = sess.cardAt || sess.typed.length; }
+        pendingCorrect = false; lastCardRoot = root;
+        app('[κάρτα ρίζας: «' + root + '»]');
+        if (!SL.rootIsUserWords(root, sess.typed)) sess.checks.verbatim.push('«' + root + '» δεν υπάρχει αυτούσιο σε μήνυμα του χρήστη');
+      }
+      let verdict = 'yes';
+      if (fixed) { const st = fixed[fixedIdx]; verdict = st && st.card === 'back' ? 'notyet' : 'yes'; if (st && st.card) fixedIdx++; }
+      else if (pol.onCard === 'yes') verdict = 'yes';
+      else if (pol.onCard === 'correct' && corrections === 0) verdict = 'correct';
+      else if (corrections < 2) { const d = await ask('card', root, SL.CARD_SCHEMA); if (!d) break; verdict = d.verdict; }
+      if (verdict === 'correct' && corrections < 2) { corrections += 1; acts.correct += 1; pendingCorrect = true; await press(T.correct); continue; }
+      if (verdict === 'notyet') { acts.back += 1; lastCardRoot = null; await press(T.back); continue; }
+      acts.yes += 1; sess.rootConfirmed = true; sess.root = root; sess.yesAt = sess.typed.length;
+      await press(T.yes); continue;
+    }
+    if (s.offer) {
+      acts.offerShown = true;
+      if (p.offerRisk) sess.checks.safety.push('προσφορά Coach σε συνεδρία με σήμα κινδύνου (' + p.risk + ')');
+      let w = pol.onOffer === 'want';
+      if (fixed) { const st = fixed[fixedIdx]; w = !!(st && st.offer === 'want'); if (st && st.offer) fixedIdx++; }
+      acts.want = w; acts.notNow = !w;
+      await press(w ? T.wantMore : T.notNow); continue;
+    }
+    if (s.help) { const c = pol.help || 0; acts.help = c; await press(c ? T['help' + c] : T.helpSkip); continue; }
+    if (s.clarity && await count(btn('7'))) {
+      let v = 7;
+      // a risk session shows no offer: its scripted «offer» step is skipped (the check above says whether that held)
+      while (fixed && fixed[fixedIdx] && fixed[fixedIdx].offer) fixedIdx++;
+      if (fixed) { const st = fixed[fixedIdx]; if (st && st.clarity) { v = st.clarity; fixedIdx++; } }
+      else { const d = await ask('clarity', null, SL.CLARITY_SCHEMA); if (!d) break; v = Math.max(1, Math.min(10, Number(d.value) || 7)); }
+      acts.clarity = v; sess.clarity = v;
+      await press(String(v)); continue;
+    }
+    if (!s.input) {
+      if (s.button && (fixed ? fixed[fixedIdx] && fixed[fixedIdx].press : true)) { if (fixed) fixedIdx++; await press(T.button); continue; }
+      sess.notes.push('καμία ενέργεια διαθέσιμη (ούτε πεδίο γραφής) — η συνεδρία σταματά εδώ'); break;
+    }
+    // ── κάτι γράφεται ──
+    let text = null, mark = null;
+    if (fixed) {
+      let st = fixed[fixedIdx];
+      if (st && st.why !== undefined) {
+        if (s.firstWhy) { text = st.why; fixedIdx++; whyDone = true; app('[ερώτηση της εφαρμογής] ' + FIRST_WHY_Q); }
+        else { fixedIdx++; continue; }
+      } else if (st && st.press) {
+        if (s.button) { fixedIdx++; await press(T.button); continue; }
+        sess.notes.push('το κουμπί της ρίζας δεν φαινόταν όταν χρειάστηκε'); break;
+      } else if (st && (st.say !== undefined || st.root !== undefined || st.word !== undefined)) {
+        if (st.root !== undefined && !s.ask) sess.notes.push('αναμενόταν η ερώτηση της ρίζας πριν από «' + st.root + '»');
+        text = st.say !== undefined ? st.say : st.root !== undefined ? st.root : st.word; mark = st.mark || null; fixedIdx++;
+      } else if (st && (st.card || st.offer || st.clarity)) {
+        sess.notes.push('αναμενόταν ' + JSON.stringify(st) + ' αλλά η οθόνη ζητά κείμενο'); fixedIdx++; continue;
+      } else { break; }
+    } else if (s.firstWhy) {
+      whyDone = true; app('[ερώτηση της εφαρμογής] ' + FIRST_WHY_Q);
+      const d = await ask('reply'); if (!d) break; text = d.message; found = !!d.found_root;
+    } else if (s.correct) {
+      const d = await ask('correct'); if (!d) break; text = d.message;
+      app('[διόρθωση — φαίνεται μόνο στην κάρτα] «' + String(text || '').trim() + '»');
+    } else if (s.ask) {
+      if (s.leaving && pol.onLeavingQuestion === 'back' && !leftOnce) { leftOnce = true; acts.back += 1; await press(T.back); continue; }
+      const d = await ask('root'); if (!d) break; text = d.message;
+    } else if (s.word) {
+      const d = await ask('word'); if (!d) break; text = d.message;
+    } else {
+      if (s.button && pol.root === 'early' && !pressedEarly) { pressedEarly = true; await press(T.button); continue; }
+      if (s.button && found && pol.root === 'button') { found = false; await press(T.button); continue; }
+      if (sess.typed.length >= SL.MAX_TYPED) { sess.notes.push('έφτασε το όριο των ' + SL.MAX_TYPED + ' μηνυμάτων'); break; }
+      const n = sess.typed.length + 1;
+      if (p.forced && p.forced[n]) text = p.forced[n];
+      else if (!sess.rootConfirmed && sess.typed.length >= SL.EXIT_AFTER) text = SL.EXIT_TEXT;
+      else if (found && pol.root === 'thanks') { found = false; text = 'Ευχαριστώ.'; }
+      else { const d = await ask('reply'); if (!d) break; text = d.message; found = !!d.found_root; }
+    }
+    if (!text || !String(text).trim()) { sess.notes.push('κενό μήνυμα από τον χρήστη — η συνεδρία σταματά εδώ'); break; }
+    await type(String(text).trim());
+    if (mark === 'crisis') crisisAt = sess.typed.length;
+  }
+  await sync();
+  if (stopped) sess.notes.push('ΣΤΑΜΑΤΗΣΕ: ' + stopped);
+  // ── ανιχνευτές συμβουλής της εφαρμογής, πριν από τη ρίζα ──
+  for (const v of sess.violations) if (v.beforeRoot && SL.ADVICE_VIOLATIONS.includes(v.type)) sess.checks.advice.push(v.type + ' (μετά από ' + v.at + ' μηνύματα)');
+  sess.otherDetectors = sess.violations.filter(v => !SL.ADVICE_VIOLATIONS.includes(v.type)).map(v => v.type);
+  // ── τηλεμετρία: το αρχείο της συσκευής ──
+  const log = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
+  sess.events = SL.lastSessionEvents(log);
+  for (const x of SL.telemetryIssues(sess.events, acts)) sess.checks.telemetry.push(x);
+  if (p.risk === 'crisis' && crisisAt === -1 && !stopped) sess.checks.safety.push('το μήνυμα κρίσης δεν στάλθηκε (η συνεδρία σταμάτησε πριν)');
+  await page.screenshot({ path: path.join(OUT, 'stress-' + item.label + '-end.png'), fullPage: true }).catch(() => {});
+  await browser.close();
+  return { sess, stopped };
+}
+
+async function judgeSession(s, user) {
+  const until = s.yesAt !== null ? s.turns.findIndex(t => t.who === 'app' && /^\[κάρτα ρίζας/.test(t.text)) : -1;
+  const turns = (until >= 0 ? s.turns.slice(0, until) : s.turns).filter(t => t.who !== 'app');
+  if (!turns.some(t => t.who === 'aura')) return { introduced_causes: [], root_match: 'none', root_match_reason: 'καμία απάντηση της AURA' };
+  const r = await user({ system: SL.JUDGE_SYSTEM, prompt: SL.judgePrompt(turns, s.persona.hiddenRoot, s.root), schema: SL.JUDGE_SCHEMA });
+  if (r.cost) s.cost += r.cost;
+  if (r.stop) return { error: r.stop };
+  if (r.refusal) return { error: 'άρνηση του κριτή' };
+  if (r.error || !r.data) return { error: r.error || 'κενό' };
+  return r.data;
+}
+
+async function mainStress() {
+  const real = has('--real');
+  const only = (opt('--sessions', '') || '').split(',').map(Number).filter(Boolean);
+  const plan = SL.planRuns(SL.PERSONAS, only.length ? only : null);
+  const want = Number(opt('--budget', String(SL.BUDGET_CAP)));
+  if (!(want > 0) || want > SL.BUDGET_CAP) { console.error('Το όριο δαπάνης πρέπει να είναι από 0 ως $' + SL.BUDGET_CAP + '.'); process.exit(2); }
+  if (real && has('--dry')) {
+    const e = SL.estimateCost(plan, APP.consts.core.length);
+    console.log('ΣΤΡΕΣ ΤΕΣΤ — ΣΧΕΔΙΟ (καμία κλήση, κανένα build)');
+    console.log('Κλειδί στη μεταβλητή ANTHROPIC_API_KEY: ' + (KEY ? 'βρέθηκε' : 'ΔΕΝ βρέθηκε'));
+    console.log('@anthropic-ai/sdk (για τους χρήστες/κριτή): ' + (loadAnthropic() ? 'βρέθηκε' : 'ΔΕΝ βρέθηκε — npm install --no-save @anthropic-ai/sdk'));
+    console.log('AURA: το api/aura.js του repo (claude-sonnet-4-6). Χρήστες και κριτής: ' + SL.USER_MODEL + '.');
+    console.log('Αρχεία στο: ' + OUT + '\n');
+    plan.forEach(r => console.log('  ' + r.label.padEnd(4) + ' ' + r.persona.name + (r.persona.fixed ? '  [σταθερά μηνύματα]' : '  [Haiku]')));
+    console.log('\nΣυνεδρίες: ' + e.sessions + ' (' + e.sims + ' με προσομοιωμένο χρήστη, ' + e.fixed + ' με σταθερά μηνύματα). Το πολύ ' + SL.MAX_TYPED + ' μηνύματα χρήστη ανά συνεδρία.');
+    console.log('Κλήσεις AURA: ~' + e.calls + ' (το πολύ ~' + e.callsMax + '), ~$' + e.perCall.toFixed(3) + ' η καθεμία με ζεστή cache· εγγραφή cache ~$' + e.write.toFixed(2) + '.');
+    console.log('Κλήσεις Haiku: ~' + e.userCalls + ' (σχεδόν δωρεάν).');
+    console.log('ΕΚΤΙΜΗΣΗ (όχι μέτρηση): $' + e.low.toFixed(0) + '–$' + e.high.toFixed(0) + '. Όριο: $' + want.toFixed(2) + ' — η δοκιμή σταματά ΠΡΙΝ από κλήση που θα μπορούσε να το ξεπεράσει.');
+    console.log('Διάρκεια: περίπου ' + Math.round(e.calls * 11 / 60) + '–' + Math.round(e.callsMax * 13 / 60) + ' λεπτά.');
+    return;
+  }
+  if (real && !has('--yes')) { console.log('Δεν έτρεξε τίποτα. Πρώτα: --stress --real --dry. Για να τρέξει (και να ξοδέψει): --stress --real --yes'); return; }
+  // the key is typed into Read-Host (hidden, not kept in the PowerShell history), never on a command line
+  if (real && !KEY) { console.error('Δεν βρέθηκε ANTHROPIC_API_KEY σε αυτό το παράθυρο. PowerShell: $k = Read-Host "Κλειδί" -AsSecureString, και μετά το ANTHROPIC_API_KEY από το $k (βλ. οδηγίες).'); process.exit(2); }
+  if (real && !loadAnthropic()) { console.error('Λείπει το @anthropic-ai/sdk. PowerShell: npm install --no-save @anthropic-ai/sdk'); process.exit(2); }
+  fs.mkdirSync(OUT, { recursive: true });
+  const budget = SL.makeStressBudget(want);
+  const app = await startApp();
+  BASE = app.url;
+  const sessions = [];
+  let stopped = null;
+  try {
+    for (const item of plan) {
+      console.log('… ' + item.label + ' — ' + item.persona.name);
+      const r = await runStressSession(item, real ? await realModel() : stressFakeAura(), real ? stressUserReal(budget) : stressUserFake(item.persona), budget);
+      sessions.push(r.sess);
+      const bad = SL.CHECKS.filter(c => (r.sess.checks[c.key] || []).length).map(c => c.key);
+      console.log('   ρίζα: ' + (r.sess.rootConfirmed ? '«' + r.sess.root + '»' : '—') + ' | έλεγχοι με ✗: ' + (bad.join(', ') || 'κανένας') + ' | $' + r.sess.cost.toFixed(2) + ' (σύνολο $' + budget.spent().toFixed(2) + ')');
+      if (r.stopped) { stopped = r.stopped; break; }
+    }
+    for (const s of sessions) s.judge = await judgeSession(s, real ? stressUserReal(budget) : stressUserFake(null));
+  } finally {
+    await app.close();
+  }
+  const meta = { mode: real ? 'πραγματικό μοντέλο' : 'ψεύτικο μοντέλο (έλεγχος μηχανισμού)', budget: want, spent: budget.spent(), by: budget.by(), stopped };
+  writeOut('stress-report.md', SL.buildStressReport(sessions, meta));
+  writeOut('stress-report.json', JSON.stringify({ meta, sessions }, null, 2));
+  console.log('\nΚόστος: $' + budget.spent().toFixed(2) + ' (AURA $' + budget.by().aura.toFixed(2) + ', Haiku $' + budget.by().user.toFixed(2) + ')' +
+    (stopped ? ' — ΣΤΑΜΑΤΗΣΕ: ' + stopped : '') + '\nΑναφορά: ' + path.join(OUT, 'stress-report.md'));
+}
+
 (async () => {
+  if (STRESS) { await mainStress(); return; }
   if (MODE === 'real' && has('--dry')) {
     console.log('ΠΡΑΓΜΑΤΙΚΗ ΔΟΚΙΜΗ — ΣΧΕΔΙΟ (καμία κλήση, κανένα build)');
     console.log('Όριο δαπάνης: $' + Number(opt('--budget', '6')).toFixed(2) + ' | αρχεία στο: ' + OUT);
