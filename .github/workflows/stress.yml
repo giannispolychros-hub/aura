@@ -5,19 +5,31 @@ name: AURA stress test (real model)
 #   dry    = μόνο σχέδιο και εκτίμηση κόστους (καμία κλήση, κόστος 0)
 #   μικρό  = οι συνεδρίες 14, 15, 16 και 1 (μία φορά), όριο $3
 #   πλήρες = όλες οι 24 συνεδρίες, όριο $25
+#   επιλογή = μόνο οι συνεδρίες του πεδίου «sessions» (π.χ. 15,1.1,4.2), με το όριο του πεδίου «budget» (το πολύ $25)
 # Το κλειδί έρχεται ΜΟΝΟ από το secret ANTHROPIC_API_KEY, μόνο ως μεταβλητή περιβάλλοντος του βήματος που το χρειάζεται.
 # Δεν τυπώνεται, δεν γράφεται σε αρχείο ή artifact (το script ελέγχει κάθε έξοδο, και το GitHub το κρύβει στα logs).
+# Η αναφορά ανεβαίνει και στο branch «stress-reports» (φάκελος runs/<αριθμός εκτέλεσης>), για να διαβάζεται και έξω από τη σελίδα
+# της εκτέλεσης. Αυτό το κάνει ΧΩΡΙΣΤΗ δουλειά (publish), που δεν έχει το κλειδί· μόνο αυτή έχει δικαίωμα εγγραφής.
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'dry = σχέδιο και κόστος · μικρό = 14, 15, 16, 1 με όριο $3 · πλήρες = όλες με όριο $25'
+        description: 'dry = σχέδιο και κόστος · μικρό = 14, 15, 16, 1 με όριο $3 · πλήρες = όλες με όριο $25 · επιλογή = τα πεδία από κάτω'
         type: choice
         options:
           - dry
           - μικρό
           - πλήρες
+          - επιλογή
         default: dry
+      sessions:
+        description: 'Μόνο για «επιλογή»: οι συνεδρίες, π.χ. 15,1.1,4.2'
+        type: string
+        default: ''
+      budget:
+        description: 'Μόνο για «επιλογή»: όριο σε δολάρια (το πολύ 25)'
+        type: string
+        default: '5'
 
 permissions:
   contents: read
@@ -67,6 +79,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MODE: ${{ inputs.mode }}
+          SESSIONS: ${{ inputs.sessions }}
+          BUDGET: ${{ inputs.budget }}
         run: |
           OUT="$(node -p "require('os').tmpdir()")/aura_stress"
           echo "AURA_STRESS_OUT=$OUT" >> "$GITHUB_ENV"
@@ -74,6 +88,12 @@ jobs:
             dry)    node scripts/e2e_stage_a.cjs --stress --real --dry --out "$OUT" ;;
             μικρό)  node scripts/e2e_stage_a.cjs --stress --real --yes --sessions 14,15,16,1.1 --budget 3 --minutes 75 --out "$OUT" ;;
             πλήρες) node scripts/e2e_stage_a.cjs --stress --real --yes --budget 25 --minutes 75 --out "$OUT" ;;
+            επιλογή)
+              # only digits, dots and commas; a number for the budget (the script refuses anything above $25)
+              if ! [[ "$SESSIONS" =~ ^[0-9][0-9.,]*$ ]] || ! [[ "$BUDGET" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+                echo "::error::Για «επιλογή» χρειάζονται συνεδρίες (π.χ. 15,1.1) και όριο σε δολάρια."; exit 2
+              fi
+              node scripts/e2e_stage_a.cjs --stress --real --yes --sessions "$SESSIONS" --budget "$BUDGET" --minutes 75 --out "$OUT" ;;
             *)      echo "::error::Άγνωστη επιλογή"; exit 2 ;;
           esac
 
@@ -85,3 +105,46 @@ jobs:
           path: ${{ env.AURA_STRESS_OUT }}
           if-no-files-found: warn
           retention-days: 30
+
+  # Η αναφορά στο branch «stress-reports». Χωριστή δουλειά: ΔΕΝ έχει το κλειδί (κανένα secret), έχει μόνο δικαίωμα εγγραφής, και
+  # παίρνει μόνο το artifact που ανέβασε η πρώτη (ήδη ελεγμένο από το script ότι δεν περιέχει το κλειδί).
+  publish:
+    needs: stress
+    if: always() && inputs.mode != 'dry' && needs.stress.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: aura-stress-report-${{ github.run_number }}
+          path: report
+
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+          fetch-depth: 1
+
+      - name: Στο branch stress-reports
+        env:
+          RUN: ${{ github.run_number }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          if [ ! -d report ] || [ -z "$(ls -A report)" ]; then echo "Καμία αναφορά για ανέβασμα."; exit 0; fi
+          cd repo
+          git config user.name "aura-stress-report"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git fetch -q --depth 1 origin stress-reports; then
+            git checkout -q -B stress-reports FETCH_HEAD
+          else
+            git checkout -q --orphan stress-reports
+            git rm -rqf .
+          fi
+          mkdir -p "runs/$RUN"
+          cp -r ../report/. "runs/$RUN/"
+          git add "runs/$RUN"
+          git commit -q -m "Stress report, run $RUN ($MODE)"
+          git push -q origin stress-reports
+          echo "Η αναφορά: branch stress-reports, φάκελος runs/$RUN" >> "$GITHUB_STEP_SUMMARY"

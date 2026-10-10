@@ -219,6 +219,18 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   assert('STRESS: the report folder (inside the runner\'s temp) is uploaded as an artifact, also after a failure; nothing else', /actions\/upload-artifact@v4/.test(ST) && /if: always\(\) && inputs\.mode != 'dry' && env\.AURA_STRESS_OUT != ''/.test(ST) &&
     /path: \$\{\{ env\.AURA_STRESS_OUT \}\}/.test(ST) && /require\('os'\)\.tmpdir\(\)/.test(ST));
   assert('STRESS: read-only token, one run at a time', /permissions:\s*\n\s+contents: read/.test(ST) && /concurrency:/.test(ST));
+  // the report also goes to the branch «stress-reports» — by a SEPARATE job that never has the key
+  const pub = ST.slice(ST.indexOf('\n  publish:'));
+  const stressJob = ST.slice(ST.indexOf('\n  stress:'), ST.indexOf('\n  publish:'));
+  assert('PUBLISH: a separate job, after the stress job, never for dry, with write access only for itself',
+    pub.length > 300 && /needs: stress/.test(pub) && /if: always\(\) && inputs\.mode != 'dry'/.test(pub) && /permissions:\s*\n\s+contents: write/.test(pub) &&
+    !/contents: write/.test(stressJob) && (ST.match(/contents: write/g) || []).length === 1);
+  assert('PUBLISH: no secret in that job at all — it only takes the artifact (already checked for the key) to runs/<run>',
+    !/secrets\./.test(code(pub)) && /actions\/download-artifact@v4/.test(pub) && /name: aura-stress-report-\$\{\{ github\.run_number \}\}/.test(pub) &&
+    /git push -q origin stress-reports/.test(pub) && /mkdir -p "runs\/\$RUN"/.test(pub));
+  assert('ΕΠΙΛΟΓΗ: only the sessions and the budget of the form, through env, checked (digits, dots, commas; a number) before use',
+    /- επιλογή/.test(ST) && /SESSIONS: \$\{\{ inputs\.sessions \}\}/.test(ST) && /BUDGET: \$\{\{ inputs\.budget \}\}/.test(ST) &&
+    /\[\[ "\$SESSIONS" =~ \^\[0-9\]\[0-9\.,\]\*\$ \]\]/.test(ST) && /--sessions "\$SESSIONS" --budget "\$BUDGET" --minutes 75/.test(ST));
   assert('TESTS: on every push to main, all suites through the one loop in test.yml, then the build — no secret at all',
     /push:\s*\n\s+branches: \[main\]/.test(TS) && /uses: \.\/\.github\/workflows\/test\.yml/.test(TS) && /npm run build/.test(TS) && !/secrets/.test(TS) && /permissions:\s*\n\s+contents: read/.test(TS));
   assert('TESTS: test.yml can be called (workflow_call) and no longer runs a second time on main', /workflow_call:/.test(T1) && /branches-ignore: \[main\]/.test(T1));
