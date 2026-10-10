@@ -13,7 +13,7 @@
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
-// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W | X | Y (μόνο η W, η X ή η Y)
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W | X | Y | Z (μόνο μία ενότητα)
 // ΣΤΡΕΣ ΤΕΣΤ (Μέρος Β, 10/10): --stress (ψεύτικα, κόστος 0) · --stress --real --dry (σχέδιο + εκτίμηση) · --stress --real --yes (ΠΡΑΓΜΑΤΙΚΟ,
 //   όριο --budget έως $25, προεπιλογή $25) · --sessions 14,15,1 (μόνο αυτοί) · --minutes 75 (καμία νέα συνεδρία μετά). Τρέχει και από το
 //   GitHub (.github/workflows/stress.yml): η αναφορά γράφεται και στη σελίδα της εκτέλεσης. Δες την ενότητα «ΣΤΡΕΣ ΤΕΣΤ» πιο κάτω.
@@ -622,6 +622,7 @@ async function runMock() {
   await runMockW();
   await runMockX();
   await runMockY();
+  await runMockZ();
 }
 
 // ── W: the hidden tags still work after the label cleaning (founder's check of 6408fbf, ADR «8 Οκτωβρίου (γ)»), switch
@@ -1269,6 +1270,69 @@ async function runMockY() {
   }
 }
 
+// ── Z: SAFETY — the crisis line when the call FAILS (stress test 10/10, ADR «10 Οκτωβρίου (γ)»), phone size, switch closed and
+// open. A failed call on a crisis turn (500 twice = after the app's one retry; 401 like the real case) must still show the line
+// (1018 + 112 for tier A, 10306 for tier B) as its own readable line; the message goes back into the input box; the retry's
+// successful reply carries the line and the fallback goes away. A failed ordinary turn: no line. Alone: --only Z.
+async function runMockZ() {
+  const F1 = 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.', WHY = 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.';
+  const A = 'Δεν θέλω να ζω άλλο.', B = 'Δεν αντέχω άλλο.', PLAIN = 'Η δουλειά με κουράζει πολύ.';
+  const L1018 = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
+  const L10306 = 'Υπάρχει η Γραμμή Ψυχοκοινωνικής Υποστήριξης, 10306 — δωρεάν και ανώνυμη.';
+  // replies: a string = 200 with that text; a number = that HTTP status
+  const sess = async (query, replies) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: { width: 390, height: 700 } });
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      if (typeof r === 'number') return route.fulfill({ status: r, contentType: 'application/json', body: JSON.stringify({ type: 'error', error: { type: 'x', message: 'x' } }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await send(page, F1); if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, WHY);
+    return { browser, page, calls: () => n };
+  };
+  const fallback = async page => { const l = page.locator('.crisis-fallback'); return (await l.count()) ? (await l.first().innerText()).trim() : ''; };
+  const input = async page => { const t = page.locator('textarea.textarea'); return (await t.count()) ? await t.inputValue() : null; };
+  const lastAura = async page => ((await page.locator('.turn-aura').allInnerTexts()).slice(-1)[0] || '').replace(/^\s*aura\s*\n/i, '').trim();
+  for (const q of ['', '?stageA=1']) {
+    const sw = q ? 'open' : 'closed';
+    for (const [label, status] of [['500 twice (after the retry)', 500], ['401 (rejected key)', 401]]) {
+      const s = await sess(q, ['Τι σε κρατάει εκεί;', status, status, 'Είμαι εδώ μαζί σου. Θέλεις να μου πεις τι γίνεται τώρα;']);
+      await send(s.page, A); await s.page.waitForTimeout(1500);
+      ok(`Z (switch ${sw}, crisis A, ${label}): the call failed — the error shows, AND the crisis line 1018 / 112 is on screen as its own line`,
+        await s.page.locator('.err').count() === 1 && await fallback(s.page) === L1018);
+      ok(`Z (switch ${sw}, crisis A, ${label}): the message is back in the input box, to send again`, await input(s.page) === A);
+      if (status === 500) {
+        await s.page.screenshot({ path: path.join(OUT, 'Z-crisis-failed-' + sw + '.png'), fullPage: false });
+        await s.page.getByRole('button', { name: 'Go' }).click(); await s.page.waitForTimeout(1500);
+        const la = await lastAura(s.page);
+        ok(`Z (switch ${sw}, crisis A): the retry succeeds — the reply carries 1018, the separate line is gone`, la.includes('1018') && await fallback(s.page) === '');
+      }
+      await s.browser.close();
+    }
+    {
+      const s = await sess(q, ['Τι σε κρατάει εκεί;', 500, 500, 'Είμαι εδώ μαζί σου.']);
+      await send(s.page, B); await s.page.waitForTimeout(1500);
+      ok(`Z (switch ${sw}, crisis B, failed call): the 10306 line is on screen`, await fallback(s.page) === L10306);
+      await s.page.getByRole('button', { name: 'Go' }).click(); await s.page.waitForTimeout(1500);
+      const la = await lastAura(s.page);
+      ok(`Z (switch ${sw}, crisis B): the retry's reply still carries the 10306 (not lost as «already shown»), the separate line is gone`,
+        la.includes('10306') && await fallback(s.page) === '');
+      await s.browser.close();
+    }
+    {
+      const s = await sess(q, ['Τι σε κρατάει εκεί;', 500, 500, 'Τι σε κουράζει περισσότερο;']);
+      await send(s.page, PLAIN); await s.page.waitForTimeout(1500);
+      ok(`Z (switch ${sw}, ordinary message, failed call): the error as before, NO crisis line`, await s.page.locator('.err').count() === 1 && await fallback(s.page) === '' && !(await s.page.locator('body').innerText()).includes('1018'));
+      await s.browser.close();
+    }
+  }
+}
+
 // ═══ ΤΑ 6 ΣΕΝΑΡΙΑ (ψεύτικο ή πραγματικό μοντέλο) ═════════════════════════════
 function fakeModel() {
   let mainCalls = 0;
@@ -1879,7 +1943,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else await runMock();
+      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

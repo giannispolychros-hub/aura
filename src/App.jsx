@@ -1538,6 +1538,17 @@ function buildCrisisLine(tier, modelText, supportLineShown) {
   }
   return { line: /1018/.test(said) ? "" : "Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.", supportShown: !!supportLineShown };
 }
+// SAFETY (§0.1; found by the stress test with the real model, 10/10/2026, ADR «10 Οκτωβρίου (γ)»): the crisis line reached
+// the screen only on the model's reply, so a failed call on a crisis turn (bad signal, rate limit, timeout, outage) left a
+// person who had just written about ending their life with «Κάτι δεν λειτούργησε» and no number. On a failed SUPPORTIVE turn
+// the SAME line, by the SAME rule (the tier of the last user message, as if the model had said nothing), comes from code.
+// Any other turn: nothing.
+function crisisLineAfterFailedCall(mode, msgs, supportLineShown) {
+  if (mode !== "SUPPORTIVE") return { line: "", supportShown: !!supportLineShown };
+  const list = Array.isArray(msgs) ? msgs : [];
+  const last = [...list].reverse().find(m => m && m.role === "user");
+  return buildCrisisLine(classifyCrisisTier(last && typeof last.content === "string" ? last.content : ""), "", supportLineShown);
+}
 
 // AI IDENTITY BACKSTOP (EU AI Act, Art. 50 — founder's instruction after a real test on 2026-10-06:
 // «Είσαι άνθρωπος;» → «Όχι. Είμαι AURA — εργαλείο σκέψης.», true but without the words «τεχνητή
@@ -5560,6 +5571,7 @@ export default function AURAv2() {
   const [input, setInput]               = useState("");
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState(null);
+  const [crisisFallback, setCrisisFallback] = useState(null); // ADR «10 Οκτωβρίου (γ)»: the crisis line after a failed call
   const [mode, setMode]                 = useState("ANSWER");
   const [sessionStarted, setSessionStarted] = useState(false);
   // Intro choice gate: before anything, the user picks "start directly" (primary — for someone
@@ -6794,6 +6806,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // The line depends on the TIER of the message that triggered this turn: 1018 + 112 for suicidal thoughts (every
       // time), 10306 once per session for general despair. See buildCrisisLine / auratests/test_crisis_tiers.js.
       let displayText = text;
+      setCrisisFallback(null);
       if (currentMode === "SUPPORTIVE") {
         const _crisisLine = buildCrisisLine(classifyCrisisTier(lastUserMsg), text, supportLineShown.current);
         if (_crisisLine.line) displayText = text + "\n\n" + _crisisLine.line;
@@ -7195,6 +7208,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       }
     } catch(e) {
       setError(e.message);
+      // SAFETY (ADR «10 Οκτωβρίου (γ)»): a failed crisis turn still shows its crisis line, from code. The once-per-session
+      // 10306 is not marked as shown here — the retry's successful reply carries it when it clears this line.
+      const _failLine = crisisLineAfterFailedCall(currentMode, msgs, supportLineShown.current);
+      if (_failLine.line) setCrisisFallback(_failLine.line);
       // ROLLBACK — see rollbackFailedTurn above for the production evidence. Without this, the
       // failed message stays in history with no reply under it and every later send this session
       // is rejected. msgs is exactly what every caller committed to state before awaiting, so
@@ -8083,6 +8100,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setValueUnlocked(false);
     setIntroChoice(null);
     setError(null);
+    setCrisisFallback(null);
     setClaritySurge(false);
     setIllumLevel(0);
     setFinalDistillation(null);
@@ -8331,6 +8349,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         .mic-btn{background:rgba(10,9,8,0.7);border:1px solid rgba(201,168,76,0.25);color:#8a7a52;font-family:'DM Mono',monospace;font-size:16px;padding:12px 18px;cursor:pointer;border-radius:4px;min-width:48px;min-height:44px}
         .mic-btn.active{border-color:#c9a84c;color:#e8d890;background:rgba(201,168,76,0.1);}
         .turn-counter{font-size:8px;letter-spacing:.1em;color:var(--text-dim);text-align:right;margin-top:5px}
+        .crisis-fallback{font-size:13px;line-height:1.5;color:#e8e4dc;margin-top:7px;padding:8px 10px;border-left:2px solid rgba(201,168,76,0.7);background:rgba(10,9,8,0.5)}
         .err{font-size:10px;color:#e8a0a0;margin-top:7px;padding:6px 10px;border:1px solid #6b2c2c;border-radius:2px;background:rgba(74,26,26,0.25)}
 
         ::-webkit-scrollbar{width:2px}
@@ -9092,6 +9111,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             {turnCount.current > 0 && (
               <div className="turn-counter">{turnCount.current} {turnCount.current===1 ? "ανταλλαγή" : "ανταλλαγές"}</div>
             )}
+            {crisisFallback && <div role="alert" className="crisis-fallback">{crisisFallback}</div>}
             {error && <div className="err">Σφάλμα: {error}</div>}
           </div>
         )}
