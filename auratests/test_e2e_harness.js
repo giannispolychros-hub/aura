@@ -170,7 +170,8 @@ assert('E2E: the output folder goes through outDirInTemp', /const OUT = LIB\.out
 assert('E2E: every file it writes is redacted and checked for the key first',
   /function writeOut\(name, text\) \{\s*const t = LIB\.redact\(text, KEY\);\s*LIB\.assertNoSecret\(t, KEY\);/.test(E2E) &&
   (E2E.match(/fs\.writeFileSync\(/g) || []).length === 1);
-assert('E2E: the key is read only from the environment and is never printed', /const KEY = process\.env\.ANTHROPIC_API_KEY \|\| '';/.test(E2E) && !/console\.(log|error)\([^)]*\bKEY\b(?!\s*\?)/.test(E2E.replace(/KEY \? 'βρέθηκε'/, '')));
+// UPDATED (11/10, John: spaces / line breaks around the key are removed before use): still read only from the environment, then trimmed.
+assert('E2E: the key is read only from the environment (then trimmed) and is never printed', /const KEY_RAW = process\.env\.ANTHROPIC_API_KEY \|\| '';\s*const KEY = KEY_RAW\.trim\(\);/.test(E2E) && !/console\.(log|error)\([^)]*\bKEY\b(?!\s*\?)/.test(E2E.replace(/KEY \? 'βρέθηκε'/, '')));
 assert('E2E: the real model needs --yes, and stops at the budget', /MODE === 'real' && !has\('--yes'\)/.test(E2E) && /if \(!budget\.canSpend\(\)\)/.test(E2E));
 assert('E2E: calls are spaced so api/aura.js\'s 20/minute limit can never be hit by the test', /lastCall \+ 3400 - Date\.now\(\)/.test(E2E));
 assert('E2E: a fresh model per scenario', /await runScenario\(scen, await makeModel\(\), budget\)/.test(E2E));
