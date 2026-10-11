@@ -171,7 +171,7 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
 {
   assert('WIRING: --stress runs the stress test; --dry stops before any build or call', /if \(STRESS\) \{ await mainStress\(\); return; \}/.test(RUNNER) &&
     RUNNER.indexOf("if (real && has('--dry'))") < RUNNER.indexOf('const app = await startApp();', RUNNER.indexOf('async function mainStress(')));
-  assert('WIRING: --real needs --yes to spend, and the key comes ONLY from ANTHROPIC_API_KEY', /if \(real && !has\('--yes'\)\)/.test(RUNNER) && /const KEY = process\.env\.ANTHROPIC_API_KEY \|\| '';/.test(RUNNER) &&
+  assert('WIRING: --real needs --yes to spend, and the key comes ONLY from ANTHROPIC_API_KEY', /if \(real && !has\('--yes'\)\)/.test(RUNNER) && /const KEY_RAW = process\.env\.ANTHROPIC_API_KEY \|\| '';/.test(RUNNER) &&
     !/sk-ant-/.test(RUNNER) && /new Anthropic\(\{ apiKey: KEY, maxRetries: 2 \}\)/.test(RUNNER));
   const user = RUNNER.slice(RUNNER.indexOf('function stressUserReal('), RUNNER.indexOf('function stressUserFake('));
   assert('WIRING: the users and the judge are Haiku through the official SDK, structured output, low effort — the budget is checked before each call',
@@ -197,6 +197,17 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   assert('KEY CHECK: --dry asks Anthropic for the two models (free, no tokens) and reports only accepted / refused with the HTTP status',
     /client\.models\.retrieve\(id\)/.test(dry) && /\['claude-sonnet-4-6', SL\.USER_MODEL\]/.test(dry) && /e instanceof Anthropic\.APIError \? 'HTTP '/.test(dry) &&
     !/e\.message/.test(dry.slice(0, dry.indexOf('const head = ['))));
+}
+
+// ── John, 11/10: spaces and line breaks around the key are removed before use — in node, never in the shell, never shown ──
+{
+  assert('TRIM: the key is trimmed once, at the start, and the trimmed value is what api/aura.js reads from the environment',
+    /const KEY_RAW = process\.env\.ANTHROPIC_API_KEY \|\| '';\s*const KEY = KEY_RAW\.trim\(\);\s*if \(KEY_RAW && KEY !== KEY_RAW\) process\.env\.ANTHROPIC_API_KEY = KEY;/.test(RUNNER));
+  assert('TRIM: --dry looks at the key AS GIVEN (so it can say there were spaces), and says they are removed — no value shown',
+    /const ks = SL\.keyShape\(KEY_RAW\);/.test(RUNNER) && /ks\.spaces \? ' · είχε κενό ή αλλαγή γραμμής στην αρχή ή στο τέλος — αφαιρείται αυτόματα'/.test(RUNNER));
+  const ST2 = (() => { try { return fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'stress.yml'), 'utf8'); } catch (e) { return ''; } })();
+  assert('TRIM: the workflow\'s shell still never touches the value (the trimming happens inside the script)',
+    ST2.length > 500 && !/\$\{?ANTHROPIC_API_KEY/.test(ST2.split('\n').filter(l => !/^\s*#/.test(l)).join('\n')));
 }
 
 // ── GitHub Actions (John, 10/10: tests and the stress test from the phone) ─────

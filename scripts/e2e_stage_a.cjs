@@ -32,7 +32,11 @@ const opt = (f, d) => { const i = ARGS.indexOf(f); return i >= 0 && ARGS[i + 1] 
 const MODE = has('--real') ? 'real' : has('--engine-check') ? 'engine-check' : 'mock';
 const STAMP = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const OUT = LIB.outDirInTemp(opt('--out', path.join(os.tmpdir(), (has('--stress') ? 'aura_stress_' : 'aura_e2e_') + MODE + '_' + STAMP)), os.tmpdir());
-const KEY = process.env.ANTHROPIC_API_KEY || '';
+// The key, without the spaces / line breaks a pasted secret often carries at its start or end (John, 11/10). api/aura.js reads
+// the same trimmed value from the environment. Never printed, never written: every output goes through redact + assertNoSecret.
+const KEY_RAW = process.env.ANTHROPIC_API_KEY || '';
+const KEY = KEY_RAW.trim();
+if (KEY_RAW && KEY !== KEY_RAW) process.env.ANTHROPIC_API_KEY = KEY;
 const APP = LIB.loadApp(fs.readFileSync(path.join(REPO, 'src', 'App.jsx'), 'utf8'));
 let BASE = opt('--url', null);
 
@@ -1856,9 +1860,9 @@ async function mainStress() {
   if (real && has('--dry')) {
     const e = SL.estimateCost(plan, APP.consts.core.length);
     // the key: only its SHAPE, then one free call (GET /v1/models/<id>, no tokens) to see whether Anthropic accepts it — never the key
-    const ks = SL.keyShape(process.env.ANTHROPIC_API_KEY || '');
+    const ks = SL.keyShape(KEY_RAW);
     const keyLine = 'Κλειδί στη μεταβλητή ANTHROPIC_API_KEY: ' + (ks.found ? 'βρέθηκε · ' + SL.KEY_KIND_TEXT[ks.kind] : 'ΔΕΝ βρέθηκε') +
-      (ks.spaces ? ' · ΠΡΟΣΟΧΗ: έχει κενό ή αλλαγή γραμμής στην αρχή ή στο τέλος' : '') + (ks.quotes ? ' · ΠΡΟΣΟΧΗ: έχει εισαγωγικά' : '');
+      (ks.spaces ? ' · είχε κενό ή αλλαγή γραμμής στην αρχή ή στο τέλος — αφαιρείται αυτόματα' : '') + (ks.quotes ? ' · ΠΡΟΣΟΧΗ: έχει εισαγωγικά' : '');
     const accept = [];
     const Anthropic = loadAnthropic();
     if (ks.found && Anthropic) {
