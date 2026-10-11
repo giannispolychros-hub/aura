@@ -1607,7 +1607,7 @@ async function runStressSession(item, aura, user, budget) {
     applies: { safety: !!p.risk, verbatim: true } };
   // risk: a signal known BEFORE the offer (14, 15) — the offer must not appear. 16 meets its crisis after the offer.
   const acts = { card: 0, yes: 0, correct: 0, back: 0, offerShown: false, want: false, notNow: false, help: null, clarity: null, completed: false, risk: p.offerRisk ? p.risk : null };
-  let stopped = null, exits = 0;
+  let stopped = null, exits = 0, safetyExit = false;
   const browser = await launch();
   const ctx = await browser.newContext({ viewport: { width: 390, height: 700 } });
   const page = await ctx.newPage();
@@ -1665,7 +1665,7 @@ async function runStressSession(item, aura, user, budget) {
   const isExit = t => !!(APP.fns.isExplicitClosure && APP.fns.isExplicitClosure(t)) || !!(APP.fns.declaresClosing && APP.fns.declaresClosing(t));
   const type = async text => {
     sess.typed.push(text);
-    if (isExit(text)) exits += 1;
+    if (isExit(text)) { exits += 1; if (APP.fns.detectSafetySignal && APP.fns.detectSafetySignal(text)) safetyExit = true; }
     await page.locator('textarea.textarea').fill(text);
     await btn('Go').click();
     await waitIdle();
@@ -1675,6 +1675,7 @@ async function runStressSession(item, aura, user, budget) {
     if (r.stop) { stopped = stopped || r.stop; return null; }
     if (r.cost) sess.cost += r.cost;
     if (r.error || r.refusal || !r.data) { sess.notes.push('ο προσομοιωμένος χρήστης δεν απάντησε (' + (r.refusal ? 'άρνηση' : r.error || 'κενό') + ')'); return null; }
+    if (typeof r.data.message === 'string') r.data.message = SL.cleanUserText(r.data.message);
     return r.data;
   };
 
@@ -1683,7 +1684,7 @@ async function runStressSession(item, aura, user, budget) {
   let askSeen = false, lastCardRoot = null;
   const check = async s => {
     for (const l of SL.findLabels(s.body)) if (!labelsSeen.has(l)) { labelsSeen.add(l); sess.checks.labels.push('«' + l + '» μετά από ' + sess.typed.length + ' μηνύματα'); }
-    if (!sess.rootConfirmed && exits < 2) {
+    if (SL.preRootClosingChecked({ rootConfirmed: sess.rootConfirmed, exits, safetyExit })) {
       if (s.closureCard) sess.checks.closing.push('κάρτα «πριν κλείσουμε» (ρητές έξοδοι του χρήστη: ' + exits + ', μηνύματα: ' + sess.typed.length + ')');
       if (s.warningCard) sess.checks.closing.push('κάρτα προειδοποίησης (ρητές έξοδοι: ' + exits + ')');
       sess.turns.forEach((t, k) => {

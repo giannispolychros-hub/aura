@@ -261,5 +261,52 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   assert('TESTS: test.yml can be called (workflow_call) and no longer runs a second time on main', /workflow_call:/.test(T1) && /branches-ignore: \[main\]/.test(T1));
 }
 
+// ── What the first real «μικρό» (11/10/2026, run 8) showed about the harness itself ──────────────────
+{
+  // 1. The clarity question to the simulated user came back HTTP 400: the API's structured output rejects number and length
+  //    limits in a schema. Session 1.1 stopped before the scale. The 1–10 range is kept by the code (clamp), not the schema.
+  const LIMITS = ['minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', 'minLength', 'maxLength'];
+  const walk = (o, out) => { if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) { if (LIMITS.includes(k)) out.push(k); walk(v, out); } return out; };
+  assert('SCHEMAS: no number or length limit in any schema sent to the API (it answers HTTP 400)',
+    [S.USER_SCHEMA, S.CARD_SCHEMA, S.CLARITY_SCHEMA, S.JUDGE_SCHEMA].every(sc => sc && walk(sc, []).length === 0));
+  assert('CLARITY: the schema still says 1 to 10 in words, and the runner keeps the answer inside 1–10',
+    /1\D+10/.test(String(((S.CLARITY_SCHEMA || {}).properties || {}).value && S.CLARITY_SCHEMA.properties.value.description)) &&
+    RUNNER.includes('v = Math.max(1, Math.min(10, Number(d.value) || 7));'));
+  // 2. Session 15 (crisis B with «κλείνουμε»): «Καλή συνέχεια.» was counted as a goodbye before the root. By ADR «8 Οκτωβρίου (β)», 4
+  //    an exit that carries a safety signal opens no door and keeps the OLD closing — the goodbye is the designed one. The check
+  //    now skips it exactly there (and only there): any other first exit is still checked.
+  const P = st => T('preRootClosingChecked', st);
+  assert('CLOSING CHECK: before the root, with fewer than two exits and no exit with a safety signal → checked',
+    P({ rootConfirmed: false, exits: 0, safetyExit: false }) === true && P({ rootConfirmed: false, exits: 1, safetyExit: false }) === true);
+  assert('CLOSING CHECK: not checked after the root, at the second exit, or after an exit with a safety signal (the old closing)',
+    P({ rootConfirmed: true, exits: 0, safetyExit: false }) === false && P({ rootConfirmed: false, exits: 2, safetyExit: false }) === false &&
+    P({ rootConfirmed: false, exits: 1, safetyExit: true }) === false);
+  assert('CLOSING CHECK: robust — no state means checked (never silently off)', P(undefined) === true && P({}) === true);
+  const ty = RUNNER.slice(RUNNER.indexOf('const type = async text => {'), RUNNER.indexOf('const type = async text => {') + 400);
+  assert('WIRING: an exit marks safetyExit only when the APP\'s own detector sees a safety signal in that same message',
+    /if \(isExit\(text\)\) \{ exits \+= 1; if \(APP\.fns\.detectSafetySignal && APP\.fns\.detectSafetySignal\(text\)\) safetyExit = true; \}/.test(ty) &&
+    /let stopped = null, exits = 0, safetyExit = false;/.test(RUNNER));
+  assert('WIRING: the check reads the pure rule, with the session\'s own state',
+    /if \(SL\.preRootClosingChecked\(\{ rootConfirmed: sess\.rootConfirmed, exits, safetyExit \}\)\) \{/.test(RUNNER) && !/if \(!sess\.rootConfirmed && exits < 2\) \{/.test(RUNNER));
+  assert('FIXTURE: the crisis-B exit of session 15 is both an exit and a safety signal for the app',
+    APP && APP.fns.isExplicitClosure && (APP.fns.isExplicitClosure('Δεν αντέχω άλλο, κλείνουμε εδώ.') || APP.fns.declaresClosing('Δεν αντέχω άλλο, κλείνουμε εδώ.')) &&
+    APP.fns.detectSafetySignal('Δεν αντέχω άλλο, κλείνουμε εδώ.') === 'CRISIS');
+  assert('REPORT: the check\'s title says the exception', /έξοδο με σήμα κινδύνου/.test(((S.CHECKS || []).find(c => c.key === 'closing') || {}).name || ''));
+  // 3. Session 1.1: the simulated user (told to answer «Ναι») typed «Ναι», found_root: false» — a piece of its JSON leaked into
+  //    the message, and AURA was sent it. The leaked field is removed before typing; anything else is typed as written.
+  const C = s => T('cleanUserText', s);
+  assert('CLEAN: a leaked «, found_root: …» (with or without quotes, a stray » or a closing brace) is removed',
+    C('Ναι», found_root: false') === 'Ναι' && C('Ναι, "found_root": true}') === 'Ναι' && C('Δεν ξέρω» , found_root:false') === 'Δεν ξέρω');
+  assert('CLEAN: an ordinary message is untouched, including a «…» pair, commas and the word itself inside a sentence',
+    C('Ναι') === 'Ναι' && C('Μου είπε «φύγε», και έφυγα.') === 'Μου είπε «φύγε», και έφυγα.' && C('Δεν ξέρω, ίσως.') === 'Δεν ξέρω, ίσως.' &&
+    C('Το found_root δεν είναι λέξη μου') === 'Το found_root δεν είναι λέξη μου' && C(' Ναι ') === ' Ναι ');
+  assert('CLEAN: only a field at the very END is removed (a leak cannot sit in the middle of what is typed); a leading « left alone is dropped',
+    C('Ναι, found_root: true και μετά') === 'Ναι, found_root: true και μετά' && C('«Ναι», found_root: false') === 'Ναι');
+  assert('CLEAN: robust — not a string → empty', C(null) === '' && C(undefined) === '' && C(5) === '');
+  const askFn = RUNNER.slice(RUNNER.indexOf('const ask = async (need, extra, schema) => {'), RUNNER.indexOf('const ask = async (need, extra, schema) => {') + 700);
+  assert('WIRING: every simulated message is cleaned once, where the cheap model\'s answer is read',
+    /if \(typeof r\.data\.message === 'string'\) r\.data\.message = SL\.cleanUserText\(r\.data\.message\);/.test(askFn));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);
