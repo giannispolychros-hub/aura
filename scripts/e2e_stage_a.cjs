@@ -2010,7 +2010,8 @@ function dryMarkdown(plan, e, want, lines) {
 async function mainStress() {
   const real = has('--real');
   const only = (opt('--sessions', '') || '').split(',').map(x => x.trim()).filter(Boolean);
-  const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : SL.PERSONAS;
+  // «επιλογή» (--sessions) can re-run a session of either round; the full test without --sessions stays the 16 users
+  const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17)) : SL.PERSONAS;
   const plan = SL.planRuns(PEOPLE, only.length ? only : null);
   const want = Number(opt('--budget', String(SL.BUDGET_CAP)));
   if (!(want > 0) || want > SL.BUDGET_CAP) { console.error('Το όριο δαπάνης πρέπει να είναι από 0 ως $' + SL.BUDGET_CAP + '.'); process.exit(2); }

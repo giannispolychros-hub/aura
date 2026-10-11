@@ -368,7 +368,16 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
     (L('I am happy to help you with this today my friend').leaks || []).length === 0 && (L('I am happy to help you with this today my friend').english || []).length === 1);
   // wiring
   assert('WIRING: --hard runs the hard set; the plan, the dry estimate and the report all use it',
-    /const PEOPLE = has\('--hard'\) \? SL\.HARD_PERSONAS : SL\.PERSONAS;/.test(RUNNER) && /SL\.planRuns\(PEOPLE, only\.length \? only : null\)/.test(RUNNER));
+    /const PEOPLE = has\('--hard'\) \? SL\.HARD_PERSONAS : only\.length \? SL\.PERSONAS\.concat\(SL\.HARD_PERSONAS\.filter\(p => p\.id >= 17\)\) : SL\.PERSONAS;/.test(RUNNER) &&
+    /SL\.planRuns\(PEOPLE, only\.length \? only : null\)/.test(RUNNER));
+  {
+    // «επιλογή» (--sessions) re-runs a failed session of EITHER round: the 16 users plus the new ones (17–30); without
+    // --sessions the full test is still exactly the 24 sessions of the 16 users
+    const both = (S.PERSONAS || []).concat((S.HARD_PERSONAS || []).filter(p => p.id >= 17));
+    assert('ΕΠΙΛΟΓΗ: «27» and «1.1» are both found; ids are unique; the full plan is untouched',
+      (T('planRuns', both, ['27', '1.1']) || []).map(r => r.label).join(',') === '1.1,27' && new Set(both.map(p => p.id)).size === both.length &&
+      (T('planRuns', S.PERSONAS) || []).length === 24);
+  }
   assert('WIRING: a fixed card step can be «correct» (to type a crisis into «Διόρθωσε»)',
     RUNNER.includes("verdict = st && st.card === 'back' ? 'notyet' : st && st.card === 'correct' ? 'correct' : 'yes';"));
   assert('WIRING: after the session — ED findings and identity findings go to the SAFETY check (★), leaks to the LABELS check (★)',
