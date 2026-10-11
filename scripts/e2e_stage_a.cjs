@@ -629,6 +629,7 @@ async function runMock() {
   await runMockZ();
   await runMockMC();
   await runMockMH();
+  await runMockPV();
 }
 
 // ── W: the hidden tags still work after the label cleaning (founder's check of 6408fbf, ADR «8 Οκτωβρίου (γ)»), switch
@@ -1471,6 +1472,51 @@ async function runMockMH() {
   ok('MH (control, no referral): the €6 offer is shown after «Ναι», as before', b.cardShown && !b.riskLine && b.offer);
 }
 
+// ── PV: P4 — passive measurement of a «planted» root (ADR «11 Οκτωβρίου (ζ)»). On «Ναι» one record root_provenance
+// { auraShare, door }: numbers only, nothing new on screen, nothing new sent to the model. Switch open, ?rec=1, phone size.
+async function runMockPV() {
+  const F1 = 'Έχω μια προαγωγή σε άλλη πόλη και δεν ξέρω αν πρέπει να τη δεχτώ.', WHY = 'Γιατί πρέπει να απαντήσω σε μια εβδομάδα.';
+  const MIRROR = 'Δεν είναι «δεν θέλω να φύγω». Είναι «δεν θέλω να χάσω ποιος είμαι».\n\nΤι σου λέει αυτό;';
+  const T = APP.texts;
+  const run = async (opts) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: { width: 390, height: 700 } });
+    const bodies = [];
+    let n = 0;
+    const replies = ['Τι σε κρατάει εδώ;', MIRROR, 'Τι άλλο;'];
+    await page.route('**/api/aura', async route => {
+      let b = {}; try { b = JSON.parse(route.request().postData() || '{}'); } catch (e) {}
+      bodies.push(b);
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/?stageA=1&rec=1');
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await send(page, F1); if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, WHY);
+    await send(page, 'Η γιαγιά μου με χρειάζεται εδώ.'); await page.waitForTimeout(600);
+    const btn = name => page.getByRole('button', { name, exact: true });
+    if (opts.leave) await send(page, 'Ευχαριστώ.');
+    else if (await btn(T.button).count()) { await btn(T.button).click(); await page.waitForTimeout(400); }
+    await send(page, opts.root); await page.waitForTimeout(400);
+    const before = (await page.locator('body').innerText());
+    const callsBefore = bodies.length;
+    if (await btn(T.yes).count()) { await btn(T.yes).click(); await page.waitForTimeout(600); }
+    const after = (await page.locator('body').innerText());
+    const log = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
+    await browser.close();
+    return { prov: log.filter(e => e.ev === 'root_provenance'), card: log.filter(e => e.ev === 'root_card_shown'), after, before, calls: bodies.length - callsBefore, bodies };
+  };
+  const a = await run({ root: 'Δεν θέλω να χάσω ποιος είμαι.' });
+  ok('PV (button, the root in AURA\'s words): one root_provenance { auraShare: 100, door: 1 } — the door the card was logged with',
+    a.prov.length === 1 && a.prov[0].auraShare === 100 && a.prov[0].door === 1 && a.card.length === 1 && a.card[0].door === 1);
+  ok('PV: numbers only — the record has no other field than ev, t, auraShare, door', a.prov.length === 1 && Object.keys(a.prov[0]).sort().join(',') === 'auraShare,door,ev,t');
+  ok('PV: nothing new on screen (no number, no «AURA»/percentage text) and «Ναι» calls no model',
+    !/auraShare|root_provenance|\b100\b ?%/.test(a.after) && a.calls === 0 && !a.bodies.some(b => JSON.stringify(b).includes('auraShare')));
+  const b = await run({ leave: true, root: 'Με τρώει ότι θα αφήσω τη γιαγιά μόνη της.' });
+  ok('PV (first exit, the root in the user\'s own words): { auraShare: 0, door: 4 }', b.prov.length === 1 && b.prov[0].auraShare === 0 && b.prov[0].door === 4);
+}
+
 // ═══ ΤΑ 6 ΣΕΝΑΡΙΑ (ψεύτικο ή πραγματικό μοντέλο) ═════════════════════════════
 function fakeModel() {
   let mainCalls = 0;
@@ -2105,7 +2151,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else await runMock();
+      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

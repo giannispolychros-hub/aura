@@ -2739,6 +2739,31 @@ function detectsUnverifiedFoundClaim(foundText, userTexts) {
   if (content.length === 0) return false;
   return !content.some(w => corpus.includes(w));
 }
+// P4 — PASSIVE MEASUREMENT of a «planted» root (approved by John, 11/10/2026; ADR «11 Οκτωβρίου (ζ)»). The stress test with the
+// real model found confirmed roots that were mostly AURA's words first: the user typed them, so «the root is the user's words»
+// passes, but §3 says «not an AURA summary the user said yes to». For a confirmed root: the share (0–100) of its content words —
+// the same rule as detectsUnverifiedFoundClaim above (no accents, 4+ letters, minus the small words) — whose FIRST appearance in
+// the conversation was in a reply of the MODEL. The app's fixed texts (the first WHY question, the root flow's questions,
+// msgMode STAGE_A) are not the model's words; a word first seen in the root itself is the user's. A NUMBER for the device
+// log only: never shown, never sent to the model, no text kept.
+function rootAuraShare(found, msgs) {
+  const norm = s => String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const STOP = new Set(['για','και','που','αυτο','ειναι','τους','την','της','του','στο','στη','στον','στην',
+                        'με','σε','απο','των','δεν','θα','να','τι','ενα','μια','ολα','κατι','αλλα','οτι','ευρω']);
+  const root = norm(found).trim();
+  const words = [...new Set(root.split(/[^a-zα-ω0-9]+/i).filter(w => w.length >= 4 && !STOP.has(w)))];
+  if (!words.length) return 0;
+  const FIXED = norm("Γιατί έχει σημασία αυτό για σένα τώρα;").trim();
+  // the root's own capture is the LAST message, so it can never be an earlier appearance than the model's: no need to drop it
+  const list = (Array.isArray(msgs) ? msgs : []).filter(m => m && typeof m.content === "string" &&
+    (m.role === "user" || (m.role === "assistant" && m.msgMode !== "STAGE_A" && norm(m.content).trim() !== FIXED)));
+  let aura = 0;
+  for (const w of words) {
+    const first = list.find(m => norm(m.content).includes(w));
+    if (first && first.role === "assistant") aura += 1;
+  }
+  return Math.round(100 * aura / words.length);
+}
 // INTENT WITHOUT ROADS — a PASSIVE COUNTER, nothing else (founder decision, 2026-10-01; see
 // auratests/test_intent_no_roads.js). A fifth real session had the user say "ίσως ασχοληθώ και το χτίσω", answer
 // "Τίποτα" to "τι σε εμποδίζει", and be closed with a goodbye — no road was laid out. The founder chose NOT to add a
@@ -5789,11 +5814,16 @@ export default function AURAv2() {
   const [stageACopyText, setStageACopyText] = useState(null); // clipboard fallback: the text, shown to select
   const [stageACopied, setStageACopied] = useState(false);
   const cleanLabels = useCallback((t) => { const r = stripInternalLabels(t); if (r.count) labelLeaks.current += r.count; return r.text; }, []);
+  // P4 (ADR «11 Οκτωβρίου (ζ)»): the door of the card shown, as root_card_shown logged it — read when the root is confirmed.
+  const lastCardDoor = useRef(0);
   const stageADispatch = useCallback((ev) => {
     const _prev = stageARef.current;
     stageARef.current = stageAStep(_prev, ev);
     setStageAPhase(stageARef.current.phase);
-    for (const _r of stageAFlowTelemetry(_prev, stageARef.current, ev)) recordTelemetry(_r.event, _r.fields); // ADR «10 Οκτωβρίου», 2: at once
+    for (const _r of stageAFlowTelemetry(_prev, stageARef.current, ev)) { // ADR «10 Οκτωβρίου», 2: at once
+      if (_r.event === "root_card_shown") lastCardDoor.current = _r.fields.door;
+      recordTelemetry(_r.event, _r.fields);
+    }
     const _tel = stageAHelpTelemetry(_prev, stageARef.current, ev); // ADR «8 Οκτωβρίου (δ)», 6: passive, counts only
     if (_tel) recordTelemetry(_tel.event, _tel.fields);
   }, []);
@@ -8032,9 +8062,12 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
   const handleStageAYes = useCallback(() => {
     if (stageARef.current.phase !== "card") return;
     const _riskOffer = riskSignalKind.current === 2 || riskSignalKind.current === 3;
+    const _found = stageARef.current.found;
     setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: buildRootEndLines(stageARef.current.found, _riskOffer).join("\n"), msgMode: "STAGE_A", stageAEnd: true }]);
     stageADispatch({ type: "yes", riskKind: riskSignalKind.current });
-  }, [stageADispatch]);
+    // P4 (ADR «11 Οκτωβρίου (ζ)»): passive, numbers only — how much of the confirmed root the model said first, and its door
+    if (stageARef.current.stats.rootConfirmed === 1) recordTelemetry("root_provenance", { auraShare: rootAuraShare(_found, messages), door: lastCardDoor.current });
+  }, [stageADispatch, messages]);
   const handleStageAClarity = useCallback((n) => {
     if (stageARef.current.phase !== "clarity") return;
     stageADispatch({ type: "clarity", value: n });
@@ -8091,7 +8124,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     coreReadinessConfirmed.current = false;
     freeActionOffered.current = 0; freeDeferral.current = 0; askedActionBeforeRoot.current = false; rootCardOpenedOnce.current = false;
     riskSignalKind.current = 0; labelLeaks.current = 0;
-    stageARef.current = initialStageAState(); stageARootArmed.current = false; setStageAPhase(null);
+    stageARef.current = initialStageAState(); stageARootArmed.current = false; setStageAPhase(null); lastCardDoor.current = 0;
     setUiBubbles([]);
     abandonMark.current = { started: false, ended: false, done: false };
     setStageACopyText(null); setStageACopied(false);

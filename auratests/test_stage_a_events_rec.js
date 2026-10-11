@@ -112,8 +112,9 @@ const OPEN = d => ({ type: 'open', door: d, found: 'Φοβάμαι την από
 }
 {
   const d = (CODE.match(/const stageADispatch = useCallback\(\(ev\) => \{[\s\S]*?\n  \}, \[\]\);/) || [''])[0];
+    // UPDATED (11/10, ADR «11 Οκτωβρίου (ζ)», P4): the same records, at the same place; the loop also keeps the door of root_card_shown.
   assert('WIRING: stageADispatch records the flow events right after the step, then the one-tap ones (unchanged)',
-    /stageARef\.current = stageAStep\(_prev, ev\);\s*setStageAPhase\(stageARef\.current\.phase\);\s*for \(const _r of stageAFlowTelemetry\(_prev, stageARef\.current, ev\)\) recordTelemetry\(_r\.event, _r\.fields\);[^\n]*\n\s*const _tel = stageAHelpTelemetry\(_prev, stageARef\.current, ev\);/.test(d));
+    /stageARef\.current = stageAStep\(_prev, ev\);\s*setStageAPhase\(stageARef\.current\.phase\);\s*for \(const _r of stageAFlowTelemetry\(_prev, stageARef\.current, ev\)\) \{[^\n]*\n\s*if \(_r\.event === \"root_card_shown\"\) lastCardDoor\.current = _r\.fields\.door;\s*recordTelemetry\(_r\.event, _r\.fields\);\s*\}\s*const _tel = stageAHelpTelemetry\(_prev, stageARef\.current, ev\);/.test(d));
 }
 // session_abandoned
 {
