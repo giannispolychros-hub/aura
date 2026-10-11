@@ -68,15 +68,22 @@ const APPROVED = {
   cardLine: 'Με το "Ναι" ολοκληρώνεται το δωρεάν κομμάτι και σου δείχνω το επόμενο.',
   cardLineRisk: 'Με το "Ναι" ολοκληρώνεται αυτό το κομμάτι.',
   endSecond: 'Το πρώτο βήμα κάθε προβλήματος είναι ο πραγματικός ορισμός του — και τον βρήκες εσύ, χωρίς συμβουλές.',
-  endThird: "Το επόμενο ερώτημα είναι: τι μπορείς να κάνεις γι' αυτό; Στο AURA Coach βλέπεις τι μπορείς να κάνεις, τι κοστίζει ο κάθε δρόμος, και ποιο είναι το πρώτο, μικρότερο βήμα.",
-  price: 'AURA Coach · €6, μία φορά.',
+  // UPDATED (11/10, ADR «11 Οκτωβρίου (η)»): John's new text after «Ναι» (endSecond stays, risk case only); endThird is gone.
+  endDone: 'Το πρώτο μισό έγινε: βρήκες τι πραγματικά ρωτάς — εσύ, χωρίς συμβουλές.',
+  endCoach: 'Στο AURA Coach συνεχίζουμε από αυτή τη φράση σου και φεύγεις με τρία πράγματα, γραμμένα με τα δικά σου λόγια:',
+  endItem1: '· τι ακριβώς έχεις να αποφασίσεις,',
+  endItem2: '· τι κερδίζεις και τι χάνεις σε κάθε δρόμο,',
+  endItem3: '· ένα μικρό πρώτο βήμα για να το δοκιμάσεις στην πράξη — και πότε.',
+  price: 'AURA Coach · €6, μία φορά. Όχι συνδρομή.',
   wantMore: 'Θέλω να συνεχίσω',
   notNow: 'Όχι τώρα',
   notReady: 'Το AURA Coach δεν είναι ακόμα έτοιμο.',
-  helpQ: 'Τι θα σε βοηθούσε περισσότερο;',
-  help1: 'Να βρω τώρα τι μπορώ να κάνω',
-  help2: 'Να με ξαναρωτήσει σε λίγες μέρες τι έγινε',
-  help3: 'Να κρατάω τη ρίζα και τα βήματά μου',
+  // UPDATED (11/10, ADR «11 Οκτωβρίου (η)», 2): the new one-tap question and its four options.
+  helpQ: 'Τι θα σε βοηθούσε περισσότερο τώρα;',
+  help1: 'Να δω καθαρά τι ακριβώς έχω να αποφασίσω',
+  help2: 'Να δω τι κερδίζω και τι χάνω σε κάθε δρόμο',
+  help3: 'Να βρω ένα μικρό βήμα για να το δοκιμάσω στην πράξη',
+  help4: 'Να με ξαναρωτήσει σε λίγες μέρες τι έγινε',
   clarityQ: 'Τώρα, πόσο ξεκάθαρο είναι ποιο ακριβώς είναι το πρόβλημα, από το 1 έως το 10;',
   word: 'Πριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.',
 };
@@ -162,10 +169,12 @@ assert('SAME: empty never equal', F.sameAsRootText('', '') === false && F.sameAs
 // ── buildRootEndLines / buildRootCardLine ────────────────────────────────────
 const FOUND = 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά. Και ότι το αναβάλλω χρόνια επειδή δεν θέλω να το παραδεχτώ ούτε στον εαυτό μου, πόσο μάλλον σε εκείνον, που πίστεψε σε μένα από την αρχή και πλήρωσε τις σπουδές μου.';
 const L = F.buildRootEndLines(FOUND, false) || [];
-assert('END: four lines in the normal case', L.length === 4);
+// UPDATED (11/10, ADR «11 Οκτωβρίου (η)»): seven lines — the root, then John's six lines.
+assert('END: seven lines in the normal case', L.length === 7);
 assert('END: line 1 is «Η ρίζα σου: "{τι βρήκες}".» with the WHOLE text (no cut, decision «(στ)» 1)',
   L[0] === 'Η ρίζα σου: "' + FOUND + '".');
-assert('END: lines 2–4 are the approved texts, in order', L[1] === APPROVED.endSecond && L[2] === APPROVED.endThird && L[3] === APPROVED.price);
+assert('END: lines 2–7 are the approved texts, in order', L[1] === APPROVED.endDone && L[2] === APPROVED.endCoach && L[3] === APPROVED.endItem1 &&
+  L[4] === APPROVED.endItem2 && L[5] === APPROVED.endItem3 && L[6] === APPROVED.price);
 const LR = F.buildRootEndLines(FOUND, true) || [];
 assert('END (risk B/DISTRESS): only the first two lines', LR.length === 2 && LR[0] === L[0] && LR[1] === APPROVED.endSecond);
 assert('END (risk): nothing about Coach or price', !/Coach|€/.test(LR.join(' ')));

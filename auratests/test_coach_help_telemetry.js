@@ -4,7 +4,7 @@
 // answered and then closed the app left nothing — and so did one who saw the question and left.
 //   Now two passive records, counts only, written the moment it happens:
 //     coach_help_asked   { asked: 1 }                 — the question was shown
-//     coach_help_choice  { choice: 1 | 2 | 3 | 0 }    — which one; 0 = «Συνέχεια» (no choice)
+//     coach_help_choice  { choice: 1 | 2 | 3 | 4 | 0 } — which one; 0 = «Συνέχεια» (no choice). 4 since 11/10 (ADR «11 Οκτωβρίου (η)»)
 //   «Asked» without a later «choice» = the user left without answering. They go through recordTelemetry (whitelisted keys,
 //   small integers only — no text can pass), so they reach the device log and the ?debug=1 export («τηλεμετρία (.json)»).
 //   Switch closed: the Stage A UI does not exist, nothing is written. `session_completed.coachHelpChoice` is unchanged.
@@ -57,7 +57,8 @@ const step = (s, ev) => { const n = T('stageAStep', s, ev); return { next: n, te
   const w = step(offer, { type: 'want' });
   assert('ASKED: «Θέλω να συνεχίσω» opens the question and records that it was shown (nothing else)',
     w.next.phase === 'notReady' && w.tel && w.tel.event === 'coach_help_asked' && JSON.stringify(w.tel.fields) === '{"asked":1}');
-  for (const c of [1, 2, 3]) {
+  // UPDATED (11/10, ADR «11 Οκτωβρίου (η)»): four options now — choice 4 is «Να με ξαναρωτήσει σε λίγες μέρες τι έγινε».
+  for (const c of [1, 2, 3, 4]) {
     const h = step(w.next, { type: 'help', choice: c });
     assert(`CHOICE ${c}: the tap is recorded as choice ${c}, and the stats agree`,
       h.tel && h.tel.event === 'coach_help_choice' && h.tel.fields.choice === c && h.next.stats.coachHelpChoice === c && h.next.phase === 'clarity');
@@ -65,7 +66,7 @@ const step = (s, ev) => { const n = T('stageAStep', s, ev); return { next: n, te
   const none = step(w.next, { type: 'help', choice: 0 });
   assert('NO CHOICE: «Συνέχεια» is recorded as choice 0 (the question was seen, nothing chosen)', none.tel && none.tel.event === 'coach_help_choice' && none.tel.fields.choice === 0 && none.next.stats.coachHelpChoice === 0);
   const junk = step(w.next, { type: 'help', choice: 7 });
-  assert('NO CHOICE: a value that is not 1–3 is recorded as 0, never as itself', junk.tel && junk.tel.fields.choice === 0);
+  assert('NO CHOICE: a value that is not 1–4 is recorded as 0, never as itself', junk.tel && junk.tel.fields.choice === 0);
   assert('NOT RECORDED: «Όχι τώρα», «Ναι, αυτό είναι», an event that does not fit the phase, a missing argument',
     step(offer, { type: 'notNow' }).tel === null && T('stageAHelpTelemetry', null, offer, { type: 'want' }) === null && T('stageAHelpTelemetry', offer, null, { type: 'want' }) === null &&
     step(offer, { type: 'help', choice: 2 }).tel === null && step(w.next, { type: 'want' }).tel === null);
@@ -103,8 +104,8 @@ const step = (s, ev) => { const n = T('stageAStep', s, ev); return { next: n, te
   const ui = CODE.slice(CODE.indexOf('{/* STAGE A UI — BEGIN */}'), CODE.indexOf('{/* STAGE A UI — END */}'));
   assert('SWITCH CLOSED: the buttons that make these steps exist only inside the Stage A UI, which renders only with the switch open',
     ui.includes('{stageAActive.current && (') && ui.includes('type: "want"') && ui.includes('type: "help", choice: 1') && ui.includes('type: "help", choice: 0') &&
-    (CODE.match(/stageADispatch\(\{ type: "want"/g) || []).length === 1 && (CODE.match(/stageADispatch\(\{ type: "help"/g) || []).length === 4 &&
-    (ui.match(/stageADispatch\(\{ type: "(want|help)"/g) || []).length === 5);
+    (CODE.match(/stageADispatch\(\{ type: "want"/g) || []).length === 1 && (CODE.match(/stageADispatch\(\{ type: "help"/g) || []).length === 5 &&
+    (ui.match(/stageADispatch\(\{ type: "(want|help)"/g) || []).length === 6); // UPDATED (11/10, ADR «11 Οκτωβρίου (η)»): 4 options + «Συνέχεια»
   assert('NO CONTENT: the pure rule builds the record from the step and the number only, never from text',
     !/found|knew|content|userText/.test(fullFnSrc('stageAHelpTelemetry') || 'found'));
   assert('SCOPE: no new off-device flow — recordTelemetry stays local, the remote switch stays closed',

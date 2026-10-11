@@ -101,7 +101,8 @@ assert('YES: only from the card', step(sAsk, { type: 'yes', riskKind: 0 }) === s
 const sNR = step(sOffer, { type: 'want' }) || {};
 assert('WANT («Θέλω να συνεχίσω»): → not ready, clicked', sNR.phase === 'notReady' && sNR.stats.coachOfferClicked === 1);
 assert('NOT NOW: → clarity, declined', (() => { const x = step(sOffer, { type: 'notNow' }); return x.phase === 'clarity' && x.stats.coachOfferDeclined === 1 && x.stats.coachOfferClicked === 0; })());
-[1, 2, 3].forEach(c => assert(`HELP ${c}: recorded as a number, → clarity`, (() => { const x = step(sNR, { type: 'help', choice: c }); return x.phase === 'clarity' && x.stats.coachHelpChoice === c; })()));
+// UPDATED (11/10, ADR «11 Οκτωβρίου (η)»): four options.
+[1, 2, 3, 4].forEach(c => assert(`HELP ${c}: recorded as a number, → clarity`, (() => { const x = step(sNR, { type: 'help', choice: c }); return x.phase === 'clarity' && x.stats.coachHelpChoice === c; })()));
 assert('HELP: an unknown choice is recorded as 0, never as itself', (() => { const x = step(sNR, { type: 'help', choice: 7 }); return x.phase === 'clarity' && x.stats.coachHelpChoice === 0; })());
 assert('HELP skipped («Συνέχεια»): 0, → clarity', (() => { const x = step(sNR, { type: 'help', choice: 0 }); return x.phase === 'clarity' && x.stats.coachHelpChoice === 0; })());
 assert('HELP: only after «Θέλω να συνεχίσω»', step(sOffer, { type: 'help', choice: 1 }) === sOffer);
@@ -146,7 +147,7 @@ const outsideTexts = CODE.replace(R, '').replace(B, '');
 const jsxStart = CODE.indexOf('  return (\n    <>');
 assert('UI: no Stage A text is rendered outside the two gated regions',
   !/STAGE_A_TEXTS\./.test(outsideTexts.slice(outsideTexts.indexOf('  return (\n    <>'))));
-['ask', 'back', 'knewLabel', 'foundLabel', 'yes', 'correct', 'correctAsk', 'retry', 'wantMore', 'notNow', 'notReady', 'helpQ', 'help1', 'help2', 'help3', 'helpSkip', 'clarityQ', 'copy', 'download']
+['ask', 'back', 'knewLabel', 'foundLabel', 'yes', 'correct', 'correctAsk', 'retry', 'wantMore', 'notNow', 'notReady', 'helpQ', 'help1', 'help2', 'help3', 'help4', 'helpSkip', 'clarityQ', 'copy', 'download']
   .forEach(k => assert(`UI: «${k}» is on screen`, R.includes('STAGE_A_TEXTS.' + k)));
 assert('UI: the card line comes from buildRootCardLine with the risk latch (B/DISTRESS variant)',
   /buildRootCardLine\(riskSignalKind\.current === 2 \|\| riskSignalKind\.current === 3\)/.test(R));

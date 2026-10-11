@@ -134,15 +134,19 @@ const OPEN = d => ({ type: 'open', door: d, found: 'Φοβάμαι την από
 
 // ── 3: tester mode ───────────────────────────────────────────────────────────
 {
-  assert('TEXTS: exactly the two approved lines', /const TESTER_TEXTS = \{ line: "Μόνο αριθμοί — κανένα κείμενο της συζήτησης\.", button: "Στείλε τα στοιχεία της δοκιμής" \};/.test(CODE));
+  // UPDATED (11/10, ADR «11 Οκτωβρίου (η)», 3): John approved two more lines — the result of the copy, next to the button
+  // (verbatim in test_offer_text_help4_copy.js). The two lines of 10/10 are unchanged.
+  assert('TEXTS: the two approved lines, then the two results of the copy',
+    /const TESTER_TEXTS = \{\s*line: "Μόνο αριθμοί — κανένα κείμενο της συζήτησης\.", button: "Στείλε τα στοιχεία της δοκιμής",\s*copied: "[^"]+", notCopied: "[^"]+",\s*\};/.test(CODE));
   assert('MODE: ?rec=1, read once per visit like ?debug=1', /const recMode = useRef\(typeof window !== 'undefined' && new URLSearchParams\(window\.location\.search\)\.get\('rec'\) === '1'\);/.test(CODE));
   assert('NO PANEL: the debug panel still depends on ?debug=1 only', /\{debugMode\.current && \(/.test(CODE) && !/\{recMode\.current \|\| debugMode\.current/.test(CODE) && !/debugMode\.current \|\| recMode/.test(CODE));
+  // UPDATED (11/10, ADR «11 Οκτωβρίου (η)», 3): the button calls handleTesterExport, which runs exportTesterData and shows its result.
   const end = CODE.slice(CODE.indexOf('{/* Session end */}'), CODE.indexOf('{/* Session end */}') + 1600);
   assert('END SCREEN: the line, then the small button, only with ?rec=1',
-    /\{recMode\.current && \(\s*<div[^>]*>\s*<div[^>]*>\{TESTER_TEXTS\.line\}<\/div>\s*<button[^>]*onClick=\{exportTesterData\}[^>]*>\{TESTER_TEXTS\.button\}<\/button>/.test(end));
+    /\{recMode\.current && \(\s*<div[^>]*>\s*<div[^>]*>\{TESTER_TEXTS\.line\}<\/div>\s*<button[^>]*onClick=\{handleTesterExport\}[^>]*>\{TESTER_TEXTS\.button\}<\/button>/.test(end));
   const intro = CODE.slice(CODE.indexOf('{messages.length === 0 && !sessionStarted && introChoice === null && ('), CODE.indexOf('{/* ── Intro overlay'));
   assert('START SCREEN: the same, only with ?rec=1 AND stored data on the device',
-    /\{recMode\.current && storedTelemetryCount\(\) > 0 && \(\s*<div[^>]*>\s*<div[^>]*>\{TESTER_TEXTS\.line\}<\/div>\s*<button[^>]*onClick=\{exportTesterData\}[^>]*>\{TESTER_TEXTS\.button\}<\/button>/.test(intro));
+    /\{recMode\.current && storedTelemetryCount\(\) > 0 && \(\s*<div[^>]*>\s*<div[^>]*>\{TESTER_TEXTS\.line\}<\/div>\s*<button[^>]*onClick=\{handleTesterExport\}[^>]*>\{TESTER_TEXTS\.button\}<\/button>/.test(intro));
   const ex = fullFnSrc('exportTesterData') || '';
   assert('EXPORT: from the device log, through buildTesterExport, downloaded AND copied — no fetch, no network of any kind',
     /buildTesterExport\(/.test(ex) && /aura_telemetry_log/.test(ex) && /a\.download = /.test(ex) && /navigator\.clipboard/.test(ex) && !/fetch\(|XMLHttpRequest|sendBeacon|WebSocket/.test(ex));

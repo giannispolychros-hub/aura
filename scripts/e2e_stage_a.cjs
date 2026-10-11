@@ -144,14 +144,15 @@ async function runMock() {
     await page.setViewportSize({ width: 400, height: 860 });
     await page.screenshot({ path: path.join(OUT, 'stageA-2b-after-yes.png'), fullPage: false });
     ok('A: «Η ρίζα σου» line with the whole root', await page.getByText('Η ρίζα σου: "Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.".').count() === 1);
-    ok('A: price line', await page.getByText('AURA Coach · €6, μία φορά.').count() === 1);
+    // UPDATED (11/10, ADR «11 Οκτωβρίου (η)»): John's new text after «Ναι»; the whole text is checked in section OF
+    ok('A: price line', await page.getByText('AURA Coach · €6, μία φορά. Όχι συνδρομή.').count() === 1);
     ok('A: offer buttons', await page.getByRole('button', { name: 'Θέλω να συνεχίσω' }).count() === 1 && await page.getByRole('button', { name: 'Όχι τώρα' }).count() === 1);
     ok('A: copy / download available after «Ναι»', await page.getByRole('button', { name: 'Αντίγραψε τη ρίζα' }).count() === 1 && await page.getByRole('button', { name: 'Κατέβασε τη ρίζα' }).count() === 1);
     await page.screenshot({ path: path.join(OUT, 'stageA-3-offer.png'), fullPage: true });
     await page.getByRole('button', { name: 'Θέλω να συνεχίσω' }).click();
-    ok('A: not-ready text + the one-tap question', await page.getByText('Το AURA Coach δεν είναι ακόμα έτοιμο.').count() === 1 && await page.getByText('Τι θα σε βοηθούσε περισσότερο;').count() === 1);
+    ok('A: not-ready text + the one-tap question', await page.getByText('Το AURA Coach δεν είναι ακόμα έτοιμο.').count() === 1 && await page.getByText('Τι θα σε βοηθούσε περισσότερο τώρα;').count() === 1);
     await page.screenshot({ path: path.join(OUT, 'stageA-4-notready.png'), fullPage: false });
-    await page.getByRole('button', { name: 'Να κρατάω τη ρίζα και τα βήματά μου' }).click();
+    await page.getByRole('button', { name: 'Να βρω ένα μικρό βήμα για να το δοκιμάσω στην πράξη' }).click();
     ok('A: clarity question with 10 buttons', await page.getByText('Τώρα, πόσο ξεκάθαρο είναι ποιο ακριβώς είναι το πρόβλημα, από το 1 έως το 10;').count() === 1 && await page.getByRole('button', { name: '10', exact: true }).count() === 1);
     await page.getByRole('button', { name: '7', exact: true }).click();
     await page.waitForTimeout(300);
@@ -222,7 +223,9 @@ async function runMock() {
     await page.getByRole('button', { name: 'Ναι, αυτό είναι' }).click();
     await page.waitForTimeout(300);
     ok('D: only the first two lines — no Coach, no price, no offer buttons',
-      await page.getByText('AURA Coach · €6, μία φορά.').count() === 0 && await page.getByRole('button', { name: 'Θέλω να συνεχίσω' }).count() === 0 &&
+      // UPDATED (11/10, ADR «11 Οκτωβρίου (η)»): the risk text is unchanged; none of the new Coach lines, no price
+      await page.getByText('AURA Coach · €6', { exact: false }).count() === 0 && await page.getByRole('button', { name: 'Θέλω να συνεχίσω' }).count() === 0 &&
+      await page.getByText('Το πρώτο μισό έγινε', { exact: false }).count() === 0 && await page.getByText('Όχι συνδρομή', { exact: false }).count() === 0 &&
       await page.getByText('Το πρώτο βήμα κάθε προβλήματος είναι ο πραγματικός ορισμός του — και τον βρήκες εσύ, χωρίς συμβουλές.').count() === 1);
     ok('D: straight to the clarity question', await page.getByText('Τώρα, πόσο ξεκάθαρο είναι ποιο ακριβώς είναι το πρόβλημα, από το 1 έως το 10;').count() === 1);
     await browser.close();
@@ -630,6 +633,145 @@ async function runMock() {
   await runMockMC();
   await runMockMH();
   await runMockPV();
+  await runMockOF();
+}
+
+// ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
+// switch open, ?rec=1. OF1 the text after «Ναι»: John's seven lines; «Η ρίζα σου» is what the phone shows first; the same two
+// buttons. OF2 the one-tap question with four options; option 4 is recorded as 4. OF3 «Στείλε τα στοιχεία της δοκιμής»: the
+// copy result next to the button — in a normal phone browser, and in simulated in-app browsers (the user agent of the
+// browser inside Viber on Android): the clipboard refused → the old copy command → copied; no clipboard at all → copied;
+// both refused → «Δεν αντιγράφηκε…» and the file is still downloaded; a clipboard that never answers → «Δεν αντιγράφηκε…».
+// Without ?rec=1: no button, no result. Screenshots: OF-1-after-yes.png, OF-2-question.png, OF-3-copied.png,
+// OF-3-not-copied.png. Alone: --only OF.
+async function runMockOF() {
+  const T = APP.texts;
+  const F1 = 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.', WHY = 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.';
+  const ROOT = 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.';
+  const JOHN = [`Η ρίζα σου: "${ROOT}".`, 'Το πρώτο μισό έγινε: βρήκες τι πραγματικά ρωτάς — εσύ, χωρίς συμβουλές.',
+    'Στο AURA Coach συνεχίζουμε από αυτή τη φράση σου και φεύγεις με τρία πράγματα, γραμμένα με τα δικά σου λόγια:',
+    '· τι ακριβώς έχεις να αποφασίσεις,', '· τι κερδίζεις και τι χάνεις σε κάθε δρόμο,',
+    '· ένα μικρό πρώτο βήμα για να το δοκιμάσεις στην πράξη — και πότε.', 'AURA Coach · €6, μία φορά. Όχι συνδρομή.'];
+  const TT = { button: 'Στείλε τα στοιχεία της δοκιμής', copied: 'Αντιγράφηκε ✓ — κάνε επικόλληση σε μήνυμα σε μένα', notCopied: 'Δεν αντιγράφηκε — στείλε μου το αρχείο που κατέβηκε' };
+  const PHONE_UA = 'Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Mobile Safari/537.36';
+  const VIBER_UA = 'Mozilla/5.0 (Linux; Android 13; SM-A536B Build/TP1A.220624.014; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/118.0.0.0 Mobile Safari/537.36 Viber/20.6.0.0';
+  const SEED = JSON.stringify([{ ev: 'session_started', t: 1 }, { ev: 'root_card_shown', t: 2, door: 1 }, { ev: 'coach_help_choice', t: 3, choice: 4 }]);
+  const open = async (query, o) => {
+    const browser = await launch();
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, userAgent: o.ua || PHONE_UA, acceptDownloads: true });
+    if (o.grant !== false) await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE }).catch(() => {});
+    await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    if (o.seed) await ctx.addInitScript(v => { try { localStorage.setItem('aura_telemetry_log', v); } catch (e) {} }, o.seed);
+    // the simulated in-app browser: the real clipboard is kept aside only so that the test can read what was copied
+    await ctx.addInitScript(mode => {
+      const real = navigator.clipboard; window.__realClip = real;
+      const fake = w => Object.defineProperty(Navigator.prototype, 'clipboard', { configurable: true, get: () => (w ? { writeText: w, readText: () => real.readText() } : undefined) });
+      if (mode === 'none') fake(null);
+      if (mode === 'refused' || mode === 'allRefused') fake(() => Promise.reject(new DOMException('Write permission denied.', 'NotAllowedError')));
+      if (mode === 'hang') fake(() => new Promise(() => {}));
+      if (mode === 'allRefused') document.execCommand = () => false;
+    }, o.clip || 'normal');
+    const page = await ctx.newPage();
+    const replies = ['Τι σε κρατάει εκεί;', 'Η σκέψη σου παραμένει δική σου.'];
+    let n = 0;
+    await page.route('**/api/aura', route => {
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.goto(BASE + '/' + query);
+    return { browser, ctx, page };
+  };
+  const btn = (page, name) => page.getByRole('button', { name, exact: true });
+  const tap = async (page, name) => { const b = btn(page, name); if (await b.count()) await b.first().click({ timeout: 4000 }); await page.waitForTimeout(500); };
+  const say = async (page, text) => { if (await page.locator('textarea.textarea').count()) await send(page, text); };
+  const inView = async (page, text) => page.evaluate(t => {
+    const el = [...document.querySelectorAll('.turn-aura span, .warning-card .warning-text, button, [role="status"]')].find(e => e.textContent.trim() === t);
+    if (!el) return null;
+    const r = el.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), h: window.innerHeight };
+  }, text);
+  // the tester button: the download, the result on screen, what the clipboard holds
+  const sendData = async (page, wait) => {
+    let file = null;
+    const dl = page.waitForEvent('download', { timeout: 6000 }).then(async d => { file = fs.readFileSync(await d.path(), 'utf8'); }).catch(() => {});
+    await btn(page, TT.button).click({ timeout: 4000 }).catch(() => {}); // missing button: a FAIL below, never a crash
+    await dl; await page.waitForTimeout(wait || 600);
+    const status = await page.locator('[role="status"]').allInnerTexts();
+    const clip = await page.evaluate(() => (window.__realClip ? window.__realClip.readText() : Promise.resolve(null)).catch(() => null)).catch(() => null);
+    return { file, status, clip };
+  };
+
+  // ── OF1 + OF2 + the end screen: one whole session on the phone ──────────────────────────────────────────
+  {
+    const s = await open('?stageA=1&rec=1', {});
+    await s.page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await say(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await say(s.page, WHY);
+    await tap(s.page, T.button); await say(s.page, ROOT);
+    await tap(s.page, T.yes); await s.page.waitForTimeout(700);
+    const shown = (await s.page.locator('[data-stage-a-end="1"] .msg-aura').innerText().catch(() => '')).split('\n').map(x => x.trim()).filter(Boolean);
+    ok('OF1: after «Ναι» the screen shows John\'s seven lines, in order, character for character', JSON.stringify(shown) === JSON.stringify(JOHN));
+    const first = await inView(s.page, JOHN[0]);
+    ok('OF1: on the phone «Η ρίζα σου» is seen first — inside the screen, near its top', !!first && first.top >= 0 && first.top < 200 && first.bottom <= first.h);
+    const price = await inView(s.page, JOHN[6]);
+    ok('OF1: … and the whole text fits below it, down to the price line', !!price && price.bottom <= price.h && price.top > first.top);
+    ok('OF1: the same two buttons, nothing else to tap', await btn(s.page, T.wantMore).count() === 1 && await btn(s.page, T.notNow).count() === 1);
+    await s.page.screenshot({ path: path.join(OUT, 'OF-1-after-yes.png'), fullPage: false });
+    await tap(s.page, T.wantMore);
+    ok('OF2: «Το AURA Coach δεν είναι ακόμα έτοιμο.» and the question «Τι θα σε βοηθούσε περισσότερο τώρα;»',
+      await s.page.getByText(T.notReady, { exact: true }).count() === 1 && await s.page.getByText('Τι θα σε βοηθούσε περισσότερο τώρα;', { exact: true }).count() === 1);
+    const OPTS = ['Να δω καθαρά τι ακριβώς έχω να αποφασίσω', 'Να δω τι κερδίζω και τι χάνω σε κάθε δρόμο', 'Να βρω ένα μικρό βήμα για να το δοκιμάσω στην πράξη', 'Να με ξαναρωτήσει σε λίγες μέρες τι έγινε', T.helpSkip];
+    const boxes = [];
+    for (const o of OPTS) boxes.push(await btn(s.page, o).boundingBox({ timeout: 2000 }).catch(() => null));
+    ok('OF2: the four options and «Συνέχεια», one under the other, in this order', boxes.every(Boolean) && boxes.every((b, k) => k === 0 || b.y > boxes[k - 1].y));
+    await btn(s.page, OPTS[0]).scrollIntoViewIfNeeded().catch(() => {});
+    await s.page.screenshot({ path: path.join(OUT, 'OF-2-question.png'), fullPage: false });
+    const vis = [];
+    for (const o of OPTS) { const b = await btn(s.page, o).boundingBox({ timeout: 2000 }).catch(() => null); vis.push(!!b && b.y >= 0 && b.y + b.height <= 844); }
+    ok('OF2: on the phone the question and all five buttons are on one screen (nothing to scroll)', vis.every(Boolean));
+    await tap(s.page, OPTS[3]);
+    const log = await s.page.evaluate(() => JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'));
+    const ch = log.filter(r => r.ev === 'coach_help_choice');
+    ok('OF2: «Να με ξαναρωτήσει σε λίγες μέρες τι έγινε» is recorded as choice 4, once; then the clarity scale', ch.length === 1 && ch[0].choice === 4 &&
+      await s.page.getByText(T.clarityQ, { exact: true }).count() === 1);
+    await tap(s.page, '7'); await say(s.page, 'πατέρας'); await s.page.waitForTimeout(900);
+    ok('OF3 (end screen, phone browser): the button is there and no result is shown before it is tapped',
+      await btn(s.page, TT.button).count() === 1 && await s.page.locator('[role="status"]').count() === 0);
+    const r = await sendData(s.page);
+    ok('OF3 (end screen, phone browser): «' + TT.copied + '» next to the button', r.status.length === 1 && r.status[0] === TT.copied);
+    ok('OF3 (end screen): the clipboard holds the file, and the same file was downloaded (choice 4 in it, numbers only)',
+      !!r.file && r.clip === r.file && /"choice": 4/.test(r.file) && !/[Ͱ-Ͽἀ-῿]/.test(r.file));
+    const rb = await btn(s.page, TT.button).boundingBox({ timeout: 2000 }).catch(() => null), sb = await s.page.locator('[role="status"]').boundingBox({ timeout: 2000 }).catch(() => null);
+    ok('OF3: the result is right next to the button (directly under it)', !!rb && !!sb && sb.y >= rb.y + rb.height - 1 && sb.y - (rb.y + rb.height) < 30);
+    await s.page.locator('[role="status"]').scrollIntoViewIfNeeded().catch(() => {});
+    await s.page.screenshot({ path: path.join(OUT, 'OF-3-copied.png'), fullPage: false });
+    await tap(s.page, 'Νέα συνεδρία');
+    ok('OF3: a new session forgets the result (the start screen shows the button again, without it)',
+      await btn(s.page, TT.button).count() === 1 && await s.page.locator('[role="status"]').count() === 0);
+    await s.browser.close();
+  }
+  // ── OF3: the start screen in the browsers the testers may use ─────────────────────────────────────────
+  const CASES = [
+    ['phone browser (Chrome, Android)', { clip: 'normal' }, TT.copied, true],
+    ['in-app browser (Viber, Android): the clipboard is refused → the old copy command', { ua: VIBER_UA, clip: 'refused' }, TT.copied, true],
+    ['in-app browser: no clipboard at all → the old copy command', { ua: VIBER_UA, clip: 'none' }, TT.copied, true],
+    ['in-app browser: both refused', { ua: VIBER_UA, clip: 'allRefused' }, TT.notCopied, false],
+    ['in-app browser: the clipboard never answers', { ua: VIBER_UA, clip: 'hang' }, TT.notCopied, false],
+  ];
+  for (const [label, o, want, copied] of CASES) {
+    const s = await open('?stageA=1&rec=1', Object.assign({ seed: SEED }, o));
+    const r = await sendData(s.page, o.clip === 'hang' ? 3600 : 600);
+    ok(`OF3 (${label}): «${want}»`, r.status.length === 1 && r.status[0] === want);
+    ok(`OF3 (${label}): the file is still downloaded, with the stored numbers`, !!r.file && JSON.parse(r.file).records === 3);
+    if (copied) ok(`OF3 (${label}): … and the clipboard really holds that file`, r.clip === r.file);
+    else ok(`OF3 (${label}): … and nothing was put on the clipboard`, r.clip !== r.file);
+    if (o.clip === 'allRefused') await s.page.screenshot({ path: path.join(OUT, 'OF-3-not-copied.png'), fullPage: false });
+    await s.browser.close();
+  }
+  {
+    const s = await open('?stageA=1', { seed: SEED });
+    ok('OF3: without ?rec=1 — no tester button and no result on the start screen (the normal app does not change)',
+      await s.page.getByText('Ξεκίνα με το πρόβλημά σου').count() === 1 && await btn(s.page, TT.button).count() === 0 && await s.page.locator('[role="status"]').count() === 0);
+    await s.browser.close();
+  }
 }
 
 // ── W: the hidden tags still work after the label cleaning (founder's check of 6408fbf, ADR «8 Οκτωβρίου (γ)»), switch
@@ -969,7 +1111,8 @@ async function runMockX() {
       return JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
     } catch (e) { return { events: [], error: String(e.message || e).slice(0, 80) }; }
   };
-  for (const [label, name, choice] of [['option 1', T.help1, 1], ['option 2', T.help2, 2], ['option 3', T.help3, 3], ['no choice («Συνέχεια»)', T.helpSkip, 0], ['left without tapping', null, null]]) {
+  // UPDATED (11/10, ADR «11 Οκτωβρίου (η)»): four options
+  for (const [label, name, choice] of [['option 1', T.help1, 1], ['option 2', T.help2, 2], ['option 3', T.help3, 3], ['option 4', T.help4, 4], ['no choice («Συνέχεια»)', T.helpSkip, 0], ['left without tapping', null, null]]) {
     const s = await toQuestion();
     ok(`X6 (${label}): the question is on screen`, await s.page.getByText(T.helpQ).count() === 1);
     if (name) { await btn(s.page, name).click(); await s.page.waitForTimeout(500); }
@@ -2151,7 +2294,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else await runMock();
+      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

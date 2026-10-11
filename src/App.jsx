@@ -1623,16 +1623,22 @@ const STAGE_A_TEXTS = {
   retry: "Γράψ' το λίγο πιο ολοκληρωμένα",
   cardLine: "Με το \"Ναι\" ολοκληρώνεται το δωρεάν κομμάτι και σου δείχνω το επόμενο.",
   cardLineRisk: "Με το \"Ναι\" ολοκληρώνεται αυτό το κομμάτι.",
+  // endSecond: only with a risk signal now (B / DISTRESS) — unchanged there. The normal case: endDone … price (ADR «11 Οκτωβρίου (η)»).
   endSecond: "Το πρώτο βήμα κάθε προβλήματος είναι ο πραγματικός ορισμός του — και τον βρήκες εσύ, χωρίς συμβουλές.",
-  endThird: "Το επόμενο ερώτημα είναι: τι μπορείς να κάνεις γι' αυτό; Στο AURA Coach βλέπεις τι μπορείς να κάνεις, τι κοστίζει ο κάθε δρόμος, και ποιο είναι το πρώτο, μικρότερο βήμα.",
-  price: "AURA Coach · €6, μία φορά.",
+  endDone: "Το πρώτο μισό έγινε: βρήκες τι πραγματικά ρωτάς — εσύ, χωρίς συμβουλές.",
+  endCoach: "Στο AURA Coach συνεχίζουμε από αυτή τη φράση σου και φεύγεις με τρία πράγματα, γραμμένα με τα δικά σου λόγια:",
+  endItem1: "· τι ακριβώς έχεις να αποφασίσεις,",
+  endItem2: "· τι κερδίζεις και τι χάνεις σε κάθε δρόμο,",
+  endItem3: "· ένα μικρό πρώτο βήμα για να το δοκιμάσεις στην πράξη — και πότε.",
+  price: "AURA Coach · €6, μία φορά. Όχι συνδρομή.",
   wantMore: "Θέλω να συνεχίσω",
   notNow: "Όχι τώρα",
   notReady: "Το AURA Coach δεν είναι ακόμα έτοιμο.",
-  helpQ: "Τι θα σε βοηθούσε περισσότερο;",
-  help1: "Να βρω τώρα τι μπορώ να κάνω",
-  help2: "Να με ξαναρωτήσει σε λίγες μέρες τι έγινε",
-  help3: "Να κρατάω τη ρίζα και τα βήματά μου",
+  helpQ: "Τι θα σε βοηθούσε περισσότερο τώρα;",
+  help1: "Να δω καθαρά τι ακριβώς έχω να αποφασίσω",
+  help2: "Να δω τι κερδίζω και τι χάνω σε κάθε δρόμο",
+  help3: "Να βρω ένα μικρό βήμα για να το δοκιμάσω στην πράξη",
+  help4: "Να με ξαναρωτήσει σε λίγες μέρες τι έγινε",
   helpSkip: "Συνέχεια",
   clarityQ: "Τώρα, πόσο ξεκάθαρο είναι ποιο ακριβώς είναι το πρόβλημα, από το 1 έως το 10;",
   word: "Πριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.",
@@ -1720,10 +1726,12 @@ function sameAsRootText(a, b) {
   return !!A && A === B;
 }
 // §2.1 — the app's text after «Ναι». «Τι βρήκες» is ALWAYS WHOLE (ADR «6 Οκτωβρίου (στ)», 1). With a risk
-// signal of tier B or DISTRESS only the first two lines: nothing about Coach or price.
+// signal of tier B or DISTRESS only the first two lines, as before: nothing about Coach or price. The normal case is John's
+// text of 11/10 (ADR «11 Οκτωβρίου (η)»): the root first, then what the Coach gives, then the price.
 function buildRootEndLines(found, riskOffer) {
-  const head = [`Η ρίζα σου: "${String(found || "").trim()}".`, STAGE_A_TEXTS.endSecond];
-  return riskOffer ? head : [...head, STAGE_A_TEXTS.endThird, STAGE_A_TEXTS.price];
+  const root = `Η ρίζα σου: "${String(found || "").trim()}".`;
+  if (riskOffer) return [root, STAGE_A_TEXTS.endSecond];
+  return [root, STAGE_A_TEXTS.endDone, STAGE_A_TEXTS.endCoach, STAGE_A_TEXTS.endItem1, STAGE_A_TEXTS.endItem2, STAGE_A_TEXTS.endItem3, STAGE_A_TEXTS.price];
 }
 function buildRootCardLine(riskOffer) {
   return riskOffer ? STAGE_A_TEXTS.cardLineRisk : STAGE_A_TEXTS.cardLine;
@@ -1917,7 +1925,7 @@ function stageAStep(state, ev) {
       return next({ phase: "clarity" });
     case "help":
       if (s.phase !== "notReady") return s;
-      if (e.choice === 1 || e.choice === 2 || e.choice === 3) st.coachHelpChoice = e.choice;
+      if (e.choice === 1 || e.choice === 2 || e.choice === 3 || e.choice === 4) st.coachHelpChoice = e.choice;
       return next({ phase: "clarity" });
     case "clarity":
       if (s.phase !== "clarity" || !Number.isInteger(e.value) || e.value < 1 || e.value > 10) return s;
@@ -1957,10 +1965,12 @@ function stageATelemetry(stats, extra) {
 // ADR «8 Οκτωβρίου (δ)», 6 — the one-tap question after «Θέλω να συνεχίσω» is the basic test of whether anyone would pay
 // for the Coach, so it is recorded the moment it happens, not only at the end of a session that may never end: the
 // question shown (`coach_help_asked`) and the choice (`coach_help_choice`, 0 = «Συνέχεια», no choice). Counts only.
+// ADR «11 Οκτωβρίου (η)»: four options — 1 what exactly to decide · 2 what each road gains and loses · 3 a small step to test it ·
+// 4 «ask me again in a few days». The numbers 1–3 meant other options before 11/10 (0 of the 20 sessions had been measured).
 function stageAHelpTelemetry(prev, next, ev) {
   if (!prev || !next || !ev) return null;
   if (ev.type === "want" && prev.phase === "offer" && next.phase === "notReady") return { event: "coach_help_asked", fields: { asked: 1 } };
-  if (ev.type === "help" && prev.phase === "notReady" && next.phase === "clarity") return { event: "coach_help_choice", fields: { choice: ev.choice === 1 || ev.choice === 2 || ev.choice === 3 ? ev.choice : 0 } };
+  if (ev.type === "help" && prev.phase === "notReady" && next.phase === "clarity") return { event: "coach_help_choice", fields: { choice: ev.choice === 1 || ev.choice === 2 || ev.choice === 3 || ev.choice === 4 ? ev.choice : 0 } };
   return null;
 }
 // ADR «10 Οκτωβρίου», 2 (SPEC 2.2, an exception to the freeze) — every step of the root flow is recorded the moment it
@@ -3585,7 +3595,11 @@ function exportTelemetry() {
 }
 
 // ADR «10 Οκτωβρίου», 3 — TESTER MODE (?rec=1). The two lines are the only new text on screen (John, 10/10/2026).
-const TESTER_TEXTS = { line: "Μόνο αριθμοί — κανένα κείμενο της συζήτησης.", button: "Στείλε τα στοιχεία της δοκιμής" };
+// ADR «11 Οκτωβρίου (η)», 3: next to the button, the result of the copy (John, 11/10/2026).
+const TESTER_TEXTS = {
+  line: "Μόνο αριθμοί — κανένα κείμενο της συζήτησης.", button: "Στείλε τα στοιχεία της δοκιμής",
+  copied: "Αντιγράφηκε ✓ — κάνε επικόλληση σε μήνυμα σε μένα", notCopied: "Δεν αντιγράφηκε — στείλε μου το αρχείο που κατέβηκε",
+};
 // What the tester sends: the device log, filtered AGAIN here — each record keeps its event name and its numbers / booleans,
 // nothing else. recordTelemetry already drops text; this makes sure no text can leave even if a bad record ever got in.
 function buildTesterExport(rows, exportedAt) {
@@ -3608,7 +3622,24 @@ function storedTelemetryCount() {
     return Array.isArray(rows) ? rows.length : 0;
   } catch (e) { return 0; }
 }
+// The old way to copy — a hidden, read-only field and the browser's copy command. It works inside the tap itself, also where
+// the newer clipboard is missing or refused (older and in-app browsers). true only if the browser says it copied.
+function copyTextLegacy(text) {
+  let ta = null;
+  try {
+    ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed"; ta.style.top = "0"; ta.style.left = "0"; ta.style.opacity = "0"; ta.style.fontSize = "16px";
+    document.body.appendChild(ta);
+    ta.select(); ta.setSelectionRange(0, text.length);
+    return document.execCommand("copy") === true;
+  } catch (e) { return false; } finally { try { if (ta) ta.remove(); } catch (e) { } }
+}
 // «Στείλε τα στοιχεία της δοκιμής»: the file is downloaded AND copied, so the tester can attach or paste it. Nothing is sent.
+// Returns a promise of whether the copy worked (ADR «11 Οκτωβρίου (η)», 3): the newer clipboard first; if it is missing,
+// throws or is refused, the old copy command. Both start inside the tap. A clipboard that never answers counts as not
+// copied after 3 seconds, so the tester always sees one of the two results.
 function exportTesterData() {
   let rows = [];
   try {
@@ -3617,7 +3648,12 @@ function exportTesterData() {
   } catch (e) { rows = []; }
   const now = new Date().toISOString();
   const text = JSON.stringify(buildTesterExport(rows, now), null, 2);
-  try { if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {}); } catch (e) { /* no clipboard — the download still runs */ }
+  let copied;
+  try {
+    copied = navigator.clipboard && navigator.clipboard.writeText
+      ? navigator.clipboard.writeText(text).then(() => true, () => copyTextLegacy(text))
+      : Promise.resolve(copyTextLegacy(text));
+  } catch (e) { copied = Promise.resolve(copyTextLegacy(text)); }
   try {
     const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
     const a = document.createElement("a");
@@ -3625,6 +3661,7 @@ function exportTesterData() {
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch (e) { /* no download — the copy above may still have worked */ }
+  return Promise.race([copied, new Promise(resolve => setTimeout(() => resolve(false), 3000))]).then(ok => ok === true, () => false);
 }
 
 function exportMemory(mem) {
@@ -5791,6 +5828,12 @@ export default function AURAv2() {
   const debugMode = useRef(typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1');
   // ADR «10 Οκτωβρίου», 3 — tester mode: ?rec=1 keeps the device log like ?debug=1, with no panel; read once per visit.
   const recMode = useRef(typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('rec') === '1');
+  // ADR «11 Οκτωβρίου (η)», 3 — the result of «Στείλε τα στοιχεία της δοκιμής», shown next to the button: null | "ok" | "fail".
+  const [testerCopy, setTesterCopy] = useState(null);
+  const handleTesterExport = useCallback(() => {
+    setTesterCopy(null);
+    exportTesterData().then(ok => setTesterCopy(ok === true ? "ok" : "fail"), () => setTesterCopy("fail"));
+  }, []);
   // Stage A gate (step 0.1) — read once per visit, like debugMode. Closed on main; nothing reads it yet.
   const stageAActive = useRef(typeof window !== 'undefined' && isStageAActive(window.location.search));
   // STAGE A counters (step 3.0) — violation checks only, never success measures (ADR «6 Οκτωβρίου (στ)»).
@@ -5954,8 +5997,10 @@ export default function AURAv2() {
   }, [messages, loading, pivotPending, layerGatePending, memoryPromptPending, warningPending, closureConfirmPending, misfirePending, firstWhyPending]);
   // STAGE A (phone test 7/10): the root question opens without a new message (the button, «Πριν φύγεις:» before the model,
   // «Διόρθωσε»), so the scroll above never ran and the question sat behind the sticky input. Bring it into view.
+  // ADR «11 Οκτωβρίου (η)»: the same for the one-tap question after «Θέλω να συνεχίσω» — on a phone its last options were below
+  // the fold, which would lean the measurement to the first two.
   useEffect(() => {
-    if (!stageAActive.current || (stageAPhase !== "ask" && stageAPhase !== "correct")) return;
+    if (!stageAActive.current || (stageAPhase !== "ask" && stageAPhase !== "correct" && stageAPhase !== "notReady")) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [stageAPhase]);
   // ADR «8 Οκτωβρίου (δ)», 5: a UI-only bubble (the user's message that went nowhere) appears at the bottom — bring it into view.
@@ -8181,6 +8226,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setIntroChoice(null);
     setError(null);
     setCrisisFallback(null);
+    setTesterCopy(null);
     setClaritySurge(false);
     setIllumLevel(0);
     setFinalDistillation(null);
@@ -8500,7 +8546,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               {recMode.current && storedTelemetryCount() > 0 && (
                 <div style={{marginTop:"22px",textAlign:"left"}}>
                   <div style={{fontSize:"11px",color:"#8a8680",lineHeight:1.5,marginBottom:"6px"}}>{TESTER_TEXTS.line}</div>
-                  <button onClick={exportTesterData} style={{background:"transparent",border:"1px solid rgba(201,168,76,0.3)",color:"rgba(201,168,76,0.75)",fontSize:"11px",padding:"6px 10px",cursor:"pointer"}}>{TESTER_TEXTS.button}</button>
+                  <button onClick={handleTesterExport} style={{background:"transparent",border:"1px solid rgba(201,168,76,0.3)",color:"rgba(201,168,76,0.75)",fontSize:"11px",padding:"6px 10px",cursor:"pointer"}}>{TESTER_TEXTS.button}</button>
+                  {testerCopy && <div role="status" style={{fontSize:"12px",lineHeight:1.5,marginTop:"6px",color:testerCopy === "ok" ? "rgba(201,168,76,0.9)" : "#c8c4bc"}}>{testerCopy === "ok" ? TESTER_TEXTS.copied : TESTER_TEXTS.notCopied}</div>}
                 </div>
               )}
             </div>
@@ -8971,6 +9018,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                     <button className="choice-btn" onClick={() => stageADispatch({ type: "help", choice: 1 })}>{STAGE_A_TEXTS.help1}</button>
                     <button className="choice-btn" onClick={() => stageADispatch({ type: "help", choice: 2 })}>{STAGE_A_TEXTS.help2}</button>
                     <button className="choice-btn" onClick={() => stageADispatch({ type: "help", choice: 3 })}>{STAGE_A_TEXTS.help3}</button>
+                    <button className="choice-btn" onClick={() => stageADispatch({ type: "help", choice: 4 })}>{STAGE_A_TEXTS.help4}</button>
                     <button className="choice-btn" style={{opacity:0.75}} onClick={() => stageADispatch({ type: "help", choice: 0 })}>{STAGE_A_TEXTS.helpSkip}</button>
                   </div>
                 </div>
@@ -9076,7 +9124,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               {recMode.current && (
                 <div style={{marginTop:"14px"}}>
                   <div className="end-note" style={{fontSize:"11px",marginBottom:"6px"}}>{TESTER_TEXTS.line}</div>
-                  <button className="new-btn" style={{fontSize:"11px"}} onClick={exportTesterData}>{TESTER_TEXTS.button}</button>
+                  <button className="new-btn" style={{fontSize:"11px"}} onClick={handleTesterExport}>{TESTER_TEXTS.button}</button>
+                  {testerCopy && <div role="status" className="end-note" style={{fontSize:"12px",marginTop:"6px",color:testerCopy === "ok" ? "rgba(201,168,76,0.9)" : undefined}}>{testerCopy === "ok" ? TESTER_TEXTS.copied : TESTER_TEXTS.notCopied}</div>}
                 </div>
               )}
               {valueUnlocked && finalDistillation && (

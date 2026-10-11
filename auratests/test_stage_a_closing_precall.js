@@ -117,10 +117,11 @@ assert('A: the gate function itself is unchanged', sha(extractBlock('function st
 
 // ── C: the root question is scrolled into view when it opens ─────────────────
 {
+  // UPDATED (11/10, ADR «11 Οκτωβρίου (η)»): the same effect also brings the one-tap question into view (notReady).
   const at = CODE.indexOf('// STAGE A (phone test 7/10): the root question opens');
   const eff = at >= 0 ? CODE.slice(at, at + 700) : '';
   assert('C: an effect on the phase scrolls to the bottom when the root question opens (door 1, «Πριν φύγεις:», «Διόρθωσε»)',
-    /useEffect\(\(\) => \{\s*if \(!stageAActive\.current \|\| \(stageAPhase !== "ask" && stageAPhase !== "correct"\)\) return;\s*bottomRef\.current\?\.scrollIntoView\(\{ behavior: "smooth", block: "end" \}\);\s*\}, \[stageAPhase\]\);/.test(eff));
+    /useEffect\(\(\) => \{\s*if \(!stageAActive\.current \|\| \(stageAPhase !== "ask" && stageAPhase !== "correct"(?: && stageAPhase !== "notReady")?\)\) return;\s*bottomRef\.current\?\.scrollIntoView\(\{ behavior: "smooth", block: "end" \}\);\s*\}, \[stageAPhase\]\);/.test(eff));
   assert('C: switch closed → the effect returns at once (nothing on screen changes)', /if \(!stageAActive\.current \|\|/.test(eff));
   assert('C: the existing scroll (messages, the end text after «Ναι») is unchanged',
     CODE.includes('  }, [messages, loading, pivotPending, layerGatePending, memoryPromptPending, warningPending, closureConfirmPending, misfirePending, firstWhyPending]);') &&
