@@ -144,8 +144,10 @@ assert('ROBUST: no state, no reply, a non-string → false, never a crash',
 }
 
 // ── Unchanged ────────────────────────────────────────────────────────────────
-assert('UNCHANGED: the prompt (no prompt change), the parser, the closing decision and its Stage A gate, the leaving door, the marker',
-  sha(PROMPT) === '2f229a4077b57d19' && sha(fullFnSrc('parseThreeBeatShift')) === '7bceea7040494611' && sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' &&
+// The prompt digest moved once, deliberately, with P1 (ADR «11 Οκτωβρίου (δ)», item (7) of the Stage A rule; see test_minimal_closing.js).
+// This fix itself still changes no prompt text.
+assert('UNCHANGED: the prompt (no prompt change by this fix), the parser, the closing decision and its Stage A gate, the leaving door, the marker',
+  sha(PROMPT) === '9eb534c68e380beb' && sha(fullFnSrc('parseThreeBeatShift')) === '7bceea7040494611' && sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' &&
   sha(fullFnSrc('stageAPreRootDecision')) === '9697ed106f7722f3' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'c14e923cd0166b66' &&
   sha(fullFnSrc('buildStageAMarker')) === '0ef63f69e55acfde');
 assert('UNCHANGED: the question texts', CODE.includes('askLeaving: "Αν κάτι σου ξεκαθάρισε, πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;"') &&

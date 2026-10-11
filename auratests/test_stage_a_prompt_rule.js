@@ -78,6 +78,21 @@ assert('RULE: honest deferral when asked what to do — «τι κάνω» comes 
 assert('RULE: then ONE question toward the root (ONE REPLY, NOT A PROCEDURE)', /ONE question toward the root/.test(RULE) && /ONE REPLY, NOT A PROCEDURE/.test(RULE));
 assert('RULE: a step the user brings is not evaluated, developed or added to', /do not evaluate, develop or add to it/.test(RULE));
 assert('RULE: ROOT RE-FOCUS and its readiness question stay active', /ROOT RE-FOCUS and its readiness question stay fully active/.test(RULE));
+// ADR «11 Οκτωβρίου (δ)» (John approved P1, 11/10): the stress test with the real model found AURA saying «Αυτό είναι η ρίζα.» /
+// «Εδώ είναι η ρίζα:» before the root (2.1, 4.1) — against §3a. Point 7: never say what the root is; close to it, ask the canonical
+// readiness question, so the user says it in the APP's question (a card that is measured), not in the chat (no card).
+assert('RULE (7): never say what the root is — the two phrases the stress test caught are named',
+  RULE.includes('(7) Μην λες ποτέ ποια είναι η ρίζα (π.χ. «Αυτό είναι η ρίζα», «Εδώ είναι η ρίζα»).'));
+assert('RULE (7): close to the root → the readiness question; the user says the root himself, in the app\'s question',
+  RULE.includes('Όταν νιώθεις ότι ο χρήστης έφτασε κοντά, κάνε την ερώτηση ετοιμότητας (ROOT RE-FOCUS, βήμα ένα)· τη ρίζα θα την πει ο ίδιος, με δική του φράση, στην ερώτηση της εφαρμογής.'));
+{
+  const R = load(['detectsCoreReadinessAsked']);
+  const CANON = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+  assert('RULE (7): the readiness question it points to is the canonical one in the prompt, and the app recognises it (door 2)',
+    PROMPT.includes('"' + CANON + '"') && /this exact wording is canonical, not to be varied/.test(PROMPT) && R.detectsCoreReadinessAsked(CANON) === true);
+}
+assert('RULE (7): the last point, after (6), in the same paragraph (so it carries the same marker condition)',
+  RULE.indexOf('(7) Μην λες') > RULE.indexOf('(6) Όσο η ρίζα') && RULE.indexOf('(6) Όσο η ρίζα') > 0 && RULE.trim().endsWith('στην ερώτηση της εφαρμογής.'));
 assert('RULE: sits before the closing critical invariants (they stay last)',
   PROMPT.indexOf('STAGE A — FREE PART ENDS AT THE ROOT') < PROMPT.lastIndexOf('<critical_invariants>') &&
   PROMPT.indexOf('STAGE A — FREE PART ENDS AT THE ROOT') > PROMPT.lastIndexOf('</critical_invariants>', PROMPT.lastIndexOf('<critical_invariants>')));

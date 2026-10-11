@@ -186,9 +186,15 @@ assert('CLOSING: Part 2 is still told not to repeat the summary',
 // no farewell and no «session complete» while the root is unconfirmed; a short reply, no closing, if the user
 // wants to stop. Inert without the marker. +187 characters, one cache write, paid knowingly.
 // See test_stage_a_leaving_door.js (F).
+//
+// CHANGED AGAIN, DELIBERATELY, on 2026-10-11 (2f229a4077b57d19 → 9eb534c68e380beb). Stage A, founder-approved
+// (ADR «11 Οκτωβρίου (δ)», P1): item (7) appended INSIDE the same conditional paragraph — never say what the root is
+// («Αυτό είναι η ρίζα», «Εδώ είναι η ρίζα», both caught by the stress test with the real model); close to it, the
+// canonical readiness question, so the user says it in the app's question. Inert without the marker. +255 characters,
+// one cache write, paid knowingly. See test_stage_a_prompt_rule.js.
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 2f229a4077b57d19…)',
-  PROMPT_SHA.slice(0, 16) === '2f229a4077b57d19');
+assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 9eb534c68e380beb…)',
+  PROMPT_SHA.slice(0, 16) === '9eb534c68e380beb');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',
