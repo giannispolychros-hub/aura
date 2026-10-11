@@ -628,6 +628,7 @@ async function runMock() {
   await runMockY();
   await runMockZ();
   await runMockMC();
+  await runMockMH();
 }
 
 // ── W: the hidden tags still work after the label cleaning (founder's check of 6408fbf, ADR «8 Οκτωβρίου (γ)»), switch
@@ -1427,6 +1428,49 @@ async function runMockMC() {
   }
 }
 
+// ── MH: AURA refers the user to mental-health help → no €6 offer after the root (ADR «11 Οκτωβρίου (ε)», SAFETY; found by the
+// hard round with the real model, session 27). Switch open, phone size; a control session without the referral keeps the offer.
+async function runMockMH() {
+  const F1 = 'Δεν ξέρω τι μου συμβαίνει τελευταία.', WHY = 'Γιατί όλα μου φαίνονται βαριά.';
+  const REF = 'Αυτό που περιγράφεις — μήνες βαρύτητας, κούραση πριν αρχίσει η μέρα — είναι κάτι που αξίζει να μιλήσεις με κάποιον ειδικό. Ψυχολόγο ή ψυχίατρο.\n\nΈχεις σκεφτεί κάτι τέτοιο;';
+  const ROOT = 'Όλα είναι βαριά εδώ και μήνες και δεν ξέρω γιατί.';
+  const T = APP.texts;
+  const run = async (second) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: { width: 390, height: 700 } });
+    let n = 0;
+    const replies = ['Από πότε το νιώθεις αυτό;', second, 'Τι σε κρατάει πιο πολύ;'];
+    await page.route('**/api/aura', async route => {
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/?stageA=1&rec=1');
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await send(page, F1); if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, WHY);
+    await send(page, 'Μήνες τώρα, κάθε πρωί.'); await page.waitForTimeout(600);
+    const btn = name => page.getByRole('button', { name, exact: true });
+    if (await btn(T.button).count()) { await btn(T.button).click(); await page.waitForTimeout(400); }
+    await send(page, ROOT); await page.waitForTimeout(400);
+    const cards = (await page.locator('.warning-card').allInnerTexts()).join('\n');
+    if (await btn(T.yes).count()) { await btn(T.yes).click(); await page.waitForTimeout(600); }
+    const r = {
+      cardShown: cards.includes(ROOT), riskLine: cards.includes(T.cardLineRisk), offer: await btn(T.wantMore).count() > 0,
+      clarity: (await page.locator('body').innerText()).includes(T.clarityQ),
+      log: await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } }),
+    };
+    await browser.close();
+    return r;
+  };
+  const a = await run(REF);
+  ok('MH (switch open): after AURA referred to a psychologist / psychiatrist, the root card still opens with the user\'s words', a.cardShown);
+  ok('MH (switch open): … its line says «Με το "Ναι" ολοκληρώνεται αυτό το κομμάτι.» (no «σου δείχνω το επόμενο»)', a.riskLine);
+  ok('MH (switch open): «Ναι» → NO €6 offer; the clarity scale comes next; no coach_offer_shown in the log',
+    !a.offer && a.clarity && !a.log.some(e => e.ev === 'coach_offer_shown'));
+  const b = await run('Τι σε βαραίνει περισσότερο;');
+  ok('MH (control, no referral): the €6 offer is shown after «Ναι», as before', b.cardShown && !b.riskLine && b.offer);
+}
+
 // ═══ ΤΑ 6 ΣΕΝΑΡΙΑ (ψεύτικο ή πραγματικό μοντέλο) ═════════════════════════════
 function fakeModel() {
   let mainCalls = 0;
@@ -2060,7 +2104,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else await runMock();
+      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

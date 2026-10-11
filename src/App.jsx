@@ -1745,6 +1745,15 @@ function mergeRiskKind(prev, signal, tier) {
   if (!p) return now;
   return Math.min(p, now);
 }
+// ADR «11 Οκτωβρίου (ε)» (SAFETY, §0.1 / §25) — AURA's OWN reply refers the user to mental-health help. Found by the stress
+// test with the real model: after «χρειάζεται έναν ειδικό… Ψυχολόγο ή ψυχίατρο» the €6 offer followed the root card. The
+// professions only — the adjective «ψυχολογικά» and the field «ψυχολογία» are not a referral, and «έναν ειδικό» alone could be a
+// lawyer. Matched without accents, any case. The reply path raises the session's risk latch to DISTRESS: no paid offer follows.
+function detectsMentalHealthReferral(text) {
+  if (typeof text !== "string" || !text) return false;
+  const f = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return /ψυχολογ(ο|ος|ου|οι|ους)(?![α-ως])|ψυχιατρ(ο|ος|ου|οι|ους)(?![α-ως])|ψυχοθεραπευτ(η|ης|ες|ων)(?![α-ως])|ψυχικης υγειας/.test(f);
+}
 // §1.5 — door 1, the button: after the first AURA reply; never in tier A, while loading, once the closing
 // has started (two closings must never run), while the ask/card flow is open, or after the session ended.
 function stageARootButtonVisible(st) {
@@ -6831,6 +6840,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         if (_crisisLine.line) displayText = text + "\n\n" + _crisisLine.line;
         if (_crisisLine.supportShown) supportLineShown.current = true;
       }
+      // SAFETY (ADR «11 Οκτωβρίου (ε)»): AURA's own reply referred the user to mental-health help → the session counts as one with
+      // a risk signal (DISTRESS): the root card stays, no €6 offer, no paywall. Only ever raises the latch (heavier signals stay).
+      if (detectsMentalHealthReferral(text)) riskSignalKind.current = mergeRiskKind(riskSignalKind.current, "DISTRESS", null);
 
       // ROOT-CAUSE FIX (Clarity + Ownership Scale gate — real-transcript evidence: the user's
       // message "Θα το κάνω" correctly set concreteStepStated=true via detectsConcreteStep, but the
