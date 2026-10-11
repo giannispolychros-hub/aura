@@ -236,8 +236,12 @@ assert('the pair is still pushed when the message is a real answer — the guard
 // UPDATED AGAIN (2026-10-10, ADR «10 Οκτωβρίου», 1): a 12th call site joined inside stageAPreRootDecision — the SAME two
 // detectors again (`isExplicitClosure(u) || declaresClosing(u)`): before the root, with the switch open, only an explicit exit
 // (T2) keeps a closing decision. Stage A only (switch closed: returns the decision untouched). Additive, replaces nothing.
-assert('exactly twelve call sites are wired, matching the current stated scope',
-  (raw.match(/declaresClosing\s*\(/g) || []).length === 13); // 12 call sites + the definition
+// UPDATED AGAIN (2026-10-11, ADR «11 Οκτωβρίου (β)»): a 13th call site joined inside stageAModelClosesBeforeRoot — the SAME
+// two detectors (`isExplicitClosure(u) || declaresClosing(u)`), here as an EXCLUSION: when the user's own message is an
+// explicit exit, the model's closing summary is left to the old closing (the second exit, ADR «10 Οκτωβρίου», 1). Stage A
+// only (switch closed: never true). Additive, replaces nothing.
+assert('exactly thirteen call sites are wired, matching the current stated scope',
+  (raw.match(/declaresClosing\s*\(/g) || []).length === 14); // 13 call sites + the definition
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);

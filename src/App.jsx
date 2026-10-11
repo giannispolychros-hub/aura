@@ -1761,6 +1761,19 @@ function stageALeavingDoorOpens(st) {
   return o.active === true && (o.decision === "confirm" || o.decision === "terminate") && !o.used && !o.rootPhase && !o.armed &&
     !o.rootConfirmed && !o.closingStarted && o.riskKind !== 1 && !o.safetyMode && !detectSafetySignal(u) && (isExplicitClosure(u) || declaresClosing(u));
 }
+// ADR «11 Οκτωβρίου (β)» — the MODEL's own closing before the root. Found by the stress test with the real model (run 10,
+// sessions 2.1 and 4.1): after «Νιώθεις ότι κάτι άλλαξε…;» → «Ναι, άλλαξε…», the model wrote the old closing summary
+// (ΗΡΘΕΣ ΜΕ / ΒΡΗΚΕΣ / ΦΕΥΓΕΙΣ ΜΕ) and asked «…ή κλείνουμε εδώ;», although Stage A rule 6 of the prompt forbids it. That reply
+// is not shown; door 1's question is shown instead (Constitution §19). Same safety and flow conditions as the leaving door;
+// the user's own explicit exit is excluded (the second exit keeps the old closing, ADR «10 Οκτωβρίου», 1). Switch closed or
+// after the root: false.
+function stageAModelClosesBeforeRoot(st) {
+  const o = st || {};
+  const u = typeof o.lastUserText === "string" ? o.lastUserText : "";
+  return o.active === true && !o.rootConfirmed && !o.rootPhase && !o.armed && !o.closingStarted && !o.safetyMode && !o.supportive &&
+    o.riskKind !== 1 && !detectSafetySignal(u) && !(isExplicitClosure(u) || declaresClosing(u)) &&
+    typeof o.reply === "string" && parseThreeBeatShift(o.reply) !== null;
+}
 // ADR «8 Οκτωβρίου (δ)», 1 — with the switch open and before a confirmed root, the MASTER PRIORITY RULE stage
 // GRACEFUL EXIT («this governs now») is sent only when the old closing really opens on this same turn. Before, a bare
 // «Ναι» got it too, in the same request as the Stage A rule «don't say goodbye before the root». `decision` is the
@@ -1847,6 +1860,12 @@ function stageAStep(state, ev) {
       if (s.phase) return s;
       reach(1);
       return next({ phase: "ask", door: 2, leaving: false, retry: false });
+    // ADR «11 Οκτωβρίου (β)» — the model's own closing summary before the root: door 1's question («Αν κάτι σου ξεκαθάρισε…»)
+    // instead. The card it may open is door 5. It does not use up the leaving door: the user's own first exit still meets it.
+    case "modelClose":
+      if (s.phase) return s;
+      reach(1);
+      return next({ phase: "ask", door: 5, leaving: true, retry: false });
     case "back":
       if (s.phase !== "ask" && s.phase !== "card" && s.phase !== "correct") return s;
       st.rootBack += 1;
@@ -1937,7 +1956,7 @@ function stageAHelpTelemetry(prev, next, ev) {
 }
 // ADR «10 Οκτωβρίου», 2 (SPEC 2.2, an exception to the freeze) — every step of the root flow is recorded the moment it
 // happens, device only, numbers only: the card shown and from which door (1 the button · 2 readiness · 3 spontaneous · 4 the
-// first closing), the answer to it (1 «Ναι, αυτό είναι» · 2 «Διόρθωσε» · 3 «Δεν το βρήκα ακόμα»; from 1 the question · 2 the
+// first closing · 5 the model's own closing summary, ADR «11 Οκτωβρίου (β)»), the answer to it (1 «Ναι, αυτό είναι» · 2 «Διόρθωσε» · 3 «Δεν το βρήκα ακόμα»; from 1 the question · 2 the
 // card · 3 the correction), the €6 offer shown, its answer (want 1 «Θέλω να συνεχίσω» / 0 «Όχι τώρα»), the clarity value.
 // A list, in the order things happened. Built from the step and the state — never from the root text.
 function stageAFlowTelemetry(prev, next, ev) {
@@ -1945,7 +1964,7 @@ function stageAFlowTelemetry(prev, next, ev) {
   if (!prev || !next || !ev) return out;
   const FROM = { ask: 1, card: 2, correct: 3 };
   if (ev.type === "open" && next.phase === "card" && prev.phase !== "card") {
-    out.push({ event: "root_card_shown", fields: { door: prev.leaving ? 4 : (next.door === 1 || next.door === 2 || next.door === 3 ? next.door : 0) } });
+    out.push({ event: "root_card_shown", fields: { door: next.door === 5 ? 5 : prev.leaving ? 4 : (next.door === 1 || next.door === 2 || next.door === 3 ? next.door : 0) } });
   } else if (ev.type === "yes" && prev.phase === "card" && next.phase !== "card") {
     out.push({ event: "root_answer", fields: { answer: 1, from: 2 } });
     if (next.phase === "offer") out.push({ event: "coach_offer_shown", fields: { shown: 1 } });
@@ -6910,6 +6929,15 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         onboardingStepRef.current = nextCount;
       }
 
+      // STAGE A — ADR «11 Οκτωβρίου (β)»: the model's own closing summary before the root is neither shown nor kept in the
+      // history; door 1's question opens below, after the reply's bookkeeping. Before the AI-identity backstop, so its line
+      // still shows (§0.1). Switch closed: never true.
+      const _saModelClose = stageAModelClosesBeforeRoot({
+        active: stageAActive.current, reply: text, lastUserText: lastUserMsg,
+        rootConfirmed: stageARef.current.stats.rootConfirmed === 1, rootPhase: stageARef.current.phase, armed: stageARootArmed.current,
+        closingStarted: reflectionDelivered.current, riskKind: riskSignalKind.current, safetyMode, supportive: currentMode === "SUPPORTIVE",
+      });
+      if (_saModelClose) displayText = "";
       // AI IDENTITY BACKSTOP — last step before the reply is written, so no earlier rewrite of displayText
       // can drop it. See buildAiIdentityLine.
       const _aiLine = buildAiIdentityLine(lastUserMsg, displayText);
@@ -7164,6 +7192,13 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // Give AURA one more natural turn to ask the mandatory relief-scale question
         // before allowing closure. No closing UI shown this turn; conversation continues.
         outcomeScaleBlockUsed.current = true;
+        return;
+      }
+      // STAGE A — ADR «11 Οκτωβρίου (β)»: the model closed on its own before the root (its reply was emptied above) → door 1's
+      // question instead. A flow opened on this same turn (door 3) is left as it is; door 2 armed → the question is shown now.
+      if (_saModelClose && !stageARef.current.phase) {
+        stageARootArmed.current = false;
+        stageADispatch({ type: "modelClose" });
         return;
       }
       // STAGE A — the root flow outranks the old closing. A bare «Ναι» to the readiness question counts as a

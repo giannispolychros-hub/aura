@@ -627,6 +627,7 @@ async function runMock() {
   await runMockX();
   await runMockY();
   await runMockZ();
+  await runMockMC();
 }
 
 // ── W: the hidden tags still work after the label cleaning (founder's check of 6408fbf, ADR «8 Οκτωβρίου (γ)»), switch
@@ -1337,6 +1338,95 @@ async function runMockZ() {
   }
 }
 
+// ── MC: the MODEL's own closing summary before the root (ADR «11 Οκτωβρίου (β)», found by the stress test with the real model,
+// run 10, sessions 2.1 and 4.1). Switch open: the summary is not shown, door 1's question is; the card it opens is door 5 in
+// the log; the model never sees its summary again. Switch closed, and a safety turn: as today. Phone size.
+async function runMockMC() {
+  const F1 = 'Τσακωνόμαστε συνέχεια για το πού θα ζήσουμε.', WHY = 'Γιατί δεν έχω πει ποτέ καθαρά τι θέλω εγώ.';
+  const SHIFT_Q = 'Νιώθεις ότι κάτι άλλαξε σε σχέση με το πώς έβλεπες αυτό στην αρχή;';
+  const U = 'Ναι, άλλαξε. Στην αρχή έλεγα ναι σε ό,τι ήθελε εκείνη, και τώρα καταλαβαίνω ότι το έκανα για να μην πω τι θέλω εγώ.';
+  const R = 'ΗΡΘΕΣ ΜΕ: έναν τσακωμό που δεν τελειώνει.\n\nΒΡΗΚΕΣ: ότι το "ναι" ήταν τρόπος να αποφύγεις να πεις κάτι δικό σου.\n\nΦΕΥΓΕΙΣ ΜΕ: ξέρεις τι θέλεις.\n\n---\n\nΘέλεις να προσθέσεις κάτι, ή κλείνουμε εδώ;';
+  const ROOT = 'Δεν έχω πει ποτέ καθαρά τι θέλω εγώ, και θυμώνω που εκείνη δεν το μαντεύει.';
+  const T = APP.texts;
+  const sess = async (query, replies) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: { width: 390, height: 700 } });
+    const bodies = [];
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      let body = {}; try { body = JSON.parse(route.request().postData() || '{}'); } catch (e) {}
+      bodies.push(body);
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await send(page, F1); if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, WHY);
+    return { browser, page, bodies };
+  };
+  const body = page => page.locator('body').innerText();
+  const btn = (page, name) => page.getByRole('button', { name, exact: true });
+  const log = page => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
+  // a button that is not there is a FAIL below, never a crash (so the old code reports, too)
+  const press = async (page, name) => { if (await btn(page, name).count()) { await btn(page, name).first().click(); await page.waitForTimeout(500); } };
+  {
+    const s = await sess('?stageA=1&rec=1', ['Τι σε εμποδίζει να το πεις;', SHIFT_Q, R, 'Τι θα ήθελες να πεις πρώτα;']);
+    await send(s.page, 'Φοβάμαι ότι θα πει όχι.'); await send(s.page, U); await s.page.waitForTimeout(800);
+    const b = await body(s.page);
+    ok('MC (switch open): the model\'s closing summary before the root is NOT on screen (no ΗΡΘΕΣ / ΒΡΗΚΕΣ / ΦΕΥΓΕΙΣ, no «κλείνουμε εδώ;»)',
+      !/ΗΡΘΕΣ ΜΕ|ΒΡΗΚΕΣ|ΦΕΥΓΕΙΣ ΜΕ|κλείνουμε εδώ/i.test(b) && b.includes(U));
+    ok('MC (switch open): door 1\'s question is there instead — «Αν κάτι σου ξεκαθάρισε…» with «Δεν το βρήκα ακόμα, συνέχισε»; no closing card',
+      b.includes(T.askLeaving) && await btn(s.page, T.back).count() === 1 && await btn(s.page, 'Δείξε μου').count() === 0 && await s.page.locator('textarea.textarea').count() === 1);
+    await s.page.screenshot({ path: path.join(OUT, 'MC-model-close-question.png'), fullPage: false });
+    await send(s.page, ROOT); await s.page.waitForTimeout(500);
+    const cards = await s.page.locator('.warning-card').allInnerTexts();
+    ok('MC (switch open): the answer opens the root card with the user\'s own words', cards.some(c => c.includes(ROOT)) && await btn(s.page, T.yes).count() === 1);
+    await press(s.page, T.yes);
+    const ev = (await log(s.page)).filter(e => e.ev === 'root_card_shown');
+    ok('MC (switch open, ?rec=1): the log says root_card_shown {door: 5}', ev.length === 1 && ev[0].door === 5);
+    // three calls: the answer to the app's first question, «Φοβάμαι…», and the turn of the summary — the root and «Ναι» call nothing
+    ok('MC (switch open): the model was called once for that turn and never shown its own summary afterwards',
+      s.bodies.length === 3 && !s.bodies.some(x => JSON.stringify(x.messages || []).includes('ΗΡΘΕΣ ΜΕ')));
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1', ['Τι σε εμποδίζει να το πεις;', SHIFT_Q, R, 'Τι θα ήθελες να πεις πρώτα;']);
+    await send(s.page, 'Φοβάμαι ότι θα πει όχι.'); await send(s.page, U); await s.page.waitForTimeout(800);
+    await press(s.page, T.back);
+    await send(s.page, 'Ίσως ότι θέλω θάλασσα.'); await s.page.waitForTimeout(800);
+    const last = s.bodies[s.bodies.length - 1] || {};
+    const um = (last.messages || []).filter(m => m.role === 'user').map(m => typeof m.content === 'string' ? m.content : JSON.stringify(m.content));
+    ok('MC (switch open): «Δεν το βρήκα ακόμα, συνέχισε» → the conversation goes on; the next request carries both user messages and no summary',
+      (await body(s.page)).includes('Τι θα ήθελες να πεις πρώτα;') && um.some(t => t.includes(U)) && um.some(t => t.includes('Ίσως ότι θέλω θάλασσα.')) &&
+      !JSON.stringify(last.messages || []).includes('ΗΡΘΕΣ ΜΕ'));
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1', ['Τι σε εμποδίζει να το πεις;', R]);
+    await send(s.page, 'Είσαι άνθρωπος;'); await s.page.waitForTimeout(800);
+    const b = await body(s.page);
+    ok('MC (switch open, «Είσαι άνθρωπος;»): the summary is hidden, the AI-identity line still shows, and the question opens',
+      !/ΗΡΘΕΣ ΜΕ/.test(b) && /AI|τεχνητ/i.test(b) && b.includes(T.askLeaving));
+    await s.browser.close();
+  }
+  {
+    const s = await sess('', ['Τι σε εμποδίζει να το πεις;', SHIFT_Q, R]);
+    await send(s.page, 'Φοβάμαι ότι θα πει όχι.'); await send(s.page, U); await s.page.waitForTimeout(800);
+    const b = await body(s.page);
+    ok('MC (switch closed): as today — the summary is shown, no root question', /ΗΡΘΕΣ ΜΕ/.test(b) && /ΦΕΥΓΕΙΣ ΜΕ/.test(b) && !b.includes(T.askLeaving));
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1', ['Τι σε εμποδίζει να το πεις;', R]);
+    await send(s.page, 'Το πένθος για τη μητέρα μου με έχει παραλύσει.'); await s.page.waitForTimeout(800);
+    const b = await body(s.page);
+    ok('MC (switch open, DISTRESS in the message): safety as today — no root question opened by this rule',
+      !b.includes(T.askLeaving) && await btn(s.page, T.back).count() === 0);
+    await s.browser.close();
+  }
+}
+
 // ═══ ΤΑ 6 ΣΕΝΑΡΙΑ (ψεύτικο ή πραγματικό μοντέλο) ═════════════════════════════
 function fakeModel() {
   let mainCalls = 0;
@@ -1948,7 +2038,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else await runMock();
+      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
