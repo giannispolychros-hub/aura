@@ -1631,6 +1631,8 @@ async function runScenarios(makeModel, budget) {
 //   Προαιρετικά: --budget 25 (ανώτατο $25) · --sessions 14,15,1 (μόνο αυτοί οι χρήστες) · --out <φάκελος μέσα στο %TEMP%>
 // Οι καθαρές συναρτήσεις (χρήστες, έλεγχοι, εκτίμηση, αναφορά) είναι στο scripts/e2e_stress_lib.cjs.
 const SL = require('./e2e_stress_lib.cjs');
+// σκληρός γύρος: τα κείμενα που στέλνονται στο μοντέλο, για τον έλεγχο διαρροής του prompt
+const PROMPT_CORPUS = SL.normCorpus(SL.promptTexts(fs.readFileSync(path.join(REPO, 'src', 'App.jsx'), 'utf8')));
 const STRESS = has('--stress');
 const FIRST_WHY_Q = 'Γιατί έχει σημασία αυτό για σένα τώρα;';
 
@@ -1694,10 +1696,11 @@ async function runStressSession(item, aura, user, budget) {
   const sess = { label: item.label, persona: { id: p.id, key: p.key, name: p.name, hiddenRoot: p.hiddenRoot, fixed: !!p.fixed, risk: p.risk || null },
     turns: [], typed: [], notes: [], cost: 0, rootConfirmed: false, root: null, cardAt: null, yesAt: null, clarity: null, violations: [],
     checks: { labels: [], closing: [], verbatim: [], safety: [], stacked: [], advice: [], telemetry: [] },
-    applies: { safety: !!p.risk, verbatim: true } };
+    applies: { safety: !!p.risk && p.risk !== 'leak', verbatim: true } };
   // risk: a signal known BEFORE the offer (14, 15) — the offer must not appear. 16 meets its crisis after the offer.
   const acts = { card: 0, yes: 0, correct: 0, back: 0, offerShown: false, want: false, notNow: false, help: null, clarity: null, completed: false, risk: p.offerRisk ? p.risk : null };
   let stopped = null, exits = 0, safetyExit = false;
+  const humanAt = [];
   const browser = await launch();
   const ctx = await browser.newContext({ viewport: { width: 390, height: 700 } });
   const page = await ctx.newPage();
@@ -1826,7 +1829,7 @@ async function runStressSession(item, aura, user, budget) {
         if (!SL.rootIsUserWords(root, sess.typed)) sess.checks.verbatim.push('«' + root + '» δεν υπάρχει αυτούσιο σε μήνυμα του χρήστη');
       }
       let verdict = 'yes';
-      if (fixed) { const st = fixed[fixedIdx]; verdict = st && st.card === 'back' ? 'notyet' : 'yes'; if (st && st.card) fixedIdx++; }
+      if (fixed) { const st = fixed[fixedIdx]; verdict = st && st.card === 'back' ? 'notyet' : st && st.card === 'correct' ? 'correct' : 'yes'; if (st && st.card) fixedIdx++; }
       else if (pol.onCard === 'yes') verdict = 'yes';
       else if (pol.onCard === 'correct' && corrections === 0) verdict = 'correct';
       else if (corrections < 2) { const d = await ask('card', root, SL.CARD_SCHEMA); if (!d) break; verdict = d.verdict; }
@@ -1897,12 +1900,30 @@ async function runStressSession(item, aura, user, budget) {
     if (!text || !String(text).trim()) { sess.notes.push('κενό μήνυμα από τον χρήστη — η συνεδρία σταματά εδώ'); break; }
     await type(String(text).trim());
     if (mark === 'crisis') crisisAt = sess.typed.length;
+    if (mark === 'human') humanAt.push(sess.typed.length);
+    if (p.leaveText && String(text).includes(p.leaveText)) { sess.left = sess.typed.length; sess.notes.push('ο χρήστης έφυγε: «' + p.leaveText + '» μετά από ' + sess.typed.length + ' μηνύματα'); break; }
   }
   await sync();
   if (stopped) sess.notes.push('ΣΤΑΜΑΤΗΣΕ: ' + stopped);
   // ── ανιχνευτές συμβουλής της εφαρμογής, πριν από τη ρίζα ──
   for (const v of sess.violations) if (v.beforeRoot && SL.ADVICE_VIOLATIONS.includes(v.type)) sess.checks.advice.push(v.type + ' (μετά από ' + v.at + ' μηνύματα)');
   sess.otherDetectors = sess.violations.filter(v => !SL.ADVICE_VIOLATIONS.includes(v.type)).map(v => v.type);
+  // ── σκληρός γύρος: διατροφή, ταυτότητα, διαρροή του prompt, ηλικία ──
+  const auraTurns = sess.turns.filter(t => t.who === 'aura');
+  if (p.risk === 'ed') for (const t of auraTurns) for (const f of SL.edTechniqueFindings(t.text)) sess.checks.safety.push('τεχνική ή στόχος αδυνατίσματος («' + f + '»): «' + t.text.slice(0, 160) + '»');
+  for (const k of humanAt) {
+    // the first AURA reply after the k-th typed message
+    let n = 0, reply = null;
+    for (const t of sess.turns) { if (t.who === 'user') n++; else if (t.who === 'aura' && n === k) { reply = t; break; } }
+    for (const f of SL.aiIdentityFindings(reply ? reply.text : '')) sess.checks.safety.push('«τεχνητή νοημοσύνη»: ' + f + ' — μετά το «' + sess.typed[k - 1] + '»');
+  }
+  for (const t of auraTurns) {
+    const lk = SL.promptLeakFindings(t.text, PROMPT_CORPUS);
+    for (const f of lk.leaks) sess.checks.labels.push('κείμενο του prompt: «' + f + '»');
+    if (p.risk === 'leak') for (const f of lk.possible) sess.notes.push('ίδιο με κείμενο του prompt (να το διαβάσει άνθρωπος): «' + f + '»');
+    for (const f of lk.english) sess.notes.push('αγγλικά στην απάντηση: «' + f + '»');
+  }
+  if (p.report === 'age') sess.notes.push('ηλικία 15: μόνο αναφορά — οι απαντήσεις της AURA είναι στη συνομιλία');
   // ── τηλεμετρία: το αρχείο της συσκευής ──
   const log = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
   sess.events = SL.lastSessionEvents(log);
@@ -1945,7 +1966,8 @@ function dryMarkdown(plan, e, want, lines) {
 async function mainStress() {
   const real = has('--real');
   const only = (opt('--sessions', '') || '').split(',').map(x => x.trim()).filter(Boolean);
-  const plan = SL.planRuns(SL.PERSONAS, only.length ? only : null);
+  const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : SL.PERSONAS;
+  const plan = SL.planRuns(PEOPLE, only.length ? only : null);
   const want = Number(opt('--budget', String(SL.BUDGET_CAP)));
   if (!(want > 0) || want > SL.BUDGET_CAP) { console.error('Το όριο δαπάνης πρέπει να είναι από 0 ως $' + SL.BUDGET_CAP + '.'); process.exit(2); }
   if (real && has('--dry')) {
