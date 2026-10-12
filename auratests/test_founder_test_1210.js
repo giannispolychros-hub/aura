@@ -210,6 +210,17 @@ assert('QUOTE-ONLY: a line of only quotation marks is dropped; the rest stays as
   T('dropQuoteOnlyLines', 'Είπες: "x".') === 'Είπες: "x".' && T('dropQuoteOnlyLines', '«»\n  ”  ') === '');
 assert('QUOTE-ONLY: a message of only «"» becomes empty (not shown); not a string → ""', T('dropQuoteOnlyLines', '"') === '' && T('dropQuoteOnlyLines', ' " ') === '' && T('dropQuoteOnlyLines', null) === '');
 
+// CLOSING BEFORE THE ROOT (found by the real-model run 24, session 33): «μπάι» (bye) was matched inside any word, so «ό,τι
+// μπαίνει και βγαίνει» read as «the user is closing» — the normal flow closed after two exchanges; in Stage A it would open
+// «Πριν φύγεις:» too early. Now «μπάι» counts only as a word of its own.
+{
+  const dc = (() => { try { return new Function(fullFnSrc('declaresClosing') + '\nreturn declaresClosing;')(); } catch (e) { return () => 'missing'; } })();
+  assert('CLOSING: «μπαίνει», «μπαίνω», «μπαίνουμε», «ξαναμπαίνει» are not a goodbye (run 24, session 33)',
+    ['το δάνειο και ό,τι μπαίνει και βγαίνει κάθε μήνα', 'μπαίνω στο γραφείο στις οκτώ', 'μπαίνουμε στον μήνα με χρέη', 'ξαναμπαίνει το ίδιο θέμα',
+      'ΜΠΑΙΝΕΙ Ο ΜΙΣΘΟΣ', 'μπαινει ο μισθος'].every(t => dc(t) === false));
+  assert('CLOSING: «μπάι», «μπάι μπάι», «Μπάι!», «οκ μπαι» still are (a word of its own); the other closing words unchanged',
+    ['μπάι', 'μπάι μπάι', 'Μπάι!', 'οκ μπαι', 'Ευχαριστώ, μπάι', 'κλείνουμε εδώ', 'τα λέμε', 'bye'].every(t => dc(t) === true));
+}
 // ── 3. Wiring ────────────────────────────────────────────────────────────────────────────────────────────────────────────
 {
   const GEN = CODE.slice(CODE.indexOf('const generateResponse = useCallback('), CODE.indexOf('const handleSubmit = useCallback('));

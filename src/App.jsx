@@ -3989,7 +3989,8 @@ function declaresClosing(text) {
     .toLowerCase().replace(/([a-z\u03b1-\u03c9])\1+/g, "$1").replace(/ς/g, "σ");
   // TIER A. Unambiguous, anywhere. Deliberately excludes παω / γεια / φτανει / τελος, each of which
   // has a common non-closing meaning that real sessions produced.
-  if (/κλεινουμε|κλεινω|τελειωσαμε|τα λεμε|καλη συνεχεια|καληνυχτα|καλο βραδυ|αντιο|μπαι|bye|αρκετα για σημερα|ασ το αφησουμε εδω/.test(fold(t))) return true;
+  // ADR «12 Οκτωβρίου» (run 24, session 33): «μπάι» only as a word of its own — inside «μπαίνει», «μπαίνω» it closed the session.
+  if (/κλεινουμε|κλεινω|τελειωσαμε|τα λεμε|καλη συνεχεια|καληνυχτα|καλο βραδυ|αντιο|(?:^|[^α-ω])μπαι(?![α-ω])|bye|αρκετα για σημερα|ασ το αφησουμε εδω/.test(fold(t))) return true;
   // TIER B. The final sentence, and it must contain a leave-taking phrase before reducing — so a
   // final sentence made only of "Ναι" can never qualify on the reduction alone.
   const parts = t.split(/[.;!?\n]+|\u2026|\.\.\./).map(x => x.trim()).filter(Boolean);
