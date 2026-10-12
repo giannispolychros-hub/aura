@@ -135,7 +135,7 @@ for (const [name, hist, u, text, o, expect] of CASES) {
     /hideReflection=\{stageAActive\.current && stageAView\.stats\.rootConfirmed !== 1\}/.test(CODE) &&
     /onContinueToReflection=\{\(\) => \{ if \(sessionEnded \|\| loading[^\n]*\|\| \(stageAActive\.current && stageARef\.current\.stats\.rootConfirmed !== 1\)\) return; handleClosureConfirm\(true\); \}\}/.test(CODE));
   assert('UNCHANGED: decideTermination and the leaving-door gate byte for byte (the T1–T8 logic itself is untouched)',
-    sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'c14e923cd0166b66');
+    sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'f33ed155faa93145'); // UPDATED (δ): the leaving door no longer reads the decision
   assert('UNCHANGED: the first T2 still opens the root question before the model (the door is not touched)',
     CODE.includes('// STAGE A — «Πριν φύγεις:» BEFORE the model') && /stageADispatch\(\{ type: "leaving" \}\);/.test(CODE));
 }

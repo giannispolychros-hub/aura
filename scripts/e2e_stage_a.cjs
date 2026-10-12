@@ -421,10 +421,19 @@ async function runMock() {
       await send(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, WHY);
       s.before = s.calls.length; await send(s.page, phrase); await s.page.waitForTimeout(500); return s;
     };
-    for (const p of ['Δεν ξέρω', 'Ναι', 'Ναι, αυτό ακριβώς είναι!', 'Περίπου δηλαδή']) {
+    // UPDATED (12/10, ADR «12 Οκτωβρίου (δ)»): «Δεν ξέρω» to the root question counts as «Δεν το βρήκα ακόμα» and the model answers it;
+    // the retry («Γράψ' το λίγο πιο ολοκληρωμένα») stays for a short attempt («Περίπου δηλαδή»), which now carries the follow-up check.
+    {
+      const s = await door2('Δεν ξέρω');
+      ok('T door 2 «Δεν ξέρω»: no card, the question closes like «Δεν το βρήκα ακόμα», the model answers (one call), the button is back',
+        !(await card(s.page)) && !(await askShown(s.page)) && s.calls.length === s.before + 1 &&
+        await s.page.getByRole('button', { name: 'Νομίζω βρήκα τι με απασχολεί', exact: true }).count() === 1);
+      await s.browser.close();
+    }
+    for (const p of ['Ναι', 'Ναι, αυτό ακριβώς είναι!', 'Περίπου δηλαδή']) {
       const s = await door2(p);
       ok(`T door 2 «${p}»: no card — door 1's question with «Δεν το βρήκα ακόμα», nothing sent to the model`, !(await card(s.page)) && await askShown(s.page) && s.calls.length === s.before);
-      if (p === 'Δεν ξέρω') {
+      if (p === 'Περίπου δηλαδή') {
         if (await s.page.locator('textarea.textarea').count()) await send(s.page, 'Φοβάμαι την απόρριψη');
         ok('T door 2: answering that question opens the card with the answer', await card(s.page) && await s.page.getByText('«Φοβάμαι την απόρριψη»').count() === 1 && s.calls.length === s.before);
       }
@@ -639,6 +648,7 @@ async function runMock() {
   await runMockFT();
   await runMockLR();
   await runMockR3();
+  await runMockR4();
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -1087,6 +1097,79 @@ async function runMockR3() {
   }
 }
 
+// ── R4: John, 12/10/2026 (ADR «12 Οκτωβρίου (δ)»), phone size, fake model, switch open. R4-1 the real-model run 27, session 1.1: a
+// long conversation in which the app reads «… θα πω πως τα χρόνια πήγαν χαμένα» as a step — the FIRST «Ευχαριστώ, κλείνουμε εδώ.»
+// still opens «Πριν φύγεις:», before the model. R4-2 a reply made only of a farewell («Εντάξει. Καλή συνέχεια.») is shown as the
+// approved sentence. R4-3 «Δεν ξέρω» to the root question counts as «Δεν το βρήκα ακόμα» (the same event) and the model answers;
+// a short attempt still gets «Γράψ' το λίγο πιο ολοκληρωμένα». Alone: --only R4.
+async function runMockR4() {
+  const T = APP.texts;
+  const READY = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+  const STOP = 'Για στάσου εδώ.\n\nΜόλις είπες: «να είχα κάνει κάτι που να μου άφηνε την αίσθηση ότι διάλεξα εγώ».\n\n' + READY;
+  const run = async (replies, msgs) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const bodies = [];
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      let b = {}; try { b = JSON.parse(route.request().postData() || '{}'); } catch (e) {}
+      bodies.push(b);
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/?stageA=1&rec=1');
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    for (const m of msgs) { if (await page.locator('textarea.textarea').count()) await send(page, m); await page.waitForTimeout(300); }
+    const aura = async () => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+    const log = async () => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
+    return { browser, page, bodies, aura, log, btn: name => page.getByRole('button', { name, exact: true }) };
+  };
+  // ── R4-1: session 1.1 of run 27 (the simulated user's lines), the app reads a «step», then the first exit ──
+  {
+    const U = ['Γεια. Δουλεύω οκτώ χρόνια σε τράπεζα και σκέφτομαι να φύγω, αλλά δεν ξέρω για πού.', 'Δεν ξέρω ακριβώς. Νιώθω ότι μένω εκεί από συνήθεια πια.',
+      'Μάλλον η ασφάλεια, αλλά και η σκέψη ότι αν φύγω τα οκτώ χρόνια θα φαίνονται χαμένα.', 'Η δεύτερη, πιο πολύ με τρώει η ιδέα ότι τα χρόνια θα πάνε χαμένα.',
+      'Ότι θα κοιτάξω πίσω και θα πω πως τα χρόνια πήγαν χαμένα.', 'Δεν ξέρω... ίσως να είχα κάνει κάτι που να μου άφηνε την αίσθηση ότι διάλεξα εγώ και δεν με πήρε απλά η ροή.'];
+    const s = await run(['Οκτώ χρόνια. Τι σε κάνει να σκέφτεσαι να φύγεις τώρα;', 'Τι θα έλειπε αν έφευγες;', 'Ποια από τις δύο σε κρατά περισσότερο;',
+      'Τι φαντάζεσαι ότι μπορεί να πάει στραβά;', 'Τι θα έπρεπε να έχεις κάνει;', STOP, 'Εντάξει. Καλή συνέχεια.'], U);
+    const before = s.bodies.length;
+    await send(s.page, 'Ευχαριστώ, κλείνουμε εδώ.'); await s.page.waitForTimeout(400);
+    ok('R4-1 (run 27, 1.1): after a «step» read by the app, the FIRST «Ευχαριστώ, κλείνουμε εδώ.» opens «Πριν φύγεις:» — no model call, no goodbye',
+      s.bodies.length === before && await s.page.getByText(T.askLeaving, { exact: true }).count() === 1 && !/Καλή συνέχεια/.test(await s.page.locator('body').innerText()));
+    await s.page.screenshot({ path: path.join(OUT, 'R4-1-door4.png'), fullPage: false });
+    await s.browser.close();
+  }
+  // ── R4-2: a farewell-only reply ──
+  {
+    const s = await run(['Οκτώ χρόνια. Τι σε κάνει να σκέφτεσαι να φύγεις τώρα;', 'Εντάξει. Καλή συνέχεια.'], ['Γεια. Δουλεύω οκτώ χρόνια σε τράπεζα και σκέφτομαι να φύγω.', 'τίποτα ιδιαίτερο']);
+    ok('R4-2: «Εντάξει. Καλή συνέχεια.» alone is shown as «Ευχαριστώ που το μοιράστηκες. Να είσαι καλά.»',
+      (await s.aura()).slice(-1)[0] === 'Ευχαριστώ που το μοιράστηκες. Να είσαι καλά.');
+    await s.browser.close();
+  }
+  // ── R4-3: «Δεν ξέρω» to the root question ──
+  for (const ans of ['Δεν ξέρω', 'Ιδέα δεν έχω']) {
+    const s = await run(['Οκτώ χρόνια. Τι σε κάνει να σκέφτεσαι να φύγεις τώρα;', 'Τι σε κρατάει πιο πολύ;', 'Εντάξει. Τι σε δυσκολεύει να το πεις;'],
+      ['Γεια. Δουλεύω οκτώ χρόνια σε τράπεζα και σκέφτομαι να φύγω.', 'το δάνειο κυρίως']);
+    await s.btn(T.button).click(); await s.page.waitForTimeout(400);
+    const before = s.bodies.length;
+    await send(s.page, ans); await s.page.waitForTimeout(300);
+    const back = (await s.log()).filter(e => e.ev === 'root_answer' && e.answer === 3);
+    ok(`R4-3: «${ans}» → counted like «Δεν το βρήκα ακόμα» (root_answer «not yet»), the model answers, no card, no «Γράψ' το…», the button is back`,
+      back.length === 1 && s.bodies.length === before + 1 && (await s.aura()).slice(-1)[0] === 'Εντάξει. Τι σε δυσκολεύει να το πεις;' &&
+      await s.btn(T.yes).count() === 0 && await s.page.getByText(T.retry).count() === 0 && await s.btn(T.button).count() === 1);
+    await s.browser.close();
+  }
+  {
+    const s = await run(['Οκτώ χρόνια. Τι σε κάνει να σκέφτεσαι να φύγεις τώρα;', 'Τι σε κρατάει πιο πολύ;'], ['Γεια. Δουλεύω οκτώ χρόνια σε τράπεζα και σκέφτομαι να φύγω.', 'το δάνειο κυρίως']);
+    await s.btn(T.button).click(); await s.page.waitForTimeout(400);
+    const before = s.bodies.length;
+    await send(s.page, 'Τα λεφτά');
+    ok('R4-3: a short attempt («Τα λεφτά») still gets «Γράψ\' το λίγο πιο ολοκληρωμένα» — no model call, no card',
+      await s.page.getByText(T.retry).count() === 1 && s.bodies.length === before && await s.btn(T.yes).count() === 0);
+    await s.browser.close();
+  }
+}
+
 // ── W: the hidden tags still work after the label cleaning (founder's check of 6408fbf, ADR «8 Οκτωβρίου (γ)»), switch
 // closed and open. [[EXIT:yes]] at the end of a reply → the old closing card (T5); [[EXIT:no]] → none; [[EARLY_WORD:yes]]
 // → the next answer is kept as the word, and at the closing «Δείξε μου» ends the session at once, without asking for it
@@ -1223,9 +1306,10 @@ async function runMockX() {
     { const t = await turnTexts(s.page); const iq = t.findIndex(x => x.includes('Νιώθεις ότι έχει αρχίσει')); const iy = t.lastIndexOf('Ναι');
       ok('X1: the bubble comes right after the question it answers', iq >= 0 && iy === iq + 1); }
     await s.page.screenshot({ path: path.join(OUT, 'X1-door2-yes.png'), fullPage: false });
-    await send(s.page, 'Δεν ξέρω');
+    // UPDATED (12/10, ADR «12 Οκτωβρίου (δ)»): the short answer is a short attempt at a root («Τα λεφτά»); «Δεν ξέρω» now goes to the model.
+    await send(s.page, 'Τα λεφτά');
     ok('X1: a short answer → «Γράψ\' το λίγο πιο ολοκληρωμένα», no card, no model call, the answer shown', await s.page.getByText(T.retry).count() === 1 &&
-      await btn(s.page, 'Ναι, αυτό είναι').count() === 0 && s.calls.length === n && (await userBubbles(s.page)).slice(-1)[0] === 'Δεν ξέρω');
+      await btn(s.page, 'Ναι, αυτό είναι').count() === 0 && s.calls.length === n && (await userBubbles(s.page)).slice(-1)[0] === 'Τα λεφτά');
     await send(s.page, 'Φοβάμαι την απόρριψη');
     ok('X1: an answer with substance → the card with it, no model call', await s.page.getByText('«Φοβάμαι την απόρριψη»').count() === 1 && await btn(s.page, 'Ναι, αυτό είναι').count() === 1 && s.calls.length === n);
     await btn(s.page, BACK).first().click(); await s.page.waitForTimeout(1500);
@@ -1234,7 +1318,7 @@ async function runMockX() {
     const lastUser = [...last.messages].reverse().find(m => m.role === 'user');
     ok('X1: that request ends with the phrase, carries the readiness question, and NEVER the «Ναι» or the short answer',
       lastUser && lastUser.content === 'Φοβάμαι την απόρριψη' && last.messages.some(m => m.role === 'assistant' && String(m.content).includes('Νιώθεις ότι έχει αρχίσει')) &&
-      !sentUser(s.calls).includes('Ναι') && !sentUser(s.calls).includes('Δεν ξέρω'));
+      !sentUser(s.calls).includes('Ναι') && !sentUser(s.calls).includes('Τα λεφτά'));
     await s.browser.close();
   }
   // door 2 «Ναι» → «Δεν το βρήκα ακόμα» at the QUESTION (not the card): back to the conversation, nothing sent, the latch is spent
@@ -1351,8 +1435,8 @@ async function runMockX() {
       run: async s => { await send(s.page, 'Η σταθερότητα κυρίως.'); await btn(s.page, 'Νομίζω βρήκα τι με απασχολεί').click(); await s.page.waitForTimeout(400); await send(s.page, 'Περίπου δηλαδή'); } },
     { id: 'door 2 «Ναι»', text: 'Ναι', expect: async p => askShown(p), replies: ['Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;', RQ, 'Και τι;'],
       run: async s => { await send(s.page, 'Η σταθερότητα, αλλά νιώθω ότι κάτι άλλο παίζει.'); await send(s.page, 'Ναι'); } },
-    { id: 'door 2 without substance (after «Ναι»)', text: 'Δεν ξέρω', expect: async p => (await p.getByText(T.retry).count()) === 1, replies: ['Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;', RQ, 'Και τι;'],
-      run: async s => { await send(s.page, 'Η σταθερότητα, αλλά νιώθω ότι κάτι άλλο παίζει.'); await send(s.page, 'Ναι'); await send(s.page, 'Δεν ξέρω'); } },
+    { id: 'door 2 without substance (after «Ναι»)', text: 'Τα λεφτά', expect: async p => (await p.getByText(T.retry).count()) === 1, replies: ['Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;', RQ, 'Και τι;'],
+      run: async s => { await send(s.page, 'Η σταθερότητα, αλλά νιώθω ότι κάτι άλλο παίζει.'); await send(s.page, 'Ναι'); await send(s.page, 'Τα λεφτά'); } },
     { id: 'door 3 without substance', text: 'Ναι, αυτό ακριβώς είναι!', expect: async p => askShown(p), replies: ['Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;', 'Και τι;'],
       run: async s => { await send(s.page, 'Ναι, αυτό ακριβώς είναι!'); } },
     { id: 'correction without substance', text: 'Περίπου δηλαδή', expect: async p => (await p.getByText(T.retry).count()) === 1 && (await p.getByText('Φοβάμαι ότι δεν αξίζω περισσότερα').count()) >= 1,
@@ -2624,7 +2708,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else await runMock();
+      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

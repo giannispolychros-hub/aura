@@ -83,8 +83,10 @@ assert('A: the fixed text, exactly as decided', F.STAGE_A_TEXTS && F.STAGE_A_TEX
 assert('A: «Ευχαριστώ.» before the root, the old closing about to open → the door opens', GATE(base()) === true);
 assert('A: «Κλείνουμε» and «Ευχαριστώ, κλείνουμε εδώ.» → the door opens', GATE(base({ lastUserText: 'Κλείνουμε' })) === true && GATE(base({ lastUserText: 'Ευχαριστώ, κλείνουμε εδώ.' })) === true);
 assert('A: «terminate» as well as «confirm»', GATE(base({ decision: 'terminate' })) === true);
-assert('A: only where the old closing would open — decision none / warn / await → no door',
-  ['none', 'warn', 'await_outcome_scale'].every(d => GATE(base({ decision: d })) === false));
+// UPDATED (12/10, ADR «12 Οκτωβρίου (δ)»): the leaving-door gate no longer reads the old closing's decision — the first explicit exit before the root always opens «Πριν φύγεις:».
+// Found by the real-model run 27 (session 1.1): a «step» read by the app held the old closing (await_outcome_scale) and the door stayed shut.
+assert('A: the explicit exit has priority — decision none / warn / await → the door opens all the same',
+  ['none', 'warn', 'await_outcome_scale'].every(d => GATE(base({ decision: d })) === true));
 {
   const s1 = STEP(F.initialStageAState(), { type: 'leaving' });
   assert('A: the «leaving» event opens door 1\'s question (phase ask, door 1), marked as the closing variant', s1.phase === 'ask' && s1.door === 1 && s1.leaving === true);

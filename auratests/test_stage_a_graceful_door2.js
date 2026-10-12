@@ -182,7 +182,7 @@ const SHORT = JOHN.slice(0, 4); // two user messages so far
 
 // ── Not touched ──────────────────────────────────────────────────────────────
 assert('UNCHANGED: the closings and the leaving door (byte for byte)',
-  sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'c14e923cd0166b66');
+  sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'f33ed155faa93145'); // UPDATED (δ): the leaving door no longer reads the decision
 assert('UNCHANGED: the first-closing door and door 3 before the model are still there',
   SUB.includes('// STAGE A — «Πριν φύγεις:» BEFORE the model') && SUB.includes('// STAGE A — door 3 without substance BEFORE the model'));
 

@@ -83,9 +83,10 @@ assert('A: John\'s «Ευχαριστώ» — the old closing would open now (de
 assert('A: … so the door opens before the model', G('Ευχαριστώ') === true);
 assert('A: T1 «Ναι» / an ordinary answer → no door before the model', G('Ναι') === false && G('Ίσως η κενοδοξια των χρημάτων') === false);
 assert('A: second closing (used) → no door before the model, the turn goes on as before', G('Ευχαριστώ', { used: true }) === false);
-assert('A: decline cooldown still holds the closing back (same rule as after the reply)', F.stageALeavingDoorOpens({ active: true,
+// UPDATED (12/10, ADR «12 Οκτωβρίου (δ)»): the leaving-door gate no longer reads the old closing's decision — the first explicit exit before the root always opens «Πριν φύγεις:».
+assert('A: the explicit exit has priority — even in a decline cooldown (the old closing holds back) the FIRST exit opens the door', F.stageALeavingDoorOpens({ active: true,
   decision: D('Ευχαριστώ', { duringDeclineCooldown: true }), lastUserText: 'Ευχαριστώ', used: false, rootPhase: null, armed: false,
-  rootConfirmed: false, closingStarted: false, riskKind: 0, safetyMode: false }) === false);
+  rootConfirmed: false, closingStarted: false, riskKind: 0, safetyMode: false }) === true);
 assert('A: tier A earlier in the session / safety mode → no door', G('Ευχαριστώ', { riskKind: 1 }) === false && G('Ευχαριστώ', { safetyMode: true }) === false);
 {
   const fw = SUB.indexOf('if (firstWhyPending) {');
@@ -111,7 +112,7 @@ assert('A: the gate after the reply is still there (second closing → old closi
 assert('A: the old closing itself is unchanged (decideTermination, the T1/T2 detectors byte for byte)',
   sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && sha(extractBlock('function isExplicitClosure(')) === '09da70474755ef40' &&
   sha(extractBlock('function declaresClosing(')) === '25fe9be3bbcfaa57' && sha(extractBlock('function matchesClosingWord(')) === 'c3d044cc974bb7ac'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24); again (ADR «12 Οκτωβρίου (β)»): «αντίο», «τα λέμε» too; (γ): not right after a negation
-assert('A: the gate function itself is unchanged', sha(extractBlock('function stageALeavingDoorOpens(')) === 'c14e923cd0166b66' && // UPDATED (8/10): + !detectSafetySignal(u), ADR «8 Οκτωβρίου (β)», 4
+assert('A: the gate function itself is unchanged', sha(extractBlock('function stageALeavingDoorOpens(')) === 'f33ed155faa93145' && // UPDATED (8/10): + !detectSafetySignal(u), ADR «8 Οκτωβρίου (β)», 4; (δ): the leaving door no longer reads the decision
   
   /\(isExplicitClosure\(u\) \|\| declaresClosing\(u\)\);/.test(extractBlock('function stageALeavingDoorOpens(') || ''));
 

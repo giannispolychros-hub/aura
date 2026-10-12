@@ -87,6 +87,12 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
     L('Τι σε κρατάει; [[EXIT:yes]]').length === 1 && L('[MASTER PRIORITY RULE — STAGE: GRACEFUL EXIT]').length >= 1 && L('[FREE PART: ENDS AT ROOT]').length >= 1);
   assert('LABELS: ordinary text in brackets is not a label', L('Είπες [σε παρένθεση] κάτι — [1] τι σημαίνει;').length === 0 && L('Αυτό [ΟΚ] ήταν').length === 0);
   const F = t => T('findFarewells', t) || [];
+  // UPDATED (12/10, ADR «12 Οκτωβρίου (δ)»): + the approved goodbye (a farewell-only reply is shown as it).
+  assert('FAREWELLS: the approved sentence a farewell-only reply is shown as is still a goodbye; a question with «να είσαι καλά» is not',
+    F('Ευχαριστώ που το μοιράστηκες. Να είσαι καλά.').length === 1 && F('Τι θα σε έκανε να είσαι καλά;').length === 0);
+  assert('PLAN: the same session several times — «1.1,1.1,1.1» → 1.1, 1.1-2, 1.1-3 (same persona, same run); a single label stays one',
+    (T('planRuns', S.PERSONAS, ['1.1', '1.1', '1.1']) || []).map(r => r.label + ':' + r.run).join(',') === '1.1:1,1.1-2:1,1.1-3:1' &&
+    (T('planRuns', S.PERSONAS, ['1.1']) || []).length === 1);
   assert('FAREWELLS: «καλή συνέχεια», «κλείνουμε», «χάρηκα», «να προσέχεις», «καληνύχτα», with or without accents',
     F('Καλή συνέχεια.').length === 1 && F('Κλείνουμε εδώ.').length === 1 && F('Χάρηκα πολύ!').length === 1 && F('Να προσέχεις.').length === 1 && F('ΚΑΛΗΝΥΧΤΑ').length === 1 && F('Τι σε κρατάει;').length === 0);
   // the same normalisation as the app's own verbatim rule

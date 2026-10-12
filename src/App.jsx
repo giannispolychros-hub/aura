@@ -1736,12 +1736,13 @@ function rootTextHasSubstance(text) {
 }
 // ADR «12 Οκτωβρίου (γ)» (John: when the app is not sure, it does not decide alone): an answer to the app's root question that only
 // says «I don't know» («Δεν ξέρω», «Δεν ξέρω ακόμα», «Δεν ξέρω τι με απασχολεί», «Δεν είμαι σίγουρη», «Δεν μπορώ να το πω») is not a
-// root. Where such an answer passed the substance rule (and became a card), the flow now steps aside and the message goes to the
-// model; a bare «Δεν ξέρω» never passed it and keeps the existing retry. «Δεν ξέρω αν θέλω να μείνω στη δουλειά» says something: a root.
+// root. ADR «12 Οκτωβρίου (δ)» (John): it counts as «Δεν το βρήκα ακόμα» and the conversation goes on through the model — never
+// «Γράψ' το λίγο πιο ολοκληρωμένα», which stays for answers that try to say a root but are too short. «Δεν ξέρω αν θέλω να μείνω
+// στη δουλειά» says something: a root.
 function rootAnswerIsUnsure(text) {
   if (typeof text !== "string") return false;
   const f = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^α-ωa-z\s]/g, " ").replace(/\s+/g, " ").trim();
-  return /^(?:(?:ε|μμ|χμ|ειλικρινα|οχι|ναι|λοιπον) )*δεν (?:ξερω|ειμαι σιγουρ(?:ος|η|ο)|μπορω να (?:το )?πω)(?: (?:ακομα|ακομη|ακριβως|καλα|σιγουρα|πραγματικα))*(?: τι (?:με απασχολει|ειναι|να πω|με κραταει|θελω|νιωθω)(?: (?:ακομα|ακομη|ακριβως))*)?$/.test(f);
+  return /^(?:(?:ε|μμ|χμ|ειλικρινα|οχι|ναι|λοιπον|ακομα|ακομη) )*(?:δεν (?:το )?ξερω|δεν ειμαι σιγουρ(?:ος|η|ο)|δεν μπορω να (?:το )?πω|ιδεα δεν εχω|δεν εχω ιδεα|καμια ιδεα|δεν το εχω βρει)(?: (?:ακομα|ακομη|ακριβως|καλα|σιγουρα|πραγματικα))*(?: τι (?:με απασχολει|ειναι|να πω|με κραταει|θελω|νιωθω)(?: (?:ακομα|ακομη|ακριβως))*)?$/.test(f);
 }
 // §2.1α step 5 — «λέξη που κρατάς» equal to «Τι βρήκες»: lower case, no accents, no edge punctuation/space.
 function sameAsRootText(a, b) {
@@ -1976,7 +1977,12 @@ const BARE_GOODBYE_TEXT = "Ευχαριστώ που το μοιράστηκες
 function replaceBareGoodbye(content) {
   if (typeof content !== "string") return content;
   const paras = content.split(/\n\s*\n/);
-  if (paras[0].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^α-ωa-z0-9]/g, "") !== "καλησυνεχεια") return content;
+  // ADR «12 Οκτωβρίου (δ)»: also a reply made ONLY of a farewell and acknowledgements («Εντάξει. Καλή συνέχεια.», «Ωραία, τα λέμε!»,
+  // «Να είσαι καλά.») — at least one farewell, and no other word. An acknowledgement alone («Εντάξει.») is not a farewell.
+  const words = paras[0].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ").replace(/[^α-ωa-z\s]/g, " ")
+    .replace(/καλη συνεχεια|να εισαι καλα|να προσεχεισ|τα λεμε|καληνυχτα|καλο βραδυ|αντιο|γεια σου|γεια σασ|γεια/g, " FAREWELL ").split(/\s+/).filter(Boolean);
+  const ACK = new Set(["ενταξει", "οκ", "ok", "καλα", "ωραια", "τελεια", "ευχαριστω", "σε", "σασ", "και", "κι", "εσενα", "επισησ", "πολυ", "λοιπον", "ε"]);
+  if (!words.includes("FAREWELL") || !words.every(w => w === "FAREWELL" || ACK.has(w))) return content;
   const lines = [buildCrisisLine("A", "", false).line, buildCrisisLine("B", "", false).line];
   if (!paras.slice(1).every(p => lines.includes(p.trim()))) return content;
   return [BARE_GOODBYE_TEXT, ...paras.slice(1)].join("\n\n");
@@ -1994,10 +2000,14 @@ function stageARootButtonVisible(st) {
 // open now, only for an EXPLICIT closing (T2: the same two detectors decideTermination uses for userDeclaredExit —
 // never a short agreement, T1), before a confirmed root, with no closing started, never in tier A or safety mode.
 // A second explicit closing finds it used and the old closing runs as always: no loop.
+// ADR «12 Οκτωβρίου (δ)» (John): the FIRST explicit exit before the root ALWAYS opens it — the user's exit has priority over
+// anything the old closing has pending. Real-model run 27, session 1.1: «… θα πω πως τα χρόνια πήγαν χαμένα» was read as a step,
+// the old closing held for the clarity scale (await_outcome_scale), the door stayed shut and AURA said goodbye before the root.
+// So the old closing's decision (still passed by the callers) is no longer read here.
 function stageALeavingDoorOpens(st) {
   const o = st || {};
   const u = typeof o.lastUserText === "string" ? o.lastUserText : "";
-  return o.active === true && (o.decision === "confirm" || o.decision === "terminate") && !o.used && !o.rootPhase && !o.armed &&
+  return o.active === true && !o.used && !o.rootPhase && !o.armed &&
     !o.rootConfirmed && !o.closingStarted && o.riskKind !== 1 && !o.safetyMode && !detectSafetySignal(u) && (isExplicitClosure(u) || declaresClosing(u));
 }
 // ADR «11 Οκτωβρίου (β)» — the MODEL's own closing before the root. Found by the stress test with the real model (run 10,
@@ -8031,11 +8041,11 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       if (!stageACaptureAllowed(userText)) {
         stageARootArmed.current = false;
         stageADispatch({ type: "cancel" });
-      } else if (rootTextHasSubstance(userText) && rootAnswerIsUnsure(userText)) {
-        // ADR «12 Οκτωβρίου (γ)»: «Δεν ξέρω ακόμα», «Δεν ξέρω τι με απασχολεί» passed the substance rule and became a root card — they
-        // are not a root; the model takes the message. A bare «Δεν ξέρω» has no substance and keeps «Γράψ' το λίγο πιο ολοκληρωμένα».
+      } else if (rootAnswerIsUnsure(userText)) {
+        // ADR «12 Οκτωβρίου (δ)»: «Δεν ξέρω», «δεν είμαι σίγουρος», «Ιδέα δεν έχω» is not a root and not «too short» — it counts as
+        // «Δεν το βρήκα ακόμα» (the same event), and the message goes on to the model below.
         stageARootArmed.current = false;
-        stageADispatch({ type: "cancel" });
+        stageADispatch({ type: "back" });
       } else if ((_saPhase === "ask" || _saPhase === "correct") && !rootTextHasSubstance(userText)) {
         addUiBubble(userText, messages.length); // ADR «8 Οκτωβρίου (δ)», 5: shown, not sent
         stageADispatch({ type: "tooShort" });

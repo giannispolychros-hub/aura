@@ -126,7 +126,8 @@ assert('UNCHANGED: the app\'s closing steps — a bare «ευχαριστώ» be
   const B = T('buildCrisisLine', 'B', '', false).line, A = T('buildCrisisLine', 'A', '', false).line;
   assert('BARE, CRISIS PATH: the model\'s bare «Καλή συνέχεια.» above the app\'s line (10306 or 1018) → the approved sentence, the line unchanged',
     R('Καλή συνέχεια.\n\n' + B) === NEW + '\n\n' + B && R('Καλή συνέχεια!\n\n' + A) === NEW + '\n\n' + A);
-  const KEEP = ['Καλή συνέχεια με τη σχολή.', 'Τα λέμε. Καλή συνέχεια.', 'Σου εύχομαι καλή συνέχεια.', 'ΗΡΘΕΣ ΜΕ: x\n\nΒΡΗΚΕΣ: y\n\nΚαλή συνέχεια.',
+  // UPDATED (12/10, ADR «12 Οκτωβρίου (δ)»): a reply made only of farewells («Τα λέμε. Καλή συνέχεια.») is now replaced too.
+  const KEEP = ['Καλή συνέχεια με τη σχολή.', 'Σου εύχομαι καλή συνέχεια.', 'ΗΡΘΕΣ ΜΕ: x\n\nΒΡΗΚΕΣ: y\n\nΚαλή συνέχεια.',
     'Καλή συνέχεια.\n\nΤι άλλο κρατάς;', 'Τι σε κρατάει;', ''];
   const changed = KEEP.filter(s => R(s) !== s);
   assert('BARE: only a WHOLE message — a sentence with more words, or more text after it, stays as written' + (changed.length ? ' — changed: ' + changed.join(' | ') : ''), changed.length === 0);
@@ -168,8 +169,10 @@ assert('UNCHANGED: the app\'s closing steps — a bare «ευχαριστώ» be
     ['Δεν ξέρω', 'δεν ξέρω ακόμα', 'Δεν ξέρω τι με απασχολεί.', 'Δεν είμαι σίγουρη', 'Δεν μπορώ να το πω.', 'ε δεν ξέρω ακριβώς'].every(t => u(t) === true));
   assert('ROOT: an answer that says something stays a root («Δεν ξέρω αν θέλω να μείνω στη δουλειά», «Φοβάμαι ότι θα αποτύχω»)',
     ['Δεν ξέρω αν θέλω να μείνω στη δουλειά', 'Φοβάμαι ότι θα αποτύχω', 'Ότι δεν ξέρω τι θέλω από τη ζωή μου', '', null].every(t => u(t) === false));
-  assert('WIRING (root): right after the crisis check of a typed root — an «I don\'t know» that passed the substance rule is no card: the flow steps aside, the model takes it',
-    /if \(!stageACaptureAllowed\(userText\)\) \{\s*stageARootArmed\.current = false;\s*stageADispatch\(\{ type: "cancel" \}\);\s*\} else if \(rootTextHasSubstance\(userText\) && rootAnswerIsUnsure\(userText\)\) \{(?:\s*\/\/[^\n]*)+\s*stageARootArmed\.current = false;\s*stageADispatch\(\{ type: "cancel" \}\);\s*\} else if \(\(_saPhase === "ask"/.test(HS));
+  // UPDATED (12/10, ADR «12 Οκτωβρίου (δ)»): every «I don't know» answer counts as «Δεν το βρήκα ακόμα» (back) and goes to the model —
+  // a bare «Δεν ξέρω» too; «Γράψ' το λίγο πιο ολοκληρωμένα» stays for short attempts (test_round4_1210.js).
+  assert('WIRING (root): right after the crisis check of a typed root — an «I don\'t know» is no card: «Δεν το βρήκα ακόμα», then the model',
+    /if \(!stageACaptureAllowed\(userText\)\) \{\s*stageARootArmed\.current = false;\s*stageADispatch\(\{ type: "cancel" \}\);\s*\} else if \(rootAnswerIsUnsure\(userText\)\) \{(?:\s*\/\/[^\n]*)+\s*stageARootArmed\.current = false;\s*stageADispatch\(\{ type: "back" \}\);/.test(HS));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

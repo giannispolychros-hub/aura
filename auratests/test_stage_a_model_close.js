@@ -152,7 +152,7 @@ assert('ROBUST: no state, no reply, a non-string → false, never a crash',
 // And again (ADR «12 Οκτωβρίου (γ)»): NO PRESSURE TO STAY and the two additions after the safety path.
 assert('UNCHANGED: the prompt (no prompt change by this fix), the parser, the closing decision and its Stage A gate, the leaving door, the marker',
   sha(PROMPT) === '51cb2a83305f605b' && sha(fullFnSrc('parseThreeBeatShift')) === '7bceea7040494611' && sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' &&
-  sha(fullFnSrc('stageAPreRootDecision')) === '9697ed106f7722f3' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'c14e923cd0166b66' &&
+  sha(fullFnSrc('stageAPreRootDecision')) === '9697ed106f7722f3' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'f33ed155faa93145' && // UPDATED (δ): the leaving door no longer reads the decision
   sha(fullFnSrc('buildStageAMarker')) === '0ef63f69e55acfde');
 assert('UNCHANGED: the question texts', CODE.includes('askLeaving: "Αν κάτι σου ξεκαθάρισε, πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;"') &&
   CODE.includes('back: "Δεν το βρήκα ακόμα, συνέχισε"'));
