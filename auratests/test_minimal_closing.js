@@ -192,9 +192,16 @@ assert('CLOSING: Part 2 is still told not to repeat the summary',
 // («Αυτό είναι η ρίζα», «Εδώ είναι η ρίζα», both caught by the stress test with the real model); close to it, the
 // canonical readiness question, so the user says it in the app's question. Inert without the marker. +255 characters,
 // one cache write, paid knowingly. See test_stage_a_prompt_rule.js.
+//
+// CHANGED AGAIN, DELIBERATELY, on 2026-10-12 (9eb534c68e380beb → 363ffc14fe7ace47). John's decision after his own test,
+// before the first tester session (ADR «12 Οκτωβρίου»): the section FOUNDER'S TEST, 2026-10-12 (NEW MATERIAL, STOP MOMENT,
+// STRATEGY BY STATE, CHOICE QUESTION, RISK CHECKS, law/money claims, reflections, CLOSING WORDS), pointers to it in MASTER PRIORITY RULE steps
+// 1, 2 and 6, PRE-FLIGHT (1), REDUNDANCY CHECK 2 and DISTRESS GRADIENT Level 3, NEW MATERIAL as the fourth end-of-prompt
+// principle, and the closing question «Πες το με μία φράση: τι σου ξεκαθάρισε σήμερα;». +7026 characters, one cache
+// write, paid knowingly. See test_founder_test_1210.js.
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 9eb534c68e380beb…)',
-  PROMPT_SHA.slice(0, 16) === '9eb534c68e380beb');
+assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 363ffc14fe7ace47…)',
+  PROMPT_SHA.slice(0, 16) === '363ffc14fe7ace47');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',

@@ -634,6 +634,7 @@ async function runMock() {
   await runMockMH();
   await runMockPV();
   await runMockOF();
+  await runMockFT();
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -770,6 +771,118 @@ async function runMockOF() {
     const s = await open('?stageA=1', { seed: SEED });
     ok('OF3: without ?rec=1 — no tester button and no result on the start screen (the normal app does not change)',
       await s.page.getByText('Ξεκίνα με το πρόβλημά σου').count() === 1 && await btn(s.page, TT.button).count() === 0 && await s.page.locator('[role="status"]').count() === 0);
+    await s.browser.close();
+  }
+}
+
+// ── FT: John's decision of 12/10/2026, after his own test (ADR «12 Οκτωβρίου»). A SYNTHETIC scenario like his — a career doubt,
+// many practical limits, long voice-typed messages with no punctuation, one ambiguous phrase clarified as harmless, neutrality, a
+// realization — on a phone, fake model, switch open AND closed. FT1 after two risk checks the next request carries the limit note,
+// the gentle-only note and the «already said back» note; a brisk stop right after a risk check is shown as «Ας σταθούμε λίγο εδώ.»;
+// a line of only «"» is not shown. FT2 (Stage A) the stop moment frames the root moment: «Ναι» to its readiness question →
+// the app's root question (door 2, no model call) → the card → «Ναι» → the €6 offer, as before. FT3 (switch closed) a second
+// ΗΡΘΕΣ ΜΕ summary is not shown. FT4 the same scenario with a clear crisis statement later: the crisis line, every time, no
+// limit note, no root button. Alone: --only FT.
+async function runMockFT() {
+  const T = APP.texts;
+  const V = [
+    'λοιπόν δουλεύω δώδεκα χρόνια λογίστρια σε μια εταιρεία και τα τελευταία δύο χρόνια σκέφτομαι να πάω σε σχολή μαγειρικής απογευματινή δύο χρόνια αλλά έχω δάνειο για το σπίτι έχω δύο παιδιά στο δημοτικό ο άντρας μου δουλεύει βάρδιες και δεν ξέρω αν βγαίνουμε οικονομικά',
+    'γιατί κάθε χρόνο που περνάει νιώθω ότι είναι πιο αργά',
+    'ε δηλαδή κάθε πρωί πάω στο γραφείο και νιώθω ότι κάνω το ίδιο πράγμα ξανά και ξανά και ξέρεις με τα παιδιά και το δάνειο και τις βάρδιες του άντρα μου δεν βλέπω διέξοδο έτσι όπως είναι τα πράγματα',
+    'όχι όχι δεν εννοώ κάτι τέτοιο καθόλου εννοώ μόνο με τη δουλειά ότι δεν βλέπω πώς θα αλλάξει',
+    'τώρα ουδέτερα θα έλεγα ούτε καλά ούτε άσχημα απλά κουρασμένη',
+    'το δάνειο κυρίως πιο πολύ από όλα τα άλλα',   // not «αυτό με κρατάει»: that is door 3 and opens the card at once
+    'θα ήταν διαφορετικό θα μαγείρευα θα ήμουν πιο ζωντανή',
+    'ξέρεις κάτι αυτό μου ξεκαθάρισε μέσα μου είναι σωστή επιλογή η σχολή δύσκολη με το δάνειο και τα παιδιά αλλά σωστή',
+  ];
+  const READY = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+  const R = [
+    'Δώδεκα χρόνια λογίστρια. Τι σε τραβάει στη μαγειρική;',
+    'Όταν λες «δεν βλέπω διέξοδο», εννοείς κάτι πιο βαρύ — σκέφτεσαι να βλάψεις τον εαυτό σου;',
+    'Εντάξει. Είσαι ασφαλής αυτή τη στιγμή;',
+    'Όπα — στάσου εδώ. Μόλις είπες:\n"\nουδέτερα\n"\nΤι βαραίνει πιο πολύ: το δάνειο, οι βάρδιες με τα παιδιά, ή κάτι άλλο;',
+    'Και πώς θα ήταν η μέρα σου στη σχολή;',
+    'Τι σε κρατάει ακόμα πίσω;',
+  ];
+  const STOP = 'Όπα — στάσου εδώ. Μόλις είπες: "είναι σωστή επιλογή η σχολή δύσκολη με το δάνειο και τα παιδιά αλλά σωστή". ' + READY;
+  const BEAT = 'ΗΡΘΕΣ ΜΕ: σχολή ή δουλειά\nΒΡΗΚΕΣ: είναι σωστή επιλογή\nΦΕΥΓΕΙΣ ΜΕ: δύσκολη αλλά σωστή';
+  const run = async (query, replies, msgs) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const bodies = [];
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      let b = {}; try { b = JSON.parse(route.request().postData() || '{}'); } catch (e) {}
+      bodies.push(b);
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    for (const m of msgs) { if (await page.locator('textarea.textarea').count()) await send(page, m); await page.waitForTimeout(300); }
+    const aura = async () => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+    const dyn = i => { const c = bodies[i]; return c ? (LIB.classifyRequest(c, APP).dynamic || '') + systemText(c) : ''; };
+    return { browser, page, bodies, aura, dyn, btn: name => page.getByRole('button', { name, exact: true }) };
+  };
+  // ── FT1 + FT2 (switch open) ──
+  {
+    const s = await run('?stageA=1&rec=1', [...R, STOP, 'Τι άλλο;'], V.slice(0, 5));
+    const at4 = s.bodies.length - 1; // the request after «ουδέτερα»
+    const d = s.dyn(at4);
+    ok('FT1 (switch open): after two risk checks, the next request carries the limit note (2 for an ambiguous phrase)',
+      s.bodies.length >= 4 && /2 risk-clarification questions already asked this session — the limit for ambiguous phrases/.test(d));
+    ok('FT1: … and «only the gentle form» (a risk check among AURA\'s last 3 replies), and «already said back: «δώδεκα χρόνια»»',
+      /only the gentle form «Ας σταθούμε λίγο εδώ\.», never «Όπα»/.test(d) && /«δώδεκα χρόνια»/.test(d));
+    const shown = await s.aura();
+    const r4 = shown.find(t => t.includes('Τι βαραίνει πιο πολύ')) || '';
+    ok('FT1: the brisk stop right after a risk check is shown as «Ας σταθούμε λίγο εδώ.» — the rest of the reply as written',
+      r4.startsWith('Ας σταθούμε λίγο εδώ.') && !/Όπα/.test(r4) && r4.includes('ή κάτι άλλο;'));
+    ok('FT1: a line of only «"» is not shown (no lone quotation mark anywhere on screen)',
+      shown.every(t => t.split('\n').every(l => !/^\s*["«»“”]+\s*$/.test(l))) && r4.includes('ουδέτερα'));
+    ok('FT1: the app\'s crisis detector saw none of these messages — no crisis line, the root button still there',
+      !/1018|10306/.test(await s.page.locator('body').innerText()) && await s.btn(T.button).count() === 1);
+    for (const m of V.slice(5)) { await send(s.page, m); await s.page.waitForTimeout(300); }
+    const shown2 = await s.aura();
+    const stopShown = shown2.find(t => t.includes('Μόλις είπες: "είναι σωστή επιλογή')) || '';
+    ok('FT2: three replies later the stop is shown as written («Όπα — στάσου εδώ.»), ending with the readiness question',
+      stopShown.startsWith('Όπα — στάσου εδώ.') && stopShown.endsWith(READY));
+    const before = s.bodies.length;
+    await send(s.page, 'Ναι');
+    ok('FT2: «Ναι» → the app\'s root question at once, NO model call (door 2, unchanged)',
+      s.bodies.length === before && await s.page.getByText(T.ask, { exact: true }).count() >= 1);
+    await send(s.page, 'Ότι θέλω τη σχολή αλλά φοβάμαι ότι δεν θα βγαίνουμε με το δάνειο.');
+    ok('FT2: … the root card with the user\'s words, «Ναι» → the €6 offer, as before',
+      await s.btn(T.yes).count() === 1);
+    await s.btn(T.yes).click(); await s.page.waitForTimeout(600);
+    const log = await s.page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
+    const card = log.filter(e => e.ev === 'root_card_shown');
+    ok('FT2: the offer is there; the log has the card from door 2 and the €6 offer shown — telemetry unchanged',
+      await s.btn(T.wantMore).count() === 1 && card.length === 1 && card[0].door === 2 && log.some(e => e.ev === 'coach_offer_shown'));
+    await s.page.screenshot({ path: path.join(OUT, 'FT-stageA-offer.png'), fullPage: false });
+    await s.browser.close();
+  }
+  // ── FT3 (switch closed): the ΗΡΘΕΣ ΜΕ summary once ──
+  {
+    const s = await run('', [R[0], 'Τι σε τραβάει εκεί;', BEAT, 'Ωραία.\n\n' + BEAT + '\n\nΤι άλλο κρατάς από σήμερα;', 'Τι άλλο;'], [V[0], V[1], V[5], V[7], 'ναι αυτό']);
+    const shown = (await s.aura()).join('\n---\n');
+    const beats = (shown.match(/ΗΡΘΕΣ ΜΕ|ΒΡΗΚΕΣ|ΦΕΥΓΕΙΣ ΜΕ/g) || []).length;
+    ok('FT3 (switch closed): the summary is shown once; the second reply keeps its own words but not the three labelled lines',
+      s.bodies.length === 4 && beats === 3 && (shown.match(/δύσκολη αλλά σωστή/g) || []).length === 1 && shown.includes('Ωραία.\n\nΤι άλλο κρατάς από σήμερα;'));
+    await s.browser.close();
+  }
+  // ── FT4: the same scenario, later a clear crisis statement — both switch states ──
+  for (const q of ['?stageA=1&rec=1', '']) {
+    const CRISIS = 'και ξέρεις κάτι μερικές φορές σκέφτομαι να βάλω ένα τέλος στη ζωή μου';
+    const s = await run(q, [...R.slice(0, 3), 'Είμαι εδώ. Αυτό που λες είναι πολύ βαρύ. Είσαι ασφαλής αυτή τη στιγμή;', 'Είμαι εδώ.'], [...V.slice(0, 5), CRISIS]);
+    const last = s.bodies[s.bodies.length - 1] || {};
+    const kind = LIB.classifyRequest(last, APP).kind;
+    const body = await s.page.locator('body').innerText();
+    ok(`FT4 (${q ? 'switch open' : 'switch closed'}): after two risk checks, a clear crisis statement → the crisis line 1018 + 112 on screen`,
+      /1018/.test(body) && /112/.test(body));
+    ok(`FT4 (${q ? 'switch open' : 'switch closed'}): the crisis turn goes the safety way and carries NO limit note`,
+      kind === 'supportive' && !/the limit for ambiguous phrases/.test(s.dyn(s.bodies.length - 1)));
+    if (q) ok('FT4 (switch open): no root button and no card after the crisis statement', await s.btn(T.button).count() === 0 && await s.btn(T.yes).count() === 0);
     await s.browser.close();
   }
 }
@@ -1929,7 +2042,7 @@ async function runStressSession(item, aura, user, budget) {
   const sess = { label: item.label, persona: { id: p.id, key: p.key, name: p.name, hiddenRoot: p.hiddenRoot, fixed: !!p.fixed, risk: p.risk || null },
     turns: [], typed: [], notes: [], cost: 0, rootConfirmed: false, root: null, cardAt: null, yesAt: null, clarity: null, violations: [],
     checks: { labels: [], closing: [], verbatim: [], safety: [], stacked: [], advice: [], telemetry: [] },
-    applies: { safety: !!p.risk && p.risk !== 'leak', verbatim: true } };
+    applies: { safety: !!p.risk && p.risk !== 'leak', verbatim: !p.closed } };
   // risk: a signal known BEFORE the offer (14, 15) — the offer must not appear. 16 meets its crisis after the offer.
   const acts = { card: 0, yes: 0, correct: 0, back: 0, offerShown: false, want: false, notNow: false, help: null, clarity: null, completed: false, risk: p.offerRisk ? p.risk : null };
   let stopped = null, exits = 0, safetyExit = false;
@@ -1948,7 +2061,8 @@ async function runStressSession(item, aura, user, budget) {
     return route.fulfill({ status: r.status, contentType: 'application/json', body: JSON.stringify(r.data || {}) });
   });
   await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-  await page.goto(BASE + '/?stageA=1&rec=1');
+  // ADR «12 Οκτωβρίου»: a persona with `closed` runs the NORMAL flow (switch closed); the root-flow checks do not apply to it.
+  await page.goto(BASE + (p.closed ? '/?rec=1' : '/?stageA=1&rec=1'));
   await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
 
   const btn = name => page.getByRole('button', { name, exact: true });
@@ -2010,7 +2124,7 @@ async function runStressSession(item, aura, user, budget) {
   let askSeen = false, lastCardRoot = null;
   const check = async s => {
     for (const l of SL.findLabels(s.body)) if (!labelsSeen.has(l)) { labelsSeen.add(l); sess.checks.labels.push('«' + l + '» μετά από ' + sess.typed.length + ' μηνύματα'); }
-    if (SL.preRootClosingChecked({ rootConfirmed: sess.rootConfirmed, exits, safetyExit })) {
+    if (!p.closed && SL.preRootClosingChecked({ rootConfirmed: sess.rootConfirmed, exits, safetyExit })) {
       if (s.closureCard) sess.checks.closing.push('κάρτα «πριν κλείσουμε» (ρητές έξοδοι του χρήστη: ' + exits + ', μηνύματα: ' + sess.typed.length + ')');
       if (s.warningCard) sess.checks.closing.push('κάρτα προειδοποίησης (ρητές έξοδοι: ' + exits + ')');
       sess.turns.forEach((t, k) => {
@@ -2020,7 +2134,7 @@ async function runStressSession(item, aura, user, budget) {
         if (fw.length) sess.checks.closing.push('αποχαιρετισμός («' + fw.join('», «') + '»): «' + t.text.slice(0, 160) + '»');
       });
     } else sess.turns.forEach((t, k) => farewellsSeen.add(k));
-    if (s.ask && !askSeen) {
+    if (s.ask && !askSeen && !p.closed) {
       askSeen = true;
       const f = sess.turns.filter(t => t.who !== 'app');
       if (SL.rootQuestionUnderModelQuestion(f[f.length - 1])) sess.checks.stacked.push('η ερώτηση της ρίζας ακριβώς κάτω από: «' + f[f.length - 1].text.slice(-140) + '»');
@@ -2160,7 +2274,12 @@ async function runStressSession(item, aura, user, budget) {
   // ── τηλεμετρία: το αρχείο της συσκευής ──
   const log = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
   sess.events = SL.lastSessionEvents(log);
-  for (const x of SL.telemetryIssues(sess.events, acts)) sess.checks.telemetry.push(x);
+  if (!p.closed) for (const x of SL.telemetryIssues(sess.events, acts)) sess.checks.telemetry.push(x);
+  // ADR «12 Οκτωβρίου»: the founder-test measurements, for every session (read only)
+  sess.founder = SL.founderMetrics(auraTurns.map(t => t.text), APP.fns.detectsRiskClarification);
+  if (sess.founder.stops > 2) sess.notes.push('πάνω από 2 «στάσεις» της AURA (' + sess.founder.stops + ')');
+  if (sess.founder.riskChecks > 2) sess.notes.push('πάνω από 2 ερωτήσεις κινδύνου (' + sess.founder.riskChecks + ')');
+  if (sess.founder.bareGoodbye) sess.notes.push('σκέτο «Καλή συνέχεια.» (' + sess.founder.bareGoodbye + ')');
   if (p.risk === 'crisis' && crisisAt === -1 && !stopped) sess.checks.safety.push('το μήνυμα κρίσης δεν στάλθηκε (η συνεδρία σταμάτησε πριν)');
   await page.screenshot({ path: path.join(OUT, 'stress-' + item.label + '-end.png'), fullPage: true }).catch(() => {});
   await browser.close();
@@ -2200,7 +2319,7 @@ async function mainStress() {
   const real = has('--real');
   const only = (opt('--sessions', '') || '').split(',').map(x => x.trim()).filter(Boolean);
   // «επιλογή» (--sessions) can re-run a session of either round; the full test without --sessions stays the 16 users
-  const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17)) : SL.PERSONAS;
+  const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17), SL.FOUNDER_PERSONAS || []) : SL.PERSONAS;
   const plan = SL.planRuns(PEOPLE, only.length ? only : null);
   const want = Number(opt('--budget', String(SL.BUDGET_CAP)));
   if (!(want > 0) || want > SL.BUDGET_CAP) { console.error('Το όριο δαπάνης πρέπει να είναι από 0 ως $' + SL.BUDGET_CAP + '.'); process.exit(2); }
@@ -2294,7 +2413,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else await runMock();
+      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

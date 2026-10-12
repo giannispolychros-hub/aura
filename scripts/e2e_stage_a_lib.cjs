@@ -16,7 +16,7 @@ const UI_STRINGS = ['Ξεκίνα με το πρόβλημά σου', 'Γιατ�
   'turn-aura', 'className="typing"', 'className="textarea"', '>Go</button>', 'handleMemoryChoice(false)}>Όχι</button>'];
 const APP_FNS = ['detectsRootDeferral', 'detectsExplicitProductionRequest', 'detectsCoreReadinessAsked', 'parseRoadMap',
   'parseThreeBeatShift', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord', 'buildStageAMarker', 'buildFirstWhyFloor',
-  'detectSafetySignal'];
+  'detectSafetySignal', 'detectsRiskClarification'];
 
 function fold(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
 

@@ -86,9 +86,11 @@ assert('UNTOUCHED: non-strings never throw', S(null).text === '' && S(undefined)
 const GEN = CODE.slice(CODE.indexOf('const generateResponse = useCallback('), CODE.indexOf('const handleSubmit = useCallback('));
 assert('WIRING: one helper counts and cleans (labelLeaks ref)', /const labelLeaks\s*= useRef\(0\);/.test(CODE) &&
   /const cleanLabels = useCallback\(\(t\) => \{ const r = stripInternalLabels\(t\); if \(r\.count\) labelLeaks\.current \+= r\.count; return r\.text; \}, \[\]\);/.test(CODE));
+// UPDATED (12/10, ADR «12 Οκτωβρίου»): the same cleaning, now wrapped by the two display guards (the ΗΡΘΕΣ ΜΕ summary once, the
+// STOP MOMENT's limit and gentle form) — still the one line that cleans, still after the tags are read.
 assert('WIRING: main reply — cleaned right after the hidden tags are read, before every check, the screen and the history',
-  /const text = stripAraDeclarative\(cleanLabels\(rawText\.replace\(\/\\s\*\\\[\\\[EXIT:\(yes\|no\)\\\]\\\]\\s\*\$\/i, ""\)\)\);/.test(GEN) &&
-  GEN.indexOf('const exitTagMatch = rawTextWithTags.match(') < GEN.indexOf('const text = stripAraDeclarative(cleanLabels('));
+  /const text = guardStopMoment\(stripRepeatedThreeBeat\(stripAraDeclarative\(cleanLabels\(rawText\.replace\(\/\\s\*\\\[\\\[EXIT:\(yes\|no\)\\\]\\\]\\s\*\$\/i, ""\)\)\), msgs\), /.test(GEN) &&
+  GEN.indexOf('const exitTagMatch = rawTextWithTags.match(') < GEN.indexOf('cleanLabels(rawText.replace('));
 assert('WIRING: main reply — no empty bubble', /if \(displayText\.trim\(\)\) setMessages\(prev => \[\.\.\.prev, \{ id: nextMsgId\(\), role: "assistant", content: displayText, msgMode: currentMode \}\]\);/.test(GEN));
 assert('WIRING: every other model reply is cleaned too (closing Part 1, Part 2, early word, misfire, compression, First-WHY)',
   (CODE.match(/stripAraDeclarative\(cleanLabels\(/g) || []).length === 7 && !/stripAraDeclarative\((?!cleanLabels\()(?:await callAura|rawText\.replace)/.test(CODE));
@@ -101,7 +103,7 @@ assert('MEASURE: reset with a new session', /labelLeaks\.current = 0;/.test(extr
 // (modelJudgesEnd) and the early word (awaitingEarlyWord) must read the model's RAW reply, and only then is it cleaned.
 {
   const at = GEN.indexOf('const exitTagMatch = rawTextWithTags.match(');
-  const end = GEN.indexOf('\n', GEN.indexOf('const text = stripAraDeclarative(cleanLabels(rawText.replace('));
+  const end = GEN.indexOf('\n', GEN.indexOf('cleanLabels(rawText.replace('));
   const seg = at >= 0 && end > at ? GEN.slice(at, end) : '';
   assert('TAGS BEFORE CLEANING: the raw reply comes straight from callAura — nothing cleans it on the way in',
     /const rawTextWithTags = await callAura\(\[\.\.\.contextRefresh, \.\.\.msgs\], system\);/.test(GEN) &&
@@ -112,8 +114,11 @@ assert('MEASURE: reset with a new session', /labelLeaks\.current = 0;/.test(extr
     GEN.slice(GEN.indexOf('const rawTextWithTags = await callAura('), at).indexOf('cleanLabels') < 0);
   // The same lines, run: a fake raw reply in, what the app would read and show out.
   const run = rawReply => { try {
+    // UPDATED (12/10): the two display guards are passed through unchanged here — this run is about the tags and the labels.
     return new Function('rawTextWithTags', 'cleanLabels', 'stripAraDeclarative', 'awaitingEarlyWord', 'declarationLedger', 'issueDeclaration', 'turnCount',
-      seg + '\nreturn { modelJudgesEnd, awaiting: awaitingEarlyWord.current, text };')(rawReply, t => S(t).text, t => t, { current: false }, { current: [] }, () => [], { current: 0 });
+      'guardStopMoment', 'stripRepeatedThreeBeat', 'countStopMoments', 'stopMomentGentleOnly', 'detectsMentalHealthReferral', 'msgs', 'riskSignalKind',
+      seg + '\nreturn { modelJudgesEnd, awaiting: awaitingEarlyWord.current, text };')(rawReply, t => S(t).text, t => t, { current: false }, { current: [] }, () => [], { current: 0 },
+      t => t, t => t, () => 0, () => false, () => false, [], { current: 0 });
   } catch (e) { return { error: e.message }; } };
   const r1 = run('Αυτό που περιέγραψες έχει πια όνομα. [[EXIT:yes]]');
   assert('TAGS BEFORE CLEANING (run): «… [[EXIT:yes]]» → the T5 signal is read, the text shown has no tag',
