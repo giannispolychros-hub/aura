@@ -205,8 +205,10 @@ assert('the three latch call sites are unchanged',
   CODE.includes('} else if (detectsFriendPerspectiveAsked(text)) {'));
 assert('the gatesIgnored counter still reads the strict detector OR the twin (not touched)',
   /stakes:\s*detectsStakesAsked\(_clean\)\s*\|\|\s*detectsGateQuestionsLoose\(_clean\)\.stakes/.test(CODE));
-assert('detectsAffirmativeShort and detectsSpontaneousShiftRecognition are untouched (the confirmation side)',
-  /return \/\^\(ναι\|ακριβώς\|σωστά\|όντως\|νιώθω\|νομίζω ναι\|έτσι νομίζω\|κάπως έτσι\)\/i\.test\(t\);/.test(CODE));
+// UPDATED (12/10/2026, ADR «12 Οκτωβρίου (γ)», John): detectsAffirmativeShort now accepts a «Ναι» only in a clear form (same start
+// words, then only plain-yes words): «Νιώθω το ίδιο», read as a yes in the comment above, no longer is. See test_round3_1210.js.
+assert('detectsAffirmativeShort keeps the same start words (the confirmation side); only clear forms count',
+  /const AFFIRM_START = \/\^\(\?:ναι\|ακριβωσ\|σωστα\|οντωσ\|νιωθω\|νομιζω ναι\|ετσι νομιζω\|καπωσ ετσι\)\/;/.test(CODE));
 assert('the gate-reminder lines read the latches exactly as before',
   CODE.includes(`if (!stakesAsked.current) due.push('Stakes Question`) &&
   /shiftCheckCtx = deliverOnce\(shiftCheckConfirmed\.current/.test(CODE) &&

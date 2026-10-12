@@ -86,8 +86,9 @@ assert('UNTOUCHED: non-strings never throw', S(null).text === '' && S(undefined)
 const GEN = CODE.slice(CODE.indexOf('const generateResponse = useCallback('), CODE.indexOf('const handleSubmit = useCallback('));
 // UPDATED (12/10/2026, ADR «12 Οκτωβρίου (β)»): the same helper also removes, after the labels, a sentence with a helpline that is
 // not the app's and a sentence that declares a root (test_last_round_1210.js) — every model reply already passes through it.
+// And (ADR «12 Οκτωβρίου (γ)») a sentence that holds the user with pressure (test_round3_1210.js).
 assert('WIRING: one helper counts and cleans (labelLeaks ref)', /const labelLeaks\s*= useRef\(0\);/.test(CODE) &&
-  /const cleanLabels = useCallback\(\(t\) => \{ const r = stripInternalLabels\(t\); if \(r\.count\) labelLeaks\.current \+= r\.count; return stripRootDeclaration\(stripForeignHelplines\(r\.text\)\); \}, \[\]\);/.test(CODE));
+  /const cleanLabels = useCallback\(\(t\) => \{ const r = stripInternalLabels\(t\); if \(r\.count\) labelLeaks\.current \+= r\.count; return stripPressurePhrases\(stripRootDeclaration\(stripForeignHelplines\(r\.text\)\)\); \}, \[\]\);/.test(CODE));
 // UPDATED (12/10, ADR «12 Οκτωβρίου»): the same cleaning, now wrapped by the two display guards (the ΗΡΘΕΣ ΜΕ summary once, the
 // STOP MOMENT's limit and gentle form) — still the one line that cleans, still after the tags are read.
 assert('WIRING: main reply — cleaned right after the hidden tags are read, before every check, the screen and the history',

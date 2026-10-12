@@ -141,9 +141,11 @@ const SHORT = JOHN.slice(0, 4); // two user messages so far
     /coreReadinessConfirmed\.current = true;[^\n]*\n\s*addUiBubble\(userText, messages\.length\);[^\n]*\n\s*stageADispatch\(\{ type: "ready" \}\);\s*return;\s*\}/.test(blk) && !/generateResponse|callAura|setMessages/.test(blk));
   assert('DOOR 2: the old arming path after a reply stays for the «Ναι» that this block does not catch (unchanged)', /else stageARootArmed\.current = true;/.test(GEN) &&
     /else if \(coreReadinessAsked\.current && lastUserMsgForReadiness &&\s*detectsAffirmativeShort\(lastUserMsgForReadiness\.content\)\) \{/.test(GEN));
-  assert('DOOR 2: coreReadinessCtx and the readiness detectors are untouched',
+  // UPDATED (12/10/2026, ADR «12 Οκτωβρίου (γ)», John): the «Ναι» counts only in a clear form — the same start words, then only words
+  // that keep it a plain yes («νιώθω χάλια» is not a «Ναι»; test_round3_1210.js). The question detector is untouched.
+  assert('DOOR 2: coreReadinessCtx and the readiness question detector are untouched; the «Ναι» keeps the same start words',
     /function detectsCoreReadinessAsked\(text\) \{\s*return \/νιώθεις ότι\.\{0,40\}ξεκαθαρίζει\.\{0,60\}πραγματικά σε απασχολεί\/i\.test\(text \|\| ""\);\s*\}/.test(CODE) &&
-    /function detectsAffirmativeShort\(text\) \{[\s\S]*?return \/\^\(ναι\|ακριβώς\|σωστά\|όντως\|νιώθω\|νομίζω ναι\|έτσι νομίζω\|κάπως έτσι\)\/i\.test\(t\);\s*\}/.test(CODE));
+    /function detectsAffirmativeShort\(text\) \{\s*const AFFIRM_START = \/\^\(\?:ναι\|ακριβωσ\|σωστα\|οντωσ\|νιωθω\|νομιζω ναι\|ετσι νομιζω\|καπωσ ετσι\)\/;/.test(CODE));
 }
 
 // ── 2: no farewell when the closing card opens on the same reply ─────────────

@@ -207,7 +207,7 @@ assert('AFTER THE SAFETY PATH: support only, in proportion; no root, no step or 
 }
 // ── 4+5 wiring: every model reply (main, the three closing replies, misfire, compression, First-WHY) passes through cleanLabels ─
 assert('WIRING: both display guards run inside cleanLabels — the one function every model reply already passes through',
-  /const cleanLabels = useCallback\(\(t\) => \{ const r = stripInternalLabels\(t\); if \(r\.count\) labelLeaks\.current \+= r\.count; return stripRootDeclaration\(stripForeignHelplines\(r\.text\)\); \}, \[\]\);/.test(CODE) &&
+  /const cleanLabels = useCallback\(\(t\) => \{ const r = stripInternalLabels\(t\); if \(r\.count\) labelLeaks\.current \+= r\.count; return stripPressurePhrases\(stripRootDeclaration\(stripForeignHelplines\(r\.text\)\)\); \}, \[\]\);/.test(CODE) && // UPDATED (γ): + the pressure guard
   (CODE.match(/stripAraDeclarative\(cleanLabels\(/g) || []).length === 7);
 assert('WIRING: on the main path the filtered text is what the crisis line is decided on (the right line is added when the wrong one is removed)',
   GEN.indexOf('const text = guardStopMoment(stripRepeatedThreeBeat(stripAraDeclarative(cleanLabels(') > 0 &&

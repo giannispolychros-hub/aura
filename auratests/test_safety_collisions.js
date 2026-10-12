@@ -79,7 +79,7 @@ assert('2: the only supportive call is the crisis branch (so «supportive turn»
   const fnSha = n => sha(extractBlock('function ' + n + '(') || '');
   assert('2: decideTermination, matchesClosingWord, isExplicitClosure, declaresClosing unchanged (byte for byte)',
     sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && fnSha('matchesClosingWord') === 'c3d044cc974bb7ac' &&
-    fnSha('isExplicitClosure') === '09da70474755ef40' && fnSha('declaresClosing') === 'c8dbd762e16c97a7'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24); again (ADR «12 Οκτωβρίου (β)»): «αντίο», «τα λέμε» too
+    fnSha('isExplicitClosure') === '09da70474755ef40' && fnSha('declaresClosing') === '25fe9be3bbcfaa57'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24); again (ADR «12 Οκτωβρίου (β)»): «αντίο», «τα λέμε» too; (γ): not right after a negation
 }
 {
   const d = GEN.indexOf('const decision = stageAPreRootDecision(currentMode === "SUPPORTIVE"'); // UPDATED 10/10: see above

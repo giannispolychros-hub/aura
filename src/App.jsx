@@ -917,7 +917,8 @@ STRATEGY BY STATE (the second half of the same decision — the Constitution's q
 STOP MOMENT: when the user, in their own words, states a realization, a decision or a solution (e.g. «αυτό μου ξεκαθάρισε», «έπρεπε να…», «είναι σωστή επιλογή»), do not move past it — stop and make it an event. The reply opens with a short stop signal — «Όπα — στάσου εδώ.» or «Για στάσου.» or «Στάσου λίγο εδώ.» — then gives the user's exact phrase in quotation marks, verbatim, and asks ONE question that weighs it against a cost or an obstacle the user THEMSELVES named earlier. The tone: «Όπα — στάσου εδώ. Μόλις είπες: "θέλω να το κάνω — δύσκολο, με το δάνειο που τρέχει". Το θέλεις αρκετά για να σηκώσεις κι αυτό;». LIMITS: once or twice per session at most. The stop signal is only for a realization, a decision or a solution — never for a risk check. No capitals, no string of exclamation marks, no verdict («σωστή απόφαση», «μπράβο»), no new content — no cost, obstacle or idea they did not name. If the recent exchanges carry any sign of heaviness or risk, only the gentle form «Ας σταθούμε λίγο εδώ.», never «Όπα». It governs that reply: never stack APPROVAL AFTER INSIGHT, INSIGHT VERIFICATION or FIRST INSIGHT MIRROR on the same phrase. After the user's answer, no new exploratory questions — go to the root (ROOT RE-FOCUS). WITH THE [FREE PART: ENDS AT ROOT] MARKER the stop moment adds no turn before the root: it frames the root moment — the stop signal, the exact phrase, and then, in place of the weighing question, ROOT RE-FOCUS's step-one question in its canonical wording, «Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;»; the app takes it from there. A realization in the user's own words IS that step's firing condition — do not wait for more material.
 CHOICE QUESTION: when the user circles, or writes a lot at once in a tangle (often long voice-typed messages with no punctuation), ask a choice question: two or three options built ONLY from what they already said, in their words, plus «ή κάτι άλλο;». The tone: «Από όσα είπες, τι βαραίνει πιο πολύ: τα δύο χρόνια χωρίς μισθό, το ωράριο με τα παιδιά, ή κάτι άλλο;». Never an option with new content or a psychological interpretation (forbidden: «μήπως είναι φόβος αποτυχίας;»). There is no fixed number of exchanges to the root: as fast as honesty allows, and no faster.
 RISK CHECKS — FEWER FOR AMBIGUOUS WORDS, THE SAME FOR CLEAR ONES: a phrase that could, but need not, hint at harm (e.g. «θα τα παρατήσω όλα», «αδιέξοδο», «δεν βλέπω διέξοδο», «δεν πάει άλλο») gets at most TWO clarifying questions in the whole session. Once the user has made clear they are not in danger and is answering normally, never ask again about the same thing. After the clarification, go back to the topic without naming the risk (never «δεν εννοούσες κάτι πιο σκοτεινό»). Never read a feeling as a "sign" (never «η ουδετερότητα είναι σημάδι ότι έφτασες στα όριά σου»). UNCHANGED, ABSOLUTE: a clear crisis statement — suicide, self-harm, a plan or a means, «δεν θέλω να ζω» and the like — ALWAYS gets the full safety response (DISTRESS GRADIENT Level 3, SAFETY RESOURCE), however many questions were asked before; a new signal clearly stronger than the previous one allows a new check. THE CLARIFYING QUESTION ITSELF (John, 2026-10-12, after his own test): it always offers the everyday meaning as one option, in the user's own words, so that a short answer is enough — «Εννοείς ότι δεν βλέπεις πώς να χωρέσει η σχολή στη ζωή σου, ή κάτι βαρύτερο;». Never a question that asks the user to write out in words whether they would harm themselves. Never open it with a stop signal.
-AFTER THE SAFETY PATH (the per-turn note [CODE-VERIFIED: the safety path was activated …] marks it): for the rest of the session, support only, in proportion to what the user actually said — no root (neither ask toward it nor name it), no question about a step or a time, no push toward closing. It takes precedence over ROOT RE-FOCUS, the STOP MOMENT's root step and point (5) of the Stage A rule.
+AFTER THE SAFETY PATH (the per-turn note [CODE-VERIFIED: the safety path was activated …] marks it): for the rest of the session, support only, in proportion to what the user actually said — no root (neither ask toward it nor name it), no question about a step or a time, no push toward closing, never the same question twice, and if they thank you or want to leave, let them go warmly, with no new question. It takes precedence over ROOT RE-FOCUS, the STOP MOMENT's root step and point (5) of the Stage A rule.
+NO PRESSURE TO STAY, IN EVERY FLOW (John, 2026-10-12): never words that hold the user with pressure or guilt — «Περίμενε λίγο», «δεν φτάσαμε ακόμα», «πριν φύγεις πρέπει…», «μη φύγεις ακόμα» or the like. This does not close the conversation: when the user only thanks you and the app opens no closing (a bare «ευχαριστώ» before the root opens none), the conversation goes on normally — one simple question, no pressure; the app's own closing steps are unchanged. After the safety path, AFTER THE SAFETY PATH decides instead.
 THE ROOT IS THE USER'S, IN EVERY FLOW (normal flow and Stage A alike): never «αυτό είναι η ρίζα», «εδώ είναι η ρίζα», «η ρίζα είναι…», «βρήκαμε τη ρίζα» or the like — the root is the user's phrase, and only they confirm it.
 NO STEP BEFORE THE COACH (Stage A, with the [FREE PART: ENDS AT ROOT] marker): never a question about a step or a time — «πότε θα το κάνεις;», «ποιο είναι το πρώτο βήμα;» — also when the root flow is closed.
 CLAIMS ABOUT LAW AND MONEY ARE THE USER'S, NOT FACTS: a rule the user states about law or money — points (μόρια), rights, entitlements, salaries, fees — is never repeated as fact, not even in a summary: «όπως το λες», «αν ισχύει έτσι».
@@ -1733,6 +1734,15 @@ function rootTextHasSubstance(text) {
   if (typeof text !== "string") return false;
   return splitSentences(text).some(raw => substanceOfSentence(raw, ROOT_MIN_SUBSTANCE_WORDS, ROOT_FILLER_WORDS) !== null);
 }
+// ADR «12 Οκτωβρίου (γ)» (John: when the app is not sure, it does not decide alone): an answer to the app's root question that only
+// says «I don't know» («Δεν ξέρω», «Δεν ξέρω ακόμα», «Δεν ξέρω τι με απασχολεί», «Δεν είμαι σίγουρη», «Δεν μπορώ να το πω») is not a
+// root. Where such an answer passed the substance rule (and became a card), the flow now steps aside and the message goes to the
+// model; a bare «Δεν ξέρω» never passed it and keeps the existing retry. «Δεν ξέρω αν θέλω να μείνω στη δουλειά» says something: a root.
+function rootAnswerIsUnsure(text) {
+  if (typeof text !== "string") return false;
+  const f = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^α-ωa-z\s]/g, " ").replace(/\s+/g, " ").trim();
+  return /^(?:(?:ε|μμ|χμ|ειλικρινα|οχι|ναι|λοιπον) )*δεν (?:ξερω|ειμαι σιγουρ(?:ος|η|ο)|μπορω να (?:το )?πω)(?: (?:ακομα|ακομη|ακριβως|καλα|σιγουρα|πραγματικα))*(?: τι (?:με απασχολει|ειναι|να πω|με κραταει|θελω|νιωθω)(?: (?:ακομα|ακομη|ακριβως))*)?$/.test(f);
+}
 // §2.1α step 5 — «λέξη που κρατάς» equal to «Τι βρήκες»: lower case, no accents, no edge punctuation/space.
 function sameAsRootText(a, b) {
   const n = x => (typeof x === "string" ? x : "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
@@ -1885,7 +1895,7 @@ function dropQuoteOnlyLines(text) {
 // app shows those itself (buildCrisisLine). DISTRESS (3) shows no line, so it is not «the safety path».
 function describeSafetyPathCtx(riskKind) {
   if (riskKind !== 1 && riskKind !== 2) return '';
-  return `\n[CODE-VERIFIED: the safety path was activated earlier in this session, so for the rest of it: support only, in proportion to what the user actually said — no root (neither ask toward it nor name it), no question about a step or a time, no push toward closing.]\n`;
+  return `\n[CODE-VERIFIED: the safety path was activated earlier in this session, so for the rest of it: support only, in proportion to what the user actually said — no root (neither ask toward it nor name it), no question about a step or a time, no push toward closing, never the same question twice, and if they thank you or want to leave, let them go warmly, with no new question.]\n`;
 }
 // Removes the sentences of a MODEL reply that `test` (given the sentence folded: no accents, lower case, ς → σ) flags, and leaves
 // everything else byte for byte. A sentence ends at . ! ; ? … followed by a space and something that is not a digit (so «τηλ. 210…»
@@ -1929,6 +1939,48 @@ function stripForeignHelplines(text) {
 // can say no; the prompt covers them), and so does the Stage A deferral («… έρχεται μετά τη ρίζα»). What is inside quotation marks is
 // the user's own words said back (a STOP MOMENT quotes them verbatim) and is not read.
 const ROOT_DECLARATION = /(?:^|[^α-ω])ειναι (?:η|τη) (?:πραγματικη )?ριζα|(?:^|[^α-ω])η (?:πραγματικη )?ριζα(?: σου)? (?:ειναι|φαινεται|βρισκεται)|βρηκαμε (?:τη(?:ν)? )?(?:πραγματικη )?ριζα/;
+// ADR «12 Οκτωβρίου (γ)» (John): in EVERY flow, never words that hold the user with pressure or guilt — the real model answered
+// a «ευχαριστώ» after the safety path with «Περίμενε λίγο — δεν φτάσαμε ακόμα εκεί που έχει νόημα.» (run 26, session 34). Such a
+// sentence is not shown; a sentence that only OPENS with «Περίμενε (λίγο)» loses the opener and keeps its question. It closes
+// nothing: the rest of the reply goes on. The app's own «Πριν φύγεις — μία λέξη…» and «Πριν φύγεις:» are not pressure and stay;
+// «περιμένεις», the past «περίμενε» inside a sentence, and the user's words in quotation marks are not read.
+const PRESSURE_SENTENCE = /δεν (?:φτασαμε|τελειωσαμε|εχουμε τελειωσει) ακομ[αη]|(?:^|[^α-ω])μη(?:ν)? φυγεισ|πριν φυγεισ,?\s*(?:πρεπει|θελω να|χρειαζεται|ειναι σημαντικο)|(?:^|[^α-ω])μη(?:ν)? (?:το )?(?:κλεισεισ|κλεινεισ|σταματησεισ|σταματασ) (?:ακομα|ακομη|τωρα)/;
+const PRESSURE_OPENER = /^\s*περ[ιί]μενε(?:\s+(?:λ[ιί]γο|ένα λεπτό|μια στιγμ[ηή]|μισ[οό]))?(?![α-ωά-ώ])[\s,.!…—–-]*/i;
+function stripPressurePhrases(text) {
+  if (typeof text !== "string" || !text) return "";
+  const fold = x => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ").replace(/«[^»]*»|"[^"]*"|“[^”]*”/g, " ");
+  let hit = false;
+  const lines = text.split("\n").map(line => {
+    const parts = line.split(/(?<=[.!;?…])[ \t]+(?=[^\s\d])/);
+    const kept = [];
+    for (const p of parts) {
+      if (p.trim() && PRESSURE_SENTENCE.test(fold(p))) { hit = true; continue; }
+      const m = p.match(PRESSURE_OPENER);
+      if (m && m[0].length) {
+        hit = true;
+        const rest = p.slice(m[0].length);
+        if (rest.trim()) kept.push(rest.charAt(0).toUpperCase() + rest.slice(1));
+        continue;
+      }
+      kept.push(p);
+    }
+    return kept.join(" ").trim() || !line.trim() ? kept.join(" ") : null;
+  });
+  if (!hit) return text;
+  return lines.filter(l => l !== null).join("\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+// ADR «12 Οκτωβρίου (γ)» (John): a model reply that is ONLY «Καλή συνέχεια» (with or without . ! … or an emoji) is shown as the
+// approved sentence — also on the crisis path, where the app's own line follows it. On the SCREEN only (MessageBubble): the
+// history keeps what the model wrote, so the app's closing steps read exactly what they read before.
+const BARE_GOODBYE_TEXT = "Ευχαριστώ που το μοιράστηκες. Να είσαι καλά.";
+function replaceBareGoodbye(content) {
+  if (typeof content !== "string") return content;
+  const paras = content.split(/\n\s*\n/);
+  if (paras[0].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^α-ωa-z0-9]/g, "") !== "καλησυνεχεια") return content;
+  const lines = [buildCrisisLine("A", "", false).line, buildCrisisLine("B", "", false).line];
+  if (!paras.slice(1).every(p => lines.includes(p.trim()))) return content;
+  return [BARE_GOODBYE_TEXT, ...paras.slice(1)].join("\n\n");
+}
 function stripRootDeclaration(text) {
   return dropModelSentences(text, (f, p) => !/[;?]\s*["»”']*\s*$/.test(p) && ROOT_DECLARATION.test(f.replace(/«[^»]*»|"[^"]*"|“[^”]*”/g, " ")));
 }
@@ -4049,7 +4101,8 @@ function declaresClosing(text) {
   // has a common non-closing meaning that real sessions produced.
   // ADR «12 Οκτωβρίου» (run 24, session 33): «μπάι» only as a word of its own — inside «μπαίνει», «μπαίνω» it closed the session.
   // ADR «12 Οκτωβρίου (β)», the same class: «αντίο» (inside «εναντίον», «αντιοικονομικό») and «τα λέμε» (inside «πάντα λέμε»).
-  if (/κλεινουμε|κλεινω|τελειωσαμε|(?:^|[^α-ω])τα λεμε(?![α-ω])|καλη συνεχεια|καληνυχτα|καλο βραδυ|(?:^|[^α-ω])αντιο(?![α-ω])|(?:^|[^α-ω])μπαι(?![α-ω])|bye|αρκετα για σημερα|ασ το αφησουμε εδω/.test(fold(t))) return true;
+  // ADR «12 Οκτωβρίου (γ)»: not right after a negation («δεν τα λέμε αυτά», «δεν κλείνουμε ακόμα») — then the model decides.
+  if (/(?<!(?:^|[^α-ω])(?:δεν|δε|μην|μη|ουτε)(?:\s+[^\s.,;!?…·]+){0,2}\s*)(?<!(?:^|[^α-ω])οχι\s*)(?:κλεινουμε|κλεινω|τελειωσαμε|(?:^|[^α-ω])τα λεμε(?![α-ω])|καλη συνεχεια|καληνυχτα|καλο βραδυ|(?:^|[^α-ω])αντιο(?![α-ω])|(?:^|[^α-ω])μπαι(?![α-ω])|bye|αρκετα για σημερα|ασ το αφησουμε εδω)/.test(fold(t))) return true;
   // TIER B. The final sentence, and it must contain a leave-taking phrase before reducing — so a
   // final sentence made only of "Ναι" can never qualify on the reduction alone.
   const parts = t.split(/[.;!?\n]+|\u2026|\.\.\./).map(x => x.trim()).filter(Boolean);
@@ -4676,13 +4729,22 @@ function detectsOutcomeScaleAsked(text) {
 function detectsCoreReadinessAsked(text) {
   return /νιώθεις ότι.{0,40}ξεκαθαρίζει.{0,60}πραγματικά σε απασχολεί/i.test(text || "");
 }
+// ADR «12 Οκτωβρίου (γ)» (John): the «Ναι» to a yes/no question counts only in a CLEAR form — the same start words as before,
+// and after them only words that keep it a plain yes. «Νιώθω χάλια», «Ναι αλλά φοβάμαι», «ναι μάλλον», «Νιώθω το ίδιο» are not a
+// «Ναι»: when the app is not sure it decides nothing, and the message goes to the model (a person writing how they feel must not
+// get a ready-made root question). Accents, case, punctuation, emoji and doubled letters do not matter; still at most 6 words.
 function detectsAffirmativeShort(text) {
+  const AFFIRM_START = /^(?:ναι|ακριβωσ|σωστα|οντωσ|νιωθω|νομιζω ναι|ετσι νομιζω|καπωσ ετσι)/;
+  const AFFIRM_REST = new Set(["ναι", "νομιζω", "πιστευω", "οτι", "πωσ", "ετσι", "καπωσ", "ειναι", "αυτο", "ακριβωσ", "σωστα", "οντωσ", "νιωθω",
+    "το", "μου", "κατι", "ξεκαθαριζει", "ξεκαθαρισε", "αρχιζει", "να", "εχει", "βλεπω", "καταλαβαινω", "ε", "πολυ", "οκ", "ok", "βεβαια",
+    "φυσικα", "σιγουρα", "κιολασ"]);
   const t = String(text == null ? "" : text).trim();
   if (!t || t.split(/\s+/).length > 6) return false;
-  // NOTE: no \b here — same already-documented JS regex issue elsewhere in this file: \b does not
-  // recognize Greek letters as word characters, so it silently never matches. The ^ anchor plus
-  // the word-count cap above already give sufficient specificity without it.
-  return /^(ναι|ακριβώς|σωστά|όντως|νιώθω|νομίζω ναι|έτσι νομίζω|κάπως έτσι)/i.test(t);
+  // NOTE: no \b — it does not see Greek letters in JS regex (documented elsewhere in this file); the words are split instead.
+  const f = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/([α-ωa-z])\1+/g, "$1")
+    .replace(/[^α-ωa-z\s]/g, " ").replace(/ς/g, "σ").replace(/\s+/g, " ").trim();
+  const m = f.match(AFFIRM_START);
+  return !!m && f.slice(m[0].length).split(" ").filter(Boolean).every(w => AFFIRM_REST.has(w));
 }
 // Sibling to detectsCoreReadinessAsked above, same reliability class (fixed, canonical wording) —
 // detects AURA's shift-verification question, right before the three-beat structure. Reuses
@@ -4744,17 +4806,25 @@ function detectsContinuationPromiseAsked(text) {
 // avoid): catches the user's own, unprompted signal that a shift happened, independent of whether
 // AURA asked. Deliberately narrow — short phrases only, to avoid false-positiving on a message
 // that merely mentions these words in passing as part of a longer, unrelated point.
+// ADR «12 Οκτωβρίου (γ)» (John): a negation right before a phrase that opens the root card, a «shift» or a closing («δεν μου βγάζει
+// νόημα», «δεν ξέρω τι με απασχολεί», «δεν τα λέμε αυτά») — the app is not sure, so it decides nothing and the message goes to the
+// model. A negation is δεν, δε, μην, μη, ούτε up to two words before the phrase, in the same clause (a comma ends it: «Δεν αντέχω
+// άλλο, κλείνουμε» still closes); «όχι» only right before it
+// («όχι αυτό ακριβώς» — «Όχι, …» is an answer). Written as the two lookbehinds (?<!…) in front of each phrase list, so every
+// function stays self-contained. NOT for crisis detection: there, unsure still means the safety path.
 function detectsSpontaneousShiftRecognition(text) {
   const t = String(text == null ? "" : text).trim();
   if (!t || t.split(/\s+/).length > 25) return false; // was 12 — same reason
   // ADR «12 Οκτωβρίου (β)»: only as words of their own — «τώρα κατάλαβα» matched «οι γονείς μου τώρα κατάλαβαν».
-  return /(?:^|[^α-ωά-ώΐ])(τώρα κατάλαβα|τώρα το βλέπω|τώρα ξέρω|αυτό ήταν|τώρα καταλαβαίνω|άλλαξε κάτι|το βλέπω αλλιώς|το βλέπω τώρα|άλλαξε η οπτική|σκέφτομαι διαφορετικά)(?![α-ωά-ώΐ])/i.test(t);
+  // ADR «12 Οκτωβρίου (γ)»: … and not right after a negation («δεν άλλαξε κάτι»).
+  return /(?:^|[^α-ωά-ώΐ])(?<!(?:^|[^α-ωά-ώΐ])(?:δεν|δε|μην|μη|ούτε|ουτε)(?:\s+[^\s.,;;!?…·]+){0,2}\s*)(?<!(?:^|[^α-ωά-ώΐ])(?:όχι|οχι)\s*)(τώρα κατάλαβα|τώρα το βλέπω|τώρα ξέρω|αυτό ήταν|τώρα καταλαβαίνω|άλλαξε κάτι|το βλέπω αλλιώς|το βλέπω τώρα|άλλαξε η οπτική|σκέφτομαι διαφορετικά)(?![α-ωά-ώΐ])/i.test(t);
 }
 function detectsSpontaneousCoreRecognition(text) {
   const t = String(text == null ? "" : text).trim();
   if (!t || t.split(/\s+/).length > 25) return false; // was 12 — genuine recognition often arrives inside a longer sentence
   // ADR «12 Οκτωβρίου (β)»: only as words of their own — «το βρήκα» matched «δεν το βρήκαμε», «τώρα κατάλαβα» «τώρα κατάλαβαν».
-  return /(?:^|[^α-ωά-ώΐ])(ξέρω τι με απασχολεί|καταλαβαίνω τι είναι|νομίζω ξέρω τι|βρήκα τι με κρατάει|αυτό είναι το πρόβλημα|τώρα κατάλαβα|αυτό ήταν|το βρήκα|αυτό ακριβώς|μου βγάζει νόημα|κατάλαβα τι με κρατάει|ξέρω τι με κρατάει|αυτό με κρατάει)(?![α-ωά-ώΐ])/i.test(t);
+  // ADR «12 Οκτωβρίου (γ)»: … and not right after a negation («δεν μου βγάζει νόημα», «δεν ξέρω τι με απασχολεί»).
+  return /(?:^|[^α-ωά-ώΐ])(?<!(?:^|[^α-ωά-ώΐ])(?:δεν|δε|μην|μη|ούτε|ουτε)(?:\s+[^\s.,;;!?…·]+){0,2}\s*)(?<!(?:^|[^α-ωά-ώΐ])(?:όχι|οχι)\s*)(ξέρω τι με απασχολεί|καταλαβαίνω τι είναι|νομίζω ξέρω τι|βρήκα τι με κρατάει|αυτό είναι το πρόβλημα|τώρα κατάλαβα|αυτό ήταν|το βρήκα|αυτό ακριβώς|μου βγάζει νόημα|κατάλαβα τι με κρατάει|ξέρω τι με κρατάει|αυτό με κρατάει)(?![α-ωά-ώΐ])/i.test(t);
 }
 // STRUCTURAL, NOT PSYCHOLOGICAL (real gap found via transcript audit — PREMISE INVERSION already
 // states its own trigger as "user keeps circling the same two options," but nothing tracked this
@@ -5761,7 +5831,7 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
         .replace(/^[^\S\n]*\**ΔΡΟΜΟΣ(?![Α-Ωα-ωά-ώ])[^\n]*\n\s*\**ΚΕΡΔΙΖΕΙΣ[^\S\n]*:[^\n]+\n\s*\**ΚΟΣΤΙΖΕΙ[^\S\n]*:[^\n]+/gm, '')
         .replace(/^[^\S\n]*\**ΑΓΝΩΣΤΟ[^\S\n]*:[^\n]+/gm, '')
         .trim()
-    : msg.content);
+    : (isUser ? msg.content : replaceBareGoodbye(msg.content)));
   if (!roadMap && !displayContent && typeof msg.content === "string" && msg.content.trim()) return null;
 
   return (
@@ -6032,7 +6102,7 @@ export default function AURAv2() {
   }, []);
   const [stageACopyText, setStageACopyText] = useState(null); // clipboard fallback: the text, shown to select
   const [stageACopied, setStageACopied] = useState(false);
-  const cleanLabels = useCallback((t) => { const r = stripInternalLabels(t); if (r.count) labelLeaks.current += r.count; return stripRootDeclaration(stripForeignHelplines(r.text)); }, []);
+  const cleanLabels = useCallback((t) => { const r = stripInternalLabels(t); if (r.count) labelLeaks.current += r.count; return stripPressurePhrases(stripRootDeclaration(stripForeignHelplines(r.text))); }, []);
   // P4 (ADR «11 Οκτωβρίου (ζ)»): the door of the card shown, as root_card_shown logged it — read when the root is confirmed.
   const lastCardDoor = useRef(0);
   const stageADispatch = useCallback((ev) => {
@@ -7959,6 +8029,11 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     const _saArmed = stageARootArmed.current && !_saPhase && riskSignalKind.current !== 1 && !reflectionDelivered.current && !awaitingRememberedWord;
     if (stageAActive.current && (_saPhase === "ask" || _saPhase === "correct" || _saArmed)) {
       if (!stageACaptureAllowed(userText)) {
+        stageARootArmed.current = false;
+        stageADispatch({ type: "cancel" });
+      } else if (rootTextHasSubstance(userText) && rootAnswerIsUnsure(userText)) {
+        // ADR «12 Οκτωβρίου (γ)»: «Δεν ξέρω ακόμα», «Δεν ξέρω τι με απασχολεί» passed the substance rule and became a root card — they
+        // are not a root; the model takes the message. A bare «Δεν ξέρω» has no substance and keeps «Γράψ' το λίγο πιο ολοκληρωμένα».
         stageARootArmed.current = false;
         stageADispatch({ type: "cancel" });
       } else if ((_saPhase === "ask" || _saPhase === "correct") && !rootTextHasSubstance(userText)) {

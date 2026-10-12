@@ -175,12 +175,14 @@ const _CODE_FOR_DISPLAY = (() => {
 })();
 // UPDATED (12/10, ADR «12 Οκτωβρίου»): the display text also passes dropQuoteOnlyLines (a line of only «"» is not drawn) —
 // the same road-block strip inside it, evaluated with the real helper.
+// UPDATED AGAIN (12/10, ADR «12 Οκτωβρίου (γ)»): an AURA message that is only «Καλή συνέχεια» is shown as the approved sentence
+// (replaceBareGoodbye) — the expression now ends there; the road-block strip is unchanged.
 const _dcStart = _CODE_FOR_DISPLAY.indexOf('const displayContent = dropQuoteOnlyLines(roadMap');
-const _dcEnd = _CODE_FOR_DISPLAY.indexOf(': msg.content);', _dcStart);
+const _dcEnd = _CODE_FOR_DISPLAY.indexOf(': (isUser ? msg.content : replaceBareGoodbye(msg.content)));', _dcStart);
 assert('Display path located for evaluation', _dcStart >= 0 && _dcEnd > _dcStart);
 if (_dcStart >= 0 && _dcEnd > _dcStart) {
-  const _dcSrc = _CODE_FOR_DISPLAY.slice(_dcStart, _dcEnd + ': msg.content);'.length);
-  eval(extract('dropQuoteOnlyLines') + '\nfunction _stripRoadBlocks(msg, roadMap) { ' + _dcSrc + ' return displayContent; }');
+  const _dcSrc = _CODE_FOR_DISPLAY.slice(_dcStart, _dcEnd + ': (isUser ? msg.content : replaceBareGoodbye(msg.content)));'.length);
+  eval(extract('dropQuoteOnlyLines') + '\n' + extract('buildCrisisLine') + '\n' + _CODE_FOR_DISPLAY.slice(_CODE_FOR_DISPLAY.indexOf('const BARE_GOODBYE_TEXT = '), _CODE_FOR_DISPLAY.indexOf(';\n', _CODE_FOR_DISPLAY.indexOf('const BARE_GOODBYE_TEXT = ')) + 1) + '\n' + extract('replaceBareGoodbye') + '\nfunction _stripRoadBlocks(msg, roadMap) { const isUser = false; ' + _dcSrc + ' return displayContent; }');
   const _shown = _stripRoadBlocks({ content: REAL_TRANSCRIPT_MAP }, _rtParsed);
   for (const label of ['ΔΡΟΜΟΣ', 'ΚΕΡΔΙΖΕΙΣ', 'ΚΟΣΤΙΖΕΙ', 'ΑΓΝΩΣΤΟ']) {
     assert(`NO DOUBLE RENDER: «${label}» is fully stripped from the prose shown alongside the blocks`,
@@ -438,11 +440,11 @@ assert('UNSEEN FORMAT: the gain and cost are still exact; only the name may carr
 // styled block, once as leftover prose. That coupling is invisible in the source.
 // UPDATED (12/10, ADR «12 Οκτωβρίου»): the expression is now wrapped by dropQuoteOnlyLines(…) — same strip inside.
 const _dc2Start = _CODE_FOR_DISPLAY.indexOf('const displayContent = dropQuoteOnlyLines(roadMap');
-const _dc2End = _CODE_FOR_DISPLAY.indexOf(': msg.content);', _dc2Start);
+const _dc2End = _CODE_FOR_DISPLAY.indexOf(': (isUser ? msg.content : replaceBareGoodbye(msg.content)));', _dc2Start);
 assert('LOCKSTEP: display path located for evaluation', _dc2Start >= 0 && _dc2End > _dc2Start);
 if (_dc2Start >= 0 && _dc2End > _dc2Start) {
-  const _src2 = _CODE_FOR_DISPLAY.slice(_dc2Start, _dc2End + ': msg.content);'.length);
-  eval(extract('dropQuoteOnlyLines') + '\nfunction _stripLive(msg, roadMap) { ' + _src2 + ' return displayContent; }');
+  const _src2 = _CODE_FOR_DISPLAY.slice(_dc2Start, _dc2End + ': (isUser ? msg.content : replaceBareGoodbye(msg.content)));'.length);
+  eval(extract('dropQuoteOnlyLines') + '\n' + extract('buildCrisisLine') + '\n' + _CODE_FOR_DISPLAY.slice(_CODE_FOR_DISPLAY.indexOf('const BARE_GOODBYE_TEXT = '), _CODE_FOR_DISPLAY.indexOf(';\n', _CODE_FOR_DISPLAY.indexOf('const BARE_GOODBYE_TEXT = ')) + 1) + '\n' + extract('replaceBareGoodbye') + '\nfunction _stripLive(msg, roadMap) { const isUser = false; ' + _src2 + ' return displayContent; }');
   const _withUnknown = LIVE_ALPHA_MAP.replace(
     '\nΠοιο από τα δύο', '\n**ΑΓΝΩΣΤΟ:** αν επιτρέπεται δεύτερη απασχόληση\n\nΠοιο από τα δύο');
   const _shownLive = _stripLive({ content: _withUnknown }, parseRoadMap(_withUnknown));
