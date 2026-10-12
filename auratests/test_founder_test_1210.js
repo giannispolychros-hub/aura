@@ -216,10 +216,16 @@ assert('QUOTE-ONLY: a message of only «"» becomes empty (not shown); not a str
   assert('WIRING: every main reply passes the two guards, on the text that goes to the screen AND the history',
     GEN.includes('const text = guardStopMoment(stripRepeatedThreeBeat(stripAraDeclarative(cleanLabels(rawText.replace(/\\s*\\[\\[EXIT:(yes|no)\\]\\]\\s*$/i, ""))), msgs), countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current) || detectsMentalHealthReferral(rawText));'));
   assert('WIRING: the three notes are built from the conversation so far and sent with the turn (situational tier, before the hard constraints)',
-    GEN.includes('const stopMomentCtx = describeStopMomentCtx(countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current));') &&
-    GEN.includes('const riskClarificationCtx = describeRiskClarificationCtx(countRiskClarifications(msgs), ([...msgs].reverse().find(m => m.role === "user") || {}).content);') &&
-    GEN.includes('const repeatedElementsCtx = describeRepeatedElementsCtx(repeatedUserElements(msgs));') &&
+    GEN.includes('const stopMomentCtx = _notSupportive ? describeStopMomentCtx(countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current)) : \'\';') &&
+    GEN.includes('const riskClarificationCtx = _notSupportive ? describeRiskClarificationCtx(countRiskClarifications(msgs), ([...msgs].reverse().find(m => m.role === "user") || {}).content) : \'\';') &&
+    GEN.includes('const repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs)) : \'\';') &&
     /selfRepetitionCtx, repeatedElementsCtx, stopMomentCtx, riskClarificationCtx, methodFailureCtx/.test(GEN));
+  // SAFETY (found by the real-model run 21, session 16): the notes rode along to the crisis prompt (SYSTEM_SUPPORTIVE + the same
+  // per-turn suffix) and the crisis reply opened with «Ας σταθούμε λίγο εδώ.», quoted «δεν θέλω να ζω άλλο» and added hotline
+  // details of its own. On a SUPPORTIVE (crisis / distress) turn none of the three notes is sent: that path stays as it was.
+  assert('SAFETY: on a SUPPORTIVE (crisis / distress) turn NONE of the three new notes is sent — the safety path stays exactly as before',
+    GEN.includes('const _notSupportive = currentMode !== "SUPPORTIVE";') &&
+    GEN.indexOf('const _notSupportive = currentMode !== "SUPPORTIVE";') < GEN.indexOf('const repeatedElementsCtx = '));
   const TRM = CODE.slice(CODE.indexOf('const deliverFinalClosure = useCallback('), CODE.indexOf('const triggerTermination = useCallback(') + 6000);
   assert('WIRING: the closing replies (Part 1, both paths, and Part 2) cannot show a second three-beat either',
     (TRM.match(/const text = stripRepeatedThreeBeat\(stripAraDeclarative\(cleanLabels\(rawText\.replace\(\/\\s\*\\\[\\\[EXIT:\(yes\|no\)\\\]\\\]\\s\*\$\/i, ""\)\)\), msgs\);/g) || []).length === 3);

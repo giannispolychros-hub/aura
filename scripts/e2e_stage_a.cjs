@@ -782,7 +782,7 @@ async function runMockOF() {
 // a line of only «"» is not shown. FT2 (Stage A) the stop moment frames the root moment: «Ναι» to its readiness question →
 // the app's root question (door 2, no model call) → the card → «Ναι» → the €6 offer, as before. FT3 (switch closed) a second
 // ΗΡΘΕΣ ΜΕ summary is not shown. FT4 the same scenario with a clear crisis statement later: the crisis line, every time, no
-// limit note, no root button. Alone: --only FT.
+// limit note and none of the new notes, no root button. Alone: --only FT.
 async function runMockFT() {
   const T = APP.texts;
   const V = [
@@ -882,6 +882,9 @@ async function runMockFT() {
       /1018/.test(body) && /112/.test(body));
     ok(`FT4 (${q ? 'switch open' : 'switch closed'}): the crisis turn goes the safety way and carries NO limit note`,
       kind === 'supportive' && !/the limit for ambiguous phrases/.test(s.dyn(s.bodies.length - 1)));
+    // SAFETY (real-model run 21, session 16): none of the three new notes rides along to the crisis prompt
+    ok(`FT4 (${q ? 'switch open' : 'switch closed'}): … and none of the new notes at all (no STOP MOMENT, no «said back») — the crisis prompt as before`,
+      !/STOP MOMENT|said back to them|risk-clarification/.test(s.dyn(s.bodies.length - 1)));
     if (q) ok('FT4 (switch open): no root button and no card after the crisis statement', await s.btn(T.button).count() === 0 && await s.btn(T.yes).count() === 0);
     await s.browser.close();
   }

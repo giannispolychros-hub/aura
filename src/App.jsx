@@ -6734,9 +6734,12 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         ? `\n[CODE-VERIFIED: ${selfRepCheck.sameQuestion ? "you have now asked the SAME CLOSING QUESTION in three consecutive replies, word for word" : `your own last 2 replies were structurally similar (${selfRepCheck.sameOpening ? "same opening phrase" : "high word overlap"})`} — this is exactly the kind of "no genuine movement" evidence that should trigger the Strategy Change pillar (see STRATEGY SWITCH TIMING/WHICH FAMILY TO SWITCH TO above), not just a wording tweak. Draw from a region of INTERVENTION SPACE you have not used yet this session.]\n`
         : '';
       // ADR «12 Οκτωβρίου» — NEW MATERIAL, STOP MOMENT, RISK CHECKS: three notes built from what was already said this session.
-      const repeatedElementsCtx = describeRepeatedElementsCtx(repeatedUserElements(msgs));
-      const stopMomentCtx = describeStopMomentCtx(countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current));
-      const riskClarificationCtx = describeRiskClarificationCtx(countRiskClarifications(msgs), ([...msgs].reverse().find(m => m.role === "user") || {}).content);
+      // SAFETY (real-model run 21, session 16): never on a SUPPORTIVE (crisis / distress) turn — the crisis prompt gets the same
+      // suffix, and with the gentle-form note the crisis reply opened with «Ας σταθούμε λίγο εδώ.». That path stays as it was.
+      const _notSupportive = currentMode !== "SUPPORTIVE";
+      const repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs)) : '';
+      const stopMomentCtx = _notSupportive ? describeStopMomentCtx(countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current)) : '';
+      const riskClarificationCtx = _notSupportive ? describeRiskClarificationCtx(countRiskClarifications(msgs), ([...msgs].reverse().find(m => m.role === "user") || {}).content) : '';
       // ROAD QUESTIONS STAND-DOWN (see gatesCtx above): this block tells the model to switch region
       // or show the map — but the map has already been shown, and a short answer to a road question
       // is an answer, not stagnation.
