@@ -199,9 +199,15 @@ assert('CLOSING: Part 2 is still told not to repeat the summary',
 // 1, 2 and 6, PRE-FLIGHT (1), REDUNDANCY CHECK 2 and DISTRESS GRADIENT Level 3, NEW MATERIAL as the fourth end-of-prompt
 // principle, and the closing question «Πες το με μία φράση: τι σου ξεκαθάρισε σήμερα;». +7026 characters, one cache
 // write, paid knowingly. See test_founder_test_1210.js.
+//
+// CHANGED AGAIN, DELIBERATELY, on 2026-10-12 (363ffc14fe7ace47 → 530e3889dfb643e2). The last round before the first tester
+// session (ADR «12 Οκτωβρίου (β)»): RISK CHECKS — the clarifying question offers the everyday meaning first, never asks the
+// user to write out harm, never opens with a stop signal; STOP MOMENT — the signal is for a realization only; three new
+// paragraphs in the same section (AFTER THE SAFETY PATH, THE ROOT IS THE USER'S IN EVERY FLOW, NO STEP BEFORE THE COACH);
+// the Level 3 pointer names the form. +1377 characters, one cache write, paid knowingly. See test_last_round_1210.js.
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 363ffc14fe7ace47…)',
-  PROMPT_SHA.slice(0, 16) === '363ffc14fe7ace47');
+assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 530e3889dfb643e2…)',
+  PROMPT_SHA.slice(0, 16) === '530e3889dfb643e2');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',

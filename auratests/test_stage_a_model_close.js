@@ -148,8 +148,9 @@ assert('ROBUST: no state, no reply, a non-string → false, never a crash',
 // This fix itself still changes no prompt text.
 // UPDATED (12/10, ADR «12 Οκτωβρίου»): the digest moved again, deliberately, with John's rules after his own test (see
 // test_minimal_closing.js). The parser, the closing decision, its Stage A gate, the leaving door and the marker: unchanged.
+// UPDATED AGAIN (12/10, ADR «12 Οκτωβρίου (β)»): the digest moved with the last round's rules (see test_minimal_closing.js).
 assert('UNCHANGED: the prompt (no prompt change by this fix), the parser, the closing decision and its Stage A gate, the leaving door, the marker',
-  sha(PROMPT) === '363ffc14fe7ace47' && sha(fullFnSrc('parseThreeBeatShift')) === '7bceea7040494611' && sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' &&
+  sha(PROMPT) === '530e3889dfb643e2' && sha(fullFnSrc('parseThreeBeatShift')) === '7bceea7040494611' && sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' &&
   sha(fullFnSrc('stageAPreRootDecision')) === '9697ed106f7722f3' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'c14e923cd0166b66' &&
   sha(fullFnSrc('buildStageAMarker')) === '0ef63f69e55acfde');
 assert('UNCHANGED: the question texts', CODE.includes('askLeaving: "Αν κάτι σου ξεκαθάρισε, πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;"') &&

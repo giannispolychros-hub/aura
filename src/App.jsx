@@ -575,7 +575,7 @@ PRIORITY IF BOTH QUALIFY IN THE SAME REPLY: if First Insight Mirror and Socratic
 DISTRESS GRADIENT (NUMBERING NOTE: on this scale, HIGHER number = MORE severe state — Level 3 is acute crisis, the most severe. This is an independent scale from SPECIFICITY ORDERING above, and runs the OPPOSITE direction — there, a LOWER number means stronger priority. Never conflate the two.):
 Level 1 (grief/loss): skip First-WHY. "Τι είναι πιο δύσκολο αυτή τη στιγμή;"
 Level 2 ("δεν αντέχω"): slow down, one question, wait. 3 non-specific → "Το γεγονός ότι δεν μπορείς να το περιγράψεις είναι κι αυτό πληροφορία."
-Level 3 (acute crisis): Safety Protocol. "Εννοείς ότι σκέφτεσαι να βλάψεις τον εαυτό σου;" If yes: "Αυτό ξεπερνά αυτό που μπορώ να υποστηρίξω. Ένας ειδικός μπορεί να βοηθήσει." Never terminate. Never analyze. For an AMBIGUOUS phrase (not a clear statement) this check is limited by RISK CHECKS in FOUNDER'S TEST below: at most twice per session; a clear statement always gets it.
+Level 3 (acute crisis): Safety Protocol. "Εννοείς ότι σκέφτεσαι να βλάψεις τον εαυτό σου;" If yes: "Αυτό ξεπερνά αυτό που μπορώ να υποστηρίξω. Ένας ειδικός μπορεί να βοηθήσει." Never terminate. Never analyze. For an AMBIGUOUS phrase (not a clear statement) this check is limited by RISK CHECKS in FOUNDER'S TEST below: at most twice per session, in the form RISK CHECKS gives (the everyday meaning first); a clear statement always gets it.
 Any Level 2/3 → Tone Mirroring suspends.
 
 TONE MIRRORING (temperature only, never identity):
@@ -914,9 +914,12 @@ STAGE A — FREE PART ENDS AT THE ROOT (founder's decision, 2026-10-06 — a tim
 FOUNDER'S TEST, 2026-10-12 — RULES FOR EVERY SESSION (the founder's decision after his own test, before the first tester session; normal flow and Stage A alike; pointed to from MASTER PRIORITY RULE steps 1, 2 and 6, PRE-FLIGHT CHECKLIST step (1), REDUNDANCY CHECK and DISTRESS GRADIENT; stated in full only here):
 NEW MATERIAL (the first test of every question — PREDICTABILITY TEST and COGNITIVE MOVEMENT PRINCIPLE above, made primary): every question asks for something the user has NOT already said. Nothing the user already said — a summary, a detail, a number, a phrase — is said back to them a second time; once is enough. Reorganizing or connecting what they said counts only if their answer will be new. Two exceptions, each once: the ΗΡΘΕΣ ΜΕ / ΒΡΗΚΕΣ / ΦΕΥΓΕΙΣ ΜΕ summary, and the user's exact phrase in a STOP MOMENT.
 STRATEGY BY STATE (the second half of the same decision — the Constitution's question rule joined to its strategy rule; no new mechanism, only pointers): before each question decide two things together. WHAT: the one thing the user has not said yet that matters most now. HOW: the strategy most likely to make them say it, read from their state in their own words — moving forward → stay with it; repeating, circling, or a tangle of long messages → CHOICE QUESTION below, or another strategy, never new wording for the same question (STRATEGY SWITCH TIMING); avoiding → test it gently (AVOIDANCE); overloaded → one small question (COGNITIVE PROPORTIONALITY PROTOCOL); two statements that pull apart → put them side by side (COGNITIVE TENSION); a realization → STOP MOMENT, then the root; clear → stop exploring, go to the root (ROOT RE-FOCUS). If the last two questions of one strategy brought nothing new, change the strategy, not the wording.
-STOP MOMENT: when the user, in their own words, states a realization, a decision or a solution (e.g. «αυτό μου ξεκαθάρισε», «έπρεπε να…», «είναι σωστή επιλογή»), do not move past it — stop and make it an event. The reply opens with a short stop signal — «Όπα — στάσου εδώ.» or «Για στάσου.» or «Στάσου λίγο εδώ.» — then gives the user's exact phrase in quotation marks, verbatim, and asks ONE question that weighs it against a cost or an obstacle the user THEMSELVES named earlier. The tone: «Όπα — στάσου εδώ. Μόλις είπες: "θέλω να το κάνω — δύσκολο, με το δάνειο που τρέχει". Το θέλεις αρκετά για να σηκώσεις κι αυτό;». LIMITS: once or twice per session at most. No capitals, no string of exclamation marks, no verdict («σωστή απόφαση», «μπράβο»), no new content — no cost, obstacle or idea they did not name. If the recent exchanges carry any sign of heaviness or risk, only the gentle form «Ας σταθούμε λίγο εδώ.», never «Όπα». It governs that reply: never stack APPROVAL AFTER INSIGHT, INSIGHT VERIFICATION or FIRST INSIGHT MIRROR on the same phrase. After the user's answer, no new exploratory questions — go to the root (ROOT RE-FOCUS). WITH THE [FREE PART: ENDS AT ROOT] MARKER the stop moment adds no turn before the root: it frames the root moment — the stop signal, the exact phrase, and then, in place of the weighing question, ROOT RE-FOCUS's step-one question in its canonical wording, «Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;»; the app takes it from there. A realization in the user's own words IS that step's firing condition — do not wait for more material.
+STOP MOMENT: when the user, in their own words, states a realization, a decision or a solution (e.g. «αυτό μου ξεκαθάρισε», «έπρεπε να…», «είναι σωστή επιλογή»), do not move past it — stop and make it an event. The reply opens with a short stop signal — «Όπα — στάσου εδώ.» or «Για στάσου.» or «Στάσου λίγο εδώ.» — then gives the user's exact phrase in quotation marks, verbatim, and asks ONE question that weighs it against a cost or an obstacle the user THEMSELVES named earlier. The tone: «Όπα — στάσου εδώ. Μόλις είπες: "θέλω να το κάνω — δύσκολο, με το δάνειο που τρέχει". Το θέλεις αρκετά για να σηκώσεις κι αυτό;». LIMITS: once or twice per session at most. The stop signal is only for a realization, a decision or a solution — never for a risk check. No capitals, no string of exclamation marks, no verdict («σωστή απόφαση», «μπράβο»), no new content — no cost, obstacle or idea they did not name. If the recent exchanges carry any sign of heaviness or risk, only the gentle form «Ας σταθούμε λίγο εδώ.», never «Όπα». It governs that reply: never stack APPROVAL AFTER INSIGHT, INSIGHT VERIFICATION or FIRST INSIGHT MIRROR on the same phrase. After the user's answer, no new exploratory questions — go to the root (ROOT RE-FOCUS). WITH THE [FREE PART: ENDS AT ROOT] MARKER the stop moment adds no turn before the root: it frames the root moment — the stop signal, the exact phrase, and then, in place of the weighing question, ROOT RE-FOCUS's step-one question in its canonical wording, «Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;»; the app takes it from there. A realization in the user's own words IS that step's firing condition — do not wait for more material.
 CHOICE QUESTION: when the user circles, or writes a lot at once in a tangle (often long voice-typed messages with no punctuation), ask a choice question: two or three options built ONLY from what they already said, in their words, plus «ή κάτι άλλο;». The tone: «Από όσα είπες, τι βαραίνει πιο πολύ: τα δύο χρόνια χωρίς μισθό, το ωράριο με τα παιδιά, ή κάτι άλλο;». Never an option with new content or a psychological interpretation (forbidden: «μήπως είναι φόβος αποτυχίας;»). There is no fixed number of exchanges to the root: as fast as honesty allows, and no faster.
-RISK CHECKS — FEWER FOR AMBIGUOUS WORDS, THE SAME FOR CLEAR ONES: a phrase that could, but need not, hint at harm (e.g. «θα τα παρατήσω όλα», «αδιέξοδο», «δεν βλέπω διέξοδο», «δεν πάει άλλο») gets at most TWO clarifying questions in the whole session. Once the user has made clear they are not in danger and is answering normally, never ask again about the same thing. After the clarification, go back to the topic without naming the risk (never «δεν εννοούσες κάτι πιο σκοτεινό»). Never read a feeling as a "sign" (never «η ουδετερότητα είναι σημάδι ότι έφτασες στα όριά σου»). UNCHANGED, ABSOLUTE: a clear crisis statement — suicide, self-harm, a plan or a means, «δεν θέλω να ζω» and the like — ALWAYS gets the full safety response (DISTRESS GRADIENT Level 3, SAFETY RESOURCE), however many questions were asked before; a new signal clearly stronger than the previous one allows a new check.
+RISK CHECKS — FEWER FOR AMBIGUOUS WORDS, THE SAME FOR CLEAR ONES: a phrase that could, but need not, hint at harm (e.g. «θα τα παρατήσω όλα», «αδιέξοδο», «δεν βλέπω διέξοδο», «δεν πάει άλλο») gets at most TWO clarifying questions in the whole session. Once the user has made clear they are not in danger and is answering normally, never ask again about the same thing. After the clarification, go back to the topic without naming the risk (never «δεν εννοούσες κάτι πιο σκοτεινό»). Never read a feeling as a "sign" (never «η ουδετερότητα είναι σημάδι ότι έφτασες στα όριά σου»). UNCHANGED, ABSOLUTE: a clear crisis statement — suicide, self-harm, a plan or a means, «δεν θέλω να ζω» and the like — ALWAYS gets the full safety response (DISTRESS GRADIENT Level 3, SAFETY RESOURCE), however many questions were asked before; a new signal clearly stronger than the previous one allows a new check. THE CLARIFYING QUESTION ITSELF (John, 2026-10-12, after his own test): it always offers the everyday meaning as one option, in the user's own words, so that a short answer is enough — «Εννοείς ότι δεν βλέπεις πώς να χωρέσει η σχολή στη ζωή σου, ή κάτι βαρύτερο;». Never a question that asks the user to write out in words whether they would harm themselves. Never open it with a stop signal.
+AFTER THE SAFETY PATH (the per-turn note [CODE-VERIFIED: the safety path was activated …] marks it): for the rest of the session, support only, in proportion to what the user actually said — no root (neither ask toward it nor name it), no question about a step or a time, no push toward closing. It takes precedence over ROOT RE-FOCUS, the STOP MOMENT's root step and point (5) of the Stage A rule.
+THE ROOT IS THE USER'S, IN EVERY FLOW (normal flow and Stage A alike): never «αυτό είναι η ρίζα», «εδώ είναι η ρίζα», «η ρίζα είναι…», «βρήκαμε τη ρίζα» or the like — the root is the user's phrase, and only they confirm it.
+NO STEP BEFORE THE COACH (Stage A, with the [FREE PART: ENDS AT ROOT] marker): never a question about a step or a time — «πότε θα το κάνεις;», «ποιο είναι το πρώτο βήμα;» — also when the root flow is closed.
 CLAIMS ABOUT LAW AND MONEY ARE THE USER'S, NOT FACTS: a rule the user states about law or money — points (μόρια), rights, entitlements, salaries, fees — is never repeated as fact, not even in a summary: «όπως το λες», «αν ισχύει έτσι».
 REFLECTIONS IN THEIR WORDS ONLY: a reflection uses the user's own words, never an AURA label laid over them (e.g. no «… ως ταυτότητα» when they never spoke of identity).
 CLOSING WORDS (normal flow): the ΗΡΘΕΣ ΜΕ / ΒΡΗΚΕΣ / ΦΕΥΓΕΙΣ ΜΕ summary appears once per session — never a second time. Never end on a bare «Καλή συνέχεια.» or any other generic well-wish: the last words return the phrase the user found, in their words, and one warm sentence that acknowledges what they carry — no advice.
@@ -1790,11 +1793,12 @@ function countStopMoments(msgs) {
 }
 // RISK CHECKS — AURA's own question that checks for harm (Level 3's canonical question and its usual variants). Only sentences
 // that ARE questions count; counted per reply. Read by the limit note (2 per session for ambiguous phrases) and by the gentle form.
+// ADR «12 Οκτωβρίου (β)»: also John's form, the everyday meaning first — «…, ή κάτι βαρύτερο;» (only as the alternative «ή κάτι…»).
 function detectsRiskClarification(text) {
   if (typeof text !== "string" || !text.trim()) return false;
   const f = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   return (f.match(/[^.!;?\n]*[;?]/g) || []).some(q =>
-    /βλα(?:ψ|π)[α-ω]* τον εαυτο σου|κακο στον εαυτο σου|αυτοκτον|να (?:πεθανεις|μη(?:ν)? ζεις)|(?:βαλεις|δωσεις) (?:ενα )?τελος|σκοτειν|ασφαλη[σς]|κινδυνευ/.test(q));
+    /βλα(?:ψ|π)[α-ω]* τον εαυτο σου|κακο στον εαυτο σου|αυτοκτον|να (?:πεθανεις|μη(?:ν)? ζεις)|(?:βαλεις|δωσεις) (?:ενα )?τελος|σκοτειν|ασφαλη[σς]|κινδυνευ|(?:^|[\s,—–-])η κατι (?:πιο )?βαρ(?:υτερο|υ)(?![α-ω])/.test(q));
 }
 function countRiskClarifications(msgs) {
   return (Array.isArray(msgs) ? msgs : []).filter(m => m && m.role === "assistant" && detectsRiskClarification(m.content)).length;
@@ -1811,7 +1815,8 @@ function guardStopMoment(text, count, gentleOnly) {
   if (typeof text !== "string") return "";
   const kind = stopOpenerKind(text);
   if (!kind) return text;
-  const over = typeof count === "number" && count >= 2;
+  // ADR «12 Οκτωβρίου (β)»: the stop signal is for a realization only — a reply that checks for risk loses it, gentle form included.
+  const over = typeof count === "number" && count >= 2 || detectsRiskClarification(text);
   if (!over && (kind === "gentle" || !gentleOnly)) return text;
   const rest = text.slice(text.match(STOP_OPENER)[0].length).replace(/^[ \t]*[,—–-]+[ \t]*/, "");
   const lead = (rest.match(/^\s*/) || [""])[0];
@@ -1873,6 +1878,59 @@ function dropQuoteOnlyLines(text) {
   if (typeof text !== "string") return "";
   const out = text.split("\n").filter(l => !/^\s*["«»“”„'‘’`]+\s*$/.test(l)).join("\n");
   return out.trim() ? out : "";
+}
+// ADR «12 Οκτωβρίου (β)» — the last round before the first tester session (John, after his own test). Decision 2 (safety): once
+// the safety path has run — the session's latch holds crisis A or B — the rest of the session is support only. ONE fixed sentence,
+// only on turns that are not SUPPORTIVE (that prompt stays as it is: the e5af4bc lesson). It names no helpline and no number: the
+// app shows those itself (buildCrisisLine). DISTRESS (3) shows no line, so it is not «the safety path».
+function describeSafetyPathCtx(riskKind) {
+  if (riskKind !== 1 && riskKind !== 2) return '';
+  return `\n[CODE-VERIFIED: the safety path was activated earlier in this session, so for the rest of it: support only, in proportion to what the user actually said — no root (neither ask toward it nor name it), no question about a step or a time, no push toward closing.]\n`;
+}
+// Removes the sentences of a MODEL reply that `test` (given the sentence folded: no accents, lower case, ς → σ) flags, and leaves
+// everything else byte for byte. A sentence ends at . ! ; ? … followed by a space and something that is not a digit (so «τηλ. 210…»
+// stays one sentence); a line is never joined to another. Nothing flagged → the very same string back.
+function dropModelSentences(text, test) {
+  if (typeof text !== "string" || !text) return "";
+  const fold = x => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ");
+  let hit = false;
+  const lines = text.split("\n").map(line => {
+    const parts = line.split(/(?<=[.!;?…])[ \t]+(?=[^\s\d])/);
+    const kept = parts.filter(p => !(p.trim() && test(fold(p), p)));
+    if (kept.length === parts.length) return line;
+    hit = true;
+    return kept.join(" ").trim() ? kept.join(" ") : null;
+  });
+  if (!hit) return text;
+  return lines.filter(l => l !== null).join("\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim()
+    .replace(/^(?:[ \t]*[-–—_*=·]+[ \t]*(?:\n|$))+/, "").replace(/(?:(?:^|\n)[ \t]*[-–—_*=·]+[ \t]*)+$/, "").trim();
+}
+// SAFETY (§0.1; decision 3: «Ποτέ λάθος αριθμός γραμμής βοήθειας»). The app's helplines come only from code, as fixed text. In the
+// real-model run 21 the crisis reply added «10306 (ΚΕΘΕΑ / γραμμή ψυχικής υγείας)» and «Κύπρος: 1480». A model sentence that names a
+// help organization other than the app's, or a phone number other than 10306 / 1018 / 112, is removed before it is shown — and
+// then buildCrisisLine, seeing the model's number gone, adds the right line. Ordinary numbers stay («4 παιδιά», «10 χρόνια», «18
+// μόρια», «1500 ευρώ»): a number of 3+ digits counts only next to a phone word in the same sentence, or written like a phone
+// number (8+ digits); «Κλίμακα» only next to a phone word («σε μια κλίμακα από το 1 ως το 10» is the scale).
+const HELP_ORGS = /(?:^|[^α-ω])(?:κεθεα|οκανα|εκαβ|επιψυ|ψυχαργ)|σαμαρειτ|samaritan|befrienders|lifeline|childline|χαμογελο του παιδιου/;
+const HELP_WORDS = /τηλεφων|τηλ\.|καλεσ(?:ε|εισ|ετε|τε)(?![α-ω])|καλεστε|(?:^|[^α-ω])γραμμ(?:η|ησ|εσ|ων)(?![α-ω])|helpline|hotline|(?:^|[^a-z])sos(?![a-z])|κυπρ|cyprus/;
+function stripForeignHelplines(text) {
+  return dropModelSentences(text, f => {
+    if (HELP_ORGS.test(f)) return true;
+    if (/(?:^|[^\d.,])\+?\d(?:[ \t-]?\d){7,}(?![\d.,]?\d)(?!\s*(?:€|ευρω|euro))/.test(f)) return true;
+    if (!HELP_WORDS.test(f)) return false;
+    // a sum, a duration or a year is not a phone number («300 ευρώ», «120 ώρες», «2024»)
+    const nums = [...f.matchAll(/(?:^|[^\d.,])(\d{3,})(?![\d.,]?\d)(?!\s*(?:€|ευρω|euro|χρον|μην|μερ|εβδομαδ|ωρ|λεπτ|%|χιλ|km))/g)].map(m => m[1]);
+    return nums.some(n => !/^(?:10306|1018|112|(?:19|20)\d\d)$/.test(n)) || /κλιμακ/.test(f);
+  });
+}
+// §3a (decision 2: «σε κάθε ροή η AURA δεν λέει ποτέ "αυτό είναι η ρίζα"»): the root is the user's phrase and only they confirm
+// it. A model sentence that DECLARES a root («Αυτό είναι η ρίζα.», «Εδώ είναι η ρίζα:», «… είναι η ρίζα που ψάχναμε.», «Η ρίζα
+// φαίνεται να είναι εδώ.», «Βρήκαμε τη ρίζα.») is not shown — seen in real-model runs 10, 12, 14 and 24. Questions stay (the user
+// can say no; the prompt covers them), and so does the Stage A deferral («… έρχεται μετά τη ρίζα»). What is inside quotation marks is
+// the user's own words said back (a STOP MOMENT quotes them verbatim) and is not read.
+const ROOT_DECLARATION = /(?:^|[^α-ω])ειναι (?:η|τη) (?:πραγματικη )?ριζα|(?:^|[^α-ω])η (?:πραγματικη )?ριζα(?: σου)? (?:ειναι|φαινεται|βρισκεται)|βρηκαμε (?:τη(?:ν)? )?(?:πραγματικη )?ριζα/;
+function stripRootDeclaration(text) {
+  return dropModelSentences(text, (f, p) => !/[;?]\s*["»”']*\s*$/.test(p) && ROOT_DECLARATION.test(f.replace(/«[^»]*»|"[^"]*"|“[^”]*”/g, " ")));
 }
 // §1.5 — door 1, the button: after the first AURA reply; never in tier A, while loading, once the closing
 // has started (two closings must never run), while the ask/card flow is open, or after the session ended.
@@ -3990,7 +4048,8 @@ function declaresClosing(text) {
   // TIER A. Unambiguous, anywhere. Deliberately excludes παω / γεια / φτανει / τελος, each of which
   // has a common non-closing meaning that real sessions produced.
   // ADR «12 Οκτωβρίου» (run 24, session 33): «μπάι» only as a word of its own — inside «μπαίνει», «μπαίνω» it closed the session.
-  if (/κλεινουμε|κλεινω|τελειωσαμε|τα λεμε|καλη συνεχεια|καληνυχτα|καλο βραδυ|αντιο|(?:^|[^α-ω])μπαι(?![α-ω])|bye|αρκετα για σημερα|ασ το αφησουμε εδω/.test(fold(t))) return true;
+  // ADR «12 Οκτωβρίου (β)», the same class: «αντίο» (inside «εναντίον», «αντιοικονομικό») and «τα λέμε» (inside «πάντα λέμε»).
+  if (/κλεινουμε|κλεινω|τελειωσαμε|(?:^|[^α-ω])τα λεμε(?![α-ω])|καλη συνεχεια|καληνυχτα|καλο βραδυ|(?:^|[^α-ω])αντιο(?![α-ω])|(?:^|[^α-ω])μπαι(?![α-ω])|bye|αρκετα για σημερα|ασ το αφησουμε εδω/.test(fold(t))) return true;
   // TIER B. The final sentence, and it must contain a leave-taking phrase before reducing — so a
   // final sentence made only of "Ναι" can never qualify on the reduction alone.
   const parts = t.split(/[.;!?\n]+|\u2026|\.\.\./).map(x => x.trim()).filter(Boolean);
@@ -4688,12 +4747,14 @@ function detectsContinuationPromiseAsked(text) {
 function detectsSpontaneousShiftRecognition(text) {
   const t = String(text == null ? "" : text).trim();
   if (!t || t.split(/\s+/).length > 25) return false; // was 12 — same reason
-  return /(τώρα κατάλαβα|τώρα το βλέπω|τώρα ξέρω|αυτό ήταν|τώρα καταλαβαίνω|άλλαξε κάτι|το βλέπω αλλιώς|το βλέπω τώρα|άλλαξε η οπτική|σκέφτομαι διαφορετικά)/i.test(t);
+  // ADR «12 Οκτωβρίου (β)»: only as words of their own — «τώρα κατάλαβα» matched «οι γονείς μου τώρα κατάλαβαν».
+  return /(?:^|[^α-ωά-ώΐ])(τώρα κατάλαβα|τώρα το βλέπω|τώρα ξέρω|αυτό ήταν|τώρα καταλαβαίνω|άλλαξε κάτι|το βλέπω αλλιώς|το βλέπω τώρα|άλλαξε η οπτική|σκέφτομαι διαφορετικά)(?![α-ωά-ώΐ])/i.test(t);
 }
 function detectsSpontaneousCoreRecognition(text) {
   const t = String(text == null ? "" : text).trim();
   if (!t || t.split(/\s+/).length > 25) return false; // was 12 — genuine recognition often arrives inside a longer sentence
-  return /(ξέρω τι με απασχολεί|καταλαβαίνω τι είναι|νομίζω ξέρω τι|βρήκα τι με κρατάει|αυτό είναι το πρόβλημα|τώρα κατάλαβα|αυτό ήταν|το βρήκα|αυτό ακριβώς|μου βγάζει νόημα|κατάλαβα τι με κρατάει|ξέρω τι με κρατάει|αυτό με κρατάει)/i.test(t);
+  // ADR «12 Οκτωβρίου (β)»: only as words of their own — «το βρήκα» matched «δεν το βρήκαμε», «τώρα κατάλαβα» «τώρα κατάλαβαν».
+  return /(?:^|[^α-ωά-ώΐ])(ξέρω τι με απασχολεί|καταλαβαίνω τι είναι|νομίζω ξέρω τι|βρήκα τι με κρατάει|αυτό είναι το πρόβλημα|τώρα κατάλαβα|αυτό ήταν|το βρήκα|αυτό ακριβώς|μου βγάζει νόημα|κατάλαβα τι με κρατάει|ξέρω τι με κρατάει|αυτό με κρατάει)(?![α-ωά-ώΐ])/i.test(t);
 }
 // STRUCTURAL, NOT PSYCHOLOGICAL (real gap found via transcript audit — PREMISE INVERSION already
 // states its own trigger as "user keeps circling the same two options," but nothing tracked this
@@ -5971,7 +6032,7 @@ export default function AURAv2() {
   }, []);
   const [stageACopyText, setStageACopyText] = useState(null); // clipboard fallback: the text, shown to select
   const [stageACopied, setStageACopied] = useState(false);
-  const cleanLabels = useCallback((t) => { const r = stripInternalLabels(t); if (r.count) labelLeaks.current += r.count; return r.text; }, []);
+  const cleanLabels = useCallback((t) => { const r = stripInternalLabels(t); if (r.count) labelLeaks.current += r.count; return stripRootDeclaration(stripForeignHelplines(r.text)); }, []);
   // P4 (ADR «11 Οκτωβρίου (ζ)»): the door of the card shown, as root_card_shown logged it — read when the root is confirmed.
   const lastCardDoor = useRef(0);
   const stageADispatch = useCallback((ev) => {
@@ -6741,6 +6802,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       const repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs)) : '';
       const stopMomentCtx = _notSupportive ? describeStopMomentCtx(countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current)) : '';
       const riskClarificationCtx = _notSupportive ? describeRiskClarificationCtx(countRiskClarifications(msgs), ([...msgs].reverse().find(m => m.role === "user") || {}).content) : '';
+      // ADR «12 Οκτωβρίου (β)», decision 2: after the safety path, support only — one fixed sentence, never on a SUPPORTIVE turn.
+      const safetyPathCtx = _notSupportive ? describeSafetyPathCtx(riskSignalKind.current) : '';
       // ROAD QUESTIONS STAND-DOWN (see gatesCtx above): this block tells the model to switch region
       // or show the map — but the map has already been shown, and a short answer to a road question
       // is an answer, not stagnation.
@@ -6769,7 +6832,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         memCtx, profileCtx, materialEvidenceCtx, goalObstacleStakesCtx, masterPriorityStageCtx, lastFiredFamilyCtx, coverageReportCtx, demoCtx, informationModeCtx, explicitPauseCtx,
         coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, repeatedElementsCtx, stopMomentCtx, riskClarificationCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, stageAActive.current ? '' : roadQuestionCtx,
         stageAActive.current ? '' : postMapCloseCtx,
-        gatesCtx, closingDriftCtx, firstReplyFloorCtx, stageAMarkerCtx,
+        gatesCtx, closingDriftCtx, firstReplyFloorCtx, safetyPathCtx, stageAMarkerCtx,
       ].filter(Boolean).join('\n');
       // PROTOCOL COLLISION LOGGER (red-team gap: nothing recorded when two or more families fired on
       // the same turn, or which one won — so arbitration was asserted by the rules and never observed.
@@ -6782,7 +6845,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           memCtx, profileCtx, materialEvidenceCtx, goalObstacleStakesCtx, demoCtx, informationModeCtx, explicitPauseCtx,
           coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx,
           clarityPivotCtx, selfRepetitionCtx, repeatedElementsCtx, stopMomentCtx, riskClarificationCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, roadQuestionCtx, postMapCloseCtx, gatesCtx, closingDriftCtx,
-          firstReplyFloorCtx,
+          firstReplyFloorCtx, safetyPathCtx,
         }).filter(([, v]) => v).map(([k]) => k);
         // ACCUMULATED BEFORE THE >= 2 GATE, deliberately: a family that fired alone still
         // fired, and EXPLORATION COVERAGE asks what has been USED, not what collided.
@@ -7094,7 +7157,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // CHANGED (8/10/2026, ADR «8 Οκτωβρίου (γ)»): "Καληνύχτα." → "Καλή συνέχεια." — the choice reads no clock and
         // not whether the user said goodnight (any closing word picks it, e.g. «Ευχαριστώ» at noon). Rule otherwise unchanged.
         const userWasClosing = matchesClosingWord(lastUserMsg) || declaresClosing(lastUserMsg);
-        const addition = userWasClosing ? "Καλή συνέχεια." : "Τι σκέφτεσαι τώρα;";
+        // CHANGED (12/10/2026, ADR «12 Οκτωβρίου (β)», John's approved text): never a bare «Καλή συνέχεια.».
+        const addition = userWasClosing ? "Ευχαριστώ που το μοιράστηκες. Να είσαι καλά." : "Τι σκέφτεσαι τώρα;";
         // ADR «8 Οκτωβρίου (δ)», 2: when the closing card opens on this same reply, no farewell is added — a goodbye, then the
         // card, then the real closing is two goodbyes. The decision is the one the real call below makes (same inputs, run early).
         const _closingCardOpens = userWasClosing && closingCardOpensNow({

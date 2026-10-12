@@ -161,9 +161,11 @@ const SHORT = JOHN.slice(0, 4); // two user messages so far
   function isBare(t) { return T('isBareEmojiOrAcknowledgment', t) === true; }
   const at = GEN.indexOf('if (isBareEmojiOrAcknowledgment(displayText)) {');
   const blk = at >= 0 ? GEN.slice(at, GEN.indexOf('// EXPLICIT STYLE PREFERENCE', at)) : '';
+  // UPDATED (12/10/2026, ADR «12 Οκτωβρίου (β)», John's approved text): the closing sentence is «Ευχαριστώ που το μοιράστηκες. Να είσαι
+  // καλά.», never a bare «Καλή συνέχεια.»; the rule around it is unchanged.
   assert('2: wiring — the rule itself is as before: the closing check, the two sentences',
     blk.includes('const userWasClosing = matchesClosingWord(lastUserMsg) || declaresClosing(lastUserMsg);') &&
-    blk.includes('const addition = userWasClosing ? "Καλή συνέχεια." : "Τι σκέφτεσαι τώρα;";'));
+    blk.includes('const addition = userWasClosing ? "Ευχαριστώ που το μοιράστηκες. Να είσαι καλά." : "Τι σκέφτεσαι τώρα;";'));
   assert('2: wiring — only when the user was closing, the same decision as the real call (this reply, the model signal), supportive → none',
     // UPDATED (10/10, ADR «10 Οκτωβρίου», 1): the same decision now passes through the pre-root gate.
     /const _closingCardOpens = userWasClosing && closingCardOpensNow\(\{/.test(blk) && /decision: stageAPreRootDecision\(currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{/.test(blk) &&

@@ -110,7 +110,7 @@ assert('A: the gate after the reply is still there (second closing → old closi
   /if \(stageALeavingDoorOpens\(\{\s*active: stageAActive\.current, decision,/.test(GEN));
 assert('A: the old closing itself is unchanged (decideTermination, the T1/T2 detectors byte for byte)',
   sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && sha(extractBlock('function isExplicitClosure(')) === '09da70474755ef40' &&
-  sha(extractBlock('function declaresClosing(')) === 'bf6a7b3a8d25cff7' && sha(extractBlock('function matchesClosingWord(')) === 'c3d044cc974bb7ac'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24)
+  sha(extractBlock('function declaresClosing(')) === 'c8dbd762e16c97a7' && sha(extractBlock('function matchesClosingWord(')) === 'c3d044cc974bb7ac'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24); again (ADR «12 Οκτωβρίου (β)»): «αντίο», «τα λέμε» too
 assert('A: the gate function itself is unchanged', sha(extractBlock('function stageALeavingDoorOpens(')) === 'c14e923cd0166b66' && // UPDATED (8/10): + !detectSafetySignal(u), ADR «8 Οκτωβρίου (β)», 4
   
   /\(isExplicitClosure\(u\) \|\| declaresClosing\(u\)\);/.test(extractBlock('function stageALeavingDoorOpens(') || ''));

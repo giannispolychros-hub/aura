@@ -124,7 +124,7 @@ assert('B: the gate does not use the T1 detector (matchesClosingWord) or a new d
   const sha = n => hash(extractBlock('function ' + n + '('));
   assert('B: T1/T2 unchanged — decideTermination, matchesClosingWord, isExplicitClosure, declaresClosing are byte-identical to before',
     hash(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && sha('matchesClosingWord') === 'c3d044cc974bb7ac' &&
-    sha('isExplicitClosure') === '09da70474755ef40' && sha('declaresClosing') === 'bf6a7b3a8d25cff7'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24)
+    sha('isExplicitClosure') === '09da70474755ef40' && sha('declaresClosing') === 'c8dbd762e16c97a7'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24); again (ADR «12 Οκτωβρίου (β)»): «αντίο», «τα λέμε» too
 }
 
 // ── C: second time → the normal closing ──────────────────────────────────────

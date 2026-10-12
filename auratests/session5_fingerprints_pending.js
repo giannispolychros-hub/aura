@@ -194,8 +194,9 @@ assert('ADVICE_LEAKAGE (RED — the gap): detectsUnsourcedOptionOffer SHOULD fla
 //                        CHECK BEFORE ADDING (prompt text) exists but is scoped to a DIFFERENT
 //                        moment (right after the three-beat shift specifically), not this one.
 // UPDATED (8/10/2026, ADR «8 Οκτωβρίου (γ)»): the closing choice now reads "Καλή συνέχεια." instead of "Καληνύχτα.".
+// UPDATED AGAIN (12/10/2026, ADR «12 Οκτωβρίου (β)», John's approved text): "Ευχαριστώ που το μοιράστηκες. Να είσαι καλά.".
 characterize('PREMATURE_CLOSURE: the bare-emoji override contains no check-in step, only the two hardcoded sentence choices',
-  /const addition = userWasClosing \? "Καλή συνέχεια\." : "Τι σκέφτεσαι τώρα;";/.test(raw) &&
+  /const addition = userWasClosing \? "Ευχαριστώ που το μοιράστηκες\. Να είσαι καλά\." : "Τι σκέφτεσαι τώρα;";/.test(raw) &&
   !/(θέλεις να συνεχίσουμε|θέλεις να προσθέσεις)/i.test(raw.slice(raw.indexOf('isBareEmojiOrAcknowledgment(displayText)'), raw.indexOf('isBareEmojiOrAcknowledgment(displayText)') + 1200)));
 characterize('PREMATURE_CLOSURE: CHECK BEFORE ADDING exists but is scoped to the three-beat moment specifically, not the bare-emoji path',
   /CHECK BEFORE ADDING, right after the three-beat shift/.test(raw));
@@ -254,8 +255,9 @@ assert('EXIT_SWALLOWS_LOOP (PINNED, watch for future coupling): decideTerminatio
 // UPDATED (8/10/2026, ADR «8 Οκτωβρίου (γ)»): the bare-emoji override's half of this fingerprint is closed — its closing
 // literal is now "Καλή συνέχεια.", which names no time of day (it still reads no clock, and needs none). The model's own
 // free text can still say "Καληνύχτα"; that half is unchanged (prompt-level, not touched).
-characterize('TEMPORAL_HALLUCINATION: the bare-emoji override no longer names a time of day ("Καλή συνέχεια.", no "Καληνύχτα." literal)',
-  /const addition = userWasClosing \? "Καλή συνέχεια\." : "Τι σκέφτεσαι τώρα;";/.test(raw) && !/const addition = userWasClosing \? "Καληνύχτα\."/.test(raw));
+// UPDATED (12/10/2026, ADR «12 Οκτωβρίου (β)»): now «Ευχαριστώ που το μοιράστηκες. Να είσαι καλά.» — still no time of day.
+characterize('TEMPORAL_HALLUCINATION: the bare-emoji override no longer names a time of day («Ευχαριστώ που το μοιράστηκες. Να είσαι καλά.», no "Καληνύχτα." literal)',
+  /const addition = userWasClosing \? "Ευχαριστώ που το μοιράστηκες\. Να είσαι καλά\." : "Τι σκέφτεσαι τώρα;";/.test(raw) && !/const addition = userWasClosing \? "Καληνύχτα\."/.test(raw));
 
 // ── FINGERPRINT: LANGUAGE_QUALITY ────────────────────────────────────────────────────────────
 // SIGNAL:               LANGUAGE_QUALITY

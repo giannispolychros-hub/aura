@@ -111,8 +111,10 @@ assert('MAIN PATH: built from the switch read once per visit',
   /const stageAMarkerCtx = buildStageAMarker\(stageAActive\.current\);/.test(CODE));
 const SUFFIX = (CODE.match(/const dynamicSuffix = \[([\s\S]*?)\]\.filter\(Boolean\)/) || ['', ''])[1];
 assert('MAIN PATH: the marker is in the per-turn suffix (uncached block)', /stageAMarkerCtx/.test(SUFFIX));
+// UPDATED (12/10/2026, ADR «12 Οκτωβρίου (β)»): the safety-path note (after a crisis, support only) joins the hard-constraint tier,
+// right before the marker; the marker stays LAST.
 assert('MAIN PATH: and it is LAST — the hard-constraint tier, highest attention',
-  /firstReplyFloorCtx,\s*stageAMarkerCtx,?\s*$/.test(SUFFIX.trim()));
+  /firstReplyFloorCtx,\s*safetyPathCtx,\s*stageAMarkerCtx,?\s*$/.test(SUFFIX.trim()));
 assert('FIRST-WHY: the entry reply carries the marker too',
   /buildFirstWhyFloor\(\), buildStageAMarker\(stageAActive\.current\)\]\.filter\(Boolean\)/.test(CODE));
 assert('MISFIRE RECOVERY: the recovery reply carries the marker too',

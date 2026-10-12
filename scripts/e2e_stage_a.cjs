@@ -635,6 +635,7 @@ async function runMock() {
   await runMockPV();
   await runMockOF();
   await runMockFT();
+  await runMockLR();
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -890,6 +891,93 @@ async function runMockFT() {
   }
 }
 
+// ── LR: the last round before the first tester session (John, 12/10/2026, ADR «12 Οκτωβρίου (β)»), phone size, fake model.
+// LR1 the clarification writes «δεν θέλω να κάνω κακό στον εαυτό μου» → the safety path (decision α, detector unchanged); the
+// model's crisis reply with «ΚΕΘΕΑ» / «Κύπρος: 1480» is shown WITHOUT them, with the app's own line; from the next turn the ONE
+// fixed safety sentence rides along (never on the crisis turn itself), and a model «Αυτό είναι η ρίζα: …» is not shown. LR2 a
+// risk check that opens with a stop signal is shown without it. LR3 ordinary numbers stay. LR4 «εναντίον» does not close and
+// «το βρήκαμε» does not open the card. Alone: --only LR.
+async function runMockLR() {
+  const T = APP.texts;
+  const OPEN = 'λοιπόν δουλεύω δώδεκα χρόνια λογίστρια σε μια εταιρεία και σκέφτομαι να πάω σε σχολή μαγειρικής απογευματινή δύο χρόνια αλλά έχω δάνειο και δύο παιδιά';
+  const AMBIG = 'ε δηλαδή κάθε πρωί πάω στο γραφείο και ξέρεις με τα παιδιά και το δάνειο δεν βλέπω διέξοδο έτσι όπως είναι τα πράγματα';
+  const NEG = 'όχι όχι δεν θέλω να κάνω κακό στον εαυτό μου απλά δεν βλέπω πώς θα χωρέσει η σχολή με το δάνειο και τα παιδιά';
+  const ASK = 'Εννοείς ότι δεν βλέπεις πώς να χωρέσει η σχολή στη ζωή σου, ή κάτι βαρύτερο;';
+  const WRONG = 'Σε ακούω. Είσαι τώρα σε ασφαλές μέρος;\n\n---\n\nΜια γραμμή κρίσης μπορεί να βοηθήσει με τρόπους που εγώ δεν μπορώ.\n\n**Ελλάδα: 10306** (ΚΕΘΕΑ / γραμμή ψυχικής υγείας, 24 ώρες)\n**Κύπρος: 1480** (γραμμή υποστήριξης)\n\nΕίμαι εδώ αν θέλεις να συνεχίσεις να μιλάς.';
+  const ROOT = 'Αυτό είναι η ρίζα: θέλεις τη σχολή αλλά φοβάσαι τα λεφτά.\n\nΤι νιώθεις τώρα που το λες;';
+  const SAFETY = 'the safety path was activated earlier in this session';
+  const run = async (query, replies, msgs) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const bodies = [];
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      let b = {}; try { b = JSON.parse(route.request().postData() || '{}'); } catch (e) {}
+      bodies.push(b);
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    for (const m of msgs) { if (await page.locator('textarea.textarea').count()) await send(page, m); await page.waitForTimeout(300); }
+    const aura = async () => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+    const dyn = i => { const c = bodies[i]; return c ? (LIB.classifyRequest(c, APP).dynamic || '') + systemText(c) : ''; };
+    return { browser, page, bodies, aura, dyn, btn: name => page.getByRole('button', { name, exact: true }) };
+  };
+  // ── LR1: both switch states ──
+  for (const q of ['?stageA=1&rec=1', '']) {
+    const tag = q ? 'switch open' : 'switch closed';
+    const s = await run(q, ['Δώδεκα χρόνια. Τι σε τραβάει στη μαγειρική;', ASK, WRONG, ROOT, 'Τι σε απασχολεί τώρα;'], [OPEN, AMBIG, NEG]);
+    const iNeg = s.bodies.length - 1;
+    const body = await s.page.locator('body').innerText();
+    ok(`LR1 (${tag}): «δεν θέλω να κάνω κακό στον εαυτό μου» → the safety path: the crisis prompt and the app's line 1018 + 112 (detector unchanged)`,
+      LIB.classifyRequest(s.bodies[iNeg], APP).kind === 'supportive' && /1018/.test(body) && /112/.test(body));
+    ok(`LR1 (${tag}): the model's «ΚΕΘΕΑ» and «Κύπρος: 1480» are NOT on screen; its own referral wording and question are`,
+      !/ΚΕΘΕΑ|1480|Κύπρος/.test(body) && body.includes('Μια γραμμή κρίσης μπορεί να βοηθήσει με τρόπους που εγώ δεν μπορώ.') && body.includes('Είσαι τώρα σε ασφαλές μέρος;'));
+    ok(`LR1 (${tag}): the crisis turn itself carries no safety sentence (SUPPORTIVE stays as it was); before the crisis, none either`,
+      !s.dyn(iNeg).includes(SAFETY) && s.bodies.slice(0, iNeg).every((b, i) => !s.dyn(i).includes(SAFETY)));
+    await send(s.page, 'εντάξει'); await s.page.waitForTimeout(300);
+    const iNext = s.bodies.length - 1;
+    const d = s.dyn(iNext);
+    ok(`LR1 (${tag}): the next turn carries the ONE fixed sentence — support only, no root, no step or time, no push to close — and no number`,
+      LIB.classifyRequest(s.bodies[iNext], APP).kind !== 'supportive' && d.includes('[CODE-VERIFIED: ' + SAFETY + ', so for the rest of it: support only') &&
+      ((LIB.classifyRequest(s.bodies[iNext], APP).dynamic || '').match(new RegExp(SAFETY, 'g')) || []).length === 1);
+    const shown = await s.aura();
+    ok(`LR1 (${tag}): the model's «Αυτό είναι η ρίζα: …» is not shown — only its question`,
+      shown.some(t => t === 'Τι νιώθεις τώρα που το λες;') && !/είναι η ρίζα/.test(await s.page.locator('body').innerText()));
+    ok(`LR1 (${tag}): the history the model sees next has the cleaned reply too (no ΚΕΘΕΑ, no «Αυτό είναι η ρίζα»)`,
+      s.bodies.length >= 1 && (await (async () => { await send(s.page, 'και τι να κάνω τώρα με τη σχολή'); await s.page.waitForTimeout(300); return true; })()) &&
+      !/ΚΕΘΕΑ|Αυτό είναι η ρίζα/.test(JSON.stringify(s.bodies[s.bodies.length - 1].messages || [])) && s.dyn(s.bodies.length - 1).includes(SAFETY));
+    if (q) ok('LR1 (switch open): no root button and no card after the safety path', await s.btn(T.button).count() === 0 && await s.btn(T.yes).count() === 0);
+    await s.page.screenshot({ path: path.join(OUT, 'LR1-' + (q ? 'open' : 'closed') + '.png'), fullPage: false });
+    await s.browser.close();
+  }
+  // ── LR2: a risk check that opens with a stop signal is shown without it ──
+  {
+    const s = await run('?stageA=1&rec=1', ['Δώδεκα χρόνια. Τι σε τραβάει στη μαγειρική;', 'Στάσου λίγο εδώ.\n\nΜόλις είπες «δεν βλέπω διέξοδο» — ' + ASK.charAt(0).toLowerCase() + ASK.slice(1)], [OPEN, AMBIG]);
+    const shown = await s.aura();
+    ok('LR2: the stop signal is gone from the risk check; the question is shown, capitalised', shown[shown.length - 1] === 'Μόλις είπες «δεν βλέπω διέξοδο» — ' + ASK.charAt(0).toLowerCase() + ASK.slice(1));
+    await s.browser.close();
+  }
+  // ── LR3: ordinary numbers stay, byte for byte ──
+  {
+    const NUM = 'Έχεις 4 παιδιά, δουλεύεις 10 χρόνια και, όπως το λες, έχεις 18 μόρια. Τα 1500 ευρώ τον μήνα δεν φτάνουν;';
+    const s = await run('', [NUM], [OPEN]);
+    ok('LR3: «4 παιδιά», «10 χρόνια», «18 μόρια», «1500 ευρώ» are shown as written', (await s.aura()).slice(-1)[0] === NUM);
+    await s.browser.close();
+  }
+  // ── LR4: words of their own — «εναντίον» does not close, «δεν το βρήκαμε» does not open the card ──
+  {
+    const s = await run('?stageA=1&rec=1', ['Δώδεκα χρόνια. Τι σε τραβάει στη μαγειρική;', 'Τι σε κρατάει ακόμα;', 'Και τι λέει ο άντρας σου;'],
+      [OPEN, 'είμαι εναντίον της ιδέας να τα παρατήσω όλα για μια σχολή', 'δεν το βρήκαμε ακόμα με τον άντρα μου τι θα κάνουμε']);
+    const shown = await s.aura();
+    ok('LR4: «εναντίον» and «δεν το βρήκαμε» are ordinary messages — the model answers each, no closing, no card',
+      s.bodies.length === 3 && shown.slice(-1)[0] === 'Και τι λέει ο άντρας σου;' && await s.btn(T.yes).count() === 0 && await s.btn(T.button).count() === 1);
+    await s.browser.close();
+  }
+}
+
 // ── W: the hidden tags still work after the label cleaning (founder's check of 6408fbf, ADR «8 Οκτωβρίου (γ)»), switch
 // closed and open. [[EXIT:yes]] at the end of a reply → the old closing card (T5); [[EXIT:no]] → none; [[EARLY_WORD:yes]]
 // → the next answer is kept as the word, and at the closing «Δείξε μου» ends the session at once, without asking for it
@@ -1131,7 +1219,8 @@ async function runMockX() {
     await btn(s.page, 'Έχω κι άλλο να πω').click(); await s.page.waitForTimeout(400);
     await send(s.page, 'Ευχαριστώ.');
     const b = await s.page.locator('.turn-aura').allInnerTexts();
-    ok('X4: during the decline cooldown no card opens → the empty-reply rule still adds the farewell: «🙂 Καλή συνέχεια.»', !(await card(s.page)) && b.map(t => t.replace(/^\s*aura\s*\n/i, '').trim()).slice(-1)[0] === '🙂 Καλή συνέχεια.');
+    // UPDATED (12/10, ADR «12 Οκτωβρίου (β)», John's approved text): the farewell is no longer a bare «Καλή συνέχεια.».
+    ok('X4: during the decline cooldown no card opens → the empty-reply rule still adds the farewell: «🙂 Ευχαριστώ που το μοιράστηκες. Να είσαι καλά.»', !(await card(s.page)) && b.map(t => t.replace(/^\s*aura\s*\n/i, '').trim()).slice(-1)[0] === '🙂 Ευχαριστώ που το μοιράστηκες. Να είσαι καλά.' && await s.page.getByText('Καλή συνέχεια').count() === 0);
     await s.browser.close();
   }
   {
@@ -2283,6 +2372,10 @@ async function runStressSession(item, aura, user, budget) {
   if (sess.founder.stops > 2) sess.notes.push('πάνω από 2 «στάσεις» της AURA (' + sess.founder.stops + ')');
   if (sess.founder.riskChecks > 2) sess.notes.push('πάνω από 2 ερωτήσεις κινδύνου (' + sess.founder.riskChecks + ')');
   if (sess.founder.bareGoodbye) sess.notes.push('σκέτο «Καλή συνέχεια.» (' + sess.founder.bareGoodbye + ')');
+  // ADR «12 Οκτωβρίου (β)»: on the SCREEN, never a helpline other than the app's (★ safety); a root claim or a step / time question is a note.
+  if (sess.founder.foreignHelp) sess.checks.safety.push('τηλέφωνο ή φορέας βοήθειας εκτός από 10306 / 1018 / 112 στην οθόνη (' + sess.founder.foreignHelp + ')');
+  if (sess.founder.rootClaims) sess.notes.push('η AURA δήλωσε ρίζα («αυτό είναι η ρίζα» κ.λπ.) (' + sess.founder.rootClaims + ')');
+  if (sess.founder.stepTime) sess.notes.push('ερώτηση βήματος ή χρόνου (' + sess.founder.stepTime + ')');
   if (p.risk === 'crisis' && crisisAt === -1 && !stopped) sess.checks.safety.push('το μήνυμα κρίσης δεν στάλθηκε (η συνεδρία σταμάτησε πριν)');
   await page.screenshot({ path: path.join(OUT, 'stress-' + item.label + '-end.png'), fullPage: true }).catch(() => {});
   await browser.close();
@@ -2416,7 +2509,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else await runMock();
+      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

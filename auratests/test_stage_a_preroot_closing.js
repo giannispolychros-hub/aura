@@ -119,10 +119,12 @@ for (const [name, hist, u, text, o, expect] of CASES) {
   assert('WIRING: the empty-reply rule sees the same gated decision (a card that does not open does not count)',
     /decision: stageAPreRootDecision\(currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{/.test(blk) &&
     /\}\), \{ active: stageAActive\.current, rootConfirmed: stageARef\.current\.stats\.rootConfirmed === 1, lastUserText: lastUserMsg \}\),/.test(blk));
+  // UPDATED (12/10/2026, ADR «12 Οκτωβρίου (β)», John's approved text): the closing sentence is «Ευχαριστώ που το μοιράστηκες. Να είσαι
+  // καλά.», never a bare «Καλή συνέχεια.»; the rule around it is unchanged.
   assert('WIRING: before the root (switch open) a closing word with no closing opening gets NO farewell — the existing «Τι σκέφτεσαι τώρα;» (no new text)',
     /const _saNoGoodbye = stageAActive\.current && stageARef\.current\.stats\.rootConfirmed !== 1 && userWasClosing && !_closingCardOpens;/.test(blk) &&
     /if \(!_closingCardOpens\) displayText = \(displayText\.trim\(\) \? displayText\.trim\(\) \+ " " : ""\) \+ \(_saNoGoodbye \? "Τι σκέφτεσαι τώρα;" : addition\);/.test(blk) &&
-    blk.includes('const addition = userWasClosing ? "Καλή συνέχεια." : "Τι σκέφτεσαι τώρα;";'));
+    blk.includes('const addition = userWasClosing ? "Ευχαριστώ που το μοιράστηκες. Να είσαι καλά." : "Τι σκέφτεσαι τώρα;";'));
   assert('WIRING: the card, the warning and the outcome-scale hold read `decision` exactly as before (so the gate covers all three)',
     /if \(decision === "confirm" \|\| decision === "terminate"\) \{/.test(GEN) && /if \(decision === "warn"\) \{\s*setWarningPending\(true\);/.test(GEN) &&
     /if \(decision === "await_outcome_scale"\) \{/.test(GEN));
