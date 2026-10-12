@@ -2288,7 +2288,7 @@ function stressUserReal(budget) {
         output_config: { effort: 'low', format: { type: 'json_schema', schema } },
       });
     } catch (e) {
-      return { error: e instanceof Anthropic.APIError ? 'HTTP ' + (e.status || '?') : 'σφάλμα σύνδεσης' };
+      return { error: e instanceof Anthropic.APIError ? SL.apiErrorLabel(e.status, e.message) : 'σφάλμα σύνδεσης' };
     }
     const cost = budget.add(r.usage, 'user');
     if (r.stop_reason === 'refusal') return { refusal: true, cost };

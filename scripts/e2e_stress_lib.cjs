@@ -394,6 +394,11 @@ function findFarewells(text) { const f = fold(text); return FAREWELLS.filter(w =
 // φτάσαμε ακόμα», «πριν φύγεις πρέπει…», «μη φύγεις»). Δική του λίστα, ανεξάρτητη από τον φύλακα της εφαρμογής: ελέγχει την ΟΘΟΝΗ.
 const LEAVING = /ευχαριστ|κλεινουμε|κλεινω|φευγω|πρεπει να φυγω|τα λεμε|αντιο|καληνυχτα|(?:^|[^α-ω])μπαι(?![α-ω])|bye|θα το σκεφτω|σταματαμε|τελειωσαμε|αρκετα για σημερα/;
 function isLeaving(text) { return LEAVING.test(fold(text)); }
+// Run 28 (12/10/2026): the simulated user and the judge got «HTTP 400» mid-run, with no way to tell why. The SDK's message is
+// still NEVER written anywhere; only this one fact is derived from it: the account ran out of credit.
+function apiErrorLabel(status, message) {
+  return 'HTTP ' + (status || '?') + (/credit balance|billing|purchase credits/i.test(String(message || '')) ? ' (τελείωσε το υπόλοιπο του λογαριασμού στο Anthropic)' : '');
+}
 function pressureFindings(text) {
   const out = [];
   const f = fold(text).replace(/«[^»]*»|"[^"]*"/g, ' ');
@@ -629,6 +634,6 @@ function buildStressReport(sessions, meta) {
 module.exports = {
   USER_MODEL, PRICES, BUDGET_CAP, WORST_CALL, costOf, makeStressBudget, PERSONAS, HARD_PERSONAS, FOUNDER_PERSONAS, founderMetrics, BASE_POLICY, policyOf, planRuns, MAX_TYPED, EXIT_AFTER, EXIT_TEXT,
   USER_SCHEMA, CARD_SCHEMA, CLARITY_SCHEMA, personaSystem, personaPrompt, transcriptText, parseJsonReply, cleanUserText, JUDGE_SCHEMA, JUDGE_SYSTEM, judgePrompt,
-  fold, findLabels, FAREWELLS, findFarewells, isLeaving, pressureFindings, edTechniqueFindings, aiIdentityFindings, promptTexts, normCorpus, promptLeakFindings, preRootClosingChecked, normalizeVerbatim, rootIsUserWords, rootQuestionUnderModelQuestion,
+  fold, findLabels, FAREWELLS, findFarewells, isLeaving, pressureFindings, apiErrorLabel, edTechniqueFindings, aiIdentityFindings, promptTexts, normCorpus, promptLeakFindings, preRootClosingChecked, normalizeVerbatim, rootIsUserWords, rootQuestionUnderModelQuestion,
   ADVICE_VIOLATIONS, violationType, lastSessionEvents, telemetryIssues, estimateCost, CHECKS, sessionScore, buildStressReport, keyShape, KEY_KIND_TEXT,
 };
