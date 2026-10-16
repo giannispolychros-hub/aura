@@ -1585,10 +1585,11 @@ async function runMockX() {
     const calls0 = s.calls.length;
     if (P.id === 'door 1 without substance' || P.id === 'correction without substance') {
       await s.page.waitForTimeout(900); // the smooth scroll
-      const vis = await s.page.evaluate(() => { const t = [...document.querySelectorAll('.warning-text')].find(e => /Γράψ' το λίγο/.test(e.innerText)); const inp = document.querySelector('.input-area');
+      // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): the retry line is found by the app's own text (John's longer text of 16/10)
+      const vis = await s.page.evaluate(retry => { const t = [...document.querySelectorAll('.warning-text')].find(e => e.innerText.trim() === retry); const inp = document.querySelector('.input-area');
         const lastU = [...document.querySelectorAll('.turn-user')].pop();
         const r = el => el ? el.getBoundingClientRect() : null; const a = r(t), b = r(inp), u = r(lastU);
-        return a && b && u ? { retryAboveInput: a.bottom <= b.top + 1, bubbleOnScreen: u.top >= 0 && u.bottom <= innerHeight } : null; });
+        return a && b && u ? { retryAboveInput: a.bottom <= b.top + 1, bubbleOnScreen: u.top >= 0 && u.bottom <= innerHeight } : null; }, T.retry);
       ok(`X5 «${P.id}»: on a phone screen the retry line is fully above the input box and the new bubble is on screen (the screen scrolled to it)`, !!vis && vis.retryAboveInput && vis.bubbleOnScreen);
     }
     ok(`X5 «${P.id}»: the user's message is on screen as a bubble`, nBubbles >= 1 && (await userBubbles(s.page)).includes(P.text));
