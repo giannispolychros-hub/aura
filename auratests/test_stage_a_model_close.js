@@ -154,7 +154,8 @@ assert('UNCHANGED: the prompt (no prompt change by this fix), the parser, the cl
   sha(PROMPT) === '51cb2a83305f605b' && sha(fullFnSrc('parseThreeBeatShift')) === '7bceea7040494611' && sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' &&
   sha(fullFnSrc('stageAPreRootDecision')) === '9697ed106f7722f3' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'f33ed155faa93145' && // UPDATED (δ): the leaving door no longer reads the decision
   sha(fullFnSrc('buildStageAMarker')) === '0ef63f69e55acfde');
-assert('UNCHANGED: the question texts', CODE.includes('askLeaving: "Αν κάτι σου ξεκαθάρισε, πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;"') &&
+// UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 for the same question.
+assert('UNCHANGED: the question texts', CODE.includes('askLeaving: "Πριν φύγεις: αν κάτι ξεκαθάρισε, γράψ\' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;"') &&
   CODE.includes('back: "Δεν το βρήκα ακόμα, συνέχισε"'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

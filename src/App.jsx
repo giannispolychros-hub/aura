@@ -1629,27 +1629,30 @@ function buildStageAMarker(active) {
 const STAGE_A_TEXTS = {
   button: "Νομίζω βρήκα τι με απασχολεί",
   ask: "Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;",
-  askLeaving: "Αν κάτι σου ξεκαθάρισε, πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;",
+  askLeaving: "Πριν φύγεις: αν κάτι ξεκαθάρισε, γράψ' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;",
   back: "Δεν το βρήκα ακόμα, συνέχισε",
   knewLabel: "Τι ήξερες",
   foundLabel: "Τι βρήκες",
   yes: "Ναι, αυτό είναι",
   correct: "Διόρθωσε",
   correctAsk: "Γράψε τη ρίζα όπως θα την έλεγες εσύ, ολόκληρη.",
-  retry: "Γράψ' το λίγο πιο ολοκληρωμένα",
+  retry: "Πες το λίγο πιο ολοκληρωμένα — όπως θα το έλεγες σε έναν φίλο.",
   cardLine: "Με το \"Ναι\" ολοκληρώνεται το δωρεάν κομμάτι και σου δείχνω το επόμενο.",
   cardLineRisk: "Με το \"Ναι\" ολοκληρώνεται αυτό το κομμάτι.",
-  // endSecond: only with a risk signal now (B / DISTRESS) — unchanged there. The normal case: endDone … price (ADR «11 Οκτωβρίου (η)»).
+  // endSecond: only with a risk signal now (B / DISTRESS) — unchanged there. The normal case: endYours … endKeep (ADR «16 Οκτωβρίου (β)»).
   endSecond: "Το πρώτο βήμα κάθε προβλήματος είναι ο πραγματικός ορισμός του — και τον βρήκες εσύ, χωρίς συμβουλές.",
-  endDone: "Το πρώτο μισό έγινε: βρήκες τι πραγματικά ρωτάς — εσύ, χωρίς συμβουλές.",
-  endCoach: "Στο AURA Coach συνεχίζουμε από αυτή τη φράση σου και φεύγεις με τρία πράγματα, γραμμένα με τα δικά σου λόγια:",
-  endItem1: "· τι ακριβώς έχεις να αποφασίσεις,",
-  endItem2: "· τι κερδίζεις και τι χάνεις σε κάθε δρόμο,",
-  endItem3: "· ένα μικρό πρώτο βήμα για να το δοκιμάσεις στην πράξη — και πότε.",
-  price: "AURA Coach · €6, μία φορά. Όχι συνδρομή.",
+  endYours: "Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή.",
+  endDone: "Το πρώτο μισό έγινε: ξέρεις πια τι πραγματικά ρωτάς.",
+  endNext: "Μένει το δεύτερο: και τώρα;",
+  endCoach: "Στο AURA Coach ξεκινάμε από αυτή ακριβώς τη φράση σου. Φεύγεις με τρία πράγματα, γραμμένα με τα δικά σου λόγια:",
+  endItem1: "· τι ακριβώς έχεις να αποφασίσεις",
+  endItem2: "· τι κερδίζεις και τι χάνεις σε κάθε δρόμο",
+  endItem3: "· ένα μικρό πρώτο βήμα για να το δοκιμάσεις — και πότε",
+  price: "€6, μία φορά. Όχι συνδρομή.",
+  endKeep: "Κι αν όχι τώρα, αυτό που βρήκες είναι ήδη δικό σου.",
   wantMore: "Θέλω να συνεχίσω",
   notNow: "Όχι τώρα",
-  notReady: "Το AURA Coach δεν είναι ακόμα έτοιμο.",
+  notReady: "Σε ευχαριστώ. Το AURA Coach δεν είναι ακόμα έτοιμο — δεν χρεώθηκες τίποτα. Η απάντησή σου θα καθορίσει τι θα φτιαχτεί πρώτο:",
   helpQ: "Τι θα σε βοηθούσε περισσότερο τώρα;",
   help1: "Να δω καθαρά τι ακριβώς έχω να αποφασίσω",
   help2: "Να δω τι κερδίζω και τι χάνω σε κάθε δρόμο",
@@ -1737,7 +1740,7 @@ function rootTextHasSubstance(text) {
 // ADR «12 Οκτωβρίου (γ)» (John: when the app is not sure, it does not decide alone): an answer to the app's root question that only
 // says «I don't know» («Δεν ξέρω», «Δεν ξέρω ακόμα», «Δεν ξέρω τι με απασχολεί», «Δεν είμαι σίγουρη», «Δεν μπορώ να το πω») is not a
 // root. ADR «12 Οκτωβρίου (δ)» (John): it counts as «Δεν το βρήκα ακόμα» and the conversation goes on through the model — never
-// «Γράψ' το λίγο πιο ολοκληρωμένα», which stays for answers that try to say a root but are too short. «Δεν ξέρω αν θέλω να μείνω
+// the retry («Πες το λίγο πιο ολοκληρωμένα…», before 16/10 «Γράψ' το…»), which stays for answers that try to say a root but are too short. «Δεν ξέρω αν θέλω να μείνω
 // στη δουλειά» says something: a root.
 function rootAnswerIsUnsure(text) {
   if (typeof text !== "string") return false;
@@ -1753,11 +1756,13 @@ function sameAsRootText(a, b) {
 }
 // §2.1 — the app's text after «Ναι». «Τι βρήκες» is ALWAYS WHOLE (ADR «6 Οκτωβρίου (στ)», 1). With a risk
 // signal of tier B or DISTRESS only the first two lines, as before: nothing about Coach or price. The normal case is John's
-// text of 11/10 (ADR «11 Οκτωβρίου (η)»): the root first, then what the Coach gives, then the price.
+// text of 16/10 (ADR «16 Οκτωβρίου (β)»): the root first, in «», then what the Coach gives, then the price; "" is a blank line.
 function buildRootEndLines(found, riskOffer) {
-  const root = `Η ρίζα σου: "${String(found || "").trim()}".`;
-  if (riskOffer) return [root, STAGE_A_TEXTS.endSecond];
-  return [root, STAGE_A_TEXTS.endDone, STAGE_A_TEXTS.endCoach, STAGE_A_TEXTS.endItem1, STAGE_A_TEXTS.endItem2, STAGE_A_TEXTS.endItem3, STAGE_A_TEXTS.price];
+  const f = String(found || "").trim();
+  if (riskOffer) return [`Η ρίζα σου: "${f}".`, STAGE_A_TEXTS.endSecond];
+  return [`«${f}»`, STAGE_A_TEXTS.endYours, "", STAGE_A_TEXTS.endDone, STAGE_A_TEXTS.endNext, "",
+    STAGE_A_TEXTS.endCoach, STAGE_A_TEXTS.endItem1, STAGE_A_TEXTS.endItem2, STAGE_A_TEXTS.endItem3, "",
+    STAGE_A_TEXTS.price, STAGE_A_TEXTS.endKeep];
 }
 function buildRootCardLine(riskOffer) {
   return riskOffer ? STAGE_A_TEXTS.cardLineRisk : STAGE_A_TEXTS.cardLine;
@@ -2109,7 +2114,7 @@ function stageAStep(state, ev) {
       if (s.phase) return s;
       reach(1);
       return next({ phase: "ask", door: 2, leaving: false, retry: false });
-    // ADR «11 Οκτωβρίου (β)» — the model's own closing summary before the root: door 1's question («Αν κάτι σου ξεκαθάρισε…»)
+    // ADR «11 Οκτωβρίου (β)» — the model's own closing summary before the root: door 1's question («Πριν φύγεις: αν κάτι ξεκαθάρισε…»; before 16/10 «Αν κάτι σου ξεκαθάρισε…»)
     // instead. The card it may open is door 5. It does not use up the leaving door: the user's own first exit still meets it.
     case "modelClose":
       if (s.phase) return s;
@@ -8810,7 +8815,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                 Είμαι τεχνητή νοημοσύνη. Δεν σου λέω τι να κάνεις πριν βρεις τι πραγματικά ρωτάς.
               </div>
               <div style={{fontSize:"13px",color:"#8a8680",lineHeight:1.6,marginBottom:"18px",textAlign:"left"}}>
-                Δεν χρειάζεται να το έχεις καθαρό. Γράψ' το όπως είναι.
+                Γράψε ό,τι σε απασχολεί, όπως έρχεται. Μπερδεμένο είναι μια χαρά.
               </div>
               <button onClick={()=>{setIntroChoice("direct");setSessionStarted(true);recordTelemetry("session_started");setTimeout(()=>textareaRef.current?.focus(),50);}}
                 style={{display:"block",width:"100%",background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.35)",color:"rgba(201,168,76,0.85)",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",cursor:"pointer",borderRadius:"4px"}}>
@@ -8833,7 +8838,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
 
         {/* ── Header ── */}
         <header className="header" style={{flexDirection:"column",alignItems:"flex-end",gap:"2px",paddingBottom:"6px"}}>
-          <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"18px",fontWeight:300,color:"#d8d4cc",letterSpacing:".04em",lineHeight:1.4,textAlign:"right"}}>We find the question that matters.<br /><span style={{fontSize:"14px",color:"#8a8680"}}>Nothing else.</span></span>
+          <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"18px",fontWeight:300,color:"#d8d4cc",letterSpacing:".04em",lineHeight:1.4,textAlign:"right"}}>Βρίσκουμε την ερώτηση που&nbsp;μετράει.<br /><span style={{fontSize:"14px",color:"#8a8680"}}>Τίποτα άλλο.</span></span>
           <div className="header-right">
             {/* Lens is invisible — no indicator shown to user */}
             {safetyMode && (
@@ -9503,7 +9508,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                     textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
                   }, 300);
                 }}
-                placeholder={messages.length === 0 ? "Γράψε κάτι για να ξεκινήσουμε..." : "Γράψε..."}
+                placeholder={messages.length === 0 ? "Γράψ' το όπως έρχεται…" : "Γράψε..."}
                 rows={5}
                 disabled={loading}
                 enterKeyHint="send"

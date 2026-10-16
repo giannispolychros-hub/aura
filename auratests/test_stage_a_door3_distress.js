@@ -62,8 +62,9 @@ const SUB = CODE.slice(CODE.indexOf('const handleSubmit = useCallback('), CODE.i
 const GEN = CODE.slice(CODE.indexOf('const generateResponse = useCallback('), CODE.indexOf('const handleSubmit = useCallback('));
 
 // ── 2: the new text ──────────────────────────────────────────────────────────
+// UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 for door 4.
 assert('2: the door at the first closing — the new text, exactly',
-  T.askLeaving === 'Αν κάτι σου ξεκαθάρισε, πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;');
+  T.askLeaving === "Πριν φύγεις: αν κάτι ξεκαθάρισε, γράψ' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;");
 assert('2: the old «Πριν φύγεις:» text is gone from the code (the closing word question «Πριν φύγεις — …» is another text and stays)',
   !CODE.includes('Πριν φύγεις: πες το με μία φράση') && T.word === 'Πριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.');
 assert('2: the door 1 question and «Δεν το βρήκα ακόμα» are unchanged',

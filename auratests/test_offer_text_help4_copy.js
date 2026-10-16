@@ -62,27 +62,35 @@ const UI = CODE.slice(CODE.indexOf('{/* STAGE A UI — BEGIN */}'), CODE.indexOf
 
 // ── 1: the text after «Ναι» ─────────────────────────────────────────────────
 const ROOT = 'Φοβάμαι ότι αν φύγω θα απογοητεύσω τον πατέρα μου.';
+// UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 replaces the 11/10 one (test_texts_1610.js); the risk text is unchanged.
 const JOHN = [
-  `Η ρίζα σου: "${ROOT}".`,
-  'Το πρώτο μισό έγινε: βρήκες τι πραγματικά ρωτάς — εσύ, χωρίς συμβουλές.',
-  'Στο AURA Coach συνεχίζουμε από αυτή τη φράση σου και φεύγεις με τρία πράγματα, γραμμένα με τα δικά σου λόγια:',
-  '· τι ακριβώς έχεις να αποφασίσεις,',
-  '· τι κερδίζεις και τι χάνεις σε κάθε δρόμο,',
-  '· ένα μικρό πρώτο βήμα για να το δοκιμάσεις στην πράξη — και πότε.',
-  'AURA Coach · €6, μία φορά. Όχι συνδρομή.',
+  `«${ROOT}»`,
+  'Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή.',
+  '',
+  'Το πρώτο μισό έγινε: ξέρεις πια τι πραγματικά ρωτάς.',
+  'Μένει το δεύτερο: και τώρα;',
+  '',
+  'Στο AURA Coach ξεκινάμε από αυτή ακριβώς τη φράση σου. Φεύγεις με τρία πράγματα, γραμμένα με τα δικά σου λόγια:',
+  '· τι ακριβώς έχεις να αποφασίσεις',
+  '· τι κερδίζεις και τι χάνεις σε κάθε δρόμο',
+  '· ένα μικρό πρώτο βήμα για να το δοκιμάσεις — και πότε',
+  '',
+  '€6, μία φορά. Όχι συνδρομή.',
+  'Κι αν όχι τώρα, αυτό που βρήκες είναι ήδη δικό σου.',
 ];
+const RISK_ROOT = `Η ρίζα σου: "${ROOT}".`;
 {
   const L = T('buildRootEndLines', ROOT, false);
-  assert('END: exactly John\'s seven lines, in his order, character for character', Array.isArray(L) && L.length === 7 && L.every((x, k) => x === JOHN[k]));
-  assert('END: «Η ρίζα σου» is the FIRST line (what the phone shows first)', Array.isArray(L) && L[0].startsWith('Η ρίζα σου: "'));
+  assert('END: exactly John\'s lines, in his order, character for character', Array.isArray(L) && L.length === JOHN.length && L.every((x, k) => x === JOHN[k]));
+  assert('END: the root is the FIRST line (what the phone shows first)', Array.isArray(L) && L[0] === `«${ROOT}»`);
   assert('END: the root is whole, never cut (a long root of 400 characters)',
-    (() => { const long = 'Δεν ξέρω '.repeat(44).trim(); const x = T('buildRootEndLines', long, false); return x[0] === `Η ρίζα σου: "${long}".`; })());
-  assert('END: the price line says one payment and no subscription', TX.price === 'AURA Coach · €6, μία φορά. Όχι συνδρομή.');
+    (() => { const long = 'Δεν ξέρω '.repeat(44).trim(); const x = T('buildRootEndLines', long, false); return x[0] === `«${long}»`; })());
+  assert('END: the price line says one payment and no subscription', TX.price === '€6, μία φορά. Όχι συνδρομή.');
   assert('END: the old sentences are gone from the normal text («Το πρώτο βήμα κάθε προβλήματος…», «Το επόμενο ερώτημα είναι…»)',
     Array.isArray(L) && !/Το πρώτο βήμα κάθε προβλήματος|Το επόμενο ερώτημα είναι/.test(L.join('\n')) && !/Το επόμενο ερώτημα είναι/.test(CODE));
   const R = T('buildRootEndLines', ROOT, true);
   assert('RISK (B / DISTRESS): UNCHANGED — the root and «Το πρώτο βήμα κάθε προβλήματος…», nothing about Coach or price',
-    Array.isArray(R) && R.length === 2 && R[0] === JOHN[0] &&
+    Array.isArray(R) && R.length === 2 && R[0] === RISK_ROOT &&
     R[1] === 'Το πρώτο βήμα κάθε προβλήματος είναι ο πραγματικός ορισμός του — και τον βρήκες εσύ, χωρίς συμβουλές.' && !/Coach|€|συνδρομή/.test(R.join(' ')));
   assert('SAME LOGIC: «Ναι» still writes these lines as one message marked as the end; the buttons are the same two',
     CODE.includes('content: buildRootEndLines(stageARef.current.found, _riskOffer).join("\\n"), msgMode: "STAGE_A", stageAEnd: true }') &&

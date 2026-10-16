@@ -57,7 +57,8 @@ function region(startMarker, endMarker) {
 
 // ── (α) ENTRY SCREEN: the AI disclosure ──────────────────────────────────────
 const AI_LINE = 'Είμαι τεχνητή νοημοσύνη. Δεν σου λέω τι να κάνεις πριν βρεις τι πραγματικά ρωτάς.';
-const INVITE = "Δεν χρειάζεται να το έχεις καθαρό. Γράψ' το όπως είναι.";
+// UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's line of 16/10 in the place of the old one.
+const INVITE = 'Γράψε ό,τι σε απασχολεί, όπως έρχεται. Μπερδεμένο είναι μια χαρά.';
 const ENTRY = visible(region('{messages.length === 0 && !sessionStarted && introChoice === null && (', 'setIntroChoice("direct")'));
 assert('ENTRY: the entry screen was located', ENTRY.length > 50);
 assert('ENTRY: it states, word for word, that the person is talking to an AI', ENTRY.includes(AI_LINE));

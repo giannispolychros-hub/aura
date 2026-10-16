@@ -64,20 +64,24 @@ const APPROVED = {
   yes: 'Ναι, αυτό είναι',
   correct: 'Διόρθωσε',
   correctAsk: 'Γράψε τη ρίζα όπως θα την έλεγες εσύ, ολόκληρη.',
-  retry: "Γράψ' το λίγο πιο ολοκληρωμένα",
+  retry: 'Πες το λίγο πιο ολοκληρωμένα — όπως θα το έλεγες σε έναν φίλο.', // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»)
   cardLine: 'Με το "Ναι" ολοκληρώνεται το δωρεάν κομμάτι και σου δείχνω το επόμενο.',
   cardLineRisk: 'Με το "Ναι" ολοκληρώνεται αυτό το κομμάτι.',
   endSecond: 'Το πρώτο βήμα κάθε προβλήματος είναι ο πραγματικός ορισμός του — και τον βρήκες εσύ, χωρίς συμβουλές.',
   // UPDATED (11/10, ADR «11 Οκτωβρίου (η)»): John's new text after «Ναι» (endSecond stays, risk case only); endThird is gone.
-  endDone: 'Το πρώτο μισό έγινε: βρήκες τι πραγματικά ρωτάς — εσύ, χωρίς συμβουλές.',
-  endCoach: 'Στο AURA Coach συνεχίζουμε από αυτή τη φράση σου και φεύγεις με τρία πράγματα, γραμμένα με τα δικά σου λόγια:',
-  endItem1: '· τι ακριβώς έχεις να αποφασίσεις,',
-  endItem2: '· τι κερδίζεις και τι χάνεις σε κάθε δρόμο,',
-  endItem3: '· ένα μικρό πρώτο βήμα για να το δοκιμάσεις στην πράξη — και πότε.',
-  price: 'AURA Coach · €6, μία φορά. Όχι συνδρομή.',
+  // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 — endYours, endNext, endKeep are new; the rest reworded.
+  endYours: 'Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή.',
+  endDone: 'Το πρώτο μισό έγινε: ξέρεις πια τι πραγματικά ρωτάς.',
+  endNext: 'Μένει το δεύτερο: και τώρα;',
+  endCoach: 'Στο AURA Coach ξεκινάμε από αυτή ακριβώς τη φράση σου. Φεύγεις με τρία πράγματα, γραμμένα με τα δικά σου λόγια:',
+  endItem1: '· τι ακριβώς έχεις να αποφασίσεις',
+  endItem2: '· τι κερδίζεις και τι χάνεις σε κάθε δρόμο',
+  endItem3: '· ένα μικρό πρώτο βήμα για να το δοκιμάσεις — και πότε',
+  price: '€6, μία φορά. Όχι συνδρομή.',
+  endKeep: 'Κι αν όχι τώρα, αυτό που βρήκες είναι ήδη δικό σου.',
   wantMore: 'Θέλω να συνεχίσω',
   notNow: 'Όχι τώρα',
-  notReady: 'Το AURA Coach δεν είναι ακόμα έτοιμο.',
+  notReady: 'Σε ευχαριστώ. Το AURA Coach δεν είναι ακόμα έτοιμο — δεν χρεώθηκες τίποτα. Η απάντησή σου θα καθορίσει τι θα φτιαχτεί πρώτο:', // UPDATED (16/10)
   // UPDATED (11/10, ADR «11 Οκτωβρίου (η)», 2): the new one-tap question and its four options.
   helpQ: 'Τι θα σε βοηθούσε περισσότερο τώρα;',
   help1: 'Να δω καθαρά τι ακριβώς έχω να αποφασίσω',
@@ -170,15 +174,17 @@ assert('SAME: empty never equal', F.sameAsRootText('', '') === false && F.sameAs
 const FOUND = 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά. Και ότι το αναβάλλω χρόνια επειδή δεν θέλω να το παραδεχτώ ούτε στον εαυτό μου, πόσο μάλλον σε εκείνον, που πίστεψε σε μένα από την αρχή και πλήρωσε τις σπουδές μου.';
 const L = F.buildRootEndLines(FOUND, false) || [];
 // UPDATED (11/10, ADR «11 Οκτωβρίου (η)»): seven lines — the root, then John's six lines.
-assert('END: seven lines in the normal case', L.length === 7);
-assert('END: line 1 is «Η ρίζα σου: "{τι βρήκες}".» with the WHOLE text (no cut, decision «(στ)» 1)',
-  L[0] === 'Η ρίζα σου: "' + FOUND + '".');
-assert('END: lines 2–7 are the approved texts, in order', L[1] === APPROVED.endDone && L[2] === APPROVED.endCoach && L[3] === APPROVED.endItem1 &&
-  L[4] === APPROVED.endItem2 && L[5] === APPROVED.endItem3 && L[6] === APPROVED.price);
+// UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 — thirteen lines, three of them blank; the root in «».
+assert('END: thirteen lines in the normal case', L.length === 13);
+assert('END: line 1 is «{τι βρήκες}» with the WHOLE text (no cut, decision «(στ)» 1)', L[0] === '«' + FOUND + '»');
+assert('END: then the approved texts, in order, with a blank line between the parts', L[1] === APPROVED.endYours && L[2] === '' &&
+  L[3] === APPROVED.endDone && L[4] === APPROVED.endNext && L[5] === '' && L[6] === APPROVED.endCoach && L[7] === APPROVED.endItem1 &&
+  L[8] === APPROVED.endItem2 && L[9] === APPROVED.endItem3 && L[10] === '' && L[11] === APPROVED.price && L[12] === APPROVED.endKeep);
 const LR = F.buildRootEndLines(FOUND, true) || [];
-assert('END (risk B/DISTRESS): only the first two lines', LR.length === 2 && LR[0] === L[0] && LR[1] === APPROVED.endSecond);
+assert('END (risk B/DISTRESS): only the first two lines, as before 16/10', LR.length === 2 && LR[0] === 'Η ρίζα σου: "' + FOUND + '".' && LR[1] === APPROVED.endSecond);
 assert('END (risk): nothing about Coach or price', !/Coach|€/.test(LR.join(' ')));
-assert('END: the found text is trimmed of outer spaces only', (F.buildRootEndLines('  φόβος  ', false) || [])[0] === 'Η ρίζα σου: "φόβος".');
+assert('END: the found text is trimmed of outer spaces only', (F.buildRootEndLines('  φόβος  ', false) || [])[0] === '«φόβος»' &&
+  (F.buildRootEndLines('  φόβος  ', true) || [])[0] === 'Η ρίζα σου: "φόβος".');
 assert('CARD LINE: normal', F.buildRootCardLine(false) === APPROVED.cardLine);
 assert('CARD LINE: risk B/DISTRESS', F.buildRootCardLine(true) === APPROVED.cardLineRisk);
 

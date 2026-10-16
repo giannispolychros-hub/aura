@@ -13,7 +13,7 @@
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
-// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W | X | Y | Z (μόνο μία ενότητα)
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W | X | Y | Z | … | R4 | TX (μόνο μία ενότητα)
 // ΣΤΡΕΣ ΤΕΣΤ (Μέρος Β, 10/10): --stress (ψεύτικα, κόστος 0) · --stress --real --dry (σχέδιο + εκτίμηση) · --stress --real --yes (ΠΡΑΓΜΑΤΙΚΟ,
 //   όριο --budget έως $25, προεπιλογή $25) · --sessions 14,15,1 (μόνο αυτοί) · --minutes 75 (καμία νέα συνεδρία μετά). Τρέχει και από το
 //   GitHub (.github/workflows/stress.yml): η αναφορά γράφεται και στη σελίδα της εκτέλεσης. Δες την ενότητα «ΣΤΡΕΣ ΤΕΣΤ» πιο κάτω.
@@ -120,7 +120,8 @@ async function runMock() {
     const callsBefore = calls.length;
     // Phone test 6/10: a reply without substance must not become the root.
     await send(page, 'Περίπου δηλαδή');
-    ok('A: «Περίπου δηλαδή» is NOT accepted as a root — the app asks for more, no card', await page.getByText("Γράψ' το λίγο πιο ολοκληρωμένα").count() === 1 && await page.getByRole('button', { name: 'Ναι, αυτό είναι' }).count() === 0);
+    // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): the retry text is read from the app (John's text of 16/10; checked word for word in TX)
+    ok('A: «Περίπου δηλαδή» is NOT accepted as a root — the app asks for more, no card', await page.getByText(APP.texts.retry).count() === 1 && await page.getByRole('button', { name: 'Ναι, αυτό είναι' }).count() === 0);
     await send(page, 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.');
     ok('A: the answer is NOT sent to the model', calls.length === callsBefore);
     ok('A: the card shows «Τι βρήκες» verbatim', await page.getByText('«Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.»').count() === 1);
@@ -132,7 +133,7 @@ async function runMock() {
     await page.getByRole('button', { name: 'Διόρθωσε' }).click();
     ok('A: the correction asks for the whole root', await page.getByText('Γράψε τη ρίζα όπως θα την έλεγες εσύ, ολόκληρη.').count() === 1);
     await send(page, 'Περίπου δηλαδή');
-    ok('A: «Περίπου δηλαδή» as a correction is refused and the previous root is kept', await page.getByText("Γράψ' το λίγο πιο ολοκληρωμένα").count() === 1 && await page.getByText('«Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.»').count() === 1);
+    ok('A: «Περίπου δηλαδή» as a correction is refused and the previous root is kept', await page.getByText(APP.texts.retry).count() === 1 && await page.getByText('«Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.»').count() === 1);
     await send(page, 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.');
     // A SHORT phone screen, where the end text does not fit — the case the founder saw (the previous code left
     // «Η ρίζα σου» about 90px ABOVE the screen at this size).
@@ -140,17 +141,17 @@ async function runMock() {
     await page.getByRole('button', { name: 'Ναι, αυτό είναι' }).click();
     await page.waitForTimeout(900);
     { const top = await page.evaluate(() => { const el = document.querySelector('[data-stage-a-end="1"]'); return el ? el.getBoundingClientRect().top : null; });
-      ok('A: after «Ναι», on a short phone screen, «Η ρίζα σου» is visible at the top (not scrolled away for the price)', top !== null && top >= 0 && top < 250); }
+      ok('A: after «Ναι», on a short phone screen, the root line is visible at the top (not scrolled away for the price)', top !== null && top >= 0 && top < 250); }
     await page.setViewportSize({ width: 400, height: 860 });
     await page.screenshot({ path: path.join(OUT, 'stageA-2b-after-yes.png'), fullPage: false });
-    ok('A: «Η ρίζα σου» line with the whole root', await page.getByText('Η ρίζα σου: "Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.".').count() === 1);
-    // UPDATED (11/10, ADR «11 Οκτωβρίου (η)»): John's new text after «Ναι»; the whole text is checked in section OF
-    ok('A: price line', await page.getByText('AURA Coach · €6, μία φορά. Όχι συνδρομή.').count() === 1);
+    // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 — the root in «», then the offer; the whole text is checked in OF and TX
+    ok('A: the root line with the whole root', await page.locator('[data-stage-a-end="1"]').getByText('«Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.»', { exact: true }).count() === 1);
+    ok('A: price line', await page.getByText('€6, μία φορά. Όχι συνδρομή.', { exact: true }).count() === 1);
     ok('A: offer buttons', await page.getByRole('button', { name: 'Θέλω να συνεχίσω' }).count() === 1 && await page.getByRole('button', { name: 'Όχι τώρα' }).count() === 1);
     ok('A: copy / download available after «Ναι»', await page.getByRole('button', { name: 'Αντίγραψε τη ρίζα' }).count() === 1 && await page.getByRole('button', { name: 'Κατέβασε τη ρίζα' }).count() === 1);
     await page.screenshot({ path: path.join(OUT, 'stageA-3-offer.png'), fullPage: true });
     await page.getByRole('button', { name: 'Θέλω να συνεχίσω' }).click();
-    ok('A: not-ready text + the one-tap question', await page.getByText('Το AURA Coach δεν είναι ακόμα έτοιμο.').count() === 1 && await page.getByText('Τι θα σε βοηθούσε περισσότερο τώρα;').count() === 1);
+    ok('A: not-ready text + the one-tap question', await page.getByText(APP.texts.notReady, { exact: true }).count() === 1 && await page.getByText('Τι θα σε βοηθούσε περισσότερο τώρα;').count() === 1);
     await page.screenshot({ path: path.join(OUT, 'stageA-4-notready.png'), fullPage: false });
     await page.getByRole('button', { name: 'Να βρω ένα μικρό βήμα για να το δοκιμάσω στην πράξη' }).click();
     ok('A: clarity question with 10 buttons', await page.getByText('Τώρα, πόσο ξεκάθαρο είναι ποιο ακριβώς είναι το πρόβλημα, από το 1 έως το 10;').count() === 1 && await page.getByRole('button', { name: '10', exact: true }).count() === 1);
@@ -224,8 +225,11 @@ async function runMock() {
     await page.waitForTimeout(300);
     ok('D: only the first two lines — no Coach, no price, no offer buttons',
       // UPDATED (11/10, ADR «11 Οκτωβρίου (η)»): the risk text is unchanged; none of the new Coach lines, no price
-      await page.getByText('AURA Coach · €6', { exact: false }).count() === 0 && await page.getByRole('button', { name: 'Θέλω να συνεχίσω' }).count() === 0 &&
+      // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): none of John's 16/10 offer lines either; the root line as before («Η ρίζα σου: "…".»)
+      await page.getByText('€6', { exact: false }).count() === 0 && await page.getByRole('button', { name: 'Θέλω να συνεχίσω' }).count() === 0 &&
       await page.getByText('Το πρώτο μισό έγινε', { exact: false }).count() === 0 && await page.getByText('Όχι συνδρομή', { exact: false }).count() === 0 &&
+      await page.getByText('Αυτό το βρήκες εσύ', { exact: false }).count() === 0 && await page.getByText('Κι αν όχι τώρα', { exact: false }).count() === 0 &&
+      await page.getByText('Η ρίζα σου: "Ότι δεν έχω επιτρέψει στον εαυτό μου να πενθήσει τη μητέρα μου.".', { exact: true }).count() === 1 &&
       await page.getByText('Το πρώτο βήμα κάθε προβλήματος είναι ο πραγματικός ορισμός του — και τον βρήκες εσύ, χωρίς συμβουλές.').count() === 1);
     ok('D: straight to the clarity question', await page.getByText('Τώρα, πόσο ξεκάθαρο είναι ποιο ακριβώς είναι το πρόβλημα, από το 1 έως το 10;').count() === 1);
     await browser.close();
@@ -276,7 +280,7 @@ async function runMock() {
     await send(page, 'Ευχαριστώ.');
     const before = calls.length;
     await send(page, 'Η αμφιβολία');
-    ok('F2: «Η αμφιβολία» is not a root (asks for more)', await page.getByText("Γράψ' το λίγο πιο ολοκληρωμένα").count() === 1 && await page.getByRole('button', { name: 'Ναι, αυτό είναι' }).count() === 0);
+    ok('F2: «Η αμφιβολία» is not a root (asks for more)', await page.getByText(APP.texts.retry).count() === 1 && await page.getByRole('button', { name: 'Ναι, αυτό είναι' }).count() === 0);
     await send(page, 'Φοβάμαι την απόρριψη');
     ok('F2: «Φοβάμαι την απόρριψη» is a root → the card, nothing sent to the model', await page.getByText('«Φοβάμαι την απόρριψη»').count() === 1 && calls.length === before);
     await page.getByRole('button', { name: 'Ναι, αυτό είναι' }).click();
@@ -497,8 +501,9 @@ async function runMock() {
       await send(s.page, 'Ευχαριστώ');
       ok('U1 (John): «Ευχαριστώ» → NO model call that turn, the closing\'s root question with «Δεν το βρήκα ακόμα»',
         s.calls.length === before && await s.page.getByText(LEAVING).count() === 1 && await btnN(s.page, BACK).count() === 1);
-      ok('U1: the new wording, exactly — «Αν κάτι σου ξεκαθάρισε, πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;»',
-        await s.page.getByText('Αν κάτι σου ξεκαθάρισε, πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;', { exact: true }).count() === 1);
+      // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 for door 4
+      ok('U1: the new wording, exactly — «Πριν φύγεις: αν κάτι ξεκαθάρισε, γράψ\' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;»',
+        await s.page.getByText("Πριν φύγεις: αν κάτι ξεκαθάρισε, γράψ' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;", { exact: true }).count() === 1);
       ok('U1 (John): the model\'s closing reply («Το σήμα είναι ξεκάθαρο…», the friend question) never appears',
         await s.page.getByText('Το σήμα είναι ξεκάθαρο').count() === 0 && await s.page.getByText('Αν ένας φίλος σου').count() === 0);
       await send(s.page, 'Ίσως η κενοδοξια των χρημάτων');
@@ -568,7 +573,7 @@ async function runMock() {
     for (const vp of [{ width: 390, height: 700 }, { width: 390, height: 430 }]) {
       const s = await start('?stageA=1', [JR[0], JR[1], 'Τι σε κρατάει εκεί;', JR[3]], vp);
       await send(s.page, 'Ευχαριστώ'); await s.page.waitForTimeout(900);
-      ok(`U5 (phone ${vp.width}×${vp.height}): the closing's root question and «Δεν το βρήκα ακόμα» fully visible above the input`, await visible(s.page, 'Αν κάτι σου ξεκαθάρισε'));
+      ok(`U5 (phone ${vp.width}×${vp.height}): the closing's root question and «Δεν το βρήκα ακόμα» fully visible above the input`, await visible(s.page, 'Πριν φύγεις: αν κάτι ξεκαθάρισε')); // UPDATED (16/10)
       await btnN(s.page, BACK).click(); await s.page.waitForTimeout(500);
       await send(s.page, 'Ίσως η κενοδοξια των χρημάτων');
       await btnN(s.page, 'Νομίζω βρήκα τι με απασχολεί').click(); await s.page.waitForTimeout(900);
@@ -649,6 +654,7 @@ async function runMock() {
   await runMockLR();
   await runMockR3();
   await runMockR4();
+  await runMockTX();
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -663,10 +669,11 @@ async function runMockOF() {
   const T = APP.texts;
   const F1 = 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.', WHY = 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.';
   const ROOT = 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.';
-  const JOHN = [`Η ρίζα σου: "${ROOT}".`, 'Το πρώτο μισό έγινε: βρήκες τι πραγματικά ρωτάς — εσύ, χωρίς συμβουλές.',
-    'Στο AURA Coach συνεχίζουμε από αυτή τη φράση σου και φεύγεις με τρία πράγματα, γραμμένα με τα δικά σου λόγια:',
-    '· τι ακριβώς έχεις να αποφασίσεις,', '· τι κερδίζεις και τι χάνεις σε κάθε δρόμο,',
-    '· ένα μικρό πρώτο βήμα για να το δοκιμάσεις στην πράξη — και πότε.', 'AURA Coach · €6, μία φορά. Όχι συνδρομή.'];
+  // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 (its blank lines are checked in TX); the last line is now endKeep
+  const JOHN = [`«${ROOT}»`, 'Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή.', 'Το πρώτο μισό έγινε: ξέρεις πια τι πραγματικά ρωτάς.',
+    'Μένει το δεύτερο: και τώρα;', 'Στο AURA Coach ξεκινάμε από αυτή ακριβώς τη φράση σου. Φεύγεις με τρία πράγματα, γραμμένα με τα δικά σου λόγια:',
+    '· τι ακριβώς έχεις να αποφασίσεις', '· τι κερδίζεις και τι χάνεις σε κάθε δρόμο', '· ένα μικρό πρώτο βήμα για να το δοκιμάσεις — και πότε',
+    '€6, μία φορά. Όχι συνδρομή.', 'Κι αν όχι τώρα, αυτό που βρήκες είναι ήδη δικό σου.'];
   const TT = { button: 'Στείλε τα στοιχεία της δοκιμής', copied: 'Αντιγράφηκε ✓ — κάνε επικόλληση σε μήνυμα σε μένα', notCopied: 'Δεν αντιγράφηκε — στείλε μου το αρχείο που κατέβηκε' };
   const PHONE_UA = 'Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Mobile Safari/537.36';
   const VIBER_UA = 'Mozilla/5.0 (Linux; Android 13; SM-A536B Build/TP1A.220624.014; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/118.0.0.0 Mobile Safari/537.36 Viber/20.6.0.0';
@@ -723,15 +730,15 @@ async function runMockOF() {
     await tap(s.page, T.button); await say(s.page, ROOT);
     await tap(s.page, T.yes); await s.page.waitForTimeout(700);
     const shown = (await s.page.locator('[data-stage-a-end="1"] .msg-aura').innerText().catch(() => '')).split('\n').map(x => x.trim()).filter(Boolean);
-    ok('OF1: after «Ναι» the screen shows John\'s seven lines, in order, character for character', JSON.stringify(shown) === JSON.stringify(JOHN));
+    ok('OF1: after «Ναι» the screen shows John\'s lines, in order, character for character', JSON.stringify(shown) === JSON.stringify(JOHN));
     const first = await inView(s.page, JOHN[0]);
-    ok('OF1: on the phone «Η ρίζα σου» is seen first — inside the screen, near its top', !!first && first.top >= 0 && first.top < 200 && first.bottom <= first.h);
-    const price = await inView(s.page, JOHN[6]);
-    ok('OF1: … and the whole text fits below it, down to the price line', !!price && price.bottom <= price.h && price.top > first.top);
+    ok('OF1: on the phone the root line is seen first — inside the screen, near its top', !!first && first.top >= 0 && first.top < 200 && first.bottom <= first.h);
+    const price = await inView(s.page, JOHN[JOHN.length - 1]);
+    ok('OF1: … and the whole text fits below it, down to the last line', !!price && price.bottom <= price.h && price.top > first.top);
     ok('OF1: the same two buttons, nothing else to tap', await btn(s.page, T.wantMore).count() === 1 && await btn(s.page, T.notNow).count() === 1);
     await s.page.screenshot({ path: path.join(OUT, 'OF-1-after-yes.png'), fullPage: false });
     await tap(s.page, T.wantMore);
-    ok('OF2: «Το AURA Coach δεν είναι ακόμα έτοιμο.» and the question «Τι θα σε βοηθούσε περισσότερο τώρα;»',
+    ok('OF2: the not-ready text and the question «Τι θα σε βοηθούσε περισσότερο τώρα;»',
       await s.page.getByText(T.notReady, { exact: true }).count() === 1 && await s.page.getByText('Τι θα σε βοηθούσε περισσότερο τώρα;', { exact: true }).count() === 1);
     const OPTS = ['Να δω καθαρά τι ακριβώς έχω να αποφασίσω', 'Να δω τι κερδίζω και τι χάνω σε κάθε δρόμο', 'Να βρω ένα μικρό βήμα για να το δοκιμάσω στην πράξη', 'Να με ξαναρωτήσει σε λίγες μέρες τι έγινε', T.helpSkip];
     const boxes = [];
@@ -1164,9 +1171,134 @@ async function runMockR4() {
     await s.btn(T.button).click(); await s.page.waitForTimeout(400);
     const before = s.bodies.length;
     await send(s.page, 'Τα λεφτά');
-    ok('R4-3: a short attempt («Τα λεφτά») still gets «Γράψ\' το λίγο πιο ολοκληρωμένα» — no model call, no card',
+    ok('R4-3: a short attempt («Τα λεφτά») still gets the retry text — no model call, no card',
       await s.page.getByText(T.retry).count() === 1 && s.bodies.length === before && await s.btn(T.yes).count() === 0);
     await s.browser.close();
+  }
+}
+
+// ── TX: John, 16/10/2026 (ADR «16 Οκτωβρίου (β)»): ONLY fixed texts, before the first tester session. Two phone sizes (390×844 and
+// 360×640), switch open, ?rec=1, fake model. Every new text must be on screen word for word and FIT: no line cut, nothing running off
+// the side, no sideways scroll. TX1 the first screen; TX2 the chat screen's header line and the input's first placeholder; TX3 door 4
+// («Πριν φύγεις: …») and the retry; TX4 the offer after «Ναι», line for line with its blank lines; TX5 the message after «Θέλω να
+// συνεχίσω», with the question and its five choices unchanged. The texts are written out here on purpose (not read from the app),
+// so the old code fails. Screenshots TX-1-first-screen, TX-2-chat, TX-3-door4, TX-4-offer, TX-5-not-ready (-390 / -360). Alone: --only TX.
+async function runMockTX() {
+  const W = {
+    head: 'Βρίσκουμε την ερώτηση που μετράει.\nΤίποτα άλλο.',
+    ai: 'Είμαι τεχνητή νοημοσύνη. Δεν σου λέω τι να κάνεις πριν βρεις τι πραγματικά ρωτάς.',
+    invite: 'Γράψε ό,τι σε απασχολεί, όπως έρχεται. Μπερδεμένο είναι μια χαρά.',
+    placeholder: 'Γράψ\' το όπως έρχεται…',
+    leaving: 'Πριν φύγεις: αν κάτι ξεκαθάρισε, γράψ\' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;',
+    back: 'Δεν το βρήκα ακόμα, συνέχισε',
+    retry: 'Πες το λίγο πιο ολοκληρωμένα — όπως θα το έλεγες σε έναν φίλο.',
+    notReady: 'Σε ευχαριστώ. Το AURA Coach δεν είναι ακόμα έτοιμο — δεν χρεώθηκες τίποτα. Η απάντησή σου θα καθορίσει τι θα φτιαχτεί πρώτο:',
+    helpQ: 'Τι θα σε βοηθούσε περισσότερο τώρα;',
+  };
+  const ROOT = 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.';
+  const OFFER = [`«${ROOT}»`, 'Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή.', '', 'Το πρώτο μισό έγινε: ξέρεις πια τι πραγματικά ρωτάς.',
+    'Μένει το δεύτερο: και τώρα;', '', 'Στο AURA Coach ξεκινάμε από αυτή ακριβώς τη φράση σου. Φεύγεις με τρία πράγματα, γραμμένα με τα δικά σου λόγια:',
+    '· τι ακριβώς έχεις να αποφασίσεις', '· τι κερδίζεις και τι χάνεις σε κάθε δρόμο', '· ένα μικρό πρώτο βήμα για να το δοκιμάσεις — και πότε', '',
+    '€6, μία φορά. Όχι συνδρομή.', 'Κι αν όχι τώρα, αυτό που βρήκες είναι ήδη δικό σου.'];
+  const OPTS = ['Να δω καθαρά τι ακριβώς έχω να αποφασίσω', 'Να δω τι κερδίζω και τι χάνω σε κάθε δρόμο', 'Να βρω ένα μικρό βήμα για να το δοκιμάσω στην πράξη',
+    'Να με ξαναρωτήσει σε λίγες μέρες τι έγινε', 'Συνέχεια'];
+  const F1 = 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.', WHY = 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.';
+  // The element that shows exactly this text: inside the screen's width, its content not wider than its box (nothing cut or
+  // hidden), and the page does not scroll sideways. Also where it is, for «on one screen» and for the notes.
+  const fit = async (page, text) => page.evaluate(t => {
+    const norm = x => x.replace(/\s+/g, ' ').trim();
+    const els = [...document.querySelectorAll('body *')].filter(e => e.offsetParent !== null || e.tagName === 'BODY');
+    const el = els.filter(e => norm(e.innerText || '') === norm(t)).pop();
+    if (!el) return null;
+    const r = el.getBoundingClientRect(), W = window.innerWidth, p = el.parentElement.getBoundingClientRect();
+    const lh = parseFloat(getComputedStyle(el).lineHeight) || 20;
+    // inside the screen AND inside its own box (a line that runs out of its card or over the side picture counts as cut)
+    return { inside: r.left >= 0 && r.right <= W + 0.5 && r.left >= p.left - 0.5 && r.right <= p.right + 0.5,
+      notCut: el.scrollWidth <= el.clientWidth + 1 || el.clientWidth === 0,
+      noSideScroll: document.documentElement.scrollWidth <= W, top: Math.round(r.top), bottom: Math.round(r.bottom), h: window.innerHeight,
+      lines: Math.round(r.height / lh) };
+  }, text);
+  const good = f => !!f && f.inside && f.notCut && f.noSideScroll;
+  for (const vp of [{ width: 390, height: 844 }, { width: 360, height: 640 }]) {
+    const tag = `${vp.width}×${vp.height}`, sfx = '-' + vp.width;
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vp, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    const replies = ['Τι σε κρατάει εκεί;', 'Η σκέψη σου παραμένει δική σου.'];
+    let n = 0;
+    await page.route('**/api/aura', route => { const r = replies[Math.min(n, replies.length - 1)]; n++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) }); });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/?stageA=1&rec=1');
+    await page.waitForTimeout(500);
+    const btn = name => page.getByRole('button', { name, exact: true });
+
+    // ── TX1: the first screen ──
+    const ai = await fit(page, W.ai), inv = await fit(page, W.invite);
+    const startBtn = await page.getByText('Ξεκίνα με το πρόβλημά σου').boundingBox().catch(() => null);
+    ok(`TX1 (${tag}): the AI line, unchanged, and under it John's line «${W.invite}» — both whole, nothing cut`,
+      good(ai) && good(inv) && ai.bottom <= inv.top);
+    ok(`TX1 (${tag}): the old line is gone; the two lines and the start button are on one screen`,
+      await page.getByText("Δεν χρειάζεται να το έχεις καθαρό", { exact: false }).count() === 0 && !!startBtn && startBtn.y + startBtn.height <= vp.height);
+    await page.screenshot({ path: path.join(OUT, 'TX-1-first-screen' + sfx + '.png'), fullPage: false });
+
+    // ── TX2: the chat screen — the header line and the input's first placeholder ──
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click(); await page.waitForTimeout(400);
+    const head = await fit(page, W.head);
+    ok(`TX2 (${tag}): the header reads «Βρίσκουμε την ερώτηση που μετράει.» / «Τίποτα άλλο.» — whole, nothing cut; no English`,
+      good(head) && head.top >= 0 && !/We find the question|Nothing else/.test(await page.locator('body').innerText()));
+    // the Greek line is wider than the English: on a phone it wraps — «που μετράει.» stays together, so «μετράει.» is never alone
+    const alone = await page.evaluate(() => { const h = [...document.querySelectorAll('header span')].find(e => /^Βρίσκουμε/.test(e.textContent)); if (!h) return null;
+      const tn = h.firstChild, t = tn && tn.textContent || '', top = w => { const i = t.indexOf(w); if (i < 0) return null; const r = document.createRange(); r.setStart(tn, i); r.setEnd(tn, i + w.length); return Math.round(r.getBoundingClientRect().top); };
+      return { pou: top('που'), m: top('μετράει') }; });
+    ok(`TX2 (${tag}): «μετράει.» is not alone on a line (the break is «Βρίσκουμε την ερώτηση / που μετράει.» or none)`, !!alone && alone.pou !== null && alone.pou === alone.m);
+    const ph = await page.evaluate(() => { const ta = document.querySelector('textarea.textarea'); if (!ta) return null;
+      const cs = getComputedStyle(ta), c = document.createElement('canvas').getContext('2d'); c.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      return { text: ta.placeholder, w: c.measureText(ta.placeholder).width, room: ta.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) }; });
+    ok(`TX2 (${tag}): the input's placeholder is «${W.placeholder}», on one line`, !!ph && ph.text === W.placeholder && ph.w <= ph.room);
+    await page.screenshot({ path: path.join(OUT, 'TX-2-chat' + sfx + '.png'), fullPage: false });
+
+    // ── TX3: door 4 and the retry ──
+    await send(page, F1); if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, WHY);
+    await send(page, 'Ευχαριστώ, κλείνουμε εδώ.'); await page.waitForTimeout(600);
+    const lv = await fit(page, W.leaving);
+    ok(`TX3 (${tag}): the first exit → «${W.leaving.slice(0, 40)}…», whole, with «Δεν το βρήκα ακόμα» under it`, good(lv) && await btn(W.back).count() === 1);
+    await page.screenshot({ path: path.join(OUT, 'TX-3-door4' + sfx + '.png'), fullPage: false });
+    await send(page, 'Τα λεφτά'); await page.waitForTimeout(300);
+    const rt = await fit(page, W.retry);
+    ok(`TX3 (${tag}): a short attempt → «${W.retry}», whole, no card`, good(rt) && await btn('Ναι, αυτό είναι').count() === 0);
+
+    // ── TX4: the offer after «Ναι» ──
+    await send(page, ROOT);
+    await btn('Ναι, αυτό είναι').click({ timeout: 4000 }).catch(() => {}); await page.waitForTimeout(900);
+    const lines = await page.evaluate(() => { const m = document.querySelector('[data-stage-a-end="1"] .msg-aura'); return m ? [...m.children].map(c => c.textContent) : null; });
+    ok(`TX4 (${tag}): John's text, line for line, with its three blank lines`, JSON.stringify(lines) === JSON.stringify(OFFER));
+    const geo = await page.evaluate(() => { const m = document.querySelector('[data-stage-a-end="1"] .msg-aura'); if (!m) return null;
+      const W = window.innerWidth, rs = [...m.children].map(c => c.getBoundingClientRect()).filter(r => r.width > 0);
+      return { inside: rs.every(r => r.left >= 0 && r.right <= W + 0.5), noSideScroll: document.documentElement.scrollWidth <= W,
+        top: Math.round(m.getBoundingClientRect().top), bottom: Math.round(m.getBoundingClientRect().bottom), h: window.innerHeight }; });
+    ok(`TX4 (${tag}): every line inside the screen's width, nothing cut, no sideways scroll`, !!geo && geo.inside && geo.noSideScroll);
+    ok(`TX4 (${tag}): the root line is what the phone shows first (the message starts near the top of the screen)`, !!geo && geo.top >= 0 && geo.top < 200);
+    if (vp.height >= 800) ok(`TX4 (${tag}): the whole text is on one screen, down to «Κι αν όχι τώρα…»`, !!geo && geo.bottom <= geo.h);
+    else results.push(`NOTE — TX4 (${tag}): the text ${geo && geo.bottom <= geo.h ? 'fits on one screen' : 'runs ' + (geo ? geo.bottom - geo.h : '?') + 'px below the screen (scroll down to read the rest and the buttons)'}`);
+    ok(`TX4 (${tag}): the same two buttons`, await btn('Θέλω να συνεχίσω').count() === 1 && await btn('Όχι τώρα').count() === 1);
+    await page.screenshot({ path: path.join(OUT, 'TX-4-offer' + sfx + '.png'), fullPage: false });
+
+    // ── TX5: after «Θέλω να συνεχίσω» ──
+    await btn('Θέλω να συνεχίσω').click({ timeout: 4000 }).catch(() => {}); await page.waitForTimeout(900);
+    const nr = await fit(page, W.notReady), q = await fit(page, W.helpQ);
+    ok(`TX5 (${tag}): «${W.notReady.slice(0, 50)}…», whole, then «${W.helpQ}»`, good(nr) && good(q) && nr.bottom <= q.top);
+    const boxes = [];
+    for (const o of OPTS) boxes.push(await btn(o).boundingBox({ timeout: 2000 }).catch(() => null));
+    ok(`TX5 (${tag}): the five choices, unchanged, in the same order, inside the screen's width`,
+      boxes.every(Boolean) && boxes.every((b, k) => (k === 0 || b.y > boxes[k - 1].y) && b.x >= 0 && b.x + b.width <= vp.width + 0.5));
+    const onScreen = !!nr && nr.top >= 0 && boxes.every(b => b && b.y >= 0 && b.y + b.height <= vp.height);
+    if (vp.height >= 800) ok(`TX5 (${tag}): the text, the question and all five choices on one screen`, onScreen);
+    else results.push(`NOTE — TX5 (${tag}): ${onScreen ? 'the text, the question and all five choices are on one screen' : 'not all on one screen (scroll)'}`);
+    await page.screenshot({ path: path.join(OUT, 'TX-5-not-ready' + sfx + '.png'), fullPage: false });
+    await btn(OPTS[0]).click({ timeout: 4000 }).catch(() => {}); await page.waitForTimeout(400);
+    const log = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
+    ok(`TX5 (${tag}): the first choice is still recorded as 1 (same telemetry)`, log.filter(r => r.ev === 'coach_help_choice').map(r => r.choice).join(',') === '1');
+    await browser.close();
   }
 }
 
@@ -2708,7 +2840,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else await runMock();
+      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
