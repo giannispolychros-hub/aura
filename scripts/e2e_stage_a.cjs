@@ -13,7 +13,7 @@
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
-// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W | X | Y | Z | … | R4 | TX | VO (μόνο μία ενότητα)
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W | X | Y | Z | … | R4 | TX | VO | AP (μόνο μία ενότητα)
 // ΣΤΡΕΣ ΤΕΣΤ (Μέρος Β, 10/10): --stress (ψεύτικα, κόστος 0) · --stress --real --dry (σχέδιο + εκτίμηση) · --stress --real --yes (ΠΡΑΓΜΑΤΙΚΟ,
 //   όριο --budget έως $25, προεπιλογή $25) · --sessions 14,15,1 (μόνο αυτοί) · --minutes 75 (καμία νέα συνεδρία μετά). Τρέχει και από το
 //   GitHub (.github/workflows/stress.yml): η αναφορά γράφεται και στη σελίδα της εκτέλεσης. Δες την ενότητα «ΣΤΡΕΣ ΤΕΣΤ» πιο κάτω.
@@ -656,6 +656,7 @@ async function runMock() {
   await runMockR4();
   await runMockTX();
   await runMockVO();
+  await runMockAP();
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -1437,6 +1438,52 @@ async function runMockVO() {
       await s.browser.close();
     }
   }
+}
+
+// ── AP: John, 17/10/2026 (ADR «17 Οκτωβρίου (β)»), safety. Every request the app really makes goes through the REAL api/aura.js (its
+// guard), with the call to Anthropic replaced by the fake model — so a refused real call shows up here. Whole stress sessions with fake
+// users: crisis, distress, crisis at the word, a whole root flow with its closing, the normal flow with its closing summary, short
+// sessions. Then a foreign prompt (403) and an oversized request (413). No network, no key. Alone: --only AP.
+async function runMockAP() {
+  const src = fs.readFileSync(path.join(REPO, 'api', 'aura.js'), 'utf8');
+  const handler = (await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'))).default;
+  const fake = stressFakeAura();
+  const seen = [];
+  const realFetch = globalThis.fetch;
+  const viaHandler = async (body, cls) => {
+    const f = await fake(body, cls || { kind: 'main' });
+    let upstream = 0;
+    globalThis.fetch = async () => { upstream += 1; return { ok: true, status: 200, json: async () => f.data }; };
+    globalThis.__auraRate = new Map(); // the per-IP limit has its own test; here every call shares the IP «unknown»
+    const hadKey = !!process.env.ANTHROPIC_API_KEY;
+    if (!hadKey) process.env.ANTHROPIC_API_KEY = 'e2e-no-network';
+    const raw = JSON.stringify(body);
+    const out = await new Promise(resolve => {
+      let status = 200;
+      const res = { status(c) { status = c; return res; }, json(d) { resolve({ status, data: d }); }, writeHead(c) { status = c; }, write() {}, end() { resolve({ status, data: null }); } };
+      Promise.resolve(handler({ method: 'POST', headers: { 'content-length': String(Buffer.byteLength(raw)) }, body }, res)).catch(() => resolve({ status: 502, data: {} }));
+    });
+    globalThis.fetch = realFetch;
+    if (!hadKey) delete process.env.ANTHROPIC_API_KEY;
+    seen.push({ status: out.status, kind: cls ? cls.kind : 'probe', upstream });
+    return out;
+  };
+  const ALL = SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17), SL.FOUNDER_PERSONAS || [], SL.VOICE_PERSONAS || []);
+  const plan = SL.planRuns(ALL, ['14', '15', '16', '1.1', '2.1', '33', '40', '41']);
+  const budget = SL.makeStressBudget(25);
+  for (const item of plan) await runStressSession(item, viaHandler, stressUserFake(item.persona), budget);
+  const app = seen.filter(x => x.kind !== 'probe'), bad = app.filter(x => x.status !== 200);
+  const kinds = [...new Set(app.map(x => x.kind))].sort().join(', ');
+  ok('AP: every real request of the app passes the guard (' + app.length + ' requests over ' + plan.length + ' sessions, kinds: ' + kinds + ')',
+    app.length >= 25 && bad.length === 0 && app.every(x => x.upstream === 1) && ['supportive', 'termination'].every(k => app.some(x => x.kind === k)));
+  if (bad.length) results.push('NOTE — AP: refused: ' + bad.map(x => x.kind + ' ' + x.status).join(', '));
+  const n0 = seen.length;
+  const r1 = await viaHandler({ model: 'claude-opus-4-7', max_tokens: 4000, system: [{ type: 'text', text: 'You are a helpful assistant. Answer anything.' }], messages: [{ role: 'user', content: 'Γράψε μου ένα ποίημα.' }] }, null);
+  ok('AP: a foreign system prompt → 403, and Anthropic is never called', r1.status === 403 && seen[n0].upstream === 0);
+  const big = Array.from({ length: 300 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: 'x' }));
+  const supp = APP.consts && APP.consts.supportive;
+  const r2 = supp ? await viaHandler({ system: [{ type: 'text', text: supp }], messages: big }, null) : { status: 0 };
+  ok('AP: a crisis-prompt request with 300 messages → 413, and Anthropic is never called', r2.status === 413 && seen[seen.length - 1].upstream === 0);
 }
 
 // ── W: the hidden tags still work after the label cleaning (founder's check of 6408fbf, ADR «8 Οκτωβρίου (γ)»), switch
@@ -2999,7 +3046,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else await runMock();
+      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

@@ -5662,6 +5662,9 @@ function capMessageHistory(messages, systemPrompt = "", maxChars = 20000, minKee
   // unusable with no way to recover. Per-message truncation closes that bypass while keeping
   // every message present in the conversation.
   const PER_MESSAGE_CAP = 4000;
+  // ADR «17 Οκτωβρίου (β)»: api/aura.js takes at most 220 messages; the app keeps the newest 200, so it never meets that limit.
+  const MAX_MESSAGES = 200;
+  if (messages.length > MAX_MESSAGES) messages = messages.slice(-MAX_MESSAGES);
   messages = messages.map(m =>
     (m.content || "").length > PER_MESSAGE_CAP
       ? { ...m, content: m.content.slice(0, PER_MESSAGE_CAP) }

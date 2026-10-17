@@ -5,6 +5,60 @@
  * Required environment variable: ANTHROPIC_API_KEY
  * Set in: Vercel Dashboard → Project → Settings → Environment Variables
  */
+import { createHash } from "node:crypto";
+
+// SECURITY (ADR «17 Οκτωβρίου (β)», exception (α) to the freeze): this endpoint used to send ANY system prompt and messages to
+// Anthropic with our key — whoever found it had a free Claude with instructions of their own. It now takes only the app's own
+// system prompts. The app makes ONE call to /api/aura (callAura in src/App.jsx), and its first block is always one of three:
+// AURA_CORE_PERSONALITY exactly (the lenses, compression, misfire, pivot and First-WHY prompts are CORE + a per-turn part, sent as a
+// second block), or a single block that starts with SYSTEM_SUPPORTIVE (crisis) or SYSTEM_TERMINATION (closing). Anything else → 403.
+// The fingerprints below are length + SHA-256 only, never the text; «npm run build» rewrites them from src/App.jsx.
+// BEGIN PROMPT FINGERPRINTS — written by scripts/gen_prompt_fingerprints.cjs from src/App.jsx («npm run build»). Do not edit by hand.
+const PROMPT_FINGERPRINTS = {
+  core: { length: 311471, sha256: "a6d7fe7ae33515a09ebce8970570ea86e73f1c71f33f4cc1b86453e6d9706af8" },
+  supportive: { length: 851, sha256: "c7815b96d83ebae85ab1dd6856ae343c7ba114f0e8ba20362d26ce853266b298" },
+  termination: { length: 20032, sha256: "d5a77ca926f9490b1d1a38c7164474c6935747964cac778a0f60754eef8e279a" },
+};
+// END PROMPT FINGERPRINTS
+
+// Size limits just above what the app really sends → 413. Measured 17/10/2026 over the 950 requests of the browser e2e: the per-turn
+// part after the fixed prompt at most 7,134 characters; capMessageHistory (src/App.jsx) sends at most 200 messages, each cut at
+// 4,000 characters, at most 40,000 in all.
+const REQUEST_LIMITS = { rest: 24000, messages: 220, messageChars: 4400, totalChars: 44000 };
+
+function sha256Hex(text) {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
+// null = the request is the app's own; otherwise { status, error }.
+function checkAuraRequest(body, fp, limits, sha) {
+  const b = body || {};
+  const sys = b.system;
+  const forbidden = { status: 403, error: "Forbidden" };
+  if (!Array.isArray(sys) || sys.length < 1 || sys.length > 2) return forbidden;
+  if (!sys.every(x => x && x.type === "text" && typeof x.text === "string")) return forbidden;
+  const first = sys[0].text;
+  const startsWith = k => !!fp[k] && first.length >= fp[k].length && sha(first.slice(0, fp[k].length)) === fp[k].sha256;
+  let rest;
+  if (fp.core && first.length === fp.core.length && sha(first) === fp.core.sha256) rest = sys.length === 2 ? sys[1].text : "";
+  else if (sys.length === 1 && startsWith("supportive")) rest = first.slice(fp.supportive.length);
+  else if (sys.length === 1 && startsWith("termination")) rest = first.slice(fp.termination.length);
+  else return forbidden;
+  const tooLarge = { status: 413, error: "Payload too large" };
+  if (rest.length > limits.rest) return tooLarge;
+  const msgs = b.messages;
+  if (!Array.isArray(msgs) || msgs.length < 1 || !msgs.every(m => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")) {
+    return { status: 400, error: "Bad request" };
+  }
+  if (msgs.length > limits.messages) return tooLarge;
+  let total = 0;
+  for (const m of msgs) {
+    if (m.content.length > limits.messageChars) return tooLarge;
+    total += m.content.length;
+  }
+  if (total > limits.totalChars) return tooLarge;
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -54,6 +108,10 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+
+    // Only the app's own prompts, within the app's own sizes (ADR «17 Οκτωβρίου (β)»).
+    const _bad = checkAuraRequest(body, PROMPT_FINGERPRINTS, REQUEST_LIMITS, sha256Hex);
+    if (_bad) return res.status(_bad.status).json({ error: _bad.error });
 
     // STREAMING SUPPORT (added — perceived-speed improvement): pass-through, backward
     // compatible. wantsStream defaults to false, so any existing caller that doesn't send

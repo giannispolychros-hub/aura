@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/gen_prompt_fingerprints.cjs && vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext .js,.jsx"
   },
