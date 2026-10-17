@@ -114,8 +114,9 @@ const OLD_END = [`Η ρίζα σου: "${ROOT}".`, 'Το πρώτο μισό έ�
     Array.isArray(R) && R.length === 2 && R[0] === `Η ρίζα σου: "${ROOT}".` &&
     R[1] === 'Το πρώτο βήμα κάθε προβλήματος είναι ο πραγματικός ορισμός του — και τον βρήκες εσύ, χωρίς συμβουλές.' &&
     !/Coach|€|συνδρομή/.test(R.join(' ')));
+  // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): the normal card line is John's new text; the risk line stays.
   assert('RISK: the card line is unchanged too', TX.cardLineRisk === 'Με το "Ναι" ολοκληρώνεται αυτό το κομμάτι.' &&
-    TX.cardLine === 'Με το "Ναι" ολοκληρώνεται το δωρεάν κομμάτι και σου δείχνω το επόμενο.');
+    TX.cardLine === 'Με το "Ναι" κλείνει αυτό το κομμάτι και σου δείχνω τι ακολουθεί.');
 
   assert('SAME LOGIC: «Ναι» still writes these lines as ONE message marked as the end; the same two buttons, the same events',
     CODE.includes('content: buildRootEndLines(stageARef.current.found, _riskOffer).join("\\n"), msgMode: "STAGE_A", stageAEnd: true }') &&

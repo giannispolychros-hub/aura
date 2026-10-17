@@ -40,9 +40,11 @@ const count = (s, t) => s.split(t).length - 1;
 
 // ── The mechanism ────────────────────────────────────────────────────────────
 assert('STATE: a separate list of UI-only lines, never part of `messages`', /const \[uiBubbles, setUiBubbles\] = useState\(\[\]\);/.test(CODE));
-const helper = (CODE.match(/const addUiBubble = useCallback\(\(text, at\) => \{[\s\S]*?\n  \}, \[\]\);/) || [''])[0];
+const helper = (CODE.match(/const addUiBubble = useCallback\(\(text, at, extra\) => \{[\s\S]*?\n  \}, \[\]\);/) || [''])[0]; // UPDATED 17/10 (δ): + extra
+// UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): a third, optional argument (the step's questions and card: role "assistant", stepCard) —
+// the text and the position always win over it; a call with two arguments makes the same user bubble as before.
 assert('HELPER: addUiBubble(text, at) keeps the text and the number of messages before it — and touches nothing else',
-  helper.length > 0 && /setUiBubbles\(prev => \[\.\.\.prev, \{ id: nextMsgId\(\), role: "user", content: String\(text \|\| ""\), at: Number\.isInteger\(at\) \? at : 0 \}\]\);/.test(helper) &&
+  helper.length > 0 && /setUiBubbles\(prev => \[\.\.\.prev, \{ id: nextMsgId\(\), role: "user", \.\.\.\(extra \|\| \{\}\), content: String\(text \|\| ""\), at: Number\.isInteger\(at\) \? at : 0 \}\]\);/.test(helper) &&
   !/setMessages|callAura|generateResponse|recordTelemetry|turnCount|stageARef|stageADispatch/.test(helper));
 assert('NOT IN THE REQUEST PATH: uiBubbles appears nowhere in generateResponse, callAura or capMessageHistory',
   !GEN.includes('uiBubbles') && !(extractBlock('async function callAura(') || '').includes('uiBubbles') && !(extractBlock('function capMessageHistory(') || 'uiBubbles').includes('uiBubbles'));
@@ -66,8 +68,10 @@ assert('SITE 4 — door 1 and the correction, an answer without substance: the b
   /addUiBubble\(userText, messages\.length\);[^\n]*\n\s*stageADispatch\(\{ type: "tooShort" \}\);\s*return;/.test(SUB));
 assert('SITE 5 — door 2, the capture without substance: the bubble, then «reask» door 2',
   /stageARootArmed\.current = false;\s*addUiBubble\(userText, messages\.length\);[^\n]*\n\s*stageADispatch\(\{ type: "reask", door: 2 \}\);\s*return;/.test(SUB));
-assert('SITE 6 — exactly these five calls exist (door 3 and door 2 «Ναι» share none): a new one is a decision, not a drift',
-  count(SUB, 'addUiBubble(userText, messages.length);') === 5);
+// UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): a sixth — the step's typed answer (the step, the smaller piece, «Πότε»), John's decision.
+assert('SITE 6 — exactly these six calls exist (door 3 and door 2 «Ναι» share none): a new one is a decision, not a drift',
+  count(SUB, 'addUiBubble(userText, messages.length);') === 6 &&
+  /if \(detectSafetySignal\(userText\)\) \{\s*stageADispatch\(\{ type: "stepStop" \}\);\s*\} else \{\s*addUiBubble\(userText, messages\.length\);/.test(SUB));
 assert('NOT A BUBBLE: a correction or an answer that becomes the card is NOT shown as a bubble (it is shown on the card / added to the conversation)',
   !/addUiBubble\(userText, messages\.length\);[^\n]*\n\s*stageADispatch\(\{ type: "correctDone"/.test(SUB) && !/addUiBubble\(userText, messages\.length\);[^\n]*\n\s*const _saDoor/.test(SUB));
 {
@@ -90,13 +94,15 @@ assert('NOT A BUBBLE: a correction or an answer that becomes the card is NOT sho
 const feedAt = CODE.indexOf('{messages.map((msg, i) => (');
 const feed = feedAt >= 0 ? CODE.slice(feedAt, feedAt + 1800) : '';
 assert('RENDER: every UI-only line is drawn after the message that was last when it was typed, with the same bubble (a user turn)',
-  /<Fragment key=\{msg\.id \|\| i\}>/.test(feed) && /uiBubbles\.filter\(g => Math\.min\(g\.at, messages\.length\) === i \+ 1\)\.map\(g => \(/.test(feed) &&
+  // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): the step card (stepCard) is drawn as its own card; every other bubble as before.
+  /<Fragment key=\{msg\.id \|\| i\}>/.test(feed) && /uiBubbles\.filter\(g => Math\.min\(g\.at, messages\.length\) === i \+ 1\)\.map\(g => g\.stepCard \? \(/.test(feed) &&
   /<MessageBubble key=\{g\.id\} msg=\{g\} onMisfire=\{\(\) => \{\}\} onContinueToReflection=\{\(\) => \{\}\} \/>/.test(feed));
 assert('RENDER: the existing message bubble is unchanged (same key, same props)',
   /<MessageBubble\s+msg=\{msg\}\s+onMisfire=\{\(\) => \{ if \(sessionEnded \|\| layerGatePending/.test(feed) || /key=\{msg\.id \|\| i\}\s+msg=\{msg\}/.test(feed) || /<MessageBubble\s+msg=\{msg\}/.test(feed));
 assert('IMPORT: Fragment comes from react', /^import \{[^}]*\bFragment\b[^}]*\} from "react";/m.test(CODE));
+// UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): the step's text after «Ναι» (stageAEnd) scrolls to its start, as the end text did; any other to the bottom.
 assert('SCROLL: a new bubble scrolls to the bottom (its own effect; the existing scroll effects are untouched)',
-  /useEffect\(\(\) => \{\s*if \(!uiBubbles\.length\) return;\s*bottomRef\.current\?\.scrollIntoView\(\{ behavior: "smooth", block: "end" \}\);\s*\}, \[uiBubbles\.length\]\);/.test(CODE) &&
+  /useEffect\(\(\) => \{\s*if \(!uiBubbles\.length\) return;[^]*?const _saEnd = uiBubbles\[uiBubbles\.length - 1\]\.stageAEnd \? document\.querySelector\('\[data-stage-a-end="1"\]'\) : null;\s*if \(_saEnd\) \{ _saEnd\.scrollIntoView\(\{ behavior: "smooth", block: "start" \}\); return; \}\s*bottomRef\.current\?\.scrollIntoView\(\{ behavior: "smooth", block: "end" \}\);\s*\}, \[uiBubbles\.length\]\);/.test(CODE) &&
   CODE.includes('  }, [messages, loading, pivotPending, layerGatePending, memoryPromptPending, warningPending, closureConfirmPending, misfirePending, firstWhyPending]);') &&
   /\}, \[stageAPhase\]\);/.test(CODE));
 assert('RESET: a new session clears them', /setUiBubbles\(\[\]\);/.test(extractBlock('const resetSession = () =>') || ''));

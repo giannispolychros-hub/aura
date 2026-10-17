@@ -85,12 +85,14 @@ assert('THE SAME RULE for content words as the app\'s other provenance counter (
   const disp = blk('const stageADispatch = useCallback((ev) => {', 900);
   assert('DOOR: the door of the card shown is kept from the root_card_shown record itself (same value as the log)',
     /if \(_r\.event === "root_card_shown"\) lastCardDoor\.current = _r\.fields\.door;/.test(disp) && /const lastCardDoor = useRef\(0\);/.test(CODE));
-  const yes = blk('const handleStageAYes = useCallback(() => {', 900);
+  // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): the handler is longer (the step's question, a UI-only bubble) — read a longer block.
+  const yes = blk('const handleStageAYes = useCallback(() => {', 1700);
   assert('ON «Ναι»: one root_provenance record — the share of THIS root against the conversation so far, and the door',
     /const _found = stageARef\.current\.found;/.test(yes) &&
     /if \(stageARef\.current\.stats\.rootConfirmed === 1\) recordTelemetry\("root_provenance", \{ auraShare: rootAuraShare\(_found, messages\), door: lastCardDoor\.current \}\);/.test(yes) &&
-    yes.indexOf('recordTelemetry("root_provenance"') > yes.indexOf('stageADispatch({ type: "yes", riskKind: riskSignalKind.current });'));
-  assert('… with the CURRENT conversation (messages in the callback\'s dependencies)', /\}, \[stageADispatch, messages\]\);/.test(yes));
+    yes.indexOf('recordTelemetry("root_provenance"') > yes.indexOf('stageADispatch({ type: "yes", riskKind: riskSignalKind.current, step: !STAGE_A_COACH_OFFER });') &&
+    yes.indexOf('stageADispatch({ type: "yes", riskKind: riskSignalKind.current, step: !STAGE_A_COACH_OFFER });') > 0);
+  assert('… with the CURRENT conversation (messages in the callback\'s dependencies)', /\}, \[stageADispatch, messages, addUiBubble\]\);/.test(yes));
   assert('NOTHING ELSE CHANGES on «Ναι»: the same end lines, the same step', /setMessages\(prev => \[\.\.\.prev, \{ id: nextMsgId\(\), role: "assistant", content: buildRootEndLines\(stageARef\.current\.found, _riskOffer\)\.join\("\\n"\), msgMode: "STAGE_A", stageAEnd: true \}\]\);/.test(yes));
   assert('NEW SESSION: the door is forgotten', /lastCardDoor\.current = 0;/.test(blk('const resetSession = () => {', 4000)));
   assert('NEVER SENT, NEVER SHOWN: the number is computed only for the log (not in generateResponse, callAura or the screen)',

@@ -137,8 +137,9 @@ assert("and it does not fire on a sentence with no opposition at all",
 // NOTHING ELSE CHANGED. Not the question, not the prompt, not the pillars, no new question, no
 // state machine. One conjunct removed from one condition, and the variable it read deleted because
 // nothing else read it.
+// UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): John added ONE condition for the test of the 20 — the switch closed (!stageAActive.current).
 assert("the returning-user gate is gone from the trigger condition",
-  /messages\.length === 0 && !firstWhyPending && needsFirstWhy\(userText\)/.test(raw));
+  /messages\.length === 0 && !firstWhyPending && !stageAActive\.current && needsFirstWhy\(userText\)/.test(raw));
 assert("isBrandNewUserMsg is deleted, not left computed and unused",
   !/isBrandNewUserMsg/.test(raw));
 // Judged on EXECUTABLE lines only. The comment above the trigger explains why the memory condition
@@ -173,10 +174,11 @@ assert("the deleted variable is gone from executable code",
 assert("and the First-WHY trigger itself branches on nothing about who the user is",
   !/brandNew/i.test(TRIGGER_CODE) && !/anchors|trajectories/.test(TRIGGER_CODE));
 // The four conditions that remain are the whole gate. Pinned so a fifth cannot appear unnoticed.
-assert("exactly three conditions remain: first message, not already pending, and needsFirstWhy",
+// UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): four — the switch closed is John's one addition; no memory / returning-user condition came back.
+assert("exactly four conditions remain: first message, not already pending, the Stage A switch closed, and needsFirstWhy",
   (() => {
     const m = raw.match(/if \(([^)]*needsFirstWhy\(userText\))\) \{/);
-    return !!m && m[1].split("&&").length === 3;
+    return !!m && m[1].split("&&").length === 4 && m[1].includes("!stageAActive.current") && !/memory|anchor|trajector/i.test(m[1]);
   })());
 
 // ── 5. THE TURN IS UNGUARDED, AND THAT IS THE FACT BEING LOCKED ───────────

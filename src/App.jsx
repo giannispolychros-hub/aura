@@ -1642,7 +1642,8 @@ const STAGE_A_TEXTS = {
   // ADR «17 Οκτωβρίου»: the first line of the session's first reply, drawn by the app (stageAMethodLineDue). Never sent anywhere.
   methodLine: "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.",
   retry: "Πες το λίγο πιο ολοκληρωμένα — όπως θα το έλεγες σε έναν φίλο.",
-  cardLine: "Με το \"Ναι\" ολοκληρώνεται το δωρεάν κομμάτι και σου δείχνω το επόμενο.",
+  // ADR «17 Οκτωβρίου (δ)»: John's text for the test of the 20.
+  cardLine: "Με το \"Ναι\" κλείνει αυτό το κομμάτι και σου δείχνω τι ακολουθεί.",
   cardLineRisk: "Με το \"Ναι\" ολοκληρώνεται αυτό το κομμάτι.",
   // endSecond: only with a risk signal now (B / DISTRESS) — unchanged there. The normal case: endYours … endKeep (ADR «16 Οκτωβρίου (β)»).
   endSecond: "Το πρώτο βήμα κάθε προβλήματος είναι ο πραγματικός ορισμός του — και τον βρήκες εσύ, χωρίς συμβουλές.",
@@ -1669,7 +1670,22 @@ const STAGE_A_TEXTS = {
   copy: "Αντίγραψε τη ρίζα",
   copied: "Αντιγράφηκε",
   download: "Κατέβασε τη ρίζα",
+  // ADR «17 Οκτωβρίου (δ)» (John's decision for the test of the 20): the step after «Ναι», his texts verbatim. «Κι αν όχι τώρα…» is endKeep.
+  stepFound: "Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή. Τώρα ξέρεις τι γίνεται.",
+  stepWhy: "Το πρώτο βήμα είναι το πιο δύσκολο. Γι' αυτό δεν θέλω το τέλειο ούτε το πιο γενναίο. Θέλω το πιο εύκολό σου.",
+  stepQ: "Ποιο είναι το πιο μικρό πράγμα που μπορείς να κάνεις γι' αυτό;",
+  stepUnknown: "Δεν ξέρω ακόμα",
+  fitsQ: "Είναι τόσο μικρό που χωράει σε μία μέρα;",
+  fitsYes: "Ναι",
+  fitsNo: "Όχι, είναι μεγάλο",
+  smallerQ: "Τότε ποιο είναι το πρώτο μικρό κομμάτι του;",
+  whenQ: "Πότε;",
+  doLabel: "Τι θα κάνεις",
+  whenLabel: "Πότε",
 };
+// ADR «17 Οκτωβρίου (δ)», (θ): the €6 screen and the one-tap question after it are closed for the test of the 20 — the step comes
+// after «Ναι» instead. Their code and texts stay exactly as they were: true brings them back, and the step is then not asked.
+const STAGE_A_COACH_OFFER = false;
 // NFC, one space for any whitespace run, outer quotes and spaces removed. The ONE normalisation both sides
 // of the verbatim check go through, so a snippet and a message can only compare equal if the user typed it.
 function normalizeVerbatim(t) {
@@ -1768,6 +1784,22 @@ function buildRootEndLines(found, riskOffer) {
   return [`«${f}»`, STAGE_A_TEXTS.endYours, "", STAGE_A_TEXTS.endDone, STAGE_A_TEXTS.endNext, "",
     STAGE_A_TEXTS.endCoach, STAGE_A_TEXTS.endItem1, STAGE_A_TEXTS.endItem2, STAGE_A_TEXTS.endItem3, "",
     STAGE_A_TEXTS.price, STAGE_A_TEXTS.endKeep];
+}
+// ADR «17 Οκτωβρίου (δ)», (α) — the app's text after «Ναι» when the step is asked: John's text, the root whole and in «», then the question.
+function buildRootStepLines(found) {
+  const f = String(found || "").trim();
+  return [`«${f}»`, STAGE_A_TEXTS.stepFound, "", STAGE_A_TEXTS.stepWhy, STAGE_A_TEXTS.stepQ];
+}
+// ADR «17 Οκτωβρίου (δ)», (ε) — the step card: the user's own words only, in this order, with no sentence of the app's. «Τι ήξερες» only
+// if the root card had it (never invented), «Πότε» only if he wrote one. The ONE source of the card, the copy and the download: the card
+// shows this very text, so the three are the same, character for character.
+function buildStepCardText(knew, knewTruncated, found, step, when) {
+  const rows = [];
+  if (knew) rows.push(`${STAGE_A_TEXTS.knewLabel}: «${knew}${knewTruncated ? "…" : ""}»`);
+  rows.push(`${STAGE_A_TEXTS.foundLabel}: «${String(found || "")}»`);
+  rows.push(`${STAGE_A_TEXTS.doLabel}: «${String(step || "")}»`);
+  if (typeof when === "string" && when.trim()) rows.push(`${STAGE_A_TEXTS.whenLabel}: «${when}»`);
+  return rows.join("\n");
 }
 // ADR «17 Οκτωβρίου» — the app's fixed line about the method goes on the FIRST reply of a Stage A session, once. Never on the
 // safety path: Supportive Mode, any risk latch (crisis A, B, DISTRESS), safety mode, or a first message that itself carries a
@@ -2075,12 +2107,16 @@ function stageAPreRootDecision(decision, st) {
 }
 // STAGE A — the whole flow as one pure step function (SPEC_FREE_END.md §1.5, §2.1, §2.1α, §2.2, §4, §6.1).
 // phase: null (conversation) · "ask" (door 1's fixed question) · "card" · "correct" · "offer" · "notReady" ·
-// "clarity" · "word" · "done". Every transition the screen can make goes through here, so the order of §2.1α is
+// "clarity" · "word" · "done"; ADR «17 Οκτωβρίου (δ)»: "step" · "fits" · "smaller" · "when" (the step, between «Ναι» and "clarity")
+// and "stopped" (a safety signal in the step). Every transition the screen can make goes through here, so the order of §2.1α is
 // enforced by code and every counter of §6.1 changes in exactly one place. An event that does not fit the
 // current phase returns the state unchanged.
 function initialStageAState() {
   return {
     phase: null, door: 0, found: "", knew: null, knewTruncated: false, riskOffer: false, retry: false, leaving: false,
+    // ADR «17 Οκτωβρίου (δ)» — the step: his words (page memory only) and which of its questions he answered (null = not asked).
+    // Outside `stats` on purpose: session_completed stays as it was, and a question that did not appear never becomes a 0.
+    step: "", when: "", stepWritten: null, fitsDay: null, smallerWritten: null, whenWritten: null, stepEnd: "",
     stats: {
       rootDoor: 0, rootShown: 0, rootConfirmed: 0, rootCorrections: 0, rootBack: 0, rootButtonPressed: 0, rootAtReply: 0,
       coachOfferShown: 0, coachOfferClicked: 0, coachOfferDeclined: 0, coachOfferSuppressed: 0, suppressedBy: 0,
@@ -2162,9 +2198,48 @@ function stageAStep(state, ev) {
         st.coachOfferSuppressed = 1; st.suppressedBy = e.riskKind;
         return next({ phase: "clarity", riskOffer: true });
       }
+      // ADR «17 Οκτωβρίου (δ)»: the step instead of the €6 offer (the caller asks for it while STAGE_A_COACH_OFFER is closed).
+      if (e.step) return next({ phase: "step", riskOffer: false });
       st.coachOfferShown = 1; reach(5);
       return next({ phase: "offer", riskOffer: false });
     }
+    // ADR «17 Οκτωβρίου (δ)», (β)–(στ) — the step, in the user's words as typed (edges trimmed), never judged by the app; an empty
+    // answer is not taken. The size question once; «Όχι, είναι μεγάλο» asks for the first small piece once, and that becomes the step.
+    case "stepText": {
+      if (s.phase !== "step") return s;
+      const t = typeof e.text === "string" ? e.text.trim() : "";
+      if (!t) return s;
+      return next({ phase: "fits", step: t, stepWritten: 1 });
+    }
+    case "stepUnknown":
+      if (s.phase !== "step") return s;
+      return next({ phase: "clarity", stepWritten: 0, stepEnd: "none" });
+    case "fitsYes":
+      if (s.phase !== "fits") return s;
+      return next({ phase: "when", fitsDay: 1 });
+    case "fitsNo":
+      if (s.phase !== "fits") return s;
+      return next({ phase: "smaller", fitsDay: 0 });
+    case "smallerText": {
+      if (s.phase !== "smaller") return s;
+      const t = typeof e.text === "string" ? e.text.trim() : "";
+      if (!t) return s;
+      return next({ phase: "when", step: t, smallerWritten: 1 });
+    }
+    case "whenText": {
+      if (s.phase !== "when") return s;
+      const t = typeof e.text === "string" ? e.text.trim() : "";
+      if (!t) return s;
+      return next({ phase: "clarity", when: t, whenWritten: 1, stepEnd: "card" });
+    }
+    case "whenUnknown":
+      if (s.phase !== "when") return s;
+      return next({ phase: "clarity", when: "", whenWritten: 0, stepEnd: "card" });
+    // (η) — a safety signal in a typed answer of the step: the step flow stops at once and keeps nothing of it. No question, card,
+    // clarity, word or end can follow (none of their events is taken in this phase); the message itself goes on to the safety path.
+    case "stepStop":
+      if (s.phase !== "step" && s.phase !== "fits" && s.phase !== "smaller" && s.phase !== "when") return s;
+      return next({ phase: "stopped", step: "", when: "", stepWritten: null, fitsDay: null, smallerWritten: null, whenWritten: null, stepEnd: "" });
     case "want":
       if (s.phase !== "offer") return s;
       st.coachOfferClicked = 1;
@@ -2192,7 +2267,7 @@ function stageAStep(state, ev) {
 // The input box is hidden while the user answers with buttons; it is shown for door 1's question,
 // for «Διόρθωσε», and for the word.
 function stageAInputHidden(phase) {
-  return phase === "card" || phase === "offer" || phase === "notReady" || phase === "clarity";
+  return phase === "card" || phase === "offer" || phase === "notReady" || phase === "clarity" || phase === "fits";
 }
 // A text typed into the Stage A flow (door 1's answer, door 2's capture, «Διόρθωσε») is NOT sent to the
 // model, so the crisis check runs on it here. ANY crisis tier closes the flow and the message goes through
@@ -2245,6 +2320,26 @@ function stageAFlowTelemetry(prev, next, ev) {
     out.push({ event: "coach_offer_answer", fields: { want: ev.type === "want" ? 1 : 0 } });
   } else if (ev.type === "clarity" && prev.phase === "clarity" && next.phase === "word") {
     out.push({ event: "clarity_scale", fields: { value: next.stats.lateClarity } });
+  }
+  return out;
+}
+// ADR «17 Οκτωβρίου (δ)», (ι) — the step's numbers, in the tester file, John's names. step_shown at «Ναι»: 1 the step was asked, 0 a risk
+// path kept it away. The rest ONCE, when the step's questions end (the card, or «Δεν ξέρω ακόμα» at the step): never while they are
+// under way, never at a safety stop, never when the user leaves half way — so a step or a «Πότε» is never counted twice, nor after a
+// crisis. A question that did not appear has NO value, never a 0 standing for an answer that was not given: step_written 1 wrote · 0
+// «Δεν ξέρω ακόμα»; step_fits_day 1 «Ναι» · 0 «Όχι, είναι μεγάλο»; smaller_piece_written 1 (that question has no other way on);
+// when_written 1 wrote · 0 «Δεν ξέρω ακόμα». Built from the state's flags — never from the words.
+function stageAStepTelemetry(prev, next, ev) {
+  const out = [];
+  if (!prev || !next || !ev) return out;
+  const v = x => x === 0 || x === 1;
+  if (ev.type === "yes" && ev.step && prev.phase === "card" && next.phase !== "card") {
+    out.push({ event: "step_shown", fields: { value: next.phase === "step" ? 1 : 0 } });
+  } else if (next.phase === "clarity" && (prev.phase === "step" || prev.phase === "when")) {
+    out.push({ event: "step_written", fields: { value: next.stepWritten === 1 ? 1 : 0 } });
+    if (v(next.fitsDay)) out.push({ event: "step_fits_day", fields: { value: next.fitsDay } });
+    if (next.smallerWritten === 1) out.push({ event: "smaller_piece_written", fields: { value: 1 } });
+    if (v(next.whenWritten)) out.push({ event: "when_written", fields: { value: next.whenWritten } });
   }
   return out;
 }
@@ -6129,10 +6224,14 @@ export default function AURAv2() {
   // ADR «8 Οκτωβρίου (δ)», 5 — where the user's message does not go to the model (the first closing, door 1/2/3 without
   // substance, the «Ναι» of door 2, the correction without substance) it is still SHOWN. A UI-only list, NOT `messages`: no
   // request, detector, counter or telemetry sees it. `at` = how many messages there were when it was typed.
+  // ADR «17 Οκτωβρίου (δ)»: the whole step lives here too — its questions (role "assistant"), his answers and the card (`stepCard`).
   const [uiBubbles, setUiBubbles] = useState([]);
-  const addUiBubble = useCallback((text, at) => {
-    setUiBubbles(prev => [...prev, { id: nextMsgId(), role: "user", content: String(text || ""), at: Number.isInteger(at) ? at : 0 }]);
+  const addUiBubble = useCallback((text, at, extra) => {
+    setUiBubbles(prev => [...prev, { id: nextMsgId(), role: "user", ...(extra || {}), content: String(text || ""), at: Number.isInteger(at) ? at : 0 }]);
   }, []);
+  // ADR «17 Οκτωβρίου (δ)» — a typed answer of the step, held for one moment: a second submit of the same text in that moment (two taps
+  // before the page redraws — the box still holds it) is the same tap. Without this it reached the next phase, or the model (ST6).
+  const stepJustTaken = useRef(null);
   const [stageACopyText, setStageACopyText] = useState(null); // clipboard fallback: the text, shown to select
   const [stageACopied, setStageACopied] = useState(false);
   const cleanLabels = useCallback((t) => { const r = stripInternalLabels(t); if (r.count) labelLeaks.current += r.count; return stripPressurePhrases(stripRootDeclaration(stripForeignHelplines(r.text))); }, []);
@@ -6148,7 +6247,22 @@ export default function AURAv2() {
     }
     const _tel = stageAHelpTelemetry(_prev, stageARef.current, ev); // ADR «8 Οκτωβρίου (δ)», 6: passive, counts only
     if (_tel) recordTelemetry(_tel.event, _tel.fields);
+    for (const _r of stageAStepTelemetry(_prev, stageARef.current, ev)) recordTelemetry(_r.event, _r.fields); // ADR «17 Οκτωβρίου (δ)», (ι)
   }, []);
+  // ADR «17 Οκτωβρίου (δ)» — one event of the step, then the app's next text as a UI-only bubble (never `messages`): the size question,
+  // the smaller-piece question, «Πότε;», the card, or «Κι αν όχι τώρα…». Fixed texts and the user's own words only; no model call.
+  const stageAStepEvent = useCallback((ev, at) => {
+    const _before = stageARef.current.phase;
+    stageADispatch(ev);
+    const _ph = stageARef.current.phase;
+    if (_ph === _before) return;
+    if (_ph === "fits") addUiBubble(STAGE_A_TEXTS.fitsQ, at, { role: "assistant" });
+    else if (_ph === "smaller") addUiBubble(STAGE_A_TEXTS.smallerQ, at, { role: "assistant" });
+    else if (_ph === "when") addUiBubble(STAGE_A_TEXTS.whenQ, at, { role: "assistant" });
+    else if (_ph === "clarity" && stageARef.current.stepEnd === "card") {
+      addUiBubble(buildStepCardText(stageARef.current.knew, stageARef.current.knewTruncated, stageARef.current.found, stageARef.current.step, stageARef.current.when), at, { role: "assistant", stepCard: true });
+    } else if (_ph === "clarity" && stageARef.current.stepEnd === "none") addUiBubble(STAGE_A_TEXTS.endKeep, at, { role: "assistant" });
+  }, [stageADispatch, addUiBubble]);
   // Opens the root card (§1.5): only with the user's own text, «Τι ήξερες» from their first messages, and the
   // risk latch deciding (tier A → no card, counted).
   const stageAOpen = useCallback((door, found, msgsNow) => {
@@ -6285,6 +6399,9 @@ export default function AURAv2() {
   // ADR «8 Οκτωβρίου (δ)», 5: a UI-only bubble (the user's message that went nowhere) appears at the bottom — bring it into view.
   useEffect(() => {
     if (!uiBubbles.length) return;
+    // ADR «17 Οκτωβρίου (δ)»: the step's text after «Ναι» is a UI-only bubble — scrolled to its START, as the end text was.
+    const _saEnd = uiBubbles[uiBubbles.length - 1].stageAEnd ? document.querySelector('[data-stage-a-end="1"]') : null;
+    if (_saEnd) { _saEnd.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [uiBubbles.length]);
   // ADR «10 Οκτωβρίου», 2 — session_abandoned (SPEC §6.1): a session left before its end — the page closed or hidden — is
@@ -8053,6 +8170,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     // single entry point: the bracket structure is broken so the text still reads normally to
     // both the user and the model, but can never match the tag-parsing regexes downstream.
     const userText = input.trim().replace(/\[\[(EXIT:(yes|no)|EARLY_WORD:yes)\]\]/gi, "(  $1  )");
+    if (stepJustTaken.current !== null && stepJustTaken.current === userText) return; // ADR «17 Οκτωβρίου (δ)»: the same tap twice
     setInput("");
     setError(null);
     // STAGE A §4 — the session's risk latch sees EVERY submitted message, before any branch below. Updated with the
@@ -8062,6 +8180,20 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     // model, so the crisis check runs here: ANY crisis closes the flow and the message takes the normal path below.
     const _saPhase = stageARef.current.phase;
     const _saArmed = stageARootArmed.current && !_saPhase && riskSignalKind.current !== 1 && !reflectionDelivered.current && !awaitingRememberedWord;
+    // ADR «17 Οκτωβρίου (δ)» — the step's typed answers (the step, the smaller piece, «Πότε»): taken like the root phrase, through this
+    // box and with no model call, but kept out of `messages` — a UI-only bubble, page memory only, so no request, detector, memory or
+    // telemetry ever sees them. (η): the same detector as for any conversation message runs first. If it catches something, the step
+    // flow stops here and the message goes on down the normal path, where the existing safety path takes it.
+    if (stageAActive.current && (_saPhase === "step" || _saPhase === "smaller" || _saPhase === "when")) {
+      if (detectSafetySignal(userText)) {
+        stageADispatch({ type: "stepStop" });
+      } else {
+        addUiBubble(userText, messages.length);
+        stageAStepEvent({ type: _saPhase === "step" ? "stepText" : _saPhase === "smaller" ? "smallerText" : "whenText", text: userText }, messages.length);
+        stepJustTaken.current = userText; setTimeout(() => { stepJustTaken.current = null; }, 0);
+        return;
+      }
+    }
     if (stageAActive.current && (_saPhase === "ask" || _saPhase === "correct" || _saArmed)) {
       if (!stageACaptureAllowed(userText)) {
         stageARootArmed.current = false;
@@ -8169,7 +8301,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     // no state machine. One conjunct removed, and the variable it read deleted because nothing else
     // read it. What still gates this turn is unchanged — needsFirstWhy, including the γρ. 377
     // binary fast-path, still decides whether asking is appropriate at all.
-    if (messages.length === 0 && !firstWhyPending && needsFirstWhy(userText)) {
+    // ADR «17 Οκτωβρίου (δ)» (John, for the test of the 20): with the switch open First-WHY does NOT fire — the model writes the
+    // first reply (main path below, method line by stageAMethodLineDue). Switch closed: exactly as before. The safety paths above come first.
+    if (messages.length === 0 && !firstWhyPending && !stageAActive.current && needsFirstWhy(userText)) {
       // ADR «17 Οκτωβρίου»: this fixed question IS the session's first reply — the method line goes above it, by the same rule.
       firstWhyMethodLine.current = stageAMethodLineDue({ active: stageAActive.current, auraBefore: false, supportive: false, riskKind: riskSignalKind.current, safetyMode, lastUserText: userText });
       setFirstWhyMessage(userText);
@@ -8388,7 +8522,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     } finally {
       submittingRef.current = false; // RT-15: release guard regardless of which path returned
     }
-  }, [input, loading, sessionEnded, messages, mode, generateResponse, awaitingRememberedWord, deliverFinalClosure, memory, currentDomain]);
+  }, [input, loading, sessionEnded, messages, mode, generateResponse, awaitingRememberedWord, deliverFinalClosure, memory, currentDomain, stageAStepEvent]);
 
   // STAGE A handlers (§1.5, §2.1, §2.1α). Fixed texts only; the model is called only by «back» from door 2's card,
   // so the captured answer gets the reply it would have had — the conversation continues, nothing is lost.
@@ -8408,11 +8542,19 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     if (stageARef.current.phase !== "card") return;
     const _riskOffer = riskSignalKind.current === 2 || riskSignalKind.current === 3;
     const _found = stageARef.current.found;
-    setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: buildRootEndLines(stageARef.current.found, _riskOffer).join("\n"), msgMode: "STAGE_A", stageAEnd: true }]);
-    stageADispatch({ type: "yes", riskKind: riskSignalKind.current });
+    // ADR «17 Οκτωβρίου (δ)», (α): outside the risk paths the step's question comes here, as a UI-only bubble, so nothing of the step
+    // ever reaches `messages` (the closing request, the detectors, memory). The old end text, with the €6, behind STAGE_A_COACH_OFFER.
+    if (!STAGE_A_COACH_OFFER && !_riskOffer) addUiBubble(buildRootStepLines(_found).join("\n"), messages.length, { role: "assistant", stageAEnd: true });
+    else setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: buildRootEndLines(stageARef.current.found, _riskOffer).join("\n"), msgMode: "STAGE_A", stageAEnd: true }]);
+    stageADispatch({ type: "yes", riskKind: riskSignalKind.current, step: !STAGE_A_COACH_OFFER });
     // P4 (ADR «11 Οκτωβρίου (ζ)»): passive, numbers only — how much of the confirmed root the model said first, and its door
     if (stageARef.current.stats.rootConfirmed === 1) recordTelemetry("root_provenance", { auraShare: rootAuraShare(_found, messages), door: lastCardDoor.current });
-  }, [stageADispatch, messages]);
+  }, [stageADispatch, messages, addUiBubble]);
+  // ADR «17 Οκτωβρίου (δ)» — the step's buttons: «Δεν ξέρω ακόμα» (the step, «Πότε»), «Ναι» / «Όχι, είναι μεγάλο» (the size question).
+  // A second tap finds the phase moved on and does nothing.
+  const handleStageAStepButton = useCallback((type) => {
+    stageAStepEvent({ type }, messages.length);
+  }, [stageAStepEvent, messages]);
   const handleStageAClarity = useCallback((n) => {
     if (stageARef.current.phase !== "clarity") return;
     stageADispatch({ type: "clarity", value: n });
@@ -8528,6 +8670,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setCrisisFallback(null);
     setTesterCopy(null);
     firstWhyMethodLine.current = false; // ADR «17 Οκτωβρίου»
+    stepJustTaken.current = null; // ADR «17 Οκτωβρίου (δ)»
     setClaritySurge(false);
     setIllumLevel(0);
     setFinalDistillation(null);
@@ -9083,7 +9226,12 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               onContinueToReflection={() => { if (sessionEnded || loading || layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending || reflectionDelivered.current || (stageAActive.current && stageARef.current.stats.rootConfirmed !== 1)) return; handleClosureConfirm(true); }}
               hideReflection={stageAActive.current && stageAView.stats.rootConfirmed !== 1}
             />
-            {uiBubbles.filter(g => Math.min(g.at, messages.length) === i + 1).map(g => (
+            {uiBubbles.filter(g => Math.min(g.at, messages.length) === i + 1).map(g => g.stepCard ? (
+              // ADR «17 Οκτωβρίου (δ)», (ε): the step card shows the very text the copy and the download carry (buildStepCardText).
+              <div key={g.id} className="warning-card" data-step-card="1">
+                <div className="warning-text" style={{whiteSpace:"pre-wrap",marginBottom:0}}>{g.content}</div>
+              </div>
+            ) : (
               <MessageBubble key={g.id} msg={g} onMisfire={() => {}} onContinueToReflection={() => {}} />
             ))}
             </Fragment>
@@ -9307,6 +9455,18 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                   </div>
                 </div>
               )}
+              {/* ADR «17 Οκτωβρίου (δ)» — the step's buttons, under its questions. No «Δεν ξέρω ακόμα» under the smaller piece. */}
+              {(stageAPhase === "step" || stageAPhase === "when") && (
+                <div className="choice-btns">
+                  <button className="choice-btn" style={{opacity:0.75}} onClick={() => handleStageAStepButton(stageAPhase === "step" ? "stepUnknown" : "whenUnknown")}>{STAGE_A_TEXTS.stepUnknown}</button>
+                </div>
+              )}
+              {stageAPhase === "fits" && (
+                <div className="choice-btns">
+                  <button className="choice-btn" onClick={() => handleStageAStepButton("fitsNo")}>{STAGE_A_TEXTS.fitsNo}</button>
+                  <button className="choice-btn prim" onClick={() => handleStageAStepButton("fitsYes")}>{STAGE_A_TEXTS.fitsYes}</button>
+                </div>
+              )}
               {stageAPhase === "offer" && (
                 <div className="choice-btns">
                   <button className="choice-btn" onClick={() => stageADispatch({ type: "notNow" })}>{STAGE_A_TEXTS.notNow}</button>
@@ -9336,17 +9496,23 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                   </div>
                 </div>
               )}
-              {stageAView.stats.rootConfirmed === 1 && (
+              {/* ADR «17 Οκτωβρίου (δ)», (ε): not while the step's questions are open, never after a safety stop; with the step card,
+                  the copy and the download carry the card's own text (the same function, the same state). */}
+              {stageAView.stats.rootConfirmed === 1 && !["step", "fits", "smaller", "when", "stopped"].includes(stageAPhase) && (
                 <div style={{display:"flex",gap:"8px",flexWrap:"wrap",margin:"10px 0"}}>
                   <button className="choice-btn" onClick={() => {
-                    const _txt = buildRootCopyText(stageAView.knew, stageAView.found, new Date().toISOString().slice(0, 10));
+                    const _txt = stageAView.stepEnd === "card"
+                      ? buildStepCardText(stageAView.knew, stageAView.knewTruncated, stageAView.found, stageAView.step, stageAView.when)
+                      : buildRootCopyText(stageAView.knew, stageAView.found, new Date().toISOString().slice(0, 10));
                     try {
                       navigator.clipboard.writeText(_txt).then(() => setStageACopied(true), () => setStageACopyText(_txt));
                     } catch (e) { setStageACopyText(_txt); }
                   }}>{stageACopied ? STAGE_A_TEXTS.copied : STAGE_A_TEXTS.copy}</button>
                   <button className="choice-btn" onClick={() => {
                     const _date = new Date().toISOString().slice(0, 10);
-                    const _txt = buildRootCopyText(stageAView.knew, stageAView.found, _date);
+                    const _txt = stageAView.stepEnd === "card"
+                      ? buildStepCardText(stageAView.knew, stageAView.knewTruncated, stageAView.found, stageAView.step, stageAView.when)
+                      : buildRootCopyText(stageAView.knew, stageAView.found, _date);
                     try {
                       const _url = URL.createObjectURL(new Blob([_txt], { type: "text/plain;charset=utf-8" }));
                       const _a = document.createElement("a");

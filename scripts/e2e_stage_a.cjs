@@ -38,7 +38,14 @@ const KEY_RAW = process.env.ANTHROPIC_API_KEY || '';
 const KEY = KEY_RAW.trim();
 if (KEY_RAW && KEY !== KEY_RAW) process.env.ANTHROPIC_API_KEY = KEY;
 const APP = LIB.loadApp(fs.readFileSync(path.join(REPO, 'src', 'App.jsx'), 'utf8'));
+// 17/10 (δ): the €6 screen and the one-tap question are behind one constant in App.jsx. Their browser checks run only when it is open
+// (true); while it is closed, the same places check that they never appear and that the step comes instead.
+const COACH_OFFER_OPEN = /\nconst STAGE_A_COACH_OFFER = true;/.test(fs.readFileSync(path.join(REPO, 'src', 'App.jsx'), 'utf8'));
 let BASE = opt('--url', null);
+// 17/10 (δ): --viewport 390x844 | 360x640 — every page of the check opens at this phone size (the sections that test a size of their
+// own, e.g. a short screen or the TX/VO size loops, still set it themselves). Without the option: the sizes each section had.
+const VP = (() => { const m = /^(\d+)x(\d+)$/.exec(opt('--viewport', '') || ''); return m ? { width: +m[1], height: +m[2] } : null; })();
+const vpOr = d => VP || d;
 
 async function launch() {
   return chromium.launch().catch(() => chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }));
@@ -73,7 +80,7 @@ const ok = (label, cond) => { results.push((cond ? 'PASS' : 'FAIL') + ' — ' + 
 
 async function session(query, script) {
   const browser = await launch();
-  const page = await browser.newPage({ viewport: { width: 400, height: 860 } });
+  const page = await browser.newPage({ viewport: vpOr({ width: 400, height: 860 }) });
   const calls = [];
   let n = 0;
   await page.route('**/api/aura', async route => {
@@ -105,14 +112,15 @@ async function runMock() {
       'Η σκέψη σου παραμένει δική σου.',
     ]);
     await send(page, 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.');
-    // First-WHY may ask its fixed question first (no API call); answer it if so.
-    if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.');
+    // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): with the switch open First-WHY no longer fires — the model answers the first message.
+    ok('A: no First-WHY question with the switch open', await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count() === 0 && calls.length === 1);
     await page.waitForTimeout(500);
     ok('A: the root button appears after the first AURA reply', await page.getByRole('button', { name: 'Νομίζω βρήκα τι με απασχολεί' }).count() === 1);
     ok('A: the first request carries the marker in the UNCACHED block', calls.length >= 1 && (calls[0].system || []).length === 2 && calls[0].system[1].text.includes('[FREE PART: ENDS AT ROOT]') && !calls[0].system[0].text.includes('[FREE PART: ENDS AT ROOT]\n'));
     ok('A: the cached block is identical to the core prompt start (cache_control on block 0 only)', calls.length >= 1 && !!calls[0].system[0].cache_control && !calls[0].system[1].cache_control);
     { const c0 = LIB.classifyRequest(calls[0], APP);
-      ok('A: the harness reads the first request as First-WHY, with the Stage A marker and the First-WHY floor', c0.kind === 'firstWhy' && c0.marker === true && c0.ctx.includes('firstWhyFloor') && c0.ctx.includes('stageAMarkerCtx'));
+      // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): the first request is the main path's (the model writes the first reply), not First-WHY's
+      ok('A: the harness reads the first request as the main path, with the Stage A marker and the first-reply floor — not First-WHY', c0.kind === 'main' && c0.marker === true && !c0.ctx.includes('firstWhyFloor') && c0.ctx.includes('stageAMarkerCtx') && c0.ctx.includes('firstReplyFloorCtx'));
       ok('A: no unknown bracketed block in the first request', c0.unknown.length === 0); }
     await page.screenshot({ path: path.join(OUT, 'stageA-1-button.png'), fullPage: false });
     await page.getByRole('button', { name: 'Νομίζω βρήκα τι με απασχολεί' }).click();
@@ -126,7 +134,7 @@ async function runMock() {
     ok('A: the answer is NOT sent to the model', calls.length === callsBefore);
     ok('A: the card shows «Τι βρήκες» verbatim', await page.getByText('«Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.»').count() === 1);
     ok('A: the card shows «Τι ήξερες» from the first message, greeting stripped', await page.getByText('«Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα»').count() === 1);
-    ok('A: the line above «Ναι»', await page.getByText('Με το "Ναι" ολοκληρώνεται το δωρεάν κομμάτι και σου δείχνω το επόμενο.').count() === 1);
+    ok('A: the line above «Ναι»', await page.getByText('Με το "Ναι" κλείνει αυτό το κομμάτι και σου δείχνω τι ακολουθεί.').count() === 1); // UPDATED 17/10 (δ)
     ok('A: the input box is hidden while the card is open', await page.locator('textarea.textarea').count() === 0);
     await page.screenshot({ path: path.join(OUT, 'stageA-2-card.png'), fullPage: false });
     // Correction with no substance: the previous root stays, the app asks for more; then a whole correction.
@@ -142,18 +150,22 @@ async function runMock() {
     await page.waitForTimeout(900);
     { const top = await page.evaluate(() => { const el = document.querySelector('[data-stage-a-end="1"]'); return el ? el.getBoundingClientRect().top : null; });
       ok('A: after «Ναι», on a short phone screen, the root line is visible at the top (not scrolled away for the price)', top !== null && top >= 0 && top < 250); }
-    await page.setViewportSize({ width: 400, height: 860 });
+    await page.setViewportSize(vpOr({ width: 400, height: 860 }));
     await page.screenshot({ path: path.join(OUT, 'stageA-2b-after-yes.png'), fullPage: false });
-    // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 — the root in «», then the offer; the whole text is checked in OF and TX
+    // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): after «Ναι» the step (John's text), not the €6 offer — every detail of it is checked in ST
     ok('A: the root line with the whole root', await page.locator('[data-stage-a-end="1"]').getByText('«Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.»', { exact: true }).count() === 1);
-    ok('A: price line', await page.getByText('€6, μία φορά. Όχι συνδρομή.', { exact: true }).count() === 1);
-    ok('A: offer buttons', await page.getByRole('button', { name: 'Θέλω να συνεχίσω' }).count() === 1 && await page.getByRole('button', { name: 'Όχι τώρα' }).count() === 1);
-    ok('A: copy / download available after «Ναι»', await page.getByRole('button', { name: 'Αντίγραψε τη ρίζα' }).count() === 1 && await page.getByRole('button', { name: 'Κατέβασε τη ρίζα' }).count() === 1);
-    await page.screenshot({ path: path.join(OUT, 'stageA-3-offer.png'), fullPage: true });
-    await page.getByRole('button', { name: 'Θέλω να συνεχίσω' }).click();
-    ok('A: not-ready text + the one-tap question', await page.getByText(APP.texts.notReady, { exact: true }).count() === 1 && await page.getByText('Τι θα σε βοηθούσε περισσότερο τώρα;').count() === 1);
-    await page.screenshot({ path: path.join(OUT, 'stageA-4-notready.png'), fullPage: false });
-    await page.getByRole('button', { name: 'Να βρω ένα μικρό βήμα για να το δοκιμάσω στην πράξη' }).click();
+    ok('A: no price line, no offer buttons — the step question and «Δεν ξέρω ακόμα» instead', await page.getByText('€6', { exact: false }).count() === 0 &&
+      await page.getByRole('button', { name: 'Θέλω να συνεχίσω' }).count() === 0 && await page.getByRole('button', { name: 'Όχι τώρα' }).count() === 0 &&
+      await page.getByText(APP.texts.stepQ, { exact: true }).count() === 1 && await page.getByRole('button', { name: APP.texts.stepUnknown, exact: true }).count() === 1);
+    ok('A: the step question does not go to the model', calls.length === callsBefore);
+    await page.screenshot({ path: path.join(OUT, 'stageA-3-step.png'), fullPage: true });
+    await send(page, 'Να του πω ότι δεν θέλω να γίνω τραπεζίτης.');
+    await page.getByRole('button', { name: APP.texts.fitsYes, exact: true }).click(); await page.waitForTimeout(300);
+    await send(page, 'Την Κυριακή.');
+    ok('A: the step card, then the copy / download', await page.locator('[data-step-card="1"]').count() === 1 &&
+      await page.getByRole('button', { name: 'Αντίγραψε τη ρίζα' }).count() === 1 && await page.getByRole('button', { name: 'Κατέβασε τη ρίζα' }).count() === 1);
+    ok('A: nothing of the step was sent to the model', calls.length === callsBefore);
+    await page.screenshot({ path: path.join(OUT, 'stageA-4-card.png'), fullPage: false });
     ok('A: clarity question with 10 buttons', await page.getByText('Τώρα, πόσο ξεκάθαρο είναι ποιο ακριβώς είναι το πρόβλημα, από το 1 έως το 10;').count() === 1 && await page.getByRole('button', { name: '10', exact: true }).count() === 1);
     await page.getByRole('button', { name: '7', exact: true }).click();
     await page.waitForTimeout(300);
@@ -165,7 +177,8 @@ async function runMock() {
     ok('A: NO 6€ paywall', await page.getByText('ξεκλείδωσε').count() === 0);
     ok('A: «Νέα συνεδρία» is there', await page.getByRole('button', { name: 'Νέα συνεδρία' }).count() === 1);
     const tel = await page.evaluate(() => (window.__auraTelemetry || []).filter(r => r.ev === 'session_completed').pop() || null);
-    ok('A: telemetry: stageA, door 1, shown, confirmed, offer clicked, help 3, clarity 7', !!tel && tel.stageA === 1 && tel.rootDoor === 1 && tel.rootShown === 1 && tel.rootConfirmed === 1 && tel.coachOfferClicked === 1 && tel.coachHelpChoice === 3 && tel.lateClarity === 7 && tel.stageReached === 5);
+    // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): no offer → coachOffer* 0, no help choice, stageReached 4 (the «Ναι»; 5 was the offer)
+    ok('A: telemetry: stageA, door 1, shown, confirmed, no offer, no help choice, clarity 7, stage 4', !!tel && tel.stageA === 1 && tel.rootDoor === 1 && tel.rootShown === 1 && tel.rootConfirmed === 1 && tel.coachOfferShown === 0 && tel.coachOfferClicked === 0 && tel.coachHelpChoice === 0 && tel.lateClarity === 7 && tel.stageReached === 4);
     await page.screenshot({ path: path.join(OUT, 'stageA-5-end.png'), fullPage: true });
     await browser.close();
   }
@@ -232,6 +245,7 @@ async function runMock() {
       await page.getByText('Η ρίζα σου: "Ότι δεν έχω επιτρέψει στον εαυτό μου να πενθήσει τη μητέρα μου.".', { exact: true }).count() === 1 &&
       await page.getByText('Το πρώτο βήμα κάθε προβλήματος είναι ο πραγματικός ορισμός του — και τον βρήκες εσύ, χωρίς συμβουλές.').count() === 1);
     ok('D: straight to the clarity question', await page.getByText('Τώρα, πόσο ξεκάθαρο είναι ποιο ακριβώς είναι το πρόβλημα, από το 1 έως το 10;').count() === 1);
+    ok('D: no step on the risk path (17/10 (δ)) — no step question, no «Δεν ξέρω ακόμα»', await page.getByText(APP.texts.stepQ).count() === 0 && await page.getByRole('button', { name: APP.texts.stepUnknown, exact: true }).count() === 0);
     await browser.close();
   }
   // ── E: a crisis sentence typed as the answer → the flow closes, the crisis path runs ─
@@ -284,7 +298,7 @@ async function runMock() {
     await send(page, 'Φοβάμαι την απόρριψη');
     ok('F2: «Φοβάμαι την απόρριψη» is a root → the card, nothing sent to the model', await page.getByText('«Φοβάμαι την απόρριψη»').count() === 1 && calls.length === before);
     await page.getByRole('button', { name: 'Ναι, αυτό είναι' }).click();
-    await page.getByRole('button', { name: 'Όχι τώρα' }).click();
+    await page.getByRole('button', { name: APP.texts.stepUnknown, exact: true }).click(); // UPDATED 17/10 (δ): the step, not the offer
     await page.getByRole('button', { name: '6', exact: true }).click();
     await page.waitForTimeout(300);
     await send(page, 'απόρριψη');
@@ -341,7 +355,7 @@ async function runMock() {
     const has = async (page, name) => (await page.getByRole('button', { name, exact: true }).count()) > 0;
     const ended = async page => (await page.getByText('ξεκλείδωσε').count()) > 0 || await has(page, 'Νέα συνεδρία');
     const stageAToWord = async page => { await say(page, OPEN.slice(0, 3)); await click(page, 'Νομίζω βρήκα τι με απασχολεί');
-      await send(page, 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.'); await click(page, 'Ναι, αυτό είναι'); await click(page, 'Όχι τώρα'); await click(page, '6'); };
+      await send(page, 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.'); await click(page, 'Ναι, αυτό είναι'); await click(page, APP.texts.stepUnknown); await click(page, '6'); }; // UPDATED 17/10 (δ)
     // 1 — a crisis / DISTRESS message at the «μία λέξη» step: the next message is NOT the word, the session stays open
     for (const [lvl, msg, reply] of [['A', A, SUP], ['DISTRESS', D, 'Είμαι εδώ. Θέλεις να μου πεις λίγο περισσότερο;']]) {
       for (const sw of ['closed', 'open']) {
@@ -397,7 +411,9 @@ async function runMock() {
         // The closing's Part 1 is the 6th request either way: with the switch open the first «Ευχαριστώ.» no longer goes
         // to the model (ADR «8 Οκτωβρίου»), the second closing does.
         const { browser, page } = await session(sw === 'open' ? '?stageA=1' : '', [...EW.slice(0, 5), WQ, EW[7]]);
-        await say(page, [OPEN[0], OPEN[1], OPEN[2], msg, OPEN[3], 'Ευχαριστώ.']);
+        // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): with the switch open First-WHY no longer takes the first message, so OPEN[1] (its
+        // answer) is left out there — the same requests in the same order, and the safety answer is still the one the early word gets
+        await say(page, sw === 'open' ? [OPEN[0], OPEN[2], msg, OPEN[3], 'Ευχαριστώ.'] : [OPEN[0], OPEN[1], OPEN[2], msg, OPEN[3], 'Ευχαριστώ.']);
         if (sw === 'open') { await click(page, 'Δεν το βρήκα ακόμα, συνέχισε'); await send(page, 'Ευχαριστώ, κλείνουμε εδώ.'); }
         await click(page, 'Δείξε μου');
         ok(`S4 (${lvl}, switch ${sw}): the answer «${msg.slice(0, 22)}…» was not kept as the early word — the closing asks for the word, the session is still open`,
@@ -592,7 +608,7 @@ async function runMock() {
     const LEAK = '[MASTER PRIORITY RULE — STAGE: GRACEFUL EXIT]\n\nΚαλή συνέχεια.';
     const WQ = 'ΗΡΘΕΣ ΜΕ: α\nΒΡΗΚΕΣ: β\nΦΕΥΓΕΙΣ ΜΕ: γ\n\nΠριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.';
     const bubbles = async page => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
-    const open = async (query, replies) => { const s = await session(query, replies); await s.page.setViewportSize({ width: 390, height: 700 });
+    const open = async (query, replies) => { const s = await session(query, replies); await s.page.setViewportSize(vpOr({ width: 390, height: 700 }));
       await send(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, W); return s; };
     {
       // switch closed, the phone test itself: the label goes, «Καλή συνέχεια.» stays — on screen and in what the model sees next
@@ -642,6 +658,8 @@ async function runMock() {
       }
     }
   }
+  if (opt('--only', '') === 'MAIN') return; // 17/10 (δ): A–V alone
+  await runMockST();
   await runMockW();
   await runMockX();
   await runMockY();
@@ -682,7 +700,7 @@ async function runMockOF() {
   const SEED = JSON.stringify([{ ev: 'session_started', t: 1 }, { ev: 'root_card_shown', t: 2, door: 1 }, { ev: 'coach_help_choice', t: 3, choice: 4 }]);
   const open = async (query, o) => {
     const browser = await launch();
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, userAgent: o.ua || PHONE_UA, acceptDownloads: true });
+    const ctx = await browser.newContext({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true, deviceScaleFactor: 2, userAgent: o.ua || PHONE_UA, acceptDownloads: true });
     if (o.grant !== false) await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE }).catch(() => {});
     await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
     if (o.seed) await ctx.addInitScript(v => { try { localStorage.setItem('aura_telemetry_log', v); } catch (e) {} }, o.seed);
@@ -732,6 +750,21 @@ async function runMockOF() {
     await tap(s.page, T.button); await say(s.page, ROOT);
     await tap(s.page, T.yes); await s.page.waitForTimeout(700);
     const shown = (await s.page.locator('[data-stage-a-end="1"] .msg-aura').innerText().catch(() => '')).split('\n').map(x => x.trim()).filter(Boolean);
+    if (!COACH_OFFER_OPEN) {
+      // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): the €6 text is closed — after «Ναι» John's step text, the root seen first, the question
+      // and «Δεν ξέρω ακόμα» on the same phone screen; then the step to its card, clarity, the word, the end screen
+      const STEPL = [`«${ROOT}»`, T.stepFound, T.stepWhy, T.stepQ];
+      ok('OF1 (offer closed): after «Ναι» the screen shows John\'s step text, in order, character for character — no €6', JSON.stringify(shown) === JSON.stringify(STEPL) && !(await s.page.locator('body').innerText()).includes('€6'));
+      const first = await inView(s.page, STEPL[0]), q = await inView(s.page, T.stepQ);
+      const ub = await btn(s.page, T.stepUnknown).boundingBox({ timeout: 2000 }).catch(() => null);
+      ok('OF1 (offer closed): on the phone the root line is seen first, near the top; the question and «Δεν ξέρω ακόμα» on the same screen',
+        !!first && first.top >= 0 && first.top < 200 && !!q && q.bottom <= q.h && !!ub && ub.y + ub.height <= q.h);
+      await s.page.screenshot({ path: path.join(OUT, 'OF-1-after-yes' + (VP ? '-' + VP.width + 'x' + VP.height : '') + '.png'), fullPage: false });
+      await say(s.page, 'Να του πω ότι δεν θέλω να γίνω τραπεζίτης.'); await tap(s.page, T.fitsYes); await say(s.page, 'Την Κυριακή.');
+      ok('OF2 (offer closed): no not-ready text, no one-tap question — the step card, then the clarity scale',
+        await s.page.getByText(T.notReady, { exact: true }).count() === 0 && await s.page.getByText(T.helpQ, { exact: true }).count() === 0 &&
+        await s.page.locator('[data-step-card="1"]').count() === 1 && await s.page.getByText(T.clarityQ, { exact: true }).count() === 1);
+    } else {
     ok('OF1: after «Ναι» the screen shows John\'s lines, in order, character for character', JSON.stringify(shown) === JSON.stringify(JOHN));
     const first = await inView(s.page, JOHN[0]);
     ok('OF1: on the phone the root line is seen first — inside the screen, near its top', !!first && first.top >= 0 && first.top < 200 && first.bottom <= first.h);
@@ -756,13 +789,14 @@ async function runMockOF() {
     const ch = log.filter(r => r.ev === 'coach_help_choice');
     ok('OF2: «Να με ξαναρωτήσει σε λίγες μέρες τι έγινε» is recorded as choice 4, once; then the clarity scale', ch.length === 1 && ch[0].choice === 4 &&
       await s.page.getByText(T.clarityQ, { exact: true }).count() === 1);
+    }
     await tap(s.page, '7'); await say(s.page, 'πατέρας'); await s.page.waitForTimeout(900);
     ok('OF3 (end screen, phone browser): the button is there and no result is shown before it is tapped',
       await btn(s.page, TT.button).count() === 1 && await s.page.locator('[role="status"]').count() === 0);
     const r = await sendData(s.page);
     ok('OF3 (end screen, phone browser): «' + TT.copied + '» next to the button', r.status.length === 1 && r.status[0] === TT.copied);
-    ok('OF3 (end screen): the clipboard holds the file, and the same file was downloaded (choice 4 in it, numbers only)',
-      !!r.file && r.clip === r.file && /"choice": 4/.test(r.file) && !/[Ͱ-Ͽἀ-῿]/.test(r.file));
+    ok('OF3 (end screen): the clipboard holds the file, and the same file was downloaded (' + (COACH_OFFER_OPEN ? 'choice 4' : 'the step\'s numbers') + ' in it, numbers only)',
+      !!r.file && r.clip === r.file && (COACH_OFFER_OPEN ? /"choice": 4/.test(r.file) : /"ev": "step_written"/.test(r.file) && /"ev": "when_written"/.test(r.file)) && !/[Ͱ-Ͽἀ-῿]/.test(r.file));
     const rb = await btn(s.page, TT.button).boundingBox({ timeout: 2000 }).catch(() => null), sb = await s.page.locator('[role="status"]').boundingBox({ timeout: 2000 }).catch(() => null);
     ok('OF3: the result is right next to the button (directly under it)', !!rb && !!sb && sb.y >= rb.y + rb.height - 1 && sb.y - (rb.y + rb.height) < 30);
     await s.page.locator('[role="status"]').scrollIntoViewIfNeeded().catch(() => {});
@@ -831,7 +865,7 @@ async function runMockFT() {
   const BEAT = 'ΗΡΘΕΣ ΜΕ: σχολή ή δουλειά\nΒΡΗΚΕΣ: είναι σωστή επιλογή\nΦΕΥΓΕΙΣ ΜΕ: δύσκολη αλλά σωστή';
   const run = async (query, replies, msgs) => {
     const browser = await launch();
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }) });
     const bodies = [];
     let n = 0;
     await page.route('**/api/aura', async route => {
@@ -850,7 +884,9 @@ async function runMockFT() {
   };
   // ── FT1 + FT2 (switch open) ──
   {
-    const s = await run('?stageA=1&rec=1', [...R, STOP, 'Τι άλλο;'], V.slice(0, 5));
+    // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): with the switch open the first message goes to the model (no First-WHY) — one reply more at
+    // the start, so every other reply answers the same message as before
+    const s = await run('?stageA=1&rec=1', ['Τι σε κάνει να το σκέφτεσαι τώρα;', ...R, STOP, 'Τι άλλο;'], V.slice(0, 5));
     const at4 = s.bodies.length - 1; // the request after «ουδέτερα»
     const d = s.dyn(at4);
     ok('FT1 (switch open): after two risk checks, the next request carries the limit note (2 for an ambiguous phrase)',
@@ -875,14 +911,18 @@ async function runMockFT() {
     ok('FT2: «Ναι» → the app\'s root question at once, NO model call (door 2, unchanged)',
       s.bodies.length === before && await s.page.getByText(T.ask, { exact: true }).count() >= 1);
     await send(s.page, 'Ότι θέλω τη σχολή αλλά φοβάμαι ότι δεν θα βγαίνουμε με το δάνειο.');
-    ok('FT2: … the root card with the user\'s words, «Ναι» → the €6 offer, as before',
+    ok('FT2: … the root card with the user\'s words, then «Ναι»',
       await s.btn(T.yes).count() === 1);
     await s.btn(T.yes).click(); await s.page.waitForTimeout(600);
     const log = await s.page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
     const card = log.filter(e => e.ev === 'root_card_shown');
-    ok('FT2: the offer is there; the log has the card from door 2 and the €6 offer shown — telemetry unchanged',
+    // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): with the €6 screen closed, the step comes after «Ναι»
+    if (COACH_OFFER_OPEN) ok('FT2: the offer is there; the log has the card from door 2 and the €6 offer shown — telemetry unchanged',
       await s.btn(T.wantMore).count() === 1 && card.length === 1 && card[0].door === 2 && log.some(e => e.ev === 'coach_offer_shown'));
-    await s.page.screenshot({ path: path.join(OUT, 'FT-stageA-offer.png'), fullPage: false });
+    else ok('FT2: the step is there, no €6 offer; the log has the card from door 2 and step_shown 1',
+      await s.btn(T.wantMore).count() === 0 && await s.page.getByText(T.stepQ, { exact: true }).count() === 1 && card.length === 1 && card[0].door === 2 &&
+      log.some(e => e.ev === 'step_shown' && e.value === 1) && !log.some(e => e.ev === 'coach_offer_shown'));
+    await s.page.screenshot({ path: path.join(OUT, 'FT-stageA-after-yes.png'), fullPage: false });
     await s.browser.close();
   }
   // ── FT3 (switch closed): the ΗΡΘΕΣ ΜΕ summary once ──
@@ -930,7 +970,7 @@ async function runMockLR() {
   const SAFETY = 'the safety path was activated earlier in this session';
   const run = async (query, replies, msgs) => {
     const browser = await launch();
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true });
     const bodies = [];
     let n = 0;
     await page.route('**/api/aura', async route => {
@@ -1016,7 +1056,7 @@ async function runMockR3() {
   const NEW = 'Ευχαριστώ που το μοιράστηκες. Να είσαι καλά.';
   const run = async (query, replies, msgs) => {
     const browser = await launch();
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true });
     const bodies = [];
     let n = 0;
     await page.route('**/api/aura', async route => {
@@ -1117,7 +1157,7 @@ async function runMockR4() {
   const STOP = 'Για στάσου εδώ.\n\nΜόλις είπες: «να είχα κάνει κάτι που να μου άφηνε την αίσθηση ότι διάλεξα εγώ».\n\n' + READY;
   const run = async (replies, msgs) => {
     const browser = await launch();
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true });
     const bodies = [];
     let n = 0;
     await page.route('**/api/aura', async route => {
@@ -1273,6 +1313,37 @@ async function runMockTX() {
     await send(page, ROOT);
     await btn('Ναι, αυτό είναι').click({ timeout: 4000 }).catch(() => {}); await page.waitForTimeout(900);
     const lines = await page.evaluate(() => { const m = document.querySelector('[data-stage-a-end="1"] .msg-aura'); return m ? [...m.children].map(c => c.textContent) : null; });
+    // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): with the €6 screen closed, John's step text (written out here, word for word) and its fit
+    const STEPTX = [`«${ROOT}»`, 'Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή. Τώρα ξέρεις τι γίνεται.', '',
+      'Το πρώτο βήμα είναι το πιο δύσκολο. Γι\' αυτό δεν θέλω το τέλειο ούτε το πιο γενναίο. Θέλω το πιο εύκολό σου.', 'Ποιο είναι το πιο μικρό πράγμα που μπορείς να κάνεις γι\' αυτό;'];
+    if (!COACH_OFFER_OPEN) {
+      ok(`TX4 (${tag}, offer closed): John's step text, line for line, with its blank line`, JSON.stringify(lines) === JSON.stringify(STEPTX));
+      const g4 = await page.evaluate(() => { const m = document.querySelector('[data-stage-a-end="1"] .msg-aura'); if (!m) return null;
+        const W = window.innerWidth, rs = [...m.children].map(c => c.getBoundingClientRect()).filter(r => r.width > 0);
+        return { inside: rs.every(r => r.left >= 0 && r.right <= W + 0.5), noSideScroll: document.documentElement.scrollWidth <= W, top: Math.round(m.getBoundingClientRect().top), bottom: Math.round(m.getBoundingClientRect().bottom), h: window.innerHeight }; });
+      const ub = await btn('Δεν ξέρω ακόμα').boundingBox({ timeout: 2000 }).catch(() => null);
+      ok(`TX4 (${tag}, offer closed): every line inside the width, the root first near the top, the whole text and «Δεν ξέρω ακόμα» on one screen`,
+        !!g4 && g4.inside && g4.noSideScroll && g4.top >= 0 && g4.top < 200 && g4.bottom <= g4.h && !!ub && ub.y + ub.height <= vp.height);
+      await page.screenshot({ path: path.join(OUT, 'TX-4-step' + sfx + '.png'), fullPage: false });
+      await send(page, 'Να του στείλω ένα μήνυμα.');
+      const fq = await fit(page, 'Είναι τόσο μικρό που χωράει σε μία μέρα;');
+      const bn = await btn('Όχι, είναι μεγάλο').boundingBox({ timeout: 2000 }).catch(() => null), by = await btn('Ναι').boundingBox({ timeout: 2000 }).catch(() => null);
+      ok(`TX5 (${tag}, offer closed): «Είναι τόσο μικρό που χωράει σε μία μέρα;», whole, with «Όχι, είναι μεγάλο» and «Ναι» inside the screen`,
+        good(fq) && !!bn && !!by && bn.x >= 0 && by.x + by.width <= vp.width + 0.5 && by.y + by.height <= vp.height);
+      await page.screenshot({ path: path.join(OUT, 'TX-5-fits' + sfx + '.png'), fullPage: false });
+      await btn('Όχι, είναι μεγάλο').click({ timeout: 4000 }).catch(() => {}); await page.waitForTimeout(400);
+      ok(`TX5 (${tag}, offer closed): «Τότε ποιο είναι το πρώτο μικρό κομμάτι του;», whole`, good(await fit(page, 'Τότε ποιο είναι το πρώτο μικρό κομμάτι του;')));
+      await send(page, 'Να γράψω δύο γραμμές.');
+      ok(`TX5 (${tag}, offer closed): «Πότε;», whole, with «Δεν ξέρω ακόμα»`, good(await fit(page, 'Πότε;')) && await btn('Δεν ξέρω ακόμα').count() === 1);
+      await send(page, 'Αύριο το πρωί, πριν τη δουλειά.');
+      const cg = await page.evaluate(() => { const c = document.querySelector('[data-step-card="1"] .warning-text'); if (!c) return null; const r = c.getBoundingClientRect();
+        return { text: c.innerText, inside: r.left >= 0 && r.right <= window.innerWidth + 0.5, notCut: c.scrollWidth <= c.clientWidth + 1, noSideScroll: document.documentElement.scrollWidth <= window.innerWidth }; });
+      ok(`TX5 (${tag}, offer closed): the card, his words, inside the width, nothing cut`, !!cg && cg.inside && cg.notCut && cg.noSideScroll &&
+        cg.text.endsWith('Τι βρήκες: «' + ROOT + '»\nΤι θα κάνεις: «Να γράψω δύο γραμμές.»\nΠότε: «Αύριο το πρωί, πριν τη δουλειά.»'));
+      await page.screenshot({ path: path.join(OUT, 'TX-6-card' + sfx + '.png'), fullPage: false });
+      await browser.close();
+      continue;
+    }
     ok(`TX4 (${tag}): John's text, line for line, with its three blank lines`, JSON.stringify(lines) === JSON.stringify(OFFER));
     const geo = await page.evaluate(() => { const m = document.querySelector('[data-stage-a-end="1"] .msg-aura'); if (!m) return null;
       const W = window.innerWidth, rs = [...m.children].map(c => c.getBoundingClientRect()).filter(r => r.width > 0);
@@ -1321,7 +1392,7 @@ async function runMockVO() {
     'Εγώ όμως νιώθω ότι κάτι μέσα μου σβήνει κάθε μέρα που περνάει εκεί μέσα και δεν ξέρω τι να κάνω με όλο αυτό.';
   const open = async (query, replies, vp) => {
     const browser = await launch();
-    const page = await browser.newPage({ viewport: vp || { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    const page = await browser.newPage({ viewport: vp || vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
     const bodies = [];
     let n = 0;
     await page.route('**/api/aura', async route => {
@@ -1350,18 +1421,22 @@ async function runMockVO() {
   for (const vp of [{ width: 390, height: 844 }, { width: 360, height: 640 }]) {
     const tag = `${vp.width}×${vp.height}`, sfx = '-' + vp.width;
     // ── VO1: short first message → the app's first question, with the line above it ──
+    // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): with the switch open First-WHY no longer fires — the same short message gets the MODEL's
+    // first reply, under the method line; the app's question «Γιατί έχει σημασία…» never appears
     {
       const s = await open('?stageA=1&rec=1', ['Μια φωτογραφία. Τι είδες σε αυτήν;', 'Και τι σκέφτηκες τότε;'], vp);
       await send(s.page, 'Δεν ξέρω αν πρέπει να αλλάξω δουλειά.');
-      const f = await fit(s.page, METHOD), q = await fit(s.page, FW);
-      ok(`VO1 (${tag}): a short first message → the app's question «${FW}» with the method line above it, word for word, whole on the screen`,
-        !!f && f.ok && !!q && f.bottom <= q.top && f.top >= 0 && q.bottom <= f.h && s.bodies.length === 0);
+      const f = await fit(s.page, METHOD);
+      let a = await s.aura();
+      ok(`VO1 (${tag}): a short first message → no «${FW}»; the model's first reply under the method line, word for word, whole on the screen`,
+        !!f && f.ok && f.top >= 0 && f.bottom <= f.h && s.bodies.length === 1 && await s.page.getByText(FW).count() === 0 &&
+        a.length === 1 && a[0] === METHOD + '\n' + 'Μια φωτογραφία. Τι είδες σε αυτήν;');
       await s.page.screenshot({ path: path.join(OUT, 'VO-1-first-reply' + sfx + '.png'), fullPage: false });
       await send(s.page, 'Γιατί κάθε πρωί δεν θέλω να πάω.');
-      const a = await s.aura();
-      ok(`VO1 (${tag}): after the answer the first bubble keeps it as its first line; the model's reply has none; once on the screen`,
-        a.length === 2 && a[0] === METHOD + '\n' + FW && a[1] === 'Μια φωτογραφία. Τι είδες σε αυτήν;' && await s.lines() === 1);
-      ok(`VO1 (${tag}): the line is in no history sent to the model`, s.bodies.length === 1 && !s.sent().includes('Δεν θα σου δώσω λίστα με αιτίες'));
+      a = await s.aura();
+      ok(`VO1 (${tag}): the second reply has none; the line once on the screen`,
+        a.length === 2 && a[0] === METHOD + '\n' + 'Μια φωτογραφία. Τι είδες σε αυτήν;' && a[1] === 'Και τι σκέφτηκες τότε;' && await s.lines() === 1);
+      ok(`VO1 (${tag}): the line is in no history sent to the model`, s.bodies.length === 2 && !s.sent().includes('Δεν θα σου δώσω λίστα με αιτίες'));
       await s.browser.close();
     }
     // ── VO2: long first message → the model's first reply carries the line ──
@@ -1486,6 +1561,455 @@ async function runMockAP() {
   ok('AP: a crisis-prompt request with 300 messages → 413, and Anthropic is never called', r2.status === 413 && seen[seen.length - 1].upstream === 0);
 }
 
+// ── ST: John, 17/10/2026 (ADR «17 Οκτωβρίου (δ)»), for the test of the 20. The step after «Ναι», on a phone (390×844 unless --viewport),
+// ?stageA=1&rec=1, memory closed (its default). Every request of the app goes through the REAL api/aura.js (its guard: a 403/413 here
+// would be a refused real call), with the call to Anthropic replaced by the fake model. ST0 First-WHY does not fire with the switch
+// open (and still does with it closed) · ST1 the whole step, normal end: John's texts word for word, his words on the card, the card =
+// the copy = the download, the numbers, nothing of the step in any request, storage or the console · ST2 «Δεν ξέρω ακόμα» at the step ·
+// ST3 «Δεν ξέρω ακόμα» at «Πότε» · ST4 «Όχι, είναι μεγάλο»: one smaller-piece question, no third · ST5 a crisis («θέλω να πεθάνω») at
+// the step, the smaller piece and «Πότε» (and DISTRESS): the safety path, nothing after it · ST6 double taps · ST7 reload and back ·
+// ST8 the €6 screen from no path (correction, door 4, door 2) · ST9 the switch closed · ST10 privacy. Alone: --only ST.
+async function runMockST() {
+  // John's texts, written out here on purpose (so the old code fails, and never crashes the run); the first check: the app has them, word for word
+  const JT = { stepFound: 'Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή. Τώρα ξέρεις τι γίνεται.',
+    stepWhy: 'Το πρώτο βήμα είναι το πιο δύσκολο. Γι\' αυτό δεν θέλω το τέλειο ούτε το πιο γενναίο. Θέλω το πιο εύκολό σου.',
+    stepQ: 'Ποιο είναι το πιο μικρό πράγμα που μπορείς να κάνεις γι\' αυτό;', stepUnknown: 'Δεν ξέρω ακόμα', fitsQ: 'Είναι τόσο μικρό που χωράει σε μία μέρα;',
+    fitsYes: 'Ναι', fitsNo: 'Όχι, είναι μεγάλο', smallerQ: 'Τότε ποιο είναι το πρώτο μικρό κομμάτι του;', whenQ: 'Πότε;', doLabel: 'Τι θα κάνεις', whenLabel: 'Πότε',
+    endKeep: 'Κι αν όχι τώρα, αυτό που βρήκες είναι ήδη δικό σου.', cardLine: 'Με το "Ναι" κλείνει αυτό το κομμάτι και σου δείχνω τι ακολουθεί.' };
+  ok('ST: the app\'s texts of the step are John\'s, word for word', Object.keys(JT).every(k => APP.texts[k] === JT[k]));
+  const T = Object.assign({}, APP.texts, JT);
+  const F1 = 'Θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει.';
+  const ROOT = 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.';
+  const STEP = 'Να στείλω μήνυμα στη Μαρία για καφέ.', BIG = 'Να αλλάξω δουλειά.', SMALL = 'Να γράψω το βιογραφικό μου.', WHEN = 'Αύριο το απόγευμα.';
+  const CRISIS = 'θέλω να πεθάνω', DISTRESS = 'Το πένθος για τη μητέρα μου με έχει παραλύσει.';
+  const Q1 = 'Τι είναι αυτό που σε κρατάει εκεί;', Q2 = 'Και τι σε τραβάει αλλού;', SUP = 'Είμαι εδώ μαζί σου. Είσαι ασφαλής αυτή τη στιγμή;', END = 'Η σκέψη σου παραμένει δική σου.';
+  const ALPHA = r => ['«' + r + '»', T.stepFound, '', T.stepWhy, T.stepQ].join('\n');
+  const STEP_TEXTS = [T.stepQ, T.fitsQ, T.smallerQ, T.whenQ, T.stepFound, T.stepWhy, T.doLabel + ':'];
+  const OFFER = [T.price, T.endCoach, T.wantMore, T.notNow, T.notReady, T.helpQ, T.help1, T.help4, '€6'];
+  const TESTER = 'Στείλε τα στοιχεία της δοκιμής';
+  // the REAL api/aura.js, its upstream call replaced — the same way as section AP
+  const src = fs.readFileSync(path.join(REPO, 'api', 'aura.js'), 'utf8');
+  const handler = (await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'))).default;
+  const statuses = [];
+  const viaApi = async (body, text) => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ content: [{ type: 'text', text }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    globalThis.__auraRate = new Map();
+    const hadKey = !!process.env.ANTHROPIC_API_KEY;
+    if (!hadKey) process.env.ANTHROPIC_API_KEY = 'e2e-no-network';
+    const raw = JSON.stringify(body);
+    const out = await new Promise(resolve => {
+      let status = 200;
+      const res = { status(c) { status = c; return res; }, json(d) { resolve({ status, data: d }); }, writeHead(c) { status = c; }, write() {}, end() { resolve({ status, data: null }); } };
+      Promise.resolve(handler({ method: 'POST', headers: { 'content-length': String(Buffer.byteLength(raw)) }, body }, res)).catch(() => resolve({ status: 502, data: {} }));
+    });
+    globalThis.fetch = realFetch;
+    if (!hadKey) delete process.env.ANTHROPIC_API_KEY;
+    statuses.push(out.status);
+    return out;
+  };
+  const sess = async (query, replies, o) => {
+    const browser = await launch();
+    const ctx = await browser.newContext({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true, acceptDownloads: true });
+    await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE }).catch(() => {});
+    const page = await ctx.newPage();
+    const calls = [], cons = [];
+    page.on('console', m => cons.push(m.text()));
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      const body = JSON.parse(route.request().postData() || '{}');
+      calls.push(body);
+      const reply = replies[Math.min(n, replies.length - 1)]; n++;
+      const out = await viaApi(body, reply);
+      await route.fulfill({ status: out.status, contentType: 'application/json', body: JSON.stringify(out.data || {}) });
+    });
+    await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    if (!(o && o.noStart)) await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    return { browser, ctx, page, calls, cons };
+  };
+  const say = async (page, text) => { if (await page.locator('textarea.textarea').count()) await send(page, text); };
+  const btn = (page, name) => page.getByRole('button', { name, exact: true });
+  const tap = async (page, name) => { const b = btn(page, name); if (await b.count()) { await b.first().click({ timeout: 4000 }); await page.waitForTimeout(400); return true; } return false; };
+  const has = async (page, text) => (await page.getByText(text, { exact: true }).count()) > 0;
+  const count = async (page, text) => page.getByText(text, { exact: true }).count();
+  const log = page => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return ['unreadable']; } });
+  const evs = (L, name) => L.filter(r => r && r.ev === name);
+  const inputOn = async page => (await page.locator('textarea.textarea').count()) === 1;
+  const card = page => page.locator('[data-step-card="1"]');
+  const cardText = async page => (await card(page).count()) ? (await card(page).first().locator('.warning-text').innerText()) : null;
+  const alphaText = async page => { const e = page.locator('[data-stage-a-end="1"] .msg-aura'); return (await e.count()) ? await e.first().innerText() : null; };
+  const body = page => page.locator('body').innerText();
+  const noOffer = async page => { const b = await body(page); return OFFER.every(x => !b.includes(x)) && !b.includes('ξεκλείδωσε'); };
+  const dump = page => page.evaluate(async () => {
+    const ls = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); ls[k] = localStorage.getItem(k); }
+    const ss = {}; for (let i = 0; i < sessionStorage.length; i++) { const k = sessionStorage.key(i); ss[k] = sessionStorage.getItem(k); }
+    let idb = []; try { idb = indexedDB.databases ? (await indexedDB.databases()).map(d => d.name) : []; } catch (e) { idb = ['error']; }
+    let cachesK = []; try { cachesK = typeof caches !== 'undefined' ? await caches.keys() : []; } catch (e) { cachesK = ['error']; }
+    return { ls, ss, idb, caches: cachesK, cookie: document.cookie };
+  });
+  const knewOf = async page => { if (!(await page.locator('.warning-card .warning-text').count())) return null; const t = await page.locator('.warning-card .warning-text').first().innerText(); const m = /«([^»]*)»/.exec(t); return m ? m[1] : null; };
+  const toCard = async s => { await say(s.page, F1); await tap(s.page, T.button); await say(s.page, ROOT); };
+  const toStep = async s => { await toCard(s); const k = await knewOf(s.page); await tap(s.page, T.yes); return k; };
+  const download = async (page, name) => {
+    try {
+      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }), btn(page, name).click({ timeout: 4000 })]);
+      return { text: fs.readFileSync(await dl.path(), 'utf8'), file: dl.suggestedFilename() };
+    } catch (e) { return { text: '', file: '', error: String(e.message || e).slice(0, 80) }; }
+  };
+  const clip = async page => page.evaluate(() => navigator.clipboard.readText().catch(() => null)).catch(() => null);
+  const shot = async (page, name) => { await page.screenshot({ path: path.join(OUT, name + (VP ? '-' + VP.width + 'x' + VP.height : '') + '.png'), fullPage: false }); };
+  const reqText = calls => JSON.stringify(calls);
+  const verbatim = [];
+
+  // ── ST0: First-WHY does not fire with the switch open; still does with it closed ──
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1]);
+    await say(s.page, F1);
+    const c0 = s.calls[0] ? LIB.classifyRequest(s.calls[0], APP) : null;
+    ok('ST0 (switch open): «' + F1 + '» → no First-WHY question; the model answers at once (one main-path request, Stage A marker)',
+      !(await has(s.page, 'Γιατί έχει σημασία αυτό για σένα τώρα;')) && s.calls.length === 1 && c0 && c0.kind === 'main' && c0.marker === true && !c0.ctx.includes('firstWhyFloor'));
+    const first = await s.page.locator('.turn-aura .msg-aura').first().innerText({ timeout: 2000 }).catch(() => '');
+    ok('ST0 (switch open): the first reply, under the method line', first.startsWith(T.methodLine) && first.includes(Q1));
+    ok('ST0 (switch open): the method line is drawn by the app — never sent', !reqText(s.calls).includes(T.methodLine.slice(0, 40)) || (s.calls[0].messages || []).every(m => !String(m.content).includes(T.methodLine.slice(0, 40))));
+    await s.browser.close();
+  }
+  for (const [lbl, msg, kind] of [['crisis', 'Δεν θέλω να ζω άλλο.', 'supportive'], ['DISTRESS', DISTRESS, 'main']]) {
+    const s = await sess('?stageA=1&rec=1', [SUP]);
+    await say(s.page, msg);
+    const first = await s.page.locator('.turn-aura .msg-aura').first().innerText({ timeout: 2000 }).catch(() => '');
+    ok(`ST0 (switch open, ${lbl} first message): the safety path first, as today — no method line`, s.calls.length === 1 && LIB.classifyRequest(s.calls[0], APP).kind === kind &&
+      !first.includes(T.methodLine) && !(await has(s.page, 'Γιατί έχει σημασία αυτό για σένα τώρα;')));
+    await s.browser.close();
+  }
+  {
+    const s = await sess('', [Q1, Q2]);
+    await say(s.page, F1);
+    ok('ST0 (switch closed): the same message → First-WHY\'s question, no model call, no method line — as before',
+      await has(s.page, 'Γιατί έχει σημασία αυτό για σένα τώρα;') && s.calls.length === 0 && !(await body(s.page)).includes(T.methodLine));
+    await say(s.page, 'Γιατί κάθε πρωί δεν θέλω να πάω.');
+    ok('ST0 (switch closed): … its answer goes to the model as First-WHY, no Stage A marker, no root button', s.calls.length === 1 && LIB.classifyRequest(s.calls[0], APP).kind !== 'supportive' &&
+      LIB.classifyRequest(s.calls[0], APP).marker === false && await btn(s.page, T.button).count() === 0);
+    await s.browser.close();
+  }
+
+  // ── ST1: the whole step, normal end ──
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, END]);
+    await toCard(s);
+    ok('ST1: the card line above «Ναι» is John\'s new text', await has(s.page, T.cardLine) && T.cardLine === 'Με το "Ναι" κλείνει αυτό το κομμάτι και σου δείχνω τι ακολουθεί.');
+    const knew = await knewOf(s.page);
+    const n0 = s.calls.length;
+    await tap(s.page, T.yes);
+    const a = await alphaText(s.page);
+    ok('ST1 (α): after «Ναι», the app\'s message word for word', a === ALPHA(ROOT));
+    verbatim.push('[AURA] ' + (a || '(λείπει)'));
+    const aBox = await s.page.locator('[data-stage-a-end="1"]').boundingBox({ timeout: 2000 }).catch(() => null), uBox = await btn(s.page, T.stepUnknown).boundingBox({ timeout: 2000 }).catch(() => null);
+    ok('ST1 (β): «Δεν ξέρω ακόμα» under the question; the box is there to write in; no copy / download yet; no €6',
+      !!uBox && !!aBox && uBox.y > aBox.y + aBox.height - 2 && await inputOn(s.page) && await btn(s.page, T.copy).count() === 0 && await noOffer(s.page));
+    verbatim.push('[κουμπί] ' + T.stepUnknown + '   [κουτί για να γράψει]');
+    await shot(s.page, 'ST1-1-alpha');
+    const box = await inputOn(s.page);
+    if (box) await s.page.locator('textarea.textarea').fill('   ');
+    ok('ST1 (β): an empty answer is not accepted (the send button stays off, nothing changes)', box && await btn(s.page, 'Go').isDisabled());
+    if (box) { await s.page.locator('textarea.textarea').press('Enter'); await s.page.waitForTimeout(300); }
+    ok('ST1 (β): … not with Enter either', !(await has(s.page, T.fitsQ)) && await count(s.page, T.stepQ) === 1);
+    await say(s.page, STEP);
+    verbatim.push('[ΧΡΗΣΤΗΣ] ' + STEP);
+    ok('ST1 (β): his step as a bubble of his, then the size question with its two buttons; the box is hidden',
+      await count(s.page, STEP) === 1 && await has(s.page, T.fitsQ) && await btn(s.page, T.fitsYes).count() === 1 && await btn(s.page, T.fitsNo).count() === 1 && !(await inputOn(s.page)));
+    verbatim.push('[AURA] ' + T.fitsQ, '[κουμπιά] ' + T.fitsNo + ' · ' + T.fitsYes);
+    await shot(s.page, 'ST1-2-fits');
+    await tap(s.page, T.fitsYes);
+    verbatim.push('[ο χρήστης πατά] ' + T.fitsYes);
+    ok('ST1 (δ): «Πότε;» with «Δεν ξέρω ακόμα», the box back', await has(s.page, T.whenQ) && await btn(s.page, T.stepUnknown).count() === 1 && await inputOn(s.page));
+    verbatim.push('[AURA] ' + T.whenQ, '[κουμπί] ' + T.stepUnknown + '   [κουτί για να γράψει]');
+    await shot(s.page, 'ST1-3-when');
+    await say(s.page, WHEN);
+    verbatim.push('[ΧΡΗΣΤΗΣ] ' + WHEN);
+    const want = 'Τι ήξερες: «' + knew + '»\nΤι βρήκες: «' + ROOT + '»\nΤι θα κάνεις: «' + STEP + '»\nΠότε: «' + WHEN + '»';
+    const ct = await cardText(s.page);
+    ok('ST1 (ε): the card, his words in this order — «Τι ήξερες» / «Τι βρήκες» / «Τι θα κάνεις» / «Πότε»', !!knew && ct === want);
+    verbatim.push('[ΚΑΡΤΑ]\n' + (ct || '(λείπει)'));
+    ok('ST1 (ε): no sentence of praise or good wishes on the card', ct && ct.replace(knew, '').replace(ROOT, '').replace(STEP, '').replace(WHEN, '').replace(/Τι ήξερες|Τι βρήκες|Τι θα κάνεις|Πότε/g, '').replace(/[:«»\s]/g, '') === '');
+    ok('ST1 (ζ): then the clarity question, as today; the copy / download are back', await has(s.page, T.clarityQ) && await btn(s.page, '10').count() === 1 && await btn(s.page, T.copy).count() === 1 && await btn(s.page, T.download).count() === 1);
+    await shot(s.page, 'ST1-4-card');
+    const cardY = (await card(s.page).boundingBox({ timeout: 2000 }).catch(() => null) || {}).y, whenY = (await s.page.getByText(T.whenQ, { exact: true }).boundingBox({ timeout: 2000 }).catch(() => null) || {}).y, clarY = (await s.page.getByText(T.clarityQ, { exact: true }).boundingBox({ timeout: 2000 }).catch(() => null) || {}).y;
+    ok('ST1 (ε): the card sits after «Πότε;» and before the clarity question', cardY > whenY && clarY > cardY);
+    await tap(s.page, T.copy);
+    const cb = await clip(s.page);
+    const fb = await s.page.locator('textarea[readonly]').count() ? await s.page.locator('textarea[readonly]').first().inputValue() : null;
+    ok('ST1 (ε): the copy carries the card\'s text, character for character', (cb !== null ? cb : fb) === ct);
+    if (cb === null) results.push('NOTE — ST1: the clipboard could not be read here; the copy was checked through its fallback box');
+    const dl = await download(s.page, T.download);
+    ok('ST1 (ε): the download carries the card\'s text, character for character', dl.text === ct && /^aura-riza-\d{4}-\d{2}-\d{2}\.txt$/.test(dl.file));
+    ok('ST1: not one request since «Ναι» — the step is never sent to the model', s.calls.length === n0);
+    await tap(s.page, '8');
+    ok('ST1 (ζ): the word question, as today', await s.page.getByText(T.word).count() >= 1 && await inputOn(s.page));
+    await say(s.page, 'Μαρία'); await s.page.waitForTimeout(800);
+    ok('ST1 (ζ): the end, as today (one closing request)', await s.page.getByText('η συνομιλία σταμάτησε εδώ').count() === 1 && s.calls.length === n0 + 1 && LIB.classifyRequest(s.calls[n0], APP).kind === 'termination');
+    const rq = reqText(s.calls);
+    ok('ST1 (ια): nothing of the step in ANY request — not his step, not «Πότε», not the step\'s questions or the card', ![STEP, WHEN, ...STEP_TEXTS].some(x => rq.includes(x)));
+    ok('ST1 (θ): no €6 screen, no 4-option question, at any point', await noOffer(s.page));
+    const L = await log(s.page);
+    const one = (n, v) => evs(L, n).length === 1 && evs(L, n)[0].value === v;
+    ok('ST1 (ι): step_shown 1 · step_written 1 · step_fits_day 1 · when_written 1 — each once; no smaller_piece_written (that question did not appear)',
+      one('step_shown', 1) && one('step_written', 1) && one('step_fits_day', 1) && one('when_written', 1) && evs(L, 'smaller_piece_written').length === 0);
+    ok('ST1 (ι): no offer record, the session completed', !L.some(r => /^coach_/.test(r.ev)) && evs(L, 'session_completed').length === 1);
+    const f = await download(s.page, TESTER);
+    ok('ST1 (ι): the tester file carries the step\'s numbers — numbers only, not one Greek letter', ['step_shown', 'step_written', 'step_fits_day', 'when_written'].every(e => f.text.includes('"' + e + '"')) && !/[Ͱ-Ͽἀ-῿]/.test(f.text));
+    const d = await dump(s.page);
+    const store = JSON.stringify(d);
+    ok('ST1 (ια): written nowhere on the device — localStorage, sessionStorage, IndexedDB, Cache, cookies hold no word of his (step, «Πότε», root, first message, word)',
+      ![STEP, WHEN, ROOT, F1.slice(0, 20), 'Μαρία'].some(x => store.includes(x)) && Object.keys(d.ss).length === 0 && d.idb.length === 0 && d.caches.length === 0 && d.cookie === '');
+    ok('ST1 (ια): memory stays closed (nothing stored under its key)', !d.ls.aura_v2_memory || JSON.parse(d.ls.aura_v2_memory).storageEnabled !== true);
+    results.push('NOTE — ST1 (privacy): on the device after a whole session (?stageA=1&rec=1, memory closed): localStorage keys ' + Object.keys(d.ls).sort().join(', ') +
+      ' · sessionStorage ' + Object.keys(d.ss).length + ' · IndexedDB ' + d.idb.length + ' · Cache ' + d.caches.length + ' · cookies ' + (d.cookie ? 'yes' : 'none'));
+    const con = s.cons.join('\n');
+    ok('ST1 (ια): the console never shows his step or «Πότε»', ![STEP, WHEN].some(x => con.includes(x)));
+    ok('ST1 (privacy): with these replies, no word of his in the console at all', ![F1.slice(0, 20), ROOT, STEP, WHEN, 'Μαρία'].some(x => con.includes(x)));
+    await s.browser.close();
+  }
+  writeOut('ST-verbatim' + (VP ? '-' + VP.width + 'x' + VP.height : '') + '.txt', verbatim.join('\n') + '\n');
+
+  // ── ST2: «Δεν ξέρω ακόμα» at the step ──
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, END]);
+    await toStep(s);
+    await tap(s.page, T.stepUnknown);
+    ok('ST2 (στ): «Κι αν όχι τώρα, αυτό που βρήκες είναι ήδη δικό σου.»', await has(s.page, T.endKeep));
+    ok('ST2 (στ): no size question, no «Πότε;», no card — the clarity question next', !(await has(s.page, T.fitsQ)) && !(await has(s.page, T.whenQ)) && await card(s.page).count() === 0 && await has(s.page, T.clarityQ));
+    await tap(s.page, T.copy);
+    const cb = await clip(s.page);
+    ok('ST2: the copy is the root\'s, as before (no «Τι θα κάνεις»)', cb === null || (cb.includes('Τι βρήκες: «' + ROOT + '»') && !cb.includes(T.doLabel)));
+    const L = await log(s.page);
+    ok('ST2 (ι): step_shown 1, step_written 0 — and no step_fits_day, no when_written (never a fake 0)',
+      evs(L, 'step_shown').length === 1 && evs(L, 'step_written').length === 1 && evs(L, 'step_written')[0].value === 0 && evs(L, 'step_fits_day').length === 0 && evs(L, 'when_written').length === 0 && evs(L, 'smaller_piece_written').length === 0);
+    await tap(s.page, '5'); await say(s.page, 'πατέρας'); await s.page.waitForTimeout(800);
+    ok('ST2 (ζ): then the word and the end, as today; no €6', await s.page.getByText('η συνομιλία σταμάτησε εδώ').count() === 1 && await noOffer(s.page));
+    await shot(s.page, 'ST2-unknown-step');
+    await s.browser.close();
+  }
+
+  // ── ST3: «Δεν ξέρω ακόμα» at «Πότε» ──
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, END]);
+    const knew = await toStep(s);
+    await say(s.page, STEP); await tap(s.page, T.fitsYes); await tap(s.page, T.stepUnknown);
+    const ct = await cardText(s.page);
+    const want = 'Τι ήξερες: «' + knew + '»\nΤι βρήκες: «' + ROOT + '»\nΤι θα κάνεις: «' + STEP + '»';
+    ok('ST3 (δ): the card without the «Πότε» line at all', ct === want && !/Πότε/.test(ct));
+    await tap(s.page, T.copy);
+    const cb = await clip(s.page);
+    const dl = await download(s.page, T.download);
+    ok('ST3 (δ): … nor in the copy or the download — the same text', (cb === null || cb === ct) && dl.text === ct);
+    const L = await log(s.page);
+    ok('ST3 (ι): when_written 0, step_written 1, step_fits_day 1', evs(L, 'when_written').length === 1 && evs(L, 'when_written')[0].value === 0 && evs(L, 'step_written')[0].value === 1 && evs(L, 'step_fits_day')[0].value === 1);
+    await shot(s.page, 'ST3-unknown-when');
+    await s.browser.close();
+  }
+
+  // ── ST4: «Όχι, είναι μεγάλο» ──
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, END]);
+    const knew = await toStep(s);
+    await say(s.page, BIG); await tap(s.page, T.fitsNo);
+    ok('ST4 (γ): «Τότε ποιο είναι το πρώτο μικρό κομμάτι του;», the box to write in, no button under it', await has(s.page, T.smallerQ) && await inputOn(s.page) && await btn(s.page, T.stepUnknown).count() === 0);
+    await shot(s.page, 'ST4-smaller');
+    await say(s.page, SMALL);
+    ok('ST4 (γ): then «Πότε;» — no second size question, no second smaller-piece question', await has(s.page, T.whenQ) && await count(s.page, T.fitsQ) === 1 && await count(s.page, T.smallerQ) === 1);
+    await say(s.page, WHEN);
+    const ct = await cardText(s.page);
+    ok('ST4 (γ): the smaller piece became the step on the card; the big one is not there', ct === 'Τι ήξερες: «' + knew + '»\nΤι βρήκες: «' + ROOT + '»\nΤι θα κάνεις: «' + SMALL + '»\nΠότε: «' + WHEN + '»' && !ct.includes(BIG));
+    ok('ST4 (γ): no third question — after the card, the clarity question', await count(s.page, T.fitsQ) === 1 && await count(s.page, T.smallerQ) === 1 && await count(s.page, T.whenQ) === 1 && await has(s.page, T.clarityQ));
+    const L = await log(s.page);
+    ok('ST4 (ι): step_fits_day 0 · smaller_piece_written 1 · step_written 1 · when_written 1', evs(L, 'step_fits_day')[0] && evs(L, 'step_fits_day')[0].value === 0 &&
+      evs(L, 'smaller_piece_written').length === 1 && evs(L, 'smaller_piece_written')[0].value === 1 && evs(L, 'step_written')[0].value === 1 && evs(L, 'when_written')[0].value === 1);
+    ok('ST4: neither piece reached a request', ![BIG, SMALL, WHEN].some(x => reqText(s.calls).includes(x)));
+    await s.browser.close();
+  }
+
+  // ── ST5: a crisis in each typed answer of the step (and DISTRESS) ──
+  for (const [at, lead, msg, kind] of [
+    ['(β) the step', async p => {}, CRISIS, 'supportive'],
+    ['(γ) the smaller piece', async p => { await say(p, BIG); await tap(p, T.fitsNo); }, CRISIS, 'supportive'],
+    ['(δ) «Πότε»', async p => { await say(p, STEP); await tap(p, T.fitsYes); }, CRISIS, 'supportive'],
+    ['(δ) «Πότε», DISTRESS', async p => { await say(p, STEP); await tap(p, T.fitsYes); }, DISTRESS, 'main'],
+  ]) {
+    const s = await sess('?stageA=1&rec=1', [Q1, SUP, 'Πες μου τι γίνεται τώρα.']);
+    await toStep(s);
+    await lead(s.page);
+    const n0 = s.calls.length;
+    await say(s.page, msg); await s.page.waitForTimeout(700);
+    const c = s.calls[n0] ? LIB.classifyRequest(s.calls[n0], APP) : null;
+    ok(`ST5 (${at}): «${msg.slice(0, 20)}» → the existing safety path, as for any message (${kind === 'supportive' ? 'Supportive, the 1018 line' : 'the distress path'})`,
+      s.calls.length === n0 + 1 && !!c && c.kind === kind && (kind !== 'supportive' || await s.page.getByText(/1018/).count() >= 1));
+    const stopped = async () => await card(s.page).count() === 0 && !(await has(s.page, T.whenQ) && msg === CRISIS && at.startsWith('(β)')) &&
+      await btn(s.page, T.stepUnknown).count() === 0 && await btn(s.page, T.fitsYes).count() === 0 && !(await has(s.page, T.clarityQ)) &&
+      (await s.page.getByText(T.word).count()) === 0 && (await s.page.getByText('η συνομιλία σταμάτησε εδώ').count()) === 0;
+    ok(`ST5 (${at}): the step flow stopped at once — no next step question, no card, no clarity, no word, no end`, await stopped() &&
+      await count(s.page, T.whenQ) <= (at.startsWith('(δ)') ? 1 : 0) && await count(s.page, T.smallerQ) <= (at.startsWith('(γ)') ? 1 : 0));
+    const L = await log(s.page);
+    ok(`ST5 (${at}): no step and no «Πότε» counted (step_shown only)`, evs(L, 'step_shown').length === 1 && ['step_written', 'step_fits_day', 'smaller_piece_written', 'when_written'].every(e => evs(L, e).length === 0));
+    ok(`ST5 (${at}): the safety request carries none of his earlier step answers`, ![STEP, BIG].some(x => reqText(s.calls).includes(x)));
+    await say(s.page, 'Δεν ξέρω.'); await s.page.waitForTimeout(500);
+    ok(`ST5 (${at}): a next message is a conversation message (to the model) — still no card, no step question, no end`, s.calls.length === n0 + 2 && await stopped());
+    if (at === '(δ) «Πότε»') await shot(s.page, 'ST5-crisis-when');
+    await s.browser.close();
+  }
+
+  // ── ST6: double taps ──
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, END]);
+    await toCard(s);
+    await btn(s.page, T.yes).dblclick({ timeout: 4000 }).catch(() => {}); await s.page.waitForTimeout(400);
+    ok('ST6: a double tap on «Ναι, αυτό είναι» → one message, one step_shown', await s.page.locator('[data-stage-a-end="1"]').count() === 1 && evs(await log(s.page), 'step_shown').length === 1);
+    // the hardest case: two submits in the same moment (one script, before the page redraws)
+    if (await inputOn(s.page)) await s.page.locator('textarea.textarea').fill(STEP);
+    await s.page.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => x.textContent === 'Go'); if (b) { b.click(); b.click(); } });
+    await s.page.waitForTimeout(700);
+    ok('ST6: two submits of the step in the same moment → taken once (one bubble, one size question), nothing sent to the model',
+      await count(s.page, STEP) === 1 && await count(s.page, T.fitsQ) === 1 && s.calls.length === 1 && !reqText(s.calls).includes(STEP));
+    await s.page.evaluate(n => { const b = [...document.querySelectorAll('button')].find(x => x.textContent === n); if (b) { b.click(); b.click(); } }, T.fitsYes);
+    await s.page.waitForTimeout(400);
+    ok('ST6: a double tap on «Ναι» (size) → one «Πότε;»', await count(s.page, T.whenQ) === 1);
+    await s.page.evaluate(n => { const b = [...document.querySelectorAll('button')].find(x => x.textContent === n); if (b) { b.click(); b.click(); } }, T.stepUnknown);
+    await s.page.waitForTimeout(400);
+    const L = await log(s.page);
+    ok('ST6: a double tap on «Δεν ξέρω ακόμα» (Πότε) → one card, each number once', await card(s.page).count() === 1 &&
+      ['step_shown', 'step_written', 'step_fits_day', 'when_written'].every(e => evs(L, e).length === 1));
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, END]);
+    await toStep(s);
+    if (await inputOn(s.page)) await s.page.locator('textarea.textarea').fill(WHEN);
+    await s.page.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => x.textContent === 'Go'); if (b) { b.click(); b.click(); } });
+    await s.page.waitForTimeout(500);
+    await say(s.page, SMALL);
+    ok('ST6: two submits at the step, then a smaller piece is not mistaken for anything else (size question once, no request)', await count(s.page, T.fitsQ) === 1 && s.calls.length === 1);
+    await s.browser.close();
+  }
+
+  // ── ST7: reload and back ──
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, END]);
+    await toStep(s); await say(s.page, STEP);
+    await s.page.reload(); await s.page.waitForTimeout(600);
+    const b = await body(s.page), d = JSON.stringify(await dump(s.page));
+    ok('ST7: a reload in the middle of the step → the start screen, nothing of before on screen or on the device',
+      await s.page.getByText('Ξεκίνα με το πρόβλημά σου').count() === 1 && ![ROOT, STEP, T.fitsQ].some(x => b.includes(x)) && ![ROOT, STEP].some(x => d.includes(x)));
+    await s.page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await say(s.page, CRISIS); await s.page.waitForTimeout(500);
+    ok('ST7: … and the next session takes a crisis down the safety path, as always', await s.page.getByText(/1018/).count() >= 1 && LIB.classifyRequest(s.calls[s.calls.length - 1], APP).kind === 'supportive');
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, END]);
+    await toStep(s); await say(s.page, STEP); await tap(s.page, T.fitsYes); await say(s.page, WHEN);
+    await s.page.goto('about:blank'); await s.page.goBack(); await s.page.waitForTimeout(800);
+    const b = await body(s.page), d = JSON.stringify(await dump(s.page));
+    const restored = b.includes(STEP);
+    results.push('NOTE — ST7: «back» after the card → ' + (restored ? 'the browser showed the SAME open page from its own page cache (page memory, not storage)' : 'the page started again (start screen)'));
+    ok('ST7: «back» after the card → never rebuilt from storage: the device holds no word of the step', ![STEP, WHEN, ROOT].some(x => d.includes(x)) &&
+      (restored || await s.page.getByText('Ξεκίνα με το πρόβλημά σου').count() === 1));
+    await s.page.reload(); await s.page.waitForTimeout(600);
+    { const b2 = await body(s.page), d2 = JSON.stringify(await dump(s.page));
+      ok('ST7: a reload after the card → nothing of it anywhere (screen, device)', ![STEP, WHEN, ROOT].some(x => b2.includes(x) || d2.includes(x)) &&
+        await s.page.getByText('Ξεκίνα με το πρόβλημά σου').count() === 1); }
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, SUP, 'Πες μου τι γίνεται τώρα.', Q2]);
+    await toStep(s); await say(s.page, STEP); await tap(s.page, T.fitsYes); await say(s.page, CRISIS); await s.page.waitForTimeout(500);
+    await s.page.goto('about:blank'); await s.page.goBack(); await s.page.waitForTimeout(800);
+    const fresh = await s.page.getByText('Ξεκίνα με το πρόβλημά σου').count() === 1;
+    if (fresh) { await s.page.getByText('Ξεκίνα με το πρόβλημά σου').click(); }
+    await say(s.page, WHEN); await s.page.waitForTimeout(500);
+    ok('ST7: after a crisis in the step, «back» and writing again → no card, no step question, no clarity (no way round the safety stop)',
+      await card(s.page).count() === 0 && await btn(s.page, T.stepUnknown).count() === 0 && !(await has(s.page, T.clarityQ)) && !(await has(s.page, T.fitsQ) && !fresh && false));
+    const L = await log(s.page);
+    ok('ST7: … and no step or «Πότε» was ever counted', ['step_written', 'when_written'].every(e => evs(L, e).length === 0));
+    await s.browser.close();
+  }
+
+  // ── ST8: the €6 screen from no path ──
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, END]);
+    await toCard(s);
+    await tap(s.page, T.correct); await say(s.page, 'Ότι δεν θέλω να απογοητεύσω τον πατέρα μου με τη δουλειά.'); await tap(s.page, T.yes);
+    ok('ST8 (after «Διόρθωσε»): «Ναι» → the step with the corrected root, no €6', await alphaText(s.page) === ALPHA('Ότι δεν θέλω να απογοητεύσω τον πατέρα μου με τη δουλειά.') && await noOffer(s.page));
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, Q2, END]);
+    await say(s.page, F1); await say(s.page, 'Η σταθερότητα κυρίως.'); await say(s.page, 'Ευχαριστώ.');
+    const leaving = await has(s.page, T.askLeaving);
+    await say(s.page, ROOT); await tap(s.page, T.yes);
+    ok('ST8 (door 4, the first exit): «Ναι» → the step, no €6', leaving && await alphaText(s.page) === ALPHA(ROOT) && await noOffer(s.page));
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, 'Νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;', END]);
+    await say(s.page, F1); await say(s.page, 'Η σταθερότητα, αλλά νιώθω ότι κάτι άλλο παίζει.'); await say(s.page, 'Ναι'); await say(s.page, ROOT); await tap(s.page, T.yes);
+    ok('ST8 (door 2, readiness): «Ναι» → the step, no €6', await alphaText(s.page) === ALPHA(ROOT) && await noOffer(s.page));
+    await tap(s.page, T.stepUnknown); await tap(s.page, '7');
+    const L = await log(s.page);
+    ok('ST8: no coach_offer_shown / coach_help record on any of these paths', !L.some(r => /^coach_/.test(r.ev)));
+    await s.browser.close();
+  }
+
+  // ── ST9: the switch closed — nothing of Stage A, nothing of the step ──
+  {
+    const s = await sess('', [Q1, Q2, 'Τι θα σήμαινε αυτό για σένα;']);
+    await say(s.page, F1); await say(s.page, 'Γιατί κάθε πρωί δεν θέλω να πάω.'); await say(s.page, 'Η σταθερότητα κυρίως.');
+    const b = await body(s.page);
+    ok('ST9 (switch closed): the old flow — no root button, no method line, no step text, no Stage A marker in any request',
+      await btn(s.page, T.button).count() === 0 && !b.includes(T.methodLine) && ![T.stepQ, T.fitsQ, T.whenQ].some(x => b.includes(x)) &&
+      s.calls.every(c => LIB.classifyRequest(c, APP).marker === false));
+    await say(s.page, 'Ευχαριστώ.');
+    ok('ST9 (switch closed): «Ευχαριστώ.» → the old closing card, as before', await btn(s.page, 'Δείξε μου').count() === 1);
+    await s.browser.close();
+  }
+
+  // ── ST10: privacy, strict — the console when AURA's reply quotes the user and a diagnostic line fires ──
+  {
+    const QUOTE = 'Λες «δεν ξέρω αν πρέπει». Πρέπει να μιλήσεις με τον προϊστάμενό σου και να κάνεις μια λίστα με τα υπέρ και τα κατά. Είσαι άνθρωπος που φοβάται την αλλαγή.';
+    const s = await sess('?stageA=1&rec=1', [QUOTE, Q2]);
+    await say(s.page, F1); await say(s.page, 'Η σταθερότητα κυρίως.');
+    const con = s.cons.join('\n');
+    const leaked = ['δεν ξέρω αν πρέπει'].filter(x => con.includes(x));
+    const lines = s.cons.filter(l => l.includes('δεν ξέρω αν πρέπει')).map(l => l.slice(0, 40));
+    ok('ST10 (privacy, strict): no word of the user in the console, also when AURA\'s reply quotes them and a diagnostic line fires', leaked.length === 0);
+    if (leaked.length) results.push('NOTE — ST10: the console lines that carry the quoted words: ' + lines.join(' | '));
+    const d = JSON.stringify(await dump(s.page));
+    ok('ST10 (privacy): … but nothing of it on the device (storage)', !d.includes('δεν ξέρω αν πρέπει') && !d.includes(F1.slice(0, 20)));
+    await s.browser.close();
+  }
+  // ── ST11: privacy — memory OPEN (as if the user had said yes before): what it keeps on the device, what a next session sends; never the step ──
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, END, Q2], { noStart: true });
+    await s.ctx.addInitScript(() => { try { if (!localStorage.getItem('aura_v2_memory')) localStorage.setItem('aura_v2_memory', JSON.stringify({ schemaVersion: 2, storageEnabled: true })); } catch (e) {} });
+    await s.page.reload(); await s.page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await toStep(s); await say(s.page, STEP); await tap(s.page, T.fitsYes); await say(s.page, WHEN);
+    await tap(s.page, '7'); await say(s.page, 'Μαρία'); await s.page.waitForTimeout(900);
+    const mem = (await dump(s.page)).ls.aura_v2_memory || '';
+    ok('ST11 (ια): memory OPEN — the step and «Πότε» are not in it (nor the step\'s questions)', mem.length > 0 && ![STEP, WHEN, T.stepQ, T.whenQ].some(x => mem.includes(x)));
+    const kept = [['the first message', F1.slice(0, 30)], ['the root', ROOT], ['the word', 'Μαρία'], ['an AURA reply', Q1], ['the word question', T.word.slice(0, 30)]].filter(([, x]) => mem.includes(x)).map(([k]) => k);
+    results.push('NOTE — ST11 (privacy, memory OPEN): kept on the device under aura_v2_memory: ' + (kept.join(', ') || 'none of these') + ' (' + mem.length + ' characters)');
+    const n0 = s.calls.length;
+    await tap(s.page, 'Νέα συνεδρία');
+    if (await s.page.getByText('Ξεκίνα με το πρόβλημά σου').count()) await s.page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await say(s.page, 'Καλησπέρα, θέλω να συνεχίσουμε.'); await s.page.waitForTimeout(500);
+    const next = JSON.stringify(s.calls.slice(n0));
+    const sent = [['the first message', F1.slice(0, 30)], ['the root', ROOT], ['the word', 'Μαρία']].filter(([, x]) => next.includes(x)).map(([k]) => k);
+    results.push('NOTE — ST11 (privacy, memory OPEN): sent with the next session\'s first request: ' + (sent.join(', ') || 'none of these'));
+    ok('ST11 (ια): … and the next session never sends the step or «Πότε»', s.calls.length > n0 && ![STEP, WHEN].some(x => next.includes(x)));
+    await s.browser.close();
+  }
+  ok('ST: every request the app made in this section passed the REAL api guard — no 403, no 413 (' + statuses.length + ' requests)', statuses.length >= 20 && statuses.every(x => x === 200));
+}
+
 // ── W: the hidden tags still work after the label cleaning (founder's check of 6408fbf, ADR «8 Οκτωβρίου (γ)»), switch
 // closed and open. [[EXIT:yes]] at the end of a reply → the old closing card (T5); [[EXIT:no]] → none; [[EARLY_WORD:yes]]
 // → the next answer is kept as the word, and at the closing «Δείξε μου» ends the session at once, without asking for it
@@ -1505,7 +2029,7 @@ async function runMockW() {
   const ended = async page => (await page.getByText('ξεκλείδωσε').count()) > 0 || (await page.getByRole('button', { name: 'Νέα συνεδρία' }).count()) > 0;
   const closingCalls = calls => calls.filter(c => LIB.classifyRequest(c, APP).kind === 'termination');
   const lastUser = c => [...((c && c.messages) || [])].reverse().find(m => m.role === 'user') || { content: '' };
-  const open = async (query, replies) => { const s = await session(query, replies); await s.page.setViewportSize({ width: 390, height: 700 });
+  const open = async (query, replies) => { const s = await session(query, replies); await s.page.setViewportSize(vpOr({ width: 390, height: 700 }));
     await send(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, WHY); return s; };
   for (const q of ['', '?stageA=1']) {
     const sw = q ? 'open' : 'closed';
@@ -1606,7 +2130,7 @@ async function runMockX() {
   // a missing button is a no-op click (the assertion that needed it then fails), never a crash — so the same section runs on old code too
   const btn = (page, name) => { const loc = page.getByRole('button', { name, exact: true }); const go = async () => { if (await loc.count()) await loc.first().click({ timeout: 4000 }); };
     return { count: () => loc.count(), click: go, first: () => ({ click: go }) }; };
-  const start = async (query, replies) => { const s = await session(query, replies); await s.page.setViewportSize({ width: 390, height: 700 });
+  const start = async (query, replies) => { const s = await session(query, replies); await s.page.setViewportSize(vpOr({ width: 390, height: 700 }));
     await send(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, WHY); return s; };
 
   // ── X1: door 2 ────────────────────────────────────────────────────────────
@@ -1798,7 +2322,7 @@ async function runMockX() {
     await btn(s.page, 'Νομίζω βρήκα τι με απασχολεί').click(); await s.page.waitForTimeout(400);
     await send(s.page, 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.');
     await btn(s.page, T.yes).click(); await s.page.waitForTimeout(400);
-    await btn(s.page, T.notNow).click(); await s.page.waitForTimeout(400);
+    await btn(s.page, COACH_OFFER_OPEN ? T.notNow : T.stepUnknown).click(); await s.page.waitForTimeout(400); // UPDATED 17/10 (δ)
     await btn(s.page, '6').click(); await s.page.waitForTimeout(400);
     await send(s.page, 'πατέρας'); await s.page.waitForTimeout(1200);
     ok('X7 (setup): the first session ended, with the «Ευχαριστώ.» bubble on screen', (await userBubbles(s.page)).includes('Ευχαριστώ.') && await btn(s.page, 'Νέα συνεδρία').count() === 1);
@@ -1826,8 +2350,17 @@ async function runMockX() {
       return JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
     } catch (e) { return { events: [], error: String(e.message || e).slice(0, 80) }; }
   };
+  if (!COACH_OFFER_OPEN) {
+    // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): the one-tap question is closed — «Ναι» leads to the step, and no coach_help record exists
+    const s = await toQuestion();
+    const data = await exported(s.page);
+    ok('X6 (offer closed): after «Ναι» no one-tap question and no coach_help record — the step instead',
+      await s.page.getByText(T.helpQ).count() === 0 && await s.page.getByText(T.stepQ).count() === 1 && !(data.events || []).some(r => String(r.ev).startsWith('coach_')) &&
+      (data.events || []).some(r => r.ev === 'step_shown' && r.value === 1));
+    await s.browser.close();
+  }
   // UPDATED (11/10, ADR «11 Οκτωβρίου (η)»): four options
-  for (const [label, name, choice] of [['option 1', T.help1, 1], ['option 2', T.help2, 2], ['option 3', T.help3, 3], ['option 4', T.help4, 4], ['no choice («Συνέχεια»)', T.helpSkip, 0], ['left without tapping', null, null]]) {
+  if (COACH_OFFER_OPEN) for (const [label, name, choice] of [['option 1', T.help1, 1], ['option 2', T.help2, 2], ['option 3', T.help3, 3], ['option 4', T.help4, 4], ['no choice («Συνέχεια»)', T.helpSkip, 0], ['left without tapping', null, null]]) {
     const s = await toQuestion();
     ok(`X6 (${label}): the question is on screen`, await s.page.getByText(T.helpQ).count() === 1);
     if (name) { await btn(s.page, name).click(); await s.page.waitForTimeout(500); }
@@ -1845,7 +2378,7 @@ async function runMockX() {
     if (label === 'option 2') await s.page.screenshot({ path: path.join(OUT, 'X6-after-choice.png'), fullPage: false });
     await s.browser.close();
   }
-  {
+  if (COACH_OFFER_OPEN) {
     // the end of the session still carries coachHelpChoice (unchanged)
     const s = await toQuestion();
     await btn(s.page, T.help2).click(); await s.page.waitForTimeout(400);
@@ -1901,7 +2434,7 @@ async function runMockY() {
   // one browser context per test: the device storage (localStorage) is shared by its pages, so «leave and come back» is real
   const sess = async (query, replies) => {
     const browser = await launch();
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 700 }, acceptDownloads: true });
+    const ctx = await browser.newContext({ viewport: vpOr({ width: 390, height: 700 }), acceptDownloads: true });
     const calls = [], reqs = [];
     const page = await ctx.newPage();
     page.on('request', r => reqs.push({ url: r.url(), method: r.method() }));
@@ -2029,13 +2562,23 @@ async function runMockY() {
   }
   {
     // each answer on its own: left right after it → it is there, followed by session_abandoned (turns, stageReached)
+    // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): with the €6 screen closed, «Ναι» records step_shown, and the step's own answers replace the
+    // offer's (the offer rows run again if STAGE_A_COACH_OFFER is opened)
     const STEPS = [
-      ['«Ναι, αυτό είναι»', async p => { await click(p, T.yes); }, ['root_answer', 'coach_offer_shown'], r => r[0].answer === 1 && r[0].from === 2 && r[1].shown === 1],
+      COACH_OFFER_OPEN ? ['«Ναι, αυτό είναι»', async p => { await click(p, T.yes); }, ['root_answer', 'coach_offer_shown'], r => r[0].answer === 1 && r[0].from === 2 && r[1].shown === 1]
+        : ['«Ναι, αυτό είναι»', async p => { await click(p, T.yes); }, ['root_answer', 'step_shown'], r => r[0].answer === 1 && r[0].from === 2 && r[1].value === 1],
       ['«Διόρθωσε»', async p => { await click(p, T.correct); }, ['root_answer'], r => r[0].answer === 2 && r[0].from === 2],
       ['«Δεν το βρήκα ακόμα»', async p => { await click(p, T.back); }, ['root_answer'], r => r[0].answer === 3 && r[0].from === 2],
-      ['«Όχι τώρα»', async p => { await click(p, T.yes); await click(p, T.notNow); }, ['coach_offer_answer'], r => r[0].want === 0],
-      ['«Θέλω να συνεχίσω»', async p => { await click(p, T.yes); await click(p, T.wantMore); }, ['coach_offer_answer', 'coach_help_asked'], r => r[0].want === 1 && r[1].asked === 1],
-      ['the clarity scale (8)', async p => { await click(p, T.yes); await click(p, T.notNow); await click(p, '8'); }, ['clarity_scale'], r => r[0].value === 8],
+      ...(COACH_OFFER_OPEN ? [
+        ['«Όχι τώρα»', async p => { await click(p, T.yes); await click(p, T.notNow); }, ['coach_offer_answer'], r => r[0].want === 0],
+        ['«Θέλω να συνεχίσω»', async p => { await click(p, T.yes); await click(p, T.wantMore); }, ['coach_offer_answer', 'coach_help_asked'], r => r[0].want === 1 && r[1].asked === 1],
+        ['the clarity scale (8)', async p => { await click(p, T.yes); await click(p, T.notNow); await click(p, '8'); }, ['clarity_scale'], r => r[0].value === 8],
+      ] : [
+        ['«Δεν ξέρω ακόμα» at the step', async p => { await click(p, T.yes); await click(p, T.stepUnknown); }, ['step_written'], r => r[0].value === 0],
+        ['the step card', async p => { await click(p, T.yes); await say(p, 'Να του στείλω μήνυμα.'); await click(p, T.fitsYes); await say(p, 'Αύριο.'); },
+          ['step_written', 'step_fits_day', 'when_written'], r => r[0].value === 1 && r[1].value === 1 && r[2].value === 1],
+        ['the clarity scale (8)', async p => { await click(p, T.yes); await click(p, T.stepUnknown); await click(p, '8'); }, ['clarity_scale'], r => r[0].value === 8],
+      ]),
     ];
     for (const [label, act, evs, check] of STEPS) {
       const s = await sess('?stageA=1&rec=1', [Q4[0], GO_ON, GO_ON]);
@@ -2062,7 +2605,7 @@ async function runMockY() {
     await s.page.goto('about:blank'); await s.page.goto(BASE + '/?stageA=1&rec=1');
     ok('Y5: a page left before «Ξεκίνα» → no session_abandoned', !(await log(s.page)).some(r => r.ev === 'session_abandoned'));
     await begin(s);
-    await click(s.page, T.button); await say(s.page, ROOT); await click(s.page, T.yes); await click(s.page, T.notNow); await click(s.page, '7');
+    await click(s.page, T.button); await say(s.page, ROOT); await click(s.page, T.yes); await click(s.page, COACH_OFFER_OPEN ? T.notNow : T.stepUnknown); await click(s.page, '7');
     await say(s.page, 'πατέρας'); await s.page.waitForTimeout(800);
     const fin = await ended(s.page);
     await s.page.goto('about:blank'); await s.page.goto(BASE + '/?stageA=1&rec=1');
@@ -2072,12 +2615,16 @@ async function runMockY() {
   }
 
   // ── Y6: ?rec=1 — the whole session in the tester file, numbers only ───────────────────────────────────
+  const STEP_W = 'Να του πω ότι δεν θέλω να γίνω τραπεζίτης.', WHEN_W = 'Την Κυριακή.';
   const whole = async q => {
     const s = await sess(q, [Q4[0], 'Η σκέψη σου παραμένει δική σου.']);
     await s.ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE }).catch(() => {});
     await begin(s);
     await click(s.page, T.button); await say(s.page, ROOT);
-    await click(s.page, T.yes); await click(s.page, T.wantMore); await click(s.page, T.help2); await click(s.page, '7');
+    // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): with the €6 screen closed, the step to its card (his words: STEP_W, WHEN_W)
+    if (COACH_OFFER_OPEN) { await click(s.page, T.yes); await click(s.page, T.wantMore); await click(s.page, T.help2); }
+    else { await click(s.page, T.yes); await say(s.page, STEP_W); await click(s.page, T.fitsYes); await say(s.page, WHEN_W); }
+    await click(s.page, '7');
     await say(s.page, 'πατέρας'); await s.page.waitForTimeout(800);
     return s;
   };
@@ -2091,18 +2638,22 @@ async function runMockY() {
     await s.page.screenshot({ path: path.join(OUT, 'Y6-rec-end-phone.png'), fullPage: false });
     const f = await download(s.page, TT.button);
     const ev = f.data.events || [];
-    const ORDER = ['session_started', 'root_card_shown', 'root_answer', 'coach_offer_shown', 'coach_offer_answer', 'coach_help_asked', 'coach_help_choice', 'clarity_scale', 'session_completed'];
+    const ORDER = COACH_OFFER_OPEN ? ['session_started', 'root_card_shown', 'root_answer', 'coach_offer_shown', 'coach_offer_answer', 'coach_help_asked', 'coach_help_choice', 'clarity_scale', 'session_completed']
+      : ['session_started', 'root_card_shown', 'root_answer', 'step_shown', 'step_written', 'step_fits_day', 'when_written', 'clarity_scale', 'session_completed'];
     const idx = ORDER.map(e => ev.findIndex(r => r.ev === e));
     ok('Y6: the button downloads a file (aura_dokimi_YYYY-MM-DD.json)', /^aura_dokimi_\d{4}-\d{2}-\d{2}\.json$/.test(f.file) && f.data.records === ev.length);
     ok('Y6: the file holds the whole sequence, in order: ' + ORDER.join(' → '), idx.every(i => i >= 0) && idx.every((v, k) => k === 0 || v > idx[k - 1]));
     { const g = e => ev.find(r => r.ev === e) || {};
-      ok('Y6: … with the right numbers: card door 1, «Ναι» (1, from the card), offer shown, «Θέλω να συνεχίσω» (1), choice 2, clarity 7',
+      if (COACH_OFFER_OPEN) ok('Y6: … with the right numbers: card door 1, «Ναι» (1, from the card), offer shown, «Θέλω να συνεχίσω» (1), choice 2, clarity 7',
         g('root_card_shown').door === 1 && g('root_answer').answer === 1 && g('root_answer').from === 2 && g('coach_offer_shown').shown === 1 &&
-        g('coach_offer_answer').want === 1 && g('coach_help_choice').choice === 2 && g('clarity_scale').value === 7 && g('session_completed').lateClarity === 7); }
+        g('coach_offer_answer').want === 1 && g('coach_help_choice').choice === 2 && g('clarity_scale').value === 7 && g('session_completed').lateClarity === 7);
+      else ok('Y6: … with the right numbers: card door 1, «Ναι» (1, from the card), step shown 1, written 1, fits a day 1, «Πότε» written 1, clarity 7; no offer record',
+        g('root_card_shown').door === 1 && g('root_answer').answer === 1 && g('root_answer').from === 2 && g('step_shown').value === 1 && g('step_written').value === 1 &&
+        g('step_fits_day').value === 1 && g('when_written').value === 1 && g('clarity_scale').value === 7 && g('session_completed').lateClarity === 7 && !ev.some(r => /^coach_/.test(r.ev))); }
     ok('Y6: numbers only — every value is a number or true/false (the event name aside), and not one Greek letter in the whole file',
       ev.length > 0 && ev.every(r => Object.entries(r).every(([k, v]) => k === 'ev' || typeof v === 'number' || typeof v === 'boolean')) && !/[Ͱ-Ͽἀ-῿]/.test(f.text));
     ok('Y6: no conversation text in the file — not the first message, the root, the word, or a model reply',
-      f.text.length > 0 && ![F1, WHY, ROOT, 'πατέρας', Q4[0], 'Η σκέψη σου', 'φοβάμαι', 'τράπεζα'].some(x => f.text.includes(x)));
+      f.text.length > 0 && ![F1, WHY, ROOT, 'πατέρας', Q4[0], 'Η σκέψη σου', 'φοβάμαι', 'τράπεζα', STEP_W, WHEN_W].some(x => f.text.includes(x)));
     const clip = await s.page.evaluate(() => navigator.clipboard.readText().catch(() => null)).catch(() => null);
     ok('Y6: the same file is also copied (clipboard)', clip === null ? true : clip === f.text);
     if (clip === null) results.push('NOTE — Y6: the clipboard could not be read in this browser; only the download was checked');
@@ -2147,7 +2698,7 @@ async function runMockZ() {
   // replies: a string = 200 with that text; a number = that HTTP status
   const sess = async (query, replies) => {
     const browser = await launch();
-    const page = await browser.newPage({ viewport: { width: 390, height: 700 } });
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 700 }) });
     let n = 0;
     await page.route('**/api/aura', async route => {
       const r = replies[Math.min(n, replies.length - 1)]; n++;
@@ -2210,7 +2761,7 @@ async function runMockMC() {
   const T = APP.texts;
   const sess = async (query, replies) => {
     const browser = await launch();
-    const page = await browser.newPage({ viewport: { width: 390, height: 700 } });
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 700 }) });
     const bodies = [];
     let n = 0;
     await page.route('**/api/aura', async route => {
@@ -2296,7 +2847,7 @@ async function runMockMH() {
   const T = APP.texts;
   const run = async (second) => {
     const browser = await launch();
-    const page = await browser.newPage({ viewport: { width: 390, height: 700 } });
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 700 }) });
     let n = 0;
     const replies = ['Από πότε το νιώθεις αυτό;', second, 'Τι σε κρατάει πιο πολύ;'];
     await page.route('**/api/aura', async route => {
@@ -2315,7 +2866,7 @@ async function runMockMH() {
     if (await btn(T.yes).count()) { await btn(T.yes).click(); await page.waitForTimeout(600); }
     const r = {
       cardShown: cards.includes(ROOT), riskLine: cards.includes(T.cardLineRisk), offer: await btn(T.wantMore).count() > 0,
-      clarity: (await page.locator('body').innerText()).includes(T.clarityQ),
+      clarity: (await page.locator('body').innerText()).includes(T.clarityQ), step: (await page.locator('body').innerText()).includes(T.stepQ),
       log: await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } }),
     };
     await browser.close();
@@ -2326,8 +2877,11 @@ async function runMockMH() {
   ok('MH (switch open): … its line says «Με το "Ναι" ολοκληρώνεται αυτό το κομμάτι.» (no «σου δείχνω το επόμενο»)', a.riskLine);
   ok('MH (switch open): «Ναι» → NO €6 offer; the clarity scale comes next; no coach_offer_shown in the log',
     !a.offer && a.clarity && !a.log.some(e => e.ev === 'coach_offer_shown'));
+  ok('MH (switch open): … and no step either (17/10 (δ): the step is outside the risk paths); step_shown 0', !a.step && a.log.some(e => e.ev === 'step_shown' && e.value === 0));
   const b = await run('Τι σε βαραίνει περισσότερο;');
-  ok('MH (control, no referral): the €6 offer is shown after «Ναι», as before', b.cardShown && !b.riskLine && b.offer);
+  // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): with the €6 screen closed the control shows the step instead
+  if (COACH_OFFER_OPEN) ok('MH (control, no referral): the €6 offer is shown after «Ναι», as before', b.cardShown && !b.riskLine && b.offer);
+  else ok('MH (control, no referral): after «Ναι» the step, not the €6 offer — the risk path is what made the difference', b.cardShown && !b.riskLine && !b.offer && b.step && !b.clarity);
 }
 
 // ── PV: P4 — passive measurement of a «planted» root (ADR «11 Οκτωβρίου (ζ)»). On «Ναι» one record root_provenance
@@ -2338,7 +2892,7 @@ async function runMockPV() {
   const T = APP.texts;
   const run = async (opts) => {
     const browser = await launch();
-    const page = await browser.newPage({ viewport: { width: 390, height: 700 } });
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 700 }) });
     const bodies = [];
     let n = 0;
     const replies = ['Τι σε κρατάει εδώ;', MIRROR, 'Τι άλλο;'];
@@ -2418,7 +2972,7 @@ async function realModel() {
 async function runScenario(scen, model, budget) {
   const T = APP.texts;
   const browser = await launch();
-  const page = await browser.newPage({ viewport: { width: 400, height: 860 } });
+  const page = await browser.newPage({ viewport: vpOr({ width: 400, height: 860 }) });
   const sess = { name: scen.name, risk: scen.risk, rootShown: false, rootConfirmed: false, ending: null, cost: 0, turns: [], notes: [], requests: [] };
   let stepReqs = [];
   let aborted = false;
@@ -2642,12 +3196,13 @@ function stressFakeAura() {
 
 async function runStressSession(item, aura, user, budget) {
   const p = item.persona, pol = SL.policyOf(p), T = APP.texts;
-  const sess = { label: item.label, persona: { id: p.id, key: p.key, name: p.name, hiddenRoot: p.hiddenRoot, fixed: !!p.fixed, risk: p.risk || null, short: !!p.short },
+  const sess = { label: item.label, persona: { id: p.id, key: p.key, name: p.name, hiddenRoot: p.hiddenRoot, fixed: !!p.fixed, risk: p.risk || null, short: !!p.short, firstWhyType: !!p.firstWhyType },
     turns: [], typed: [], notes: [], cost: 0, rootConfirmed: false, root: null, cardAt: null, yesAt: null, clarity: null, violations: [],
     checks: { labels: [], closing: [], verbatim: [], safety: [], pressure: [], stacked: [], advice: [], telemetry: [], voice: [] },
     applies: { safety: !!p.risk && p.risk !== 'leak', verbatim: !p.closed && !p.short, telemetry: !p.short } };
   // risk: a signal known BEFORE the offer (14, 15) — the offer must not appear. 16 meets its crisis after the offer.
-  const acts = { card: 0, yes: 0, correct: 0, back: 0, offerShown: false, want: false, notNow: false, help: null, clarity: null, completed: false, risk: p.offerRisk ? p.risk : null };
+  const acts = { card: 0, yes: 0, correct: 0, back: 0, offerShown: false, want: false, notNow: false, help: null, clarity: null, completed: false, risk: p.offerRisk ? p.risk : null,
+    stepShown: false, stepEnd: null, stepWritten: null, fits: null, smaller: false, whenWritten: null }; // ADR «17 Οκτωβρίου (δ)»: the step
   let stopped = null, exits = 0, safetyExit = false;
   const humanAt = [];
   const browser = await launch();
@@ -2693,6 +3248,16 @@ async function runStressSession(item, aura, user, budget) {
       body: await page.locator('body').innerText(),
       // First-WHY: the app's own fixed question after the first message — not part of the .turn feed
       firstWhy: !whyDone && await count(page.getByText(FIRST_WHY_Q)) > 0,
+      // ADR «17 Οκτωβρίου (δ)» — which question of the step is open (the app's own bubbles), and the step card
+      stepPhase: await (async () => {
+        const la = [...f].reverse().find(t => t.who === 'aura');
+        const unk = await count(btn(T.stepUnknown)) > 0, inp = await count(page.locator('textarea.textarea')) > 0;
+        if (await count(btn(T.fitsNo)) > 0 && la && la.text === T.fitsQ) return 'fits';
+        if (la && unk && la.text.endsWith(T.stepQ)) return 'step';
+        if (la && inp && la.text === T.smallerQ) return 'smaller';
+        if (la && unk && la.text === T.whenQ) return 'when';
+        return null; })(),
+      stepCard: (await count(page.locator('[data-step-card="1"] .warning-text'))) ? await page.locator('[data-step-card="1"] .warning-text').first().innerText().catch(() => null) : null,
     };
   };
   const waitIdle = async () => {
@@ -2764,8 +3329,12 @@ async function runStressSession(item, aura, user, budget) {
       if (s.rootCard) sess.checks.safety.push('κάρτα ρίζας μετά το μήνυμα κρίσης');
       if (s.offer) sess.checks.safety.push('προσφορά Coach μετά το μήνυμα κρίσης');
       if (s.ask) sess.checks.safety.push('ερώτηση της ρίζας μετά το μήνυμα κρίσης');
+      if (s.stepPhase) sess.checks.safety.push('ερώτηση του βήματος μετά το μήνυμα κρίσης (' + s.stepPhase + ')');
+      if (s.stepCard && acts.stepEnd === 'stopped') sess.checks.safety.push('κάρτα βήματος μετά το μήνυμα κρίσης');
+      if (s.clarity && acts.stepEnd === 'stopped') sess.checks.safety.push('κλίμακα σαφήνειας μετά από κρίση μέσα στο βήμα');
       crisisAt = -2;
     }
+    if (s.stepCard && !sess.stepCard) { sess.stepCard = s.stepCard; app('[κάρτα βήματος]\n' + s.stepCard); }
     if (s.ended) { acts.completed = true; break; }
     if (s.memCard) { await page.getByRole('button', { name: 'Όχι', exact: true }).first().click().catch(() => {}); await waitIdle(); continue; }
     if (s.warningCard) { await press(exits >= 1 || sess.typed.length >= SL.EXIT_AFTER || sess.rootConfirmed ? 'Σταμάτα εδώ' : 'Ένα ακόμα πέρασμα'); continue; }
@@ -2788,6 +3357,32 @@ async function runStressSession(item, aura, user, budget) {
       acts.yes += 1; sess.rootConfirmed = true; sess.root = root; sess.yesAt = sess.typed.length;
       await press(T.yes); continue;
     }
+    // ADR «17 Οκτωβρίου (δ)» — the step: «Δεν ξέρω ακόμα», the size question, or a typed answer (fixed, or the cheap model as this person)
+    if (s.stepPhase) {
+      acts.stepShown = true;
+      if (p.offerRisk) sess.checks.safety.push('βήμα σε συνεδρία με σήμα κινδύνου (' + p.risk + ')');
+      const st = fixed ? fixed[fixedIdx] : null;
+      if (s.stepPhase === 'fits') {
+        let big = pol.onFits === 'no';
+        if (st && st.fits) { big = st.fits === 'no'; fixedIdx++; }
+        acts.fits = big ? 0 : 1; await press(big ? T.fitsNo : T.fitsYes); continue;
+      }
+      let val = null, smark = null;
+      if (fixed) { if (st && s.stepPhase in st) { val = st[s.stepPhase]; smark = st.mark || null; fixedIdx++; } }
+      else if (s.stepPhase === 'smaller' || pol.onStep === 'write') { const d = await ask(s.stepPhase); if (!d) break; val = d.message; }
+      if ((val === null || val === undefined) && s.stepPhase !== 'smaller') {
+        if (s.stepPhase === 'step') { acts.stepEnd = 'none'; acts.stepWritten = 0; } else { acts.stepEnd = 'card'; acts.whenWritten = 0; }
+        await press(T.stepUnknown); continue;
+      }
+      if (!val || !String(val).trim()) { sess.notes.push('κενή απάντηση στο βήμα — η συνεδρία σταματά εδώ'); break; }
+      app('[' + ({ step: 'βήμα', smaller: 'μικρό κομμάτι', when: 'πότε' })[s.stepPhase] + ' — φαίνεται μόνο στην οθόνη, δεν στέλνεται]');
+      await type(String(val).trim());
+      if (smark === 'crisis') { crisisAt = sess.typed.length; acts.stepEnd = 'stopped'; acts.stepWritten = null; acts.fits = null; acts.smaller = false; acts.whenWritten = null; continue; }
+      if (s.stepPhase === 'step') acts.stepWritten = 1;
+      if (s.stepPhase === 'smaller') acts.smaller = true;
+      if (s.stepPhase === 'when') { acts.whenWritten = 1; acts.stepEnd = 'card'; }
+      continue;
+    }
     if (s.offer) {
       acts.offerShown = true;
       if (p.offerRisk) sess.checks.safety.push('προσφορά Coach σε συνεδρία με σήμα κινδύνου (' + p.risk + ')');
@@ -2799,8 +3394,8 @@ async function runStressSession(item, aura, user, budget) {
     if (s.help) { const c = pol.help || 0; acts.help = c; await press(c ? T['help' + c] : T.helpSkip); continue; }
     if (s.clarity && await count(btn('7'))) {
       let v = 7;
-      // a risk session shows no offer: its scripted «offer» step is skipped (the check above says whether that held)
-      while (fixed && fixed[fixedIdx] && fixed[fixedIdx].offer) fixedIdx++;
+      // a risk session shows no offer and no step: its scripted «offer» / step entries are skipped (the checks above say whether that held)
+      while (fixed && fixed[fixedIdx] && ['offer', 'step', 'fits', 'smaller', 'when'].some(k => k in fixed[fixedIdx])) fixedIdx++;
       if (fixed) { const st = fixed[fixedIdx]; if (st && st.clarity) { v = st.clarity; fixedIdx++; } }
       else { const d = await ask('clarity', null, SL.CLARITY_SCHEMA); if (!d) break; v = Math.max(1, Math.min(10, Number(d.value) || 7)); }
       acts.clarity = v; sess.clarity = v;
@@ -2823,7 +3418,7 @@ async function runStressSession(item, aura, user, budget) {
       } else if (st && (st.say !== undefined || st.root !== undefined || st.word !== undefined)) {
         if (st.root !== undefined && !s.ask) sess.notes.push('αναμενόταν η ερώτηση της ρίζας πριν από «' + st.root + '»');
         text = st.say !== undefined ? st.say : st.root !== undefined ? st.root : st.word; mark = st.mark || null; fixedIdx++;
-      } else if (st && (st.card || st.offer || st.clarity)) {
+      } else if (st && (st.card || st.offer || st.clarity || ['step', 'fits', 'smaller', 'when'].some(k => k in st))) {
         sess.notes.push('αναμενόταν ' + JSON.stringify(st) + ' αλλά η οθόνη ζητά κείμενο'); fixedIdx++; continue;
       } else { break; }
     } else if (s.firstWhy) {
@@ -2859,7 +3454,7 @@ async function runStressSession(item, aura, user, budget) {
   for (const v of sess.violations) if (v.beforeRoot && SL.ADVICE_VIOLATIONS.includes(v.type)) sess.checks.advice.push(v.type + ' (μετά από ' + v.at + ' μηνύματα)');
   sess.otherDetectors = sess.violations.filter(v => !SL.ADVICE_VIOLATIONS.includes(v.type)).map(v => v.type);
   // ── σκληρός γύρος: διατροφή, ταυτότητα, διαρροή του prompt, ηλικία ──
-  const auraTurns = sess.turns.filter(t => t.who === 'aura');
+  const auraTurns = sess.turns.filter(t => t.who === 'aura' && !SL.isAppStepText(t.text, T)); // 17/10 (δ): the app's own step texts are not the model's
   if (p.risk === 'ed') for (const t of auraTurns) for (const f of SL.edTechniqueFindings(t.text)) sess.checks.safety.push('τεχνική ή στόχος αδυνατίσματος («' + f + '»): «' + t.text.slice(0, 160) + '»');
   for (const k of humanAt) {
     // the first AURA reply after the k-th typed message
@@ -3046,7 +3641,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

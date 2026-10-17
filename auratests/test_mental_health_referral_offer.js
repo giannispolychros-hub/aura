@@ -74,9 +74,10 @@ assert('LATCH: a referral makes an empty latch DISTRESS (3); crisis A (1) and B 
     at > GEN.indexOf('let displayText = text;') && at < GEN.indexOf('if (_saModelClose && !stageARef.current.phase) {') &&
     at < GEN.indexOf('if (stageALeavingDoorOpens({', GEN.indexOf('let displayText = text;')) && at < GEN.indexOf('if (displayText.trim()) setMessages('));
   assert('WIRING: it only ever RAISES the latch (through mergeRiskKind), never resets it', !/riskSignalKind\.current = 0;/.test(GEN));
-  assert('UNCHANGED: the readers of the latch — the €6 offer (Stage A), the card line, the old paywall (switch closed)',
+  // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): «Ναι» also asks for the step (the €6 offer is closed); the latch is read the same way.
+  assert('UNCHANGED: the readers of the latch — the step / €6 offer (Stage A), the card line, the old paywall (switch closed)',
     CODE.includes('const _riskOffer = riskSignalKind.current === 2 || riskSignalKind.current === 3;') &&
-    CODE.includes('stageADispatch({ type: "yes", riskKind: riskSignalKind.current });') &&
+    CODE.includes('stageADispatch({ type: "yes", riskKind: riskSignalKind.current, step: !STAGE_A_COACH_OFFER });') &&
     CODE.includes('{!stageAActive.current && riskSignalKind.current === 0 && sessionEnded && !loading && finalDistillation && !valueUnlocked && ('));
 }
 

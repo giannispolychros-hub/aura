@@ -217,7 +217,8 @@ assert('BACK: from door 2\'s card the captured answer gets its normal reply (the
 const YES = extractBlock('const handleStageAYes = useCallback(() => ') || '';
 assert('YES: the app\'s end text, whole root, risk variant from the latch',
   /buildRootEndLines\(stageARef\.current\.found, _riskOffer\)\.join\("\\n"\)/.test(YES) && /const _riskOffer = riskSignalKind\.current === 2 \|\| riskSignalKind\.current === 3;/.test(YES));
-assert('YES: dispatch with the latch', /stageADispatch\(\{ type: "yes", riskKind: riskSignalKind\.current \}\);/.test(YES));
+// UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): «Ναι» also asks for the step while the €6 offer is closed (STAGE_A_COACH_OFFER).
+assert('YES: dispatch with the latch', /stageADispatch\(\{ type: "yes", riskKind: riskSignalKind\.current, step: !STAGE_A_COACH_OFFER \}\);/.test(YES));
 const CLAR = extractBlock('const handleStageAClarity = useCallback((n) => ') || '';
 assert('CLARITY → WORD: the fixed word question, the old closing cannot start again, word awaited',
   /appendClosingMessage\(STAGE_A_TEXTS\.word\);/.test(CLAR) && /wordQuestionDelivered\.current = true;/.test(CLAR) && /reflectionDelivered\.current = true;/.test(CLAR) && /setAwaitingRememberedWord\(true\);/.test(CLAR));
