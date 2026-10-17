@@ -143,10 +143,9 @@ assert('BUTTON: sits inside the input area (so every other pending card already 
 assert('BUTTON: counts AURA replies without the app\'s own Stage A messages', /assistantReplies: messages\.filter\(m => m\.role === "assistant" && m\.msgMode !== "STAGE_A"\)\.length/.test(B));
 assert('BUTTON: closing started = reflection delivered / word awaited / closure or warning card / ended',
   /closingStarted: reflectionDelivered\.current \|\| awaitingRememberedWord \|\| closureConfirmPending \|\| warningPending,/.test(B));
-// UPDATED (17/10, ADR «17 Οκτωβρίου»): the method line is drawn outside the two regions — above the app's first question and as the
-// first line of the first reply — but only from flags that are set with the switch open (stageAMethodLineDue: active === true).
+// UPDATED (17/10, ADR «17 Οκτωβρίου» and «(δ)»): the method line is drawn outside the two regions — as the first line of the first reply —
+// but only from a flag that is set with the switch open (stageAMethodLineDue: active === true).
 const outsideTexts = CODE.replace(R, '').replace(B, '')
-  .replace(/\{firstWhyMethodLine\.current && <div className="method-line"[^>]*>\{STAGE_A_TEXTS\.methodLine\}<\/div>\}/, '')
   .replace(/\{msg\.methodLine && !isUser && <span className="method-line"[^>]*>\{STAGE_A_TEXTS\.methodLine\}<\/span>\}/, '');
 const jsxStart = CODE.indexOf('  return (\n    <>');
 assert('UI: no Stage A text is rendered outside the two gated regions',

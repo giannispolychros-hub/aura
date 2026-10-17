@@ -131,9 +131,10 @@ for (const [name, hist, u, text, o, expect] of CASES) {
   const mb = (CODE.match(/const MessageBubble = memo\(function MessageBubble\(\{[^}]*\}\) \{/) || [''])[0];
   assert('T7 — «Δες την πορεία»: the bubble takes a flag and does not draw the button when it is set',
     /hideReflection/.test(mb) && /\{isPromiseMsg && !hideReflection && \(/.test(CODE));
+  // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): also while a question of the step is open (stageAStepOpen)
   assert('T7 — the flag is set with the switch open before the root, and the handler refuses too (belt and braces)',
-    /hideReflection=\{stageAActive\.current && stageAView\.stats\.rootConfirmed !== 1\}/.test(CODE) &&
-    /onContinueToReflection=\{\(\) => \{ if \(sessionEnded \|\| loading[^\n]*\|\| \(stageAActive\.current && stageARef\.current\.stats\.rootConfirmed !== 1\)\) return; handleClosureConfirm\(true\); \}\}/.test(CODE));
+    /hideReflection=\{stageAActive\.current && \(stageAView\.stats\.rootConfirmed !== 1 \|\| stageAStepOpen\(stageAPhase\)\)\}/.test(CODE) &&
+    /onContinueToReflection=\{\(\) => \{ if \(sessionEnded \|\| loading[^\n]*\|\| \(stageAActive\.current && \(stageARef\.current\.stats\.rootConfirmed !== 1 \|\| stageAStepOpen\(stageARef\.current\.phase\)\)\)\) return; handleClosureConfirm\(true\); \}\}/.test(CODE));
   assert('UNCHANGED: decideTermination and the leaving-door gate byte for byte (the T1–T8 logic itself is untouched)',
     sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'f33ed155faa93145'); // UPDATED (δ): the leaving door no longer reads the decision
   assert('UNCHANGED: the first T2 still opens the root question before the model (the door is not touched)',

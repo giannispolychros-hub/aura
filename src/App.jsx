@@ -1670,7 +1670,7 @@ const STAGE_A_TEXTS = {
   copy: "Αντίγραψε τη ρίζα",
   copied: "Αντιγράφηκε",
   download: "Κατέβασε τη ρίζα",
-  // ADR «17 Οκτωβρίου (δ)» (John's decision for the test of the 20): the step after «Ναι», his texts verbatim. «Κι αν όχι τώρα…» is endKeep.
+  // ADR «17 Οκτωβρίου (δ)» (John's decision for the test of the 20): the step after «Ναι», John's texts word for word. «Κι αν όχι τώρα…» is endKeep.
   stepFound: "Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή. Τώρα ξέρεις τι γίνεται.",
   stepWhy: "Το πρώτο βήμα είναι το πιο δύσκολο. Γι' αυτό δεν θέλω το τέλειο ούτε το πιο γενναίο. Θέλω το πιο εύκολό σου.",
   stepQ: "Ποιο είναι το πιο μικρό πράγμα που μπορείς να κάνεις γι' αυτό;",
@@ -1791,7 +1791,7 @@ function buildRootStepLines(found) {
   return [`«${f}»`, STAGE_A_TEXTS.stepFound, "", STAGE_A_TEXTS.stepWhy, STAGE_A_TEXTS.stepQ];
 }
 // ADR «17 Οκτωβρίου (δ)», (ε) — the step card: the user's own words only, in this order, with no sentence of the app's. «Τι ήξερες» only
-// if the root card had it (never invented), «Πότε» only if he wrote one. The ONE source of the card, the copy and the download: the card
+// if the root card had it (never invented), «Πότε» only if the user wrote one. The ONE source of the card, the copy and the download: the card
 // shows this very text, so the three are the same, character for character.
 function buildStepCardText(knew, knewTruncated, found, step, when) {
   const rows = [];
@@ -1812,7 +1812,13 @@ function stageAMethodLineDue(o) {
 function buildRootCardLine(riskOffer) {
   return riskOffer ? STAGE_A_TEXTS.cardLineRisk : STAGE_A_TEXTS.cardLine;
 }
-// §5 — what «Αντίγραψε / Κατέβασε τη ρίζα» carries: the two lines, whole, and the date. Nothing stored.
+// What «Αντίγραψε / Κατέβασε τη ρίζα» carry: the step card's own text when there is one (ADR «17 Οκτωβρίου (δ)», (ε) — the same
+// text as the card, character for character), else the root as before (buildRootCopyText). Nothing stored.
+function buildStageAShareText(v, dateStr) {
+  const x = v || {};
+  return x.stepEnd === "card" ? buildStepCardText(x.knew, x.knewTruncated, x.found, x.step, x.when) : buildRootCopyText(x.knew, x.found, dateStr);
+}
+// §5 — the root: the two lines, whole, and the date. Nothing stored.
 function buildRootCopyText(knew, found, dateStr) {
   const lines = [];
   if (knew) lines.push(`${STAGE_A_TEXTS.knewLabel}: «${knew}»`);
@@ -2114,7 +2120,7 @@ function stageAPreRootDecision(decision, st) {
 function initialStageAState() {
   return {
     phase: null, door: 0, found: "", knew: null, knewTruncated: false, riskOffer: false, retry: false, leaving: false,
-    // ADR «17 Οκτωβρίου (δ)» — the step: his words (page memory only) and which of its questions he answered (null = not asked).
+    // ADR «17 Οκτωβρίου (δ)» — the step: the user's words (page memory only) and which of its questions they answered (null = not asked).
     // Outside `stats` on purpose: session_completed stays as it was, and a question that did not appear never becomes a 0.
     step: "", when: "", stepWritten: null, fitsDay: null, smallerWritten: null, whenWritten: null, stepEnd: "",
     stats: {
@@ -2265,9 +2271,13 @@ function stageAStep(state, ev) {
   }
 }
 // The input box is hidden while the user answers with buttons; it is shown for door 1's question,
-// for «Διόρθωσε», and for the word.
+// for «Διόρθωσε», for the word, and for the typed answers of the step (the step, the smaller piece, «Πότε»).
 function stageAInputHidden(phase) {
   return phase === "card" || phase === "offer" || phase === "notReady" || phase === "clarity" || phase === "fits";
+}
+// ADR «17 Οκτωβρίου (δ)» — a question of the step is open (the step, the size question, the smaller piece, «Πότε»).
+function stageAStepOpen(phase) {
+  return phase === "step" || phase === "fits" || phase === "smaller" || phase === "when";
 }
 // A text typed into the Stage A flow (door 1's answer, door 2's capture, «Διόρθωσε») is NOT sent to the
 // model, so the crisis check runs on it here. ANY crisis tier closes the flow and the message goes through
@@ -6219,12 +6229,11 @@ export default function AURAv2() {
   // STAGE A flow (steps 3.3–3.10): the ref is the source of truth, the phase state re-renders it.
   const stageARef             = useRef(initialStageAState());
   const stageARootArmed       = useRef(false); // door 2: the readiness answer arrived — capture the NEXT message
-  const firstWhyMethodLine    = useRef(false); // ADR «17 Οκτωβρίου»: the method line above the app's first question
   const [stageAPhase, setStageAPhase] = useState(null);
   // ADR «8 Οκτωβρίου (δ)», 5 — where the user's message does not go to the model (the first closing, door 1/2/3 without
   // substance, the «Ναι» of door 2, the correction without substance) it is still SHOWN. A UI-only list, NOT `messages`: no
   // request, detector, counter or telemetry sees it. `at` = how many messages there were when it was typed.
-  // ADR «17 Οκτωβρίου (δ)»: the whole step lives here too — its questions (role "assistant"), his answers and the card (`stepCard`).
+  // ADR «17 Οκτωβρίου (δ)»: the whole step lives here too — its questions (role "assistant"), the user's answers and the card (`stepCard`).
   const [uiBubbles, setUiBubbles] = useState([]);
   const addUiBubble = useCallback((text, at, extra) => {
     setUiBubbles(prev => [...prev, { id: nextMsgId(), role: "user", ...(extra || {}), content: String(text || ""), at: Number.isInteger(at) ? at : 0 }]);
@@ -8302,10 +8311,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     // read it. What still gates this turn is unchanged — needsFirstWhy, including the γρ. 377
     // binary fast-path, still decides whether asking is appropriate at all.
     // ADR «17 Οκτωβρίου (δ)» (John, for the test of the 20): with the switch open First-WHY does NOT fire — the model writes the
-    // first reply (main path below, method line by stageAMethodLineDue). Switch closed: exactly as before. The safety paths above come first.
+    // first reply (main path below, method line by stageAMethodLineDue). Switch closed: exactly as before, and never a method line
+    // (that line is Stage A's only). The safety paths above come first.
     if (messages.length === 0 && !firstWhyPending && !stageAActive.current && needsFirstWhy(userText)) {
-      // ADR «17 Οκτωβρίου»: this fixed question IS the session's first reply — the method line goes above it, by the same rule.
-      firstWhyMethodLine.current = stageAMethodLineDue({ active: stageAActive.current, auraBefore: false, supportive: false, riskKind: riskSignalKind.current, safetyMode, lastUserText: userText });
       setFirstWhyMessage(userText);
       setMessages([{ id: nextMsgId(), role: "user", content: userText }]);
       setFirstWhyPending(true);
@@ -8326,7 +8334,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       setActiveLens(inferred);
       const initMsgs = [
         { id: nextMsgId(), role: "user", content: firstWhyMessage },
-        { id: nextMsgId(), role: "assistant", content: "Γιατί έχει σημασία αυτό για σένα τώρα;", ...(firstWhyMethodLine.current ? { methodLine: true } : {}) },
+        { id: nextMsgId(), role: "assistant", content: "Γιατί έχει σημασία αυτό για σένα τώρα;" },
         { id: nextMsgId(), role: "user", content: userText },
       ];
       setMessages(initMsgs);
@@ -8669,7 +8677,6 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setError(null);
     setCrisisFallback(null);
     setTesterCopy(null);
-    firstWhyMethodLine.current = false; // ADR «17 Οκτωβρίου»
     stepJustTaken.current = null; // ADR «17 Οκτωβρίου (δ)»
     setClaritySurge(false);
     setIllumLevel(0);
@@ -9202,7 +9209,6 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           {/* First-Why pause — AURA asks one question before entering conversation */}
           {firstWhyPending && (
             <div className="first-why-card">
-              {firstWhyMethodLine.current && <div className="method-line" style={{fontSize:"15px",lineHeight:1.6,color:"#c4c0b8",marginBottom:"14px"}}>{STAGE_A_TEXTS.methodLine}</div>}
               <div className="first-why-q">
                 Γιατί έχει σημασία αυτό για σένα τώρα;
               </div>
@@ -9220,11 +9226,13 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               counted intro-screen elements passed while the bug was live. */}
           {messages.map((msg, i) => (
             <Fragment key={msg.id || i}>
+            {/* ADR «17 Οκτωβρίου (δ)»: while a question of the step is open, an earlier bubble starts no other flow (its typed answers
+                would be taken as the step) — «Δες την πορεία» hidden and refused, «αυτό δεν ισχύει» refused. */}
             <MessageBubble
               msg={msg}
-              onMisfire={() => { if (sessionEnded || layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending) return; setMisfireType(detectPattern(messages.slice(0, i+1)).type); setMisfirePending(true); }}
-              onContinueToReflection={() => { if (sessionEnded || loading || layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending || reflectionDelivered.current || (stageAActive.current && stageARef.current.stats.rootConfirmed !== 1)) return; handleClosureConfirm(true); }}
-              hideReflection={stageAActive.current && stageAView.stats.rootConfirmed !== 1}
+              onMisfire={() => { if (sessionEnded || layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending || stageAStepOpen(stageARef.current.phase)) return; setMisfireType(detectPattern(messages.slice(0, i+1)).type); setMisfirePending(true); }}
+              onContinueToReflection={() => { if (sessionEnded || loading || layerGatePending || pivotPending || warningPending || closureConfirmPending || memoryPromptPending || firstWhyPending || reflectionDelivered.current || (stageAActive.current && (stageARef.current.stats.rootConfirmed !== 1 || stageAStepOpen(stageARef.current.phase)))) return; handleClosureConfirm(true); }}
+              hideReflection={stageAActive.current && (stageAView.stats.rootConfirmed !== 1 || stageAStepOpen(stageAPhase))}
             />
             {uiBubbles.filter(g => Math.min(g.at, messages.length) === i + 1).map(g => g.stepCard ? (
               // ADR «17 Οκτωβρίου (δ)», (ε): the step card shows the very text the copy and the download carry (buildStepCardText).
@@ -9498,21 +9506,17 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               )}
               {/* ADR «17 Οκτωβρίου (δ)», (ε): not while the step's questions are open, never after a safety stop; with the step card,
                   the copy and the download carry the card's own text (the same function, the same state). */}
-              {stageAView.stats.rootConfirmed === 1 && !["step", "fits", "smaller", "when", "stopped"].includes(stageAPhase) && (
+              {stageAView.stats.rootConfirmed === 1 && !stageAStepOpen(stageAPhase) && stageAPhase !== "stopped" && (
                 <div style={{display:"flex",gap:"8px",flexWrap:"wrap",margin:"10px 0"}}>
                   <button className="choice-btn" onClick={() => {
-                    const _txt = stageAView.stepEnd === "card"
-                      ? buildStepCardText(stageAView.knew, stageAView.knewTruncated, stageAView.found, stageAView.step, stageAView.when)
-                      : buildRootCopyText(stageAView.knew, stageAView.found, new Date().toISOString().slice(0, 10));
+                    const _txt = buildStageAShareText(stageAView, new Date().toISOString().slice(0, 10));
                     try {
                       navigator.clipboard.writeText(_txt).then(() => setStageACopied(true), () => setStageACopyText(_txt));
                     } catch (e) { setStageACopyText(_txt); }
                   }}>{stageACopied ? STAGE_A_TEXTS.copied : STAGE_A_TEXTS.copy}</button>
                   <button className="choice-btn" onClick={() => {
                     const _date = new Date().toISOString().slice(0, 10);
-                    const _txt = stageAView.stepEnd === "card"
-                      ? buildStepCardText(stageAView.knew, stageAView.knewTruncated, stageAView.found, stageAView.step, stageAView.when)
-                      : buildRootCopyText(stageAView.knew, stageAView.found, _date);
+                    const _txt = buildStageAShareText(stageAView, _date);
                     try {
                       const _url = URL.createObjectURL(new Blob([_txt], { type: "text/plain;charset=utf-8" }));
                       const _a = document.createElement("a");

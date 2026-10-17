@@ -370,7 +370,7 @@ function personaPrompt(turns, need, extra) {
     word: 'The app asks for one word, or a short phrase, that you want to keep from this conversation. Write only that.',
     card: 'The app shows this sentence as what is really bothering you: «' + String(extra || '') + '». If it is truly it, answer "yes". If it is close but not right, answer "correct" and write the right sentence. If it is not it at all, answer "notyet".',
     clarity: 'The app asks: how clear is it now what exactly the problem is, from 1 to 10? Answer honestly as this person.',
-    // ADR «17 Οκτωβρίου (δ)» — the step after «Ναι»: his own words, never judged
+    // ADR «17 Οκτωβρίου (δ)» — the step after «Ναι»: the user's own words, never judged
     step: 'The app asks: «Ποιο είναι το πιο μικρό πράγμα που μπορείς να κάνεις γι\' αυτό;». Write it as this person would, in one short sentence of your own. Set found_root to false.',
     smaller: 'The app asks: «Τότε ποιο είναι το πρώτο μικρό κομμάτι του;». Write it in one short sentence of your own. Set found_root to false.',
     when: 'The app asks: «Πότε;». Answer in a few words, as this person would. Set found_root to false.',

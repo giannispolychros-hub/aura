@@ -5,7 +5,7 @@
 //   3  The step, after «Ναι» on the root card — switch open only, outside the risk paths, NO model call:
 //      (α) John's text, verbatim · (β) the step, typed like the root phrase, with «Δεν ξέρω ακόμα» · (γ) «Είναι τόσο μικρό που
 //      χωράει σε μία μέρα;» «Ναι» / «Όχι, είναι μεγάλο» → «Τότε ποιο είναι το πρώτο μικρό κομμάτι του;» exactly once · (δ) «Πότε;»
-//      with «Δεν ξέρω ακόμα» · (ε) the card in his words (no «Πότε» line if he did not write one), the SAME text as the copy and the
+//      with «Δεν ξέρω ακόμα» · (ε) the card in the user's words (no «Πότε» line if they did not write one), the SAME text as the copy and the
 //      download · (στ) «Δεν ξέρω ακόμα» at the step → «Κι αν όχι τώρα, αυτό που βρήκες είναι ήδη δικό σου.» · (ζ) clarity, the word,
 //      the end, as today · (η) the safety detectors on every typed text of the step: a signal stops the step flow at once and the
 //      message takes the existing safety path · (θ) the €6 screen and the 4-option question stay in the code, behind ONE closed
@@ -43,7 +43,7 @@ function fullFnSrc(name) {
 }
 const textsSrc = (() => { const a = CODE.indexOf('const STAGE_A_TEXTS = {'); return a >= 0 ? CODE.slice(a, CODE.indexOf('\n};', a) + 3) : ''; })();
 const NAMES = ['initialStageAState', 'stageAStep', 'stageAInputHidden', 'stageATelemetry', 'stageAFlowTelemetry', 'stageAStepTelemetry',
-  'buildRootEndLines', 'buildRootStepLines', 'buildStepCardText', 'buildRootCopyText', 'recordTelemetry', 'detectSafetySignal'];
+  'buildRootEndLines', 'buildRootStepLines', 'buildStepCardText', 'buildRootCopyText', 'recordTelemetry', 'detectSafetySignal', 'stageAStepOpen', 'buildStageAShareText'];
 let F = {};
 try {
   F = new Function(textsSrc + '\n' + NAMES.map(n => fullFnSrc(n) || `function ${n}(){return 'missing'}`).join('\n') + '\nreturn {STAGE_A_TEXTS,' + NAMES.join(',') + '};')();
@@ -210,17 +210,19 @@ const Y = T('stageAStep', CARD, { type: 'yes', riskKind: 0, step: true });
 {
   const K = 'Δεν ξέρω αν πρέπει να φύγω';
   const full = T('buildStepCardText', K, false, ROOT, STEP, 'Αύριο το πρωί');
-  assert('(ε): the card in his words, in this order', full === 'Τι ήξερες: «' + K + '»\nΤι βρήκες: «' + ROOT + '»\nΤι θα κάνεις: «' + STEP + '»\nΠότε: «Αύριο το πρωί»');
+  assert('(ε): the card in the user\'s words, in this order', full === 'Τι ήξερες: «' + K + '»\nΤι βρήκες: «' + ROOT + '»\nΤι θα κάνεις: «' + STEP + '»\nΠότε: «Αύριο το πρωί»');
   const noWhen = T('buildStepCardText', K, false, ROOT, STEP, '');
   assert('(ε): no «Πότε» written → the line is missing entirely', noWhen === 'Τι ήξερες: «' + K + '»\nΤι βρήκες: «' + ROOT + '»\nΤι θα κάνεις: «' + STEP + '»' && !/Πότε/.test(noWhen));
   assert('(ε): no «Τι ήξερες» on the root card → none here either (never invented); a cut snippet keeps its «…»',
     T('buildStepCardText', null, false, ROOT, STEP, 'x').split('\n')[0] === 'Τι βρήκες: «' + ROOT + '»' && T('buildStepCardText', K, true, ROOT, STEP, '').startsWith('Τι ήξερες: «' + K + '…»'));
   const words = full.replace(K, '').replace(ROOT, '').replace(STEP, '').replace('Αύριο το πρωί', '').replace(/Τι ήξερες|Τι βρήκες|Τι θα κάνεις|Πότε/g, '');
-  assert('(ε): no sentence of praise or good wishes — nothing but the labels and his words', /^[:«»\s]*$/.test(words));
+  assert('(ε): no sentence of praise or good wishes — nothing but the labels and the user\'s words', /^[:«»\s]*$/.test(words));
   assert('(ε): the card shows that SAME text (pre-wrap, no label styling that would change it)',
     CODE.includes('data-step-card="1"') && /stepCard: true/.test(CODE) && CODE.includes('buildStepCardText(stageARef.current.knew, stageARef.current.knewTruncated, stageARef.current.found, stageARef.current.step, stageARef.current.when)'));
-  assert('(ε): the copy and the download take the same function on the same state, when the card exists',
-    (UI.match(/buildStepCardText\(stageAView\.knew, stageAView\.knewTruncated, stageAView\.found, stageAView\.step, stageAView\.when\)/g) || []).length >= 1 && /stageAView\.stepEnd === "card"/.test(UI));
+  const v = { stepEnd: 'card', knew: K, knewTruncated: false, found: ROOT, step: STEP, when: 'Αύριο το πρωί' };
+  assert('(ε): the copy and the download take ONE function: the card\'s own text when there is a card, else the root and the date as before',
+    T('buildStageAShareText', v, '2026-10-17') === full && T('buildStageAShareText', Object.assign({}, v, { stepEnd: 'none' }), '2026-10-17') === T('buildRootCopyText', K, ROOT, '2026-10-17') &&
+    (UI.match(/buildStageAShareText\(stageAView, /g) || []).length === 2 && !/stageAView\.stepEnd === "card"/.test(UI));
 }
 
 // The page: the step lives in UI-only bubbles (never `messages`), the safety branch falls through, the buttons.
@@ -244,7 +246,7 @@ const Y = T('stageAStep', CARD, { type: 'yes', riskKind: 0, step: true });
   assert('(ια): nothing of the step is ever handed to storage, the console or a request', !/(localStorage|sessionStorage|indexedDB|document\.cookie|console\.|saveMemory|recordTelemetry|callAura)[^\n]*(\.step\b|\.when\b|uiBubbles|stepCard|buildStepCardText)/.test(CODE));
   assert('(ια): the UI-only bubbles are cleared by «Νέα συνεδρία», with the Stage A state', /stageARef\.current = initialStageAState\(\);[^\n]*\n\s*setUiBubbles\(\[\]\);/.test(CODE));
   assert('(ζ): the copy / download buttons wait until the step\'s questions are over (and never show after a safety stop)',
-    /stageAView\.stats\.rootConfirmed === 1 && !\["step", "fits", "smaller", "when", "stopped"\]\.includes\(stageAPhase\)/.test(UI));
+    /stageAView\.stats\.rootConfirmed === 1 && !stageAStepOpen\(stageAPhase\) && stageAPhase !== "stopped" && \(/.test(UI));
 }
 
 // (ια) + double tap: two submits in the same moment (the box still holds the text, the page has not redrawn) — the second is the same
@@ -256,6 +258,19 @@ const Y = T('stageAStep', CARD, { type: 'yes', riskKind: 0, step: true });
   const g = HS.indexOf('if (stepJustTaken.current !== null && stepJustTaken.current === userText) return;');
   assert('DOUBLE SUBMIT: the same text again in that moment is dropped before anything else reads it (latch, step, model)',
     g > HS.indexOf('const userText = input.trim()') && g < HS.indexOf('setInput("");') && g < HS.indexOf('riskSignalKind.current = mergeRiskKind('));
+}
+
+// ── Clean code (John, after the first round: «Θέλω καθαρό κώδικα») ─────────────────────────────────────────────────────────────────
+{
+  assert('CLEAN: the method line above First-WHY\'s question is gone — First-WHY no longer fires with the switch open, where the line lives',
+    !/firstWhyMethodLine/.test(CODE) && HS.includes('{ id: nextMsgId(), role: "assistant", content: "Γιατί έχει σημασία αυτό για σένα τώρα;" },') &&
+    (CODE.match(/STAGE_A_TEXTS\.methodLine/g) || []).length === 1);
+  assert('CLEAN: one helper says whether a question of the step is open (step, size, smaller piece, «Πότε»)',
+    ['step', 'fits', 'smaller', 'when'].every(p => T('stageAStepOpen', p) === true) && [null, 'ask', 'card', 'correct', 'clarity', 'word', 'done', 'stopped', 'offer'].every(p => T('stageAStepOpen', p) === false));
+  assert('GUARD: while a question of the step is open, the buttons of earlier bubbles start nothing — «Δες την πορεία» is hidden and refused, «αυτό δεν ισχύει» refused',
+    /onMisfire=\{\(\) => \{ if \(sessionEnded \|\|[^\n]*\|\| stageAStepOpen\(stageARef\.current\.phase\)\) return;/.test(CODE) &&
+    /onContinueToReflection=\{\(\) => \{ [^\n]*\(stageAActive\.current && \(stageARef\.current\.stats\.rootConfirmed !== 1 \|\| stageAStepOpen\(stageARef\.current\.phase\)\)\)\) return; handleClosureConfirm\(true\); \}\}/.test(CODE) &&
+    CODE.includes('hideReflection={stageAActive.current && (stageAView.stats.rootConfirmed !== 1 || stageAStepOpen(stageAPhase))}'));
 }
 
 // ── 4. TESTER_INVITATION.md — John's texts, verbatim ───────────────────────────────────────────────────────────────────────────────

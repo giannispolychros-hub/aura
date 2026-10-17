@@ -13,7 +13,8 @@
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
-// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W | X | Y | Z | … | R4 | TX | VO | AP (μόνο μία ενότητα)
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only MAIN | ST | W | X | Y | Z | … | R4 | TX | VO | AP (μόνο μία ενότητα· MAIN = A–V)
+//   --viewport 390x844 | 360x640 (17/10 (δ): όλος ο έλεγχος σε αυτό το μέγεθος κινητού· οι ενότητες με δικά τους μεγέθη τα κρατούν)
 // ΣΤΡΕΣ ΤΕΣΤ (Μέρος Β, 10/10): --stress (ψεύτικα, κόστος 0) · --stress --real --dry (σχέδιο + εκτίμηση) · --stress --real --yes (ΠΡΑΓΜΑΤΙΚΟ,
 //   όριο --budget έως $25, προεπιλογή $25) · --sessions 14,15,1 (μόνο αυτοί) · --minutes 75 (καμία νέα συνεδρία μετά). Τρέχει και από το
 //   GitHub (.github/workflows/stress.yml): η αναφορά γράφεται και στη σελίδα της εκτέλεσης. Δες την ενότητα «ΣΤΡΕΣ ΤΕΣΤ» πιο κάτω.
@@ -71,7 +72,7 @@ function writeOut(name, text) {
 }
 
 // ═══ ΨΕΥΤΙΚΟ ΜΟΝΤΕΛΟ — ροή (A–I), ασφάλεια (S), πόρτες 2–3 (T), κλείσιμο/κινητό (U), ετικέτες (V), κρυφά σήματα (W), αποφάσεις του ADR «8 Οκτωβρίου (δ)» (X) ══
-// A ολόκληρη η ροή (κουμπί → κάρτα → «Ναι» → πρόταση → ερώτηση → σαφήνεια → λέξη → τέλος, χωρίς 6€), B κλειστός
+// A ολόκληρη η ροή (κουμπί → κάρτα → «Ναι» → το βήμα → σαφήνεια → λέξη → τέλος, χωρίς 6€· ως 17/10 (δ): «Ναι» → πρόταση → ερώτηση), B κλειστός
 // διακόπτης (τίποτα από το Στάδιο Α, καμία σήμανση), C πόρτα 2 και «πίσω», D DISTRESS (κάρτα ναι, πρόταση όχι),
 // E πρόταση κρίσης ως απάντηση (η ροή κλείνει, γραμμή 1018), F/F2 «Πριν φύγεις:» (T2 μία φορά, μετά το παλιό κλείσιμο·
 // απάντηση-ρίζα και μέτρηση), G T1 «Ναι» χωρίς πόρτα, H T2 με κρίση επιπέδου Α χωρίς πόρτα, I κλειστός διακόπτης.
@@ -1338,7 +1339,7 @@ async function runMockTX() {
       await send(page, 'Αύριο το πρωί, πριν τη δουλειά.');
       const cg = await page.evaluate(() => { const c = document.querySelector('[data-step-card="1"] .warning-text'); if (!c) return null; const r = c.getBoundingClientRect();
         return { text: c.innerText, inside: r.left >= 0 && r.right <= window.innerWidth + 0.5, notCut: c.scrollWidth <= c.clientWidth + 1, noSideScroll: document.documentElement.scrollWidth <= window.innerWidth }; });
-      ok(`TX5 (${tag}, offer closed): the card, his words, inside the width, nothing cut`, !!cg && cg.inside && cg.notCut && cg.noSideScroll &&
+      ok(`TX5 (${tag}, offer closed): the card, the user's words, inside the width, nothing cut`, !!cg && cg.inside && cg.notCut && cg.noSideScroll &&
         cg.text.endsWith('Τι βρήκες: «' + ROOT + '»\nΤι θα κάνεις: «Να γράψω δύο γραμμές.»\nΠότε: «Αύριο το πρωί, πριν τη δουλειά.»'));
       await page.screenshot({ path: path.join(OUT, 'TX-6-card' + sfx + '.png'), fullPage: false });
       await browser.close();
@@ -1564,11 +1565,12 @@ async function runMockAP() {
 // ── ST: John, 17/10/2026 (ADR «17 Οκτωβρίου (δ)»), for the test of the 20. The step after «Ναι», on a phone (390×844 unless --viewport),
 // ?stageA=1&rec=1, memory closed (its default). Every request of the app goes through the REAL api/aura.js (its guard: a 403/413 here
 // would be a refused real call), with the call to Anthropic replaced by the fake model. ST0 First-WHY does not fire with the switch
-// open (and still does with it closed) · ST1 the whole step, normal end: John's texts word for word, his words on the card, the card =
+// open (and still does with it closed) · ST1 the whole step, normal end: John's texts word for word, the user's words on the card, the card =
 // the copy = the download, the numbers, nothing of the step in any request, storage or the console · ST2 «Δεν ξέρω ακόμα» at the step ·
 // ST3 «Δεν ξέρω ακόμα» at «Πότε» · ST4 «Όχι, είναι μεγάλο»: one smaller-piece question, no third · ST5 a crisis («θέλω να πεθάνω») at
 // the step, the smaller piece and «Πότε» (and DISTRESS): the safety path, nothing after it · ST6 double taps · ST7 reload and back ·
-// ST8 the €6 screen from no path (correction, door 4, door 2) · ST9 the switch closed · ST10 privacy. Alone: --only ST.
+// ST8 the €6 screen from no path (correction, door 4, door 2) · ST9 the switch closed · ST10 privacy (the console, strict) · ST11 privacy
+// with memory OPEN · ST12 an earlier bubble starts no other flow while a question of the step is open. Alone: --only ST.
 async function runMockST() {
   // John's texts, written out here on purpose (so the old code fails, and never crashes the run); the first check: the app has them, word for word
   const JT = { stepFound: 'Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή. Τώρα ξέρεις τι γίνεται.',
@@ -1716,7 +1718,7 @@ async function runMockST() {
     ok('ST1 (β): … not with Enter either', !(await has(s.page, T.fitsQ)) && await count(s.page, T.stepQ) === 1);
     await say(s.page, STEP);
     verbatim.push('[ΧΡΗΣΤΗΣ] ' + STEP);
-    ok('ST1 (β): his step as a bubble of his, then the size question with its two buttons; the box is hidden',
+    ok('ST1 (β): the user\'s step as their own bubble, then the size question with its two buttons; the box is hidden',
       await count(s.page, STEP) === 1 && await has(s.page, T.fitsQ) && await btn(s.page, T.fitsYes).count() === 1 && await btn(s.page, T.fitsNo).count() === 1 && !(await inputOn(s.page)));
     verbatim.push('[AURA] ' + T.fitsQ, '[κουμπιά] ' + T.fitsNo + ' · ' + T.fitsYes);
     await shot(s.page, 'ST1-2-fits');
@@ -1729,7 +1731,7 @@ async function runMockST() {
     verbatim.push('[ΧΡΗΣΤΗΣ] ' + WHEN);
     const want = 'Τι ήξερες: «' + knew + '»\nΤι βρήκες: «' + ROOT + '»\nΤι θα κάνεις: «' + STEP + '»\nΠότε: «' + WHEN + '»';
     const ct = await cardText(s.page);
-    ok('ST1 (ε): the card, his words in this order — «Τι ήξερες» / «Τι βρήκες» / «Τι θα κάνεις» / «Πότε»', !!knew && ct === want);
+    ok('ST1 (ε): the card, the user\'s words in this order — «Τι ήξερες» / «Τι βρήκες» / «Τι θα κάνεις» / «Πότε»', !!knew && ct === want);
     verbatim.push('[ΚΑΡΤΑ]\n' + (ct || '(λείπει)'));
     ok('ST1 (ε): no sentence of praise or good wishes on the card', ct && ct.replace(knew, '').replace(ROOT, '').replace(STEP, '').replace(WHEN, '').replace(/Τι ήξερες|Τι βρήκες|Τι θα κάνεις|Πότε/g, '').replace(/[:«»\s]/g, '') === '');
     ok('ST1 (ζ): then the clarity question, as today; the copy / download are back', await has(s.page, T.clarityQ) && await btn(s.page, '10').count() === 1 && await btn(s.page, T.copy).count() === 1 && await btn(s.page, T.download).count() === 1);
@@ -1749,7 +1751,7 @@ async function runMockST() {
     await say(s.page, 'Μαρία'); await s.page.waitForTimeout(800);
     ok('ST1 (ζ): the end, as today (one closing request)', await s.page.getByText('η συνομιλία σταμάτησε εδώ').count() === 1 && s.calls.length === n0 + 1 && LIB.classifyRequest(s.calls[n0], APP).kind === 'termination');
     const rq = reqText(s.calls);
-    ok('ST1 (ια): nothing of the step in ANY request — not his step, not «Πότε», not the step\'s questions or the card', ![STEP, WHEN, ...STEP_TEXTS].some(x => rq.includes(x)));
+    ok('ST1 (ια): nothing of the step in ANY request — not the user\'s step, not «Πότε», not the step\'s questions or the card', ![STEP, WHEN, ...STEP_TEXTS].some(x => rq.includes(x)));
     ok('ST1 (θ): no €6 screen, no 4-option question, at any point', await noOffer(s.page));
     const L = await log(s.page);
     const one = (n, v) => evs(L, n).length === 1 && evs(L, n)[0].value === v;
@@ -1760,14 +1762,14 @@ async function runMockST() {
     ok('ST1 (ι): the tester file carries the step\'s numbers — numbers only, not one Greek letter', ['step_shown', 'step_written', 'step_fits_day', 'when_written'].every(e => f.text.includes('"' + e + '"')) && !/[Ͱ-Ͽἀ-῿]/.test(f.text));
     const d = await dump(s.page);
     const store = JSON.stringify(d);
-    ok('ST1 (ια): written nowhere on the device — localStorage, sessionStorage, IndexedDB, Cache, cookies hold no word of his (step, «Πότε», root, first message, word)',
+    ok('ST1 (ια): written nowhere on the device — localStorage, sessionStorage, IndexedDB, Cache, cookies hold no word of the user\'s (step, «Πότε», root, first message, word)',
       ![STEP, WHEN, ROOT, F1.slice(0, 20), 'Μαρία'].some(x => store.includes(x)) && Object.keys(d.ss).length === 0 && d.idb.length === 0 && d.caches.length === 0 && d.cookie === '');
     ok('ST1 (ια): memory stays closed (nothing stored under its key)', !d.ls.aura_v2_memory || JSON.parse(d.ls.aura_v2_memory).storageEnabled !== true);
     results.push('NOTE — ST1 (privacy): on the device after a whole session (?stageA=1&rec=1, memory closed): localStorage keys ' + Object.keys(d.ls).sort().join(', ') +
       ' · sessionStorage ' + Object.keys(d.ss).length + ' · IndexedDB ' + d.idb.length + ' · Cache ' + d.caches.length + ' · cookies ' + (d.cookie ? 'yes' : 'none'));
     const con = s.cons.join('\n');
-    ok('ST1 (ια): the console never shows his step or «Πότε»', ![STEP, WHEN].some(x => con.includes(x)));
-    ok('ST1 (privacy): with these replies, no word of his in the console at all', ![F1.slice(0, 20), ROOT, STEP, WHEN, 'Μαρία'].some(x => con.includes(x)));
+    ok('ST1 (ια): the console never shows the user\'s step or «Πότε»', ![STEP, WHEN].some(x => con.includes(x)));
+    ok('ST1 (privacy): with these replies, no word of the user\'s in the console at all', ![F1.slice(0, 20), ROOT, STEP, WHEN, 'Μαρία'].some(x => con.includes(x)));
     await s.browser.close();
   }
   writeOut('ST-verbatim' + (VP ? '-' + VP.width + 'x' + VP.height : '') + '.txt', verbatim.join('\n') + '\n');
@@ -1844,14 +1846,14 @@ async function runMockST() {
     const c = s.calls[n0] ? LIB.classifyRequest(s.calls[n0], APP) : null;
     ok(`ST5 (${at}): «${msg.slice(0, 20)}» → the existing safety path, as for any message (${kind === 'supportive' ? 'Supportive, the 1018 line' : 'the distress path'})`,
       s.calls.length === n0 + 1 && !!c && c.kind === kind && (kind !== 'supportive' || await s.page.getByText(/1018/).count() >= 1));
-    const stopped = async () => await card(s.page).count() === 0 && !(await has(s.page, T.whenQ) && msg === CRISIS && at.startsWith('(β)')) &&
+    const stopped = async () => await card(s.page).count() === 0 &&
       await btn(s.page, T.stepUnknown).count() === 0 && await btn(s.page, T.fitsYes).count() === 0 && !(await has(s.page, T.clarityQ)) &&
       (await s.page.getByText(T.word).count()) === 0 && (await s.page.getByText('η συνομιλία σταμάτησε εδώ').count()) === 0;
     ok(`ST5 (${at}): the step flow stopped at once — no next step question, no card, no clarity, no word, no end`, await stopped() &&
       await count(s.page, T.whenQ) <= (at.startsWith('(δ)') ? 1 : 0) && await count(s.page, T.smallerQ) <= (at.startsWith('(γ)') ? 1 : 0));
     const L = await log(s.page);
     ok(`ST5 (${at}): no step and no «Πότε» counted (step_shown only)`, evs(L, 'step_shown').length === 1 && ['step_written', 'step_fits_day', 'smaller_piece_written', 'when_written'].every(e => evs(L, e).length === 0));
-    ok(`ST5 (${at}): the safety request carries none of his earlier step answers`, ![STEP, BIG].some(x => reqText(s.calls).includes(x)));
+    ok(`ST5 (${at}): the safety request carries none of the user's earlier step answers`, ![STEP, BIG].some(x => reqText(s.calls).includes(x)));
     await say(s.page, 'Δεν ξέρω.'); await s.page.waitForTimeout(500);
     ok(`ST5 (${at}): a next message is a conversation message (to the model) — still no card, no step question, no end`, s.calls.length === n0 + 2 && await stopped());
     if (at === '(δ) «Πότε»') await shot(s.page, 'ST5-crisis-when');
@@ -1927,7 +1929,7 @@ async function runMockST() {
     if (fresh) { await s.page.getByText('Ξεκίνα με το πρόβλημά σου').click(); }
     await say(s.page, WHEN); await s.page.waitForTimeout(500);
     ok('ST7: after a crisis in the step, «back» and writing again → no card, no step question, no clarity (no way round the safety stop)',
-      await card(s.page).count() === 0 && await btn(s.page, T.stepUnknown).count() === 0 && !(await has(s.page, T.clarityQ)) && !(await has(s.page, T.fitsQ) && !fresh && false));
+      await card(s.page).count() === 0 && await btn(s.page, T.stepUnknown).count() === 0 && !(await has(s.page, T.clarityQ)));
     const L = await log(s.page);
     ok('ST7: … and no step or «Πότε» was ever counted', ['step_written', 'when_written'].every(e => evs(L, e).length === 0));
     await s.browser.close();
@@ -2005,6 +2007,18 @@ async function runMockST() {
     const sent = [['the first message', F1.slice(0, 30)], ['the root', ROOT], ['the word', 'Μαρία']].filter(([, x]) => next.includes(x)).map(([k]) => k);
     results.push('NOTE — ST11 (privacy, memory OPEN): sent with the next session\'s first request: ' + (sent.join(', ') || 'none of these'));
     ok('ST11 (ια): … and the next session never sends the step or «Πότε»', s.calls.length > n0 && ![STEP, WHEN].some(x => next.includes(x)));
+    await s.browser.close();
+  }
+  // ── ST12: an earlier bubble with «Δες την πορεία» (it starts the old closing) does nothing while a question of the step is open ──
+  {
+    const PROMISE = 'Τι σε κρατάει εκεί; Αν θέλεις, μπορώ να σου δείξω πώς έφτασες εδώ.';
+    const s = await sess('?stageA=1&rec=1', [PROMISE, END]);
+    await toStep(s);
+    ok('ST12: while the step question is open, the earlier bubble shows no «Δες την πορεία»', await has(s.page, T.stepQ) && await btn(s.page, 'Δες την πορεία').count() === 0);
+    await say(s.page, STEP); await tap(s.page, T.fitsYes);
+    ok('ST12: … nor at «Πότε;», and nothing was sent', await has(s.page, T.whenQ) && await btn(s.page, 'Δες την πορεία').count() === 0 && s.calls.length === 1);
+    await say(s.page, WHEN);
+    ok('ST12: the step goes on to its card as usual', await card(s.page).count() === 1 && s.calls.length === 1);
     await s.browser.close();
   }
   ok('ST: every request the app made in this section passed the REAL api guard — no 403, no 413 (' + statuses.length + ' requests)', statuses.length >= 20 && statuses.every(x => x === 200));
@@ -2621,7 +2635,7 @@ async function runMockY() {
     await s.ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE }).catch(() => {});
     await begin(s);
     await click(s.page, T.button); await say(s.page, ROOT);
-    // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): with the €6 screen closed, the step to its card (his words: STEP_W, WHEN_W)
+    // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): with the €6 screen closed, the step to its card (the user's words: STEP_W, WHEN_W)
     if (COACH_OFFER_OPEN) { await click(s.page, T.yes); await click(s.page, T.wantMore); await click(s.page, T.help2); }
     else { await click(s.page, T.yes); await say(s.page, STEP_W); await click(s.page, T.fitsYes); await say(s.page, WHEN_W); }
     await click(s.page, '7');
@@ -3091,6 +3105,17 @@ async function runScenario(scen, model, budget) {
       if (!(await count(btn(name)))) { sess.notes.push('το κουμπί «' + name + '» δεν φαινόταν'); if (st.card === 'yes') break; continue; }
       const r = await record('[πάτησε «' + name + '»]', () => btn(name).click());
       if (st.card === 'yes') { sess.rootConfirmed = true; r.turn.yes = true; await page.screenshot({ path: path.join(OUT, scen.risk + '-root-yes.png'), fullPage: true }); }
+    } else if ('step' in st || 'smaller' in st || 'when' in st) {
+      // ADR «17 Οκτωβρίου (δ)» — the step after «Ναι»: a text is typed like any answer (it never reaches the model); null = «Δεν ξέρω ακόμα»
+      const v = 'step' in st ? st.step : 'smaller' in st ? st.smaller : st.when;
+      const open = await count(btn(T.stepUnknown)) || ('smaller' in st && s.input);
+      if (!open) sess.notes.push('δεν εμφανίστηκε ερώτηση του βήματος (π.χ. σήμα κινδύνου)');
+      else if (v === null) await record('[πάτησε «' + T.stepUnknown + '»]', () => btn(T.stepUnknown).click());
+      else { lastUser = v; await record(v, () => type(v)); }
+    } else if (st.fits) {
+      const name = st.fits === 'no' ? T.fitsNo : T.fitsYes;
+      if (await count(btn(name))) await record('[πάτησε «' + name + '»]', () => btn(name).click());
+      else sess.notes.push('δεν εμφανίστηκε η ερώτηση του μεγέθους');
     } else if (st.offer) {
       const name = st.offer === 'want' ? T.wantMore : T.notNow;
       if (!(await count(btn(name)))) { sess.notes.push('δεν εμφανίστηκε πρόταση Coach (π.χ. σήμα κινδύνου)'); continue; }

@@ -76,17 +76,18 @@ assert('METHOD: never when the first message itself carries a crisis or distress
     /stageAMethodLineDue\(\{ active: stageAActive\.current, auraBefore: msgs\.some\(m => m && m\.role === "assistant"\), supportive: currentMode === "SUPPORTIVE", riskKind: riskSignalKind\.current, safetyMode, lastUserText: lastUserMsg \}\)/.test(GR) &&
     GR.includes('{ id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode, ...(_methodLine ? { methodLine: true } : {}) }'));
   const HS = CODE.slice(CODE.indexOf('const handleSubmit = useCallback('), CODE.indexOf('const handleStageAPress = useCallback('));
-  assert('METHOD (the app\'s first question «Γιατί έχει σημασία…»): decided once when that question opens, by the same rule',
-    /firstWhyMethodLine\.current = stageAMethodLineDue\(\{ active: stageAActive\.current, auraBefore: false, supportive: false, riskKind: riskSignalKind\.current, safetyMode, lastUserText: userText \}\);/.test(HS) &&
-    HS.includes('{ id: nextMsgId(), role: "assistant", content: "Γιατί έχει σημασία αυτό για σένα τώρα;", ...(firstWhyMethodLine.current ? { methodLine: true } : {}) }'));
-  assert('METHOD: the question card shows the line above the question',
-    /\{firstWhyPending && \(\s*<div className="first-why-card">\s*\{firstWhyMethodLine\.current && <div className="method-line"[^>]*>\{STAGE_A_TEXTS\.methodLine\}<\/div>\}\s*<div className="first-why-q">/.test(CODE));
+  // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): First-WHY no longer fires with the switch open, and the line lives only there — so the
+  // line above the app's first question could never show; its flag and wiring are removed (clean code)
+  assert('METHOD (the app\'s first question «Γιατί έχει σημασία…»): it fires only with the switch closed, so it never carries the line — no flag left',
+    HS.includes('if (messages.length === 0 && !firstWhyPending && !stageAActive.current && needsFirstWhy(userText)) {') && !/firstWhyMethodLine/.test(CODE) &&
+    HS.includes('{ id: nextMsgId(), role: "assistant", content: "Γιατί έχει σημασία αυτό για σένα τώρα;" },'));
+  assert('METHOD: the question card draws no line above the question',
+    /\{firstWhyPending && \(\s*<div className="first-why-card">\s*<div className="first-why-q">/.test(CODE));
   assert('METHOD: the reply bubble draws it as its FIRST line, from the flag (display only)',
     /\{msg\.methodLine && !isUser && <span className="method-line"[^>]*>\{STAGE_A_TEXTS\.methodLine\}<\/span>\}\s*\{displayContent\.split\("\\n"\)/.test(CODE));
   assert('METHOD: never sent anywhere — the API gets only role and content, and the line is used in no other place (no prompt, no history)',
     CODE.includes('messages: capMessageHistory(messages, systemPrompt).map(m => ({ role: m.role, content: m.content }))') &&
-    (CODE.match(/STAGE_A_TEXTS\.methodLine/g) || []).length === 2 && !constText('SYSTEM_SUPPORTIVE').includes('Δεν θα σου δώσω λίστα'));
-  assert('METHOD: a new session starts with the flag cleared', /setTesterCopy\(null\);\s*firstWhyMethodLine\.current = false;/.test(CODE.slice(CODE.indexOf('const resetSession = () =>'), CODE.indexOf('const resetSession = () =>') + 9000)));
+    (CODE.match(/STAGE_A_TEXTS\.methodLine/g) || []).length === 1 && !constText('SYSTEM_SUPPORTIVE').includes('Δεν θα σου δώσω λίστα')); // UPDATED (δ): one place
 }
 
 // ── 2β. The line on the root card — and the precondition, in the code of every path ─────────────────────────────────────────

@@ -157,8 +157,16 @@ assert('SCENARIOS: every root typed into the flow passes the app\'s own substanc
     const cst = ['KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_MIN_SUBSTANCE_WORDS', 'ROOT_FILLER_WORDS'].map(n => { const a = src.indexOf('const ' + n + ' = '); return src.slice(a, src.indexOf(';\n', a) + 1); }).join('\n');
     const H = new Function(cst + '\n' + blk(s) + '\n' + blk(sp) + '\n' + blk(r) + '\nreturn rootTextHasSubstance;')();
     return S.every(sc => sc.steps.every(t => !t.root || H(t.root))); }, false));
+// UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): the step's typed answers too (a safety signal there would stop the step flow)
 assert('SCENARIOS: no synthetic message trips the crisis detector (it would end in the crisis path, not the test)',
-  attempt(() => S.every(s => s.steps.every(t => ['say', 'root', 'word'].every(k => !t[k] || app.fns.detectSafetySignal(t[k]) === null))), false));
+  attempt(() => S.every(s => s.steps.every(t => ['say', 'root', 'word', 'step', 'smaller', 'when'].every(k => !t[k] || app.fns.detectSafetySignal(t[k]) === null))), false));
+assert('SCENARIOS (17/10 (δ)): after «Ναι» every scenario goes through the step — no €6 offer step left; one writes its own step and «Πότε», one says «Όχι, είναι μεγάλο» and writes the smaller piece',
+  S.every(sc => !sc.steps.some(t => 'offer' in t || 'help' in t) && sc.steps.some(t => 'step' in t)) &&
+  (() => { const o = (S.find(x => x.risk === 'ownStep') || { steps: [] }).steps; return o.some(t => typeof t.step === 'string') && o.some(t => t.fits === 'yes') && o.some(t => typeof t.when === 'string'); })() &&
+  S.some(sc => sc.steps.some(t => t.fits === 'no') && sc.steps.some(t => typeof t.smaller === 'string')));
+assert('RUNNER (17/10 (δ)): the scenario runner takes the step\'s entries — a text typed, null = «Δεν ξέρω ακόμα», the size buttons',
+  /\} else if \('step' in st \|\| 'smaller' in st \|\| 'when' in st\) \{/.test(attempt(() => fs.readFileSync(path.join(__dirname, '..', 'scripts', 'e2e_stage_a.cjs'), 'utf8'), '')) &&
+  /\} else if \(st\.fits\) \{/.test(attempt(() => fs.readFileSync(path.join(__dirname, '..', 'scripts', 'e2e_stage_a.cjs'), 'utf8'), '')));
 
 // ── 7. The two scripts: structure that keeps the test honest and safe ────────
 const E2E = attempt(() => fs.readFileSync(path.join(__dirname, '..', 'scripts', 'e2e_stage_a.cjs'), 'utf8'), '');
