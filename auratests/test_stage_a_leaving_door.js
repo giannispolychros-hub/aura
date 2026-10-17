@@ -72,7 +72,8 @@ const base = (patch) => Object.assign({ active: true, decision: 'confirm', lastU
 
 // UPDATED (8/10, ADR «8 Οκτωβρίου (β)»): «Ευχαριστώ» meant «I found the root» in a real test, not «I am leaving».
 // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 for door 4.
-const LEAVING = "Πριν φύγεις: αν κάτι ξεκαθάρισε, γράψ' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;";
+// UPDATED (17/10, ADR «17 Οκτωβρίου»): without «Πριν φύγεις:».
+const LEAVING = "Αν κάτι ξεκαθάρισε, γράψ' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;";
 const GEN = CODE.slice(CODE.indexOf('const generateResponse = useCallback('), CODE.indexOf('const handleSubmit = useCallback('));
 const SUB = CODE.slice(CODE.indexOf('const handleSubmit = useCallback('), CODE.indexOf('const handleStageAPress = useCallback('));
 const gateAt = GEN.indexOf('stageALeavingDoorOpens(');

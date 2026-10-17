@@ -94,7 +94,8 @@ assert('WIRING: one helper counts and cleans (labelLeaks ref)', /const labelLeak
 assert('WIRING: main reply — cleaned right after the hidden tags are read, before every check, the screen and the history',
   /const text = guardStopMoment\(stripRepeatedThreeBeat\(stripAraDeclarative\(cleanLabels\(rawText\.replace\(\/\\s\*\\\[\\\[EXIT:\(yes\|no\)\\\]\\\]\\s\*\$\/i, ""\)\)\), msgs\), /.test(GEN) &&
   GEN.indexOf('const exitTagMatch = rawTextWithTags.match(') < GEN.indexOf('cleanLabels(rawText.replace('));
-assert('WIRING: main reply — no empty bubble', /if \(displayText\.trim\(\)\) setMessages\(prev => \[\.\.\.prev, \{ id: nextMsgId\(\), role: "assistant", content: displayText, msgMode: currentMode \}\]\);/.test(GEN));
+// UPDATED (17/10, ADR «17 Οκτωβρίου»): the write carries the method-line display flag.
+assert('WIRING: main reply — no empty bubble', /if \(displayText\.trim\(\)\) setMessages\(prev => \[\.\.\.prev, \{ id: nextMsgId\(\), role: "assistant", content: displayText, msgMode: currentMode, \.\.\.\(_methodLine \? \{ methodLine: true \} : \{\}\) \}\]\);/.test(GEN));
 assert('WIRING: every other model reply is cleaned too (closing Part 1, Part 2, early word, misfire, compression, First-WHY)',
   (CODE.match(/stripAraDeclarative\(cleanLabels\(/g) || []).length === 7 && !/stripAraDeclarative\((?!cleanLabels\()(?:await callAura|rawText\.replace)/.test(CODE));
 assert('WIRING: a closing message left empty is not shown', /const appendClosingMessage = useCallback\(\(content\) => \{\s*if \(!String\(content \|\| ""\)\.trim\(\)\) return;/.test(CODE));

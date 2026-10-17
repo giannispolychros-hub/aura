@@ -209,9 +209,11 @@ assert('CLOSING: Part 2 is still told not to repeat the summary',
 // CHANGED AGAIN, DELIBERATELY, on 2026-10-12 (530e3889dfb643e2 → 51cb2a83305f605b). John's answers (ADR «12 Οκτωβρίου (γ)»): a new
 // paragraph NO PRESSURE TO STAY, IN EVERY FLOW, and AFTER THE SAFETY PATH adds «never the same question twice» and «if they thank
 // you or want to leave, let them go warmly, with no new question». +637 characters, one cache write. See test_round3_1210.js.
+// CHANGED AGAIN, DELIBERATELY, on 2026-10-17 (51cb2a83305f605b → a6d7fe7ae33515a0). John (ADR «17 Οκτωβρίου»): a new paragraph
+// ΦΩΝΗ ΤΗΣ AURA, right before the closing block. +2093 characters, one cache write. See test_voice_1710.js.
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 51cb2a83305f605b…)',
-  PROMPT_SHA.slice(0, 16) === '51cb2a83305f605b');
+assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 a6d7fe7ae33515a0…)',
+  PROMPT_SHA.slice(0, 16) === 'a6d7fe7ae33515a0');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',

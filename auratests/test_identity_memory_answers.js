@@ -118,7 +118,8 @@ assert('LINE: non-string inputs are safe', buildLine(null, null) === '' && build
 assert('LINE: the sentence itself contains the required words', fold(LINE).includes('τεχνητη νοημοσυνη'));
 
 // ── B1 / wiring ──────────────────────────────────────────────────────────────
-const MAIN_WRITE = 'setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode }]);';
+// UPDATED (17/10, ADR «17 Οκτωβρίου»): the write carries the method-line display flag.
+const MAIN_WRITE = 'setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode, ...(_methodLine ? { methodLine: true } : {}) }]);';
 const mw = CODE.indexOf(MAIN_WRITE);
 assert('WIRING: main path write located', mw > 0);
 const beforeMain = mw > 0 ? CODE.slice(mw - 900, mw) : '';

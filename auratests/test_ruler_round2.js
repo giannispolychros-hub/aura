@@ -83,9 +83,9 @@ const vFlag = corpus.filter(t => V(t, {})), cFlag = corpus.filter(t => C(t));
 // Everything flagged must be a PROHIBITED example, never a prescribed one. Counted rather than listed, so a
 // prompt edit that adds a flagged sentence fails here and is looked at by a person (before this change: 12 and 1).
 assert('the detectors flag exactly the sentences they flagged before this change, in the prompt (' + vFlag.length + ' evaluation/advice, ' + cFlag.length + ' claim)',
-  vFlag.length === 12 && cFlag.length === 1);
+  vFlag.length === 13 && cFlag.length === 1); // UPDATED (17/10, ADR «17 Οκτωβρίου»): +1, «Πολύ καλή ερώτηση» — a PROHIBITED example in ΦΩΝΗ ΤΗΣ AURA's list of clichés
 assert('none of the new phrases appears in the corpus as a PRESCRIBED sentence',
-  !corpus.some(t => /καλη (ερωτηση|ιδεα)|ευλογο ερωτημα|κουβαλασ ηδη|μοιαζει να (ψαχνεισ|φοβασαι)/.test(t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/ς/g, 'σ'))));
+  !corpus.filter(t => t !== 'Πολύ καλή ερώτηση' /* ΦΩΝΗ ΤΗΣ AURA: listed under «Never» (17/10) */).some(t => /καλη (ερωτηση|ιδεα)|ευλογο ερωτημα|κουβαλασ ηδη|μοιαζει να (ψαχνεισ|φοβασαι)/.test(t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/ς/g, 'σ'))));
 assert('"Καλή τύχη αύριο" really is in the prompt as a CLEAN goodbye (why it was NOT added)', /clean, correct goodbye — "Καλή τύχη αύριο"/.test(PROMPT));
 assert('the quoted-sentence corpus does not contain «Καλή τύχη» flagged by the evaluation detector',
   !corpus.filter(t => /καλη τυχη/i.test(t.normalize('NFD').replace(/[̀-ͯ]/g, ''))).some(t => V(t, {}) === 'EVALUATION'));

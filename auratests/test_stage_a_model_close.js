@@ -132,7 +132,7 @@ assert('ROBUST: no state, no reply, a non-string → false, never a crash',
     /riskKind: riskSignalKind\.current/.test(call) && /safetyMode,/.test(call) && /supportive: currentMode === "SUPPORTIVE"/.test(call));
   const strip = GEN.indexOf('if (_saModelClose) displayText = "";');
   assert('WIRING: the reply is emptied BEFORE it is written (so it is neither shown nor kept in the history)…',
-    at >= 0 && strip > at && strip < GEN.indexOf('if (displayText.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode }]);'));
+    at >= 0 && strip > at && strip < GEN.indexOf('if (displayText.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode, ...(_methodLine ? { methodLine: true } : {}) }]);')); // UPDATED (17/10): the method-line flag
   assert('WIRING: … and BEFORE the AI-identity backstop, so «Είσαι άνθρωπος;» still gets its line (§0.1)',
     strip >= 0 && strip < GEN.indexOf('const _aiLine = buildAiIdentityLine(lastUserMsg, displayText);'));
   const d = GEN.indexOf('if (_saModelClose && !stageARef.current.phase) {');
@@ -150,12 +150,14 @@ assert('ROBUST: no state, no reply, a non-string → false, never a crash',
 // test_minimal_closing.js). The parser, the closing decision, its Stage A gate, the leaving door and the marker: unchanged.
 // UPDATED AGAIN (12/10, ADR «12 Οκτωβρίου (β)»): the digest moved with the last round's rules (see test_minimal_closing.js).
 // And again (ADR «12 Οκτωβρίου (γ)»): NO PRESSURE TO STAY and the two additions after the safety path.
+// And again (ADR «17 Οκτωβρίου»): the new paragraph ΦΩΝΗ ΤΗΣ AURA (see test_voice_1710.js).
 assert('UNCHANGED: the prompt (no prompt change by this fix), the parser, the closing decision and its Stage A gate, the leaving door, the marker',
-  sha(PROMPT) === '51cb2a83305f605b' && sha(fullFnSrc('parseThreeBeatShift')) === '7bceea7040494611' && sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' &&
+  sha(PROMPT) === 'a6d7fe7ae33515a0' && sha(fullFnSrc('parseThreeBeatShift')) === '7bceea7040494611' && sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' &&
   sha(fullFnSrc('stageAPreRootDecision')) === '9697ed106f7722f3' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'f33ed155faa93145' && // UPDATED (δ): the leaving door no longer reads the decision
   sha(fullFnSrc('buildStageAMarker')) === '0ef63f69e55acfde');
 // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 for the same question.
-assert('UNCHANGED: the question texts', CODE.includes('askLeaving: "Πριν φύγεις: αν κάτι ξεκαθάρισε, γράψ\' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;"') &&
+// UPDATED (17/10, ADR «17 Οκτωβρίου»): without «Πριν φύγεις:».
+assert('UNCHANGED: the question texts', CODE.includes('askLeaving: "Αν κάτι ξεκαθάρισε, γράψ\' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;"') &&
   CODE.includes('back: "Δεν το βρήκα ακόμα, συνέχισε"'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

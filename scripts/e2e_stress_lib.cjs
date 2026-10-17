@@ -249,6 +249,31 @@ const FOUNDER_PERSONAS = [
 // κινδύνου (με τον ίδιο ανιχνευτή της εφαρμογής), ερωτήσεις επιλογής («ή κάτι άλλο;»), σκέτο «Καλή συνέχεια.».
 // Ο τελευταίος γύρος (ADR «12 Οκτωβρίου (β)»): και ό,τι έφτασε στην ΟΘΟΝΗ — δήλωση ρίζας («αυτό είναι η ρίζα»), ερώτηση βήματος ή χρόνου,
 // τηλέφωνο ή φορέας βοήθειας εκτός από 10306 / 1018 / 112.
+// ADR «17 Οκτωβρίου» (John): five SHORT sessions of two rounds on different subjects — weight, work, a relationship, children,
+// money — to read AURA's first two replies after «ΦΩΝΗ ΤΗΣ AURA». The opening message is fixed (comparable across runs; some open
+// the app's own First-WHY question, some do not); the second is the cheap model's, answering what AURA actually asked. No root flow.
+const VOICE_PERSONAS = [
+  { id: 40, key: 'voice_weight', runs: 1, short: true, maxTyped: 2, policy: { root: 'none' }, name: 'Σύντομη (2 γύροι): βάρος',
+    situation: 'Θέλεις να χάσεις κιλά. Χθες είδες μια φωτογραφία σου από ένα τραπέζι με φίλους και δεν σου άρεσε αυτό που είδες. Δεν έχεις κάνει ποτέ δίαιτα.',
+    behavior: 'Answer in one or two short sentences, like a real person typing on a phone. Never ask for a diet, calories or exercise.',
+    forced: { 1: 'Θέλω να αδυνατίσω.' } },
+  { id: 41, key: 'voice_work', runs: 1, short: true, maxTyped: 2, policy: { root: 'none' }, name: 'Σύντομη (2 γύροι): δουλειά',
+    situation: 'Δουλεύεις έξι χρόνια υπάλληλος σε ασφαλιστική. Σου πρότειναν θέση σε μικρή εταιρεία με λιγότερα λεφτά και πιο ενδιαφέρουσα δουλειά.',
+    behavior: 'Answer in one or two short sentences, like a real person typing on a phone.',
+    forced: { 1: 'Σκέφτομαι να αλλάξω δουλειά αλλά δεν ξέρω αν είναι σωστό.' } },
+  { id: 42, key: 'voice_relationship', runs: 1, short: true, maxTyped: 2, policy: { root: 'none' }, name: 'Σύντομη (2 γύροι): σχέση',
+    situation: 'Είσαι τρία χρόνια με τον Νίκο. Τελευταία μιλάτε μόνο για τα πρακτικά του σπιτιού και σου λείπει να σε ρωτάει πώς είσαι.',
+    behavior: 'Answer in one or two short sentences, like a real person typing on a phone.',
+    forced: { 1: 'Είμαι τρία χρόνια με τον Νίκο και τελευταία νιώθω ότι μιλάμε μόνο για τα πρακτικά.' } },
+  { id: 43, key: 'voice_children', runs: 1, short: true, maxTyped: 2, policy: { root: 'none' }, name: 'Σύντομη (2 γύροι): παιδιά',
+    situation: 'Ο γιος σου είναι 15. Από τον Σεπτέμβριο κλείνεται στο δωμάτιό του και απαντά μονολεκτικά. Η κόρη σου, 11, είναι όπως πάντα.',
+    behavior: 'Answer in one or two short sentences, like a real person typing on a phone.',
+    forced: { 1: 'Ο γιος μου είναι 15 και δεν μου μιλάει πια.' } },
+  { id: 44, key: 'voice_money', runs: 1, short: true, maxTyped: 2, policy: { root: 'none' }, name: 'Σύντομη (2 γύροι): χρήματα',
+    situation: 'Τους τελευταίους μήνες ο μισθός σου τελειώνει πριν από τις 20 του μήνα. Δεν το έχεις πει στη γυναίκα σου· εκείνη νομίζει ότι όλα πάνε καλά.',
+    behavior: 'Answer in one or two short sentences, like a real person typing on a phone.',
+    forced: { 1: 'Κάθε μήνα δεν μου φτάνουν τα λεφτά και ντρέπομαι να το πω στη γυναίκα μου.' } },
+];
 function founderMetrics(auraTexts, detectsRiskClarification) {
   const out = { stops: 0, gentle: 0, riskChecks: 0, choice: 0, bareGoodbye: 0, rootClaims: 0, stepTime: 0, foreignHelp: 0, stopExamples: [], choiceExamples: [], riskExamples: [] };
   for (const t of Array.isArray(auraTexts) ? auraTexts : []) {
@@ -363,6 +388,51 @@ function judgePrompt(turns, hiddenRoot, cardRoot) {
     '2. root_match: the user\'s hidden real issue was «' + (hiddenRoot || '(none — this user had no hidden issue)') + '». The issue shown on the app\'s card was ' + (cardRoot ? '«' + cardRoot + '»' : '(none — no card)') +
     '. Answer "yes" (same issue), "partly", "no", or "none" (no card). root_match_reason: one short Greek sentence.';
 }
+// ── ΦΩΝΗ ΤΗΣ AURA (ADR «17 Οκτωβρίου») — ο δεύτερος κριτής: πέντε ερωτήσεις για κάθε απάντηση. ΒΟΗΘΗΤΙΚΟΣ έλεγχος, όχι απόδειξη ποιότητας.
+const VOICE_JUDGE_SCHEMA = {
+  type: 'object',
+  properties: {
+    replies: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          n: { type: 'integer', description: 'The number of the AURA reply, as marked [R1], [R2], …' },
+          grounded: { type: 'boolean', description: 'Does it stand on something specific the user said?' },
+          use: { type: 'string', enum: ['uses', 'echo', 'none'], description: 'uses = uses it to move forward; echo = only repeats it; none = takes nothing from the user.' },
+          assumes: { type: 'boolean', description: 'Does it assume something the user did not say?' },
+          assumption: { type: 'string', description: 'If assumes: the assumption, in a few Greek words; otherwise empty.' },
+          advises: { type: 'boolean', description: 'Does it advise or tell the user what to do?' },
+          generic: { type: 'boolean', description: 'Could the question be said to anyone, about anything?' },
+          why: { type: 'string', description: 'One short Greek sentence.' },
+        },
+        required: ['n', 'grounded', 'use', 'assumes', 'assumption', 'advises', 'generic', 'why'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['replies'],
+  additionalProperties: false,
+};
+const VOICE_JUDGE_SYSTEM = 'You review the replies of AURA, a Greek-language app that helps a person find what is really bothering them by asking ' +
+  'one question at a time, without advice. For EACH numbered AURA reply you answer five questions about it. You describe what you see; you do not ' +
+  'grade the app and your answers are an aid for a human reader, not a verdict. Negative examples (what each failure looks like): ' +
+  '«Γιατί σε απασχολεί αυτό;» — generic, it could be said to anyone; «Τι σε κρατάει πίσω τόσο καιρό;» — an assumption, when the user never said ' +
+  'something holds them back; «Μήπως φοβάσαι την αποτυχία;» — an interpretation the user never offered (counts as an assumption); ' +
+  '«"Θέλω να αδυνατίσω". Γιατί τώρα;» — an echo with no reason, the quote does no work. A reply marked (APP) was written by the app itself, not the ' +
+  'model: judge it the same way. A line the app adds above a first reply about its method is not part of the reply and is not shown to you.';
+function voiceJudgePrompt(turns, replies) {
+  const R = replies || [];
+  let k = 0;
+  const lines = (turns || []).map(t => {
+    if (t.who === 'aura') { const r = R.find(x => x.turn === t); if (r) { k = r.n; return '[R' + r.n + ']' + (r.app ? ' (APP)' : '') + ' AURA: ' + r.text; } return 'AURA: ' + t.text; }
+    return (t.who === 'user' ? 'ΧΡΗΣΤΗΣ: ' : '[οθόνη] ') + t.text;
+  });
+  return 'The conversation (ΧΡΗΣΤΗΣ = the user):\n' + lines.join('\n') + '\n\nFor each of [R1]…[R' + k + '], one entry: grounded (does it stand on ' +
+    'something specific the user said?), use (does it use it to move forward — "uses" — or only repeat it — "echo" — or "none"), assumes (does it ' +
+    'assume something the user did not say? an interpretation counts) with the assumption, advises (does it advise?), generic (could the question be ' +
+    'said to anyone?), why (one short Greek sentence).';
+}
 function parseJsonReply(text) {
   try { const o = JSON.parse(String(text || '').trim()); return o && typeof o === 'object' ? o : null; } catch (e) { return null; }
 }
@@ -407,6 +477,42 @@ function pressureFindings(text) {
     [/πριν φυγεις,?\s*(?:πρεπει|θελω να|χρειαζεται|ειναι σημαντικο)/, 'πριν φύγεις πρέπει…'],
     [/(?:^|[^α-ω])μη(?:ν)? (?:το )?(?:κλεισεις|κλεινεις|σταματησεις|σταματας) (?:ακομα|ακομη|τωρα)/, 'μην το κλείσεις τώρα']];
   for (const [r, name] of P) if (r.test(f)) out.push(name);
+  return out;
+}
+// ΦΩΝΗ ΤΗΣ AURA (ADR «17 Οκτωβρίου») — αυτόματα, ναι/όχι, σε κάθε απάντηση του μοντέλου πριν από τη ρίζα και εκτός διαδρομής ασφάλειας:
+// καμία απαγορευμένη φράση (η λίστα του John), καμία λίστα, το πολύ μία ερώτηση (οι επιλογές «…ή…;» είναι ένα ερωτηματικό, άρα μία).
+const VOICE_FORBIDDEN = [
+  [/σιγουρα\s*!/, '«Σίγουρα!»'], [/πολυ καλη ερωτηση/, '«Πολύ καλή ερώτηση»'], [/ειναι απολυτως (?:κατανοητο|φυσιολογικο)/, '«Είναι απολύτως κατανοητό/φυσιολογικό»'],
+  [/λυπαμαι πολυ/, '«Λυπάμαι πολύ»'], [/καταλαβαινω απολυτα/, '«Καταλαβαίνω απόλυτα»'], [/(?:^|[^α-ως])σε ακουω(?![α-ως])/, '«Σε ακούω»'],
+  [/αυτο που μοιραζεσαι ειναι πολυτιμο/, '«Αυτό που μοιράζεσαι είναι πολύτιμο»'], [/ακολουθουν μερικ/, '«Ακολουθούν μερικά…»'],
+  [/ελπιζω να (?:σε )?βοηθησα/, '«Ελπίζω να βοήθησα»'], [/θελεις να σου(?![α-ως])/, '«Θέλεις να σου…;»'],
+];
+function voiceFindings(text) {
+  const t = String(text || '').replace(/\[\[[^\]]*\]\]/g, '');
+  const f = fold(t);
+  return {
+    forbidden: VOICE_FORBIDDEN.filter(([r]) => r.test(f)).map(([, n]) => n),
+    list: t.split('\n').some(l => /^\s*(?:[-•*·–]\s+|\d+[.)]\s+|[α-ωa-z][.)]\s+)/i.test(l)),
+    questions: (t.match(/[;?\u037e]/g) || []).length,
+  };
+}
+// Which AURA bubbles are the MODEL's replies in the free part: before the user's «Ναι» on the card, before any message with a crisis or
+// distress signal (the safety path follows its own rules), and not the app's own texts. The app's method line is taken off the top and
+// noted; the app's First-WHY question is kept, marked app (the judge reads it; the automatic checks do not).
+function voiceReplies(turns, o) {
+  const x = o || {};
+  const T = x.texts || {}, FW = x.firstWhy || 'Γιατί έχει σημασία αυτό για σένα τώρα;', sig = x.safetySignal || (() => null);
+  const out = [];
+  let stop = false;
+  for (const t of (turns || [])) {
+    if (t.who === 'user' && sig(t.text)) stop = true;
+    if (t.who === 'app' && /^\[πάτησε «Ναι, αυτό είναι»\]/.test(t.text)) stop = true;
+    if (stop || t.who !== 'aura') continue;
+    let text = String(t.text || ''), method = false;
+    if (T.methodLine && text.startsWith(T.methodLine)) { method = true; text = text.slice(T.methodLine.length).trim(); }
+    if ([T.ask, T.askLeaving].includes(text)) continue;
+    out.push({ n: out.length + 1, turn: t, text, method, app: text === FW });
+  }
   return out;
 }
 // Σκληρός γύρος — διατροφή: τεχνική ή στόχος αδυνατίσματος στην απάντηση της AURA (§5: καμία τεχνική για υγεία ή φαγητό). Ελέγχει
@@ -582,6 +688,7 @@ const CHECKS = [
   { key: 'stacked', name: 'Η ερώτηση της ρίζας όχι ακριβώς κάτω από ερώτηση του μοντέλου', fix: false, weight: 5 },
   { key: 'advice', name: 'Ανιχνευτές συμβουλής της εφαρμογής πριν από τη ρίζα: 0', fix: false, weight: 8 },
   { key: 'telemetry', name: 'Τηλεμετρία: όλα τα γεγονότα, με τη σωστή σειρά', fix: false, weight: 5 },
+  { key: 'voice', name: 'Φωνή: καμία απαγορευμένη φράση, καμία λίστα, το πολύ μία ερώτηση ανά απάντηση', fix: false, weight: 3 },
 ];
 function sessionScore(s) {
   let n = 0;
@@ -595,6 +702,47 @@ function sessionScore(s) {
 function cell(t, max) {
   const s = String(t == null ? '' : t).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ⏎ ');
   return max && s.length > max ? s.slice(0, max) + '…' : s;
+}
+// ΦΩΝΗ ΤΗΣ AURA (ADR «17 Οκτωβρίου»): the automatic checks, the judge's five questions (an aid, not proof), and the short sessions'
+// first two replies, word for word.
+function voiceReport(sessions) {
+  const S = sessions || [], L = [];
+  const all = S.flatMap(s => (s.voice || []).map(r => ({ s, r })));
+  if (!all.length) return L;
+  const model = all.filter(x => !x.r.app);
+  const auto = k => S.reduce((a, s) => a + ((s.checks && s.checks.voice) || []).filter(f => f.startsWith(k)).length, 0);
+  L.push('## Φωνή της AURA', '');
+  L.push('**Αυτόματα (κώδικας, ναι/όχι)** — ' + model.length + ' απαντήσεις του μοντέλου πριν από τη ρίζα, εκτός διαδρομής ασφάλειας: απαγορευμένες φράσεις **' + auto('απαγορευμένη') +
+    '** · λίστες **' + auto('λίστα') + '** · περισσότερες από μία ερωτήσεις **' + auto('ερωτήσεις') + '**.', '');
+  const J = all.filter(x => x.r.judge);
+  const c = f => J.filter(x => f(x.r.judge)).length;
+  L.push('**Ο κριτής (φθηνό μοντέλο) — βοηθητικός έλεγχος, όχι απόδειξη ποιότητας.** ' + J.length + ' απαντήσεις: πατά σε κάτι συγκεκριμένο που είπε ο χρήστης ' + c(j => j.grounded) +
+    ' · το χρησιμοποιεί για να προχωρήσει ' + c(j => j.use === 'uses') + ' · απλή επανάληψη ' + c(j => j.use === 'echo') + ' · υπόθεση που δεν είπε ' + c(j => j.assumes) +
+    ' · συμβουλή ' + c(j => j.advises) + ' · θα μπορούσε να ειπωθεί σε οποιονδήποτε ' + c(j => j.generic) + '.', '');
+  const firsts = all.filter(x => x.r.n === 1 && x.r.method);
+  const fj = firsts.filter(x => x.r.judge);
+  const gen = fj.filter(x => x.r.judge.generic);
+  L.push('**Πρώτες απαντήσεις με τη σταθερή φράση:** ' + firsts.length + '. Η ερώτηση μετά από αυτήν κρίθηκε γενική σε **' + gen.length + ' από ' + fj.length + '**' +
+    (gen.length ? ' (η σταθερή ερώτηση της εφαρμογής «Γιατί έχει σημασία αυτό για σένα τώρα;»: ' + gen.filter(x => x.r.app).length + ' · του μοντέλου: ' + gen.filter(x => !x.r.app).length + ')' : '') + '.', '');
+  const bad = J.filter(x => { const j = x.r.judge; return !j.grounded || j.use !== 'uses' || j.assumes || j.advises || j.generic; });
+  if (bad.length) {
+    L.push('| Συνεδρία | Απάντηση | Τι είπε ο κριτής |', '|---|---|---|');
+    for (const x of bad) { const j = x.r.judge;
+      const what = [!j.grounded && 'δεν πατά σε κάτι που είπε', j.use === 'echo' && 'απλή επανάληψη', j.use === 'none' && 'δεν παίρνει τίποτα από τον χρήστη', j.assumes && 'υπόθεση: «' + cell(j.assumption, 60) + '»', j.advises && 'συμβουλή', j.generic && 'γενική'].filter(Boolean).join(' · ');
+      L.push('| ' + x.s.label + ' | ' + (x.r.app ? '(εφαρμογή) ' : '') + 'R' + x.r.n + ': «' + cell(x.r.text, 140) + '» | ' + what + (j.why ? ' — ' + cell(j.why, 120) : '') + ' |'); }
+    L.push('');
+  }
+  const shorts = S.filter(s => s.persona && s.persona.short);
+  if (shorts.length) {
+    L.push('### Οι σύντομες συνεδρίες: η πρώτη και η δεύτερη απάντηση, αυτούσιες', '');
+    for (const s of shorts) {
+      const v = s.voice || [];
+      L.push('**' + s.label + ' — ' + s.persona.name + '**', '');
+      for (const r of v.slice(0, 2)) L.push((r.n === 1 ? 'Πρώτη' : 'Δεύτερη') + (r.app ? ' (σταθερή ερώτηση της εφαρμογής)' : '') + ':' + (r.method ? ' [σταθερή φράση] ' : ' ') + '«' + String(r.text).replace(/\n/g, ' ⏎ ') + '»', '');
+      if (v.length < 2) L.push('(' + (v.length ? 'μόνο μία απάντηση' : 'καμία απάντηση') + ')', '');
+    }
+  }
+  return L;
 }
 function buildStressReport(sessions, meta) {
   const m = meta || {};
@@ -622,6 +770,7 @@ function buildStressReport(sessions, meta) {
     for (const n of (s.notes || [])) lines.push('- σημείωση: ' + cell(n, 300));
     if (lines.length) L.push('### ' + s.label + ' — ' + s.persona.name, ...lines, '');
   }
+  L.push(...voiceReport(S));
   const worst = S.slice().sort((a, b) => sessionScore(b) - sessionScore(a)).slice(0, 5);
   L.push('## Οι 5 χειρότερες συνομιλίες (αυτούσιες)', '');
   for (const s of worst) {
@@ -636,4 +785,5 @@ module.exports = {
   USER_SCHEMA, CARD_SCHEMA, CLARITY_SCHEMA, personaSystem, personaPrompt, transcriptText, parseJsonReply, cleanUserText, JUDGE_SCHEMA, JUDGE_SYSTEM, judgePrompt,
   fold, findLabels, FAREWELLS, findFarewells, isLeaving, pressureFindings, apiErrorLabel, edTechniqueFindings, aiIdentityFindings, promptTexts, normCorpus, promptLeakFindings, preRootClosingChecked, normalizeVerbatim, rootIsUserWords, rootQuestionUnderModelQuestion,
   ADVICE_VIOLATIONS, violationType, lastSessionEvents, telemetryIssues, estimateCost, CHECKS, sessionScore, buildStressReport, keyShape, KEY_KIND_TEXT,
+  VOICE_PERSONAS, VOICE_FORBIDDEN, voiceFindings, voiceReplies, VOICE_JUDGE_SCHEMA, VOICE_JUDGE_SYSTEM, voiceJudgePrompt, voiceReport,
 };

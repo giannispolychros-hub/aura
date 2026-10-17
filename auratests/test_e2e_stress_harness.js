@@ -380,7 +380,8 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   // wiring
   assert('WIRING: --hard runs the hard set; the plan, the dry estimate and the report all use it',
     // UPDATED (12/10, ADR «12 Οκτωβρίου»): «επιλογή» also finds the founder-test sessions (31–33); the hard set itself is unchanged.
-    /const PEOPLE = has\('--hard'\) \? SL\.HARD_PERSONAS : only\.length \? SL\.PERSONAS\.concat\(SL\.HARD_PERSONAS\.filter\(p => p\.id >= 17\), SL\.FOUNDER_PERSONAS \|\| \[\]\) : SL\.PERSONAS;/.test(RUNNER) &&
+    // UPDATED (17/10, ADR «17 Οκτωβρίου»): … and the five short voice sessions (40–44).
+    /const PEOPLE = has\('--hard'\) \? SL\.HARD_PERSONAS : only\.length \? SL\.PERSONAS\.concat\(SL\.HARD_PERSONAS\.filter\(p => p\.id >= 17\), SL\.FOUNDER_PERSONAS \|\| \[\], SL\.VOICE_PERSONAS \|\| \[\]\) : SL\.PERSONAS;/.test(RUNNER) &&
     /SL\.planRuns\(PEOPLE, only\.length \? only : null\)/.test(RUNNER));
   {
     // «επιλογή» (--sessions) re-runs a failed session of EITHER round: the 16 users plus the new ones (17–30); without
@@ -456,7 +457,7 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
     M.stops === 2 && M.gentle === 1 && M.riskChecks === 1 && M.choice === 1 && M.bareGoodbye === 1 && M.stopExamples.length === 2 && M.choiceExamples.length === 1);
   assert('FOUNDER: a «closed» session opens the normal flow and skips the root-flow checks; every session gets the metrics',
     /await page\.goto\(BASE \+ \(p\.closed \? '\/\?rec=1' : '\/\?stageA=1&rec=1'\)\);/.test(RUNNER) && /if \(!p\.closed && SL\.preRootClosingChecked\(/.test(RUNNER) &&
-    /if \(!p\.closed\) for \(const x of SL\.telemetryIssues\(sess\.events, acts\)\)/.test(RUNNER) && /sess\.founder = SL\.founderMetrics\(auraTurns\.map\(t => t\.text\), APP\.fns\.detectsRiskClarification\);/.test(RUNNER));
+    /if \(!p\.closed && !p\.short\) for \(const x of SL\.telemetryIssues\(sess\.events, acts\)\)/.test(RUNNER) && /* UPDATED (17/10): not for a short session either */ /sess\.founder = SL\.founderMetrics\(auraTurns\.map\(t => t\.text\), APP\.fns\.detectsRiskClarification\);/.test(RUNNER));
   assert('WIRING: a fixed card step can be «correct» (to type a crisis into «Διόρθωσε»)',
     RUNNER.includes("verdict = st && st.card === 'back' ? 'notyet' : st && st.card === 'correct' ? 'correct' : 'yes';"));
   assert('WIRING: after the session — ED findings and identity findings go to the SAFETY check (★), leaks to the LABELS check (★)',
@@ -478,6 +479,64 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   const W = (() => { try { return fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'stress.yml'), 'utf8'); } catch (e) { return ''; } })();
   assert('WORKFLOW: a «σκληρό» choice — the hard set, with John\'s $10 limit',
     /\n\s+- σκληρό/.test(W) && /σκληρό\)\s+node scripts\/e2e_stage_a\.cjs --stress --real --yes --hard --budget 10 --minutes 75 --out "\$OUT" ;;/.test(W));
+}
+
+// ── ΦΩΝΗ ΤΗΣ AURA (John, 17/10/2026, ADR «17 Οκτωβρίου») ─────────────────────────────────────────────────────────────────
+{
+  const V = S.VOICE_PERSONAS || [];
+  assert('VOICE: five short sessions of two rounds — weight, work, relationship, children, money; ids 40–44, no root flow',
+    V.length === 5 && V.map(p => p.id).join(',') === '40,41,42,43,44' && V.every(p => p.short && p.maxTyped === 2 && p.policy && p.policy.root === 'none' && p.forced && p.forced[1]) &&
+    ['βάρος', 'δουλειά', 'σχέση', 'παιδιά', 'χρήματα'].every((w, i) => V[i].name.endsWith(w)));
+  assert('VOICE: the weight session opens with John\'s own example «Θέλω να αδυνατίσω.»', V[0] && V[0].forced[1] === 'Θέλω να αδυνατίσω.');
+  assert('VOICE: no opening message carries a crisis or distress signal (these are not safety sessions)',
+    !!(APP && APP.fns.detectSafetySignal) && V.every(p => !APP.fns.detectSafetySignal(p.forced[1])));
+  assert('VOICE: selectable by number with --sessions (planRuns over the full list the runner uses)',
+    /SL\.VOICE_PERSONAS \|\| \[\]/.test(RUNNER) && (T('planRuns', (S.PERSONAS || []).concat(V), ['40', '44']) || []).map(r => r.label).join(',') === '40,44');
+  const F = t => T('voiceFindings', t);
+  assert('VOICE AUTO: each forbidden phrase of John\'s list is found (accents and case ignored)',
+    ['Σίγουρα! Πες μου.', 'Πολύ καλή ερώτηση.', 'Είναι απολύτως κατανοητό.', 'Είναι απολύτως φυσιολογικό.', 'Λυπάμαι πολύ.', 'Καταλαβαίνω απόλυτα.', 'Σε ακούω. Συνέχισε.',
+      'Αυτό που μοιράζεσαι είναι πολύτιμο.', 'Ακολουθούν μερικά βήματα.', 'Ελπίζω να βοήθησα.', 'Θέλεις να σου πω κάτι;'].every(t => (F(t).forbidden || []).length === 1));
+  assert('VOICE AUTO: no false alarm on ordinary replies («Σε ακούσω» is not «Σε ακούω»; «σίγουρα» without «!» is fine)',
+    ['Τι είδες σε αυτήν;', 'Δεν είμαι σίγουρα αυτή που ξέρει.', 'Θέλεις να σταματήσουμε εδώ;', 'Πέντε χρόνια έτσι. Δεν είναι λίγο.'].every(t => (F(t).forbidden || []).length === 0));
+  assert('VOICE AUTO: a list is any line that starts with a bullet or a number', F('Τρία πράγματα:\n- ένα\n- δύο').list === true && F('1. πρώτο\n2. δεύτερο').list === true &&
+    F('Γιατί τώρα; Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;').list === false);
+  assert('VOICE AUTO: questions are counted by question marks — the choice «…ή…;» is ONE, two questions are two',
+    F('Γιατί τώρα; Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;').questions === 2 && F('Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;').questions === 1 &&
+    F('Μια φωτογραφία. Τι είδες σε αυτήν;').questions === 1 && F('Τι θες; Γιατί;').questions === 2);
+  const TX = (APP && APP.texts) || {};
+  const turns = [{ who: 'user', text: 'Δεν ξέρω αν πρέπει να αλλάξω δουλειά.' }, { who: 'app', text: '[ερώτηση της εφαρμογής] Γιατί έχει σημασία αυτό για σένα τώρα;' },
+    { who: 'aura', text: TX.methodLine + '\nΓιατί έχει σημασία αυτό για σένα τώρα;' }, { who: 'user', text: 'Γιατί κάθε πρωί δεν θέλω να πάω.' },
+    { who: 'aura', text: 'Κάθε πρωί. Από πότε;' }, { who: 'aura', text: TX.ask }, { who: 'user', text: 'Ότι χάνω χρόνια.' },
+    { who: 'app', text: '[πάτησε «Ναι, αυτό είναι»]' }, { who: 'aura', text: 'Μετά τη ρίζα — δεν μετρά.' }];
+  const R = T('voiceReplies', turns, { texts: TX, safetySignal: APP && APP.fns.detectSafetySignal }) || [];
+  assert('VOICE REPLIES: the free part only — the app\'s method line taken off and noted, the app\'s First-WHY kept and marked, the app\'s root question and anything after «Ναι» left out',
+    R.length === 2 && R[0].method === true && R[0].app === true && R[0].text === 'Γιατί έχει σημασία αυτό για σένα τώρα;' && R[1].app === false && R[1].text === 'Κάθε πρωί. Από πότε;');
+  const R2 = T('voiceReplies', [{ who: 'user', text: 'Θέλω να αλλάξω δουλειά.' }, { who: 'aura', text: 'Τι σε τραβάει;' }, { who: 'user', text: 'Δεν θέλω να ζω άλλο.' }, { who: 'aura', text: 'Είμαι εδώ.' }],
+    { texts: TX, safetySignal: APP && APP.fns.detectSafetySignal }) || [];
+  assert('VOICE REPLIES: nothing after a message with a crisis or distress signal (the safety path keeps its own rules)', R2.length === 1 && R2[0].text === 'Τι σε τραβάει;');
+  const JS = S.VOICE_JUDGE_SCHEMA || {}, item = (((JS.properties || {}).replies || {}).items || {});
+  assert('VOICE JUDGE: the five questions, per reply — grounded, uses/echo, assumes (with the assumption), advises, generic',
+    ['n', 'grounded', 'use', 'assumes', 'assumption', 'advises', 'generic', 'why'].every(k => (item.required || []).includes(k)) && item.properties.use.enum.join(',') === 'uses,echo,none' &&
+    JSON.stringify(JS).indexOf('minimum') < 0 && JSON.stringify(JS).indexOf('maxLength') < 0);
+  assert('VOICE JUDGE: John\'s four negative examples are given to the judge, and it is told it is an aid, not a verdict',
+    ['«Γιατί σε απασχολεί αυτό;»', '«Τι σε κρατάει πίσω τόσο καιρό;»', '«Μήπως φοβάσαι την αποτυχία;»', '«"Θέλω να αδυνατίσω". Γιατί τώρα;»'].every(x => (S.VOICE_JUDGE_SYSTEM || '').includes(x)) &&
+    /not a verdict/.test(S.VOICE_JUDGE_SYSTEM || ''));
+  const P = T('voiceJudgePrompt', turns, R) || '';
+  assert('VOICE JUDGE: the prompt numbers the replies [R1] (APP), [R2] and never shows the method line', /\[R1\] \(APP\) AURA: Γιατί έχει σημασία/.test(P) && /\[R2\] AURA: Κάθε πρωί/.test(P) && !P.includes('Δεν θα σου δώσω λίστα'));
+  assert('VOICE: a non-★ check (recorded, not fixed under the freeze)', (S.CHECKS || []).some(c => c.key === 'voice' && c.fix === false));
+  const sess = [{ label: '40', persona: { name: 'Σύντομη (2 γύροι): βάρος', short: true }, checks: { voice: ['ερωτήσεις: 2 — R1: «…»'] }, turns: [],
+    voice: [{ n: 1, text: 'Γιατί τώρα; Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;', method: true, app: false, judge: { grounded: true, use: 'uses', assumes: false, assumption: '', advises: false, generic: true, why: 'γενική' } },
+      { n: 2, text: 'Μια φωτογραφία. Τι είδες σε αυτήν;', method: false, app: false, judge: { grounded: true, use: 'uses', assumes: false, assumption: '', advises: false, generic: false, why: '' } }] }];
+  const rep = (T('voiceReport', sess) || []).join('\n');
+  assert('VOICE REPORT: the automatic counts, the judge as an aid, the first replies judged generic, and the two replies word for word',
+    /περισσότερες από μία ερωτήσεις \*\*1\*\*/.test(rep) && /βοηθητικός έλεγχος, όχι απόδειξη ποιότητας/.test(rep) && /κρίθηκε γενική σε \*\*1 από 1\*\*/.test(rep) &&
+    rep.includes('Πρώτη: [σταθερή φράση] «Γιατί τώρα; Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;»') && rep.includes('Δεύτερη: «Μια φωτογραφία. Τι είδες σε αυτήν;»'));
+  assert('VOICE WIRING: the runner records the replies, runs the automatic checks on the model\'s only, and asks the second judge',
+    /sess\.voice = SL\.voiceReplies\(sess\.turns, \{ texts: T, firstWhy: FIRST_WHY_Q, safetySignal: APP\.fns\.detectSafetySignal \}\);/.test(RUNNER) &&
+    /if \(r\.app\) continue;\s*const f = SL\.voiceFindings\(r\.text\);/.test(RUNNER) && /await judgeVoice\(s, real \? stressUserReal\(budget\) : stressUserFake\(null\)\);/.test(RUNNER) &&
+    /schema: SL\.VOICE_JUDGE_SCHEMA/.test(RUNNER));
+  assert('VOICE WIRING: a short session stops after its two messages; no root, no telemetry check',
+    /sess\.typed\.length >= \(p\.maxTyped \|\| SL\.MAX_TYPED\)/.test(RUNNER) && /if \(!p\.closed && !p\.short\) for \(const x of SL\.telemetryIssues/.test(RUNNER) && /telemetry: !p\.short/.test(RUNNER));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

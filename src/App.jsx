@@ -924,6 +924,7 @@ NO STEP BEFORE THE COACH (Stage A, with the [FREE PART: ENDS AT ROOT] marker): n
 CLAIMS ABOUT LAW AND MONEY ARE THE USER'S, NOT FACTS: a rule the user states about law or money — points (μόρια), rights, entitlements, salaries, fees — is never repeated as fact, not even in a summary: «όπως το λες», «αν ισχύει έτσι».
 REFLECTIONS IN THEIR WORDS ONLY: a reflection uses the user's own words, never an AURA label laid over them (e.g. no «… ως ταυτότητα» when they never spoke of identity).
 CLOSING WORDS (normal flow): the ΗΡΘΕΣ ΜΕ / ΒΡΗΚΕΣ / ΦΕΥΓΕΙΣ ΜΕ summary appears once per session — never a second time. Never end on a bare «Καλή συνέχεια.» or any other generic well-wish: the last words return the phrase the user found, in their words, and one warm sentence that acknowledges what they carry — no advice.
+ΦΩΝΗ ΤΗΣ AURA — AURA'S VOICE (John, 2026-10-17; how a reply sounds, in every flow). NOT on the safety path: in Supportive Mode, whenever the DISTRESS GRADIENT applies, and after the per-turn note [CODE-VERIFIED: the safety path was activated …], the safety rules and AFTER THE SAFETY PATH decide alone — safety always wins. A rule above that fixes its own form keeps its own form: the road map, the ΗΡΘΕΣ ΜΕ / ΒΡΗΚΕΣ / ΦΕΥΓΕΙΣ ΜΕ summary, the three-beat shift, STOP MOMENT, CHOICE QUESTION, a risk check. Otherwise: (1) Short: 1–3 lines; no lists, no bullet points, no emoji, no exclamation marks. (2) One question. It may carry 2–3 short options («…ή…;») when they make answering easier; never an option that carries a psychological interpretation. (3) Precision: every question stands on something specific the user said and uses it to move forward. If one of their words is the reason for the question, you may quote it in «»; never a quote as ritual or echo. (4) Empathy through precision, not adjectives: when the user shows weight, one short acknowledgement in their own words (e.g. «Πέντε χρόνια έτσι. Δεν είναι λίγο.»); when they do not, none. It never approves or judges what they decide (UNIVERSAL NO-EVALUATION). Never the clichés of a generic AI or of therapy: «Σίγουρα!», «Πολύ καλή ερώτηση», «Είναι απολύτως κατανοητό/φυσιολογικό», «Λυπάμαι πολύ», «Καταλαβαίνω απόλυτα», «Σε ακούω» as filler, «Αυτό που μοιράζεσαι είναι πολύτιμο», «Ακολουθούν μερικά…», «Ελπίζω να βοήθησα», «Θέλεις να σου…;». (5) No assumption the user did not state (e.g. «τι σε κρατάει πίσω τόσο καιρό», when they never said something holds them back). On weight, food or the body, never a question that pushes toward more restriction. In Stage A the app itself writes one fixed line about the method above the first reply («Δεν θα σου δώσω λίστα με αιτίες και λύσεις…»): never repeat or paraphrase it. An example of STYLE, not a template to copy: «Θέλω να αδυνατίσω» → «Γιατί τώρα; Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;». «Καιρό. Αλλά χθες είδα μια φωτογραφία μου.» → «Μια φωτογραφία. Τι είδες σε αυτήν;»
 
 <critical_invariants>
 FINAL REINFORCEMENT (positional-audit addition — the four principles below are already stated in full above; this is a brief recency-anchor, not a new or competing definition, added because nothing this critical is restated anywhere in the back 85% of this prompt. RELATIONSHIP TO PRE-FLIGHT CHECKLIST above, clarified via deeper audit — real gap found: both say "before composing any reply" but never referenced each other. These run together, not as two separate checklists: this one is the constant, always-present safety anchor; PRE-FLIGHT CHECKLIST is the fuller, situational sequence. Think of this as its permanent step -1, always active regardless of which of PRE-FLIGHT CHECKLIST's other steps apply this turn): before composing any reply, hold these four, briefly — CONTRACT: identify patterns, never decide which interpretation is correct, every finding returns as a genuine question. MIRROR RULE: never name the user's thought as certain, never add a conclusion they have not evidenced. NO ADVICE: the user owns every conclusion — AURA's task ends at clarity, not at telling them what to do. NEW MATERIAL: every question asks for something the user has not already said, by the strategy their state calls for; nothing they already said is said back to them a second time.
@@ -1629,13 +1630,17 @@ function buildStageAMarker(active) {
 const STAGE_A_TEXTS = {
   button: "Νομίζω βρήκα τι με απασχολεί",
   ask: "Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;",
-  askLeaving: "Πριν φύγεις: αν κάτι ξεκαθάρισε, γράψ' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;",
+  askLeaving: "Αν κάτι ξεκαθάρισε, γράψ' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;",
   back: "Δεν το βρήκα ακόμα, συνέχισε",
   knewLabel: "Τι ήξερες",
   foundLabel: "Τι βρήκες",
   yes: "Ναι, αυτό είναι",
   correct: "Διόρθωσε",
   correctAsk: "Γράψε τη ρίζα όπως θα την έλεγες εσύ, ολόκληρη.",
+  // ADR «17 Οκτωβρίου»: on the card, above the buttons — true on every path: the card only ever shows the user's own typed words.
+  cardOwn: "Αυτά είναι δικά σου λόγια, όχι δικά μου. Είναι αυτό που πραγματικά σε απασχολεί;",
+  // ADR «17 Οκτωβρίου»: the first line of the session's first reply, drawn by the app (stageAMethodLineDue). Never sent anywhere.
+  methodLine: "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.",
   retry: "Πες το λίγο πιο ολοκληρωμένα — όπως θα το έλεγες σε έναν φίλο.",
   cardLine: "Με το \"Ναι\" ολοκληρώνεται το δωρεάν κομμάτι και σου δείχνω το επόμενο.",
   cardLineRisk: "Με το \"Ναι\" ολοκληρώνεται αυτό το κομμάτι.",
@@ -1763,6 +1768,14 @@ function buildRootEndLines(found, riskOffer) {
   return [`«${f}»`, STAGE_A_TEXTS.endYours, "", STAGE_A_TEXTS.endDone, STAGE_A_TEXTS.endNext, "",
     STAGE_A_TEXTS.endCoach, STAGE_A_TEXTS.endItem1, STAGE_A_TEXTS.endItem2, STAGE_A_TEXTS.endItem3, "",
     STAGE_A_TEXTS.price, STAGE_A_TEXTS.endKeep];
+}
+// ADR «17 Οκτωβρίου» — the app's fixed line about the method goes on the FIRST reply of a Stage A session, once. Never on the
+// safety path: Supportive Mode, any risk latch (crisis A, B, DISTRESS), safety mode, or a first message that itself carries a
+// crisis or distress signal. Switch closed: never (the old flow does give a road map). Display only — it is a flag on the
+// message, drawn by MessageBubble; no prompt and no history ever carries it (the e5af4bc lesson).
+function stageAMethodLineDue(o) {
+  const x = o || {};
+  return x.active === true && !x.auraBefore && !x.supportive && x.riskKind === 0 && !x.safetyMode && !detectSafetySignal(x.lastUserText || "");
 }
 function buildRootCardLine(riskOffer) {
   return riskOffer ? STAGE_A_TEXTS.cardLineRisk : STAGE_A_TEXTS.cardLine;
@@ -2114,7 +2127,7 @@ function stageAStep(state, ev) {
       if (s.phase) return s;
       reach(1);
       return next({ phase: "ask", door: 2, leaving: false, retry: false });
-    // ADR «11 Οκτωβρίου (β)» — the model's own closing summary before the root: door 1's question («Πριν φύγεις: αν κάτι ξεκαθάρισε…»; before 16/10 «Αν κάτι σου ξεκαθάρισε…»)
+    // ADR «11 Οκτωβρίου (β)» — the model's own closing summary before the root: door 1's question («Αν κάτι ξεκαθάρισε, γράψ' το…»; 16/10 «Πριν φύγεις: …», before «Αν κάτι σου ξεκαθάρισε…»)
     // instead. The card it may open is door 5. It does not use up the leaving door: the user's own first exit still meets it.
     case "modelClose":
       if (s.phase) return s;
@@ -5878,6 +5891,7 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
       })()}
       {displayContent && (
         <div className={isUser ? "msg-user" : `msg-aura ${isObs ? "obs" : ""} ${isInsight ? "ins" : ""} ${isTermination ? "term" : ""} ${isSafe ? "safe" : ""} ${isSnapshot ? "snapshot-msg" : ""}`}>
+          {msg.methodLine && !isUser && <span className="method-line" style={{display:"block",marginBottom:"8px"}}>{STAGE_A_TEXTS.methodLine}</span>}
           {displayContent.split("\n").map((line, j, arr) => (
             <span key={j}>
               {isTermination
@@ -6107,6 +6121,7 @@ export default function AURAv2() {
   // STAGE A flow (steps 3.3–3.10): the ref is the source of truth, the phase state re-renders it.
   const stageARef             = useRef(initialStageAState());
   const stageARootArmed       = useRef(false); // door 2: the readiness answer arrived — capture the NEXT message
+  const firstWhyMethodLine    = useRef(false); // ADR «17 Οκτωβρίου»: the method line above the app's first question
   const [stageAPhase, setStageAPhase] = useState(null);
   // ADR «8 Οκτωβρίου (δ)», 5 — where the user's message does not go to the model (the first closing, door 1/2/3 without
   // substance, the «Ναι» of door 2, the correction without substance) it is still SHOWN. A UI-only list, NOT `messages`: no
@@ -7302,7 +7317,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // can drop it. See buildAiIdentityLine.
       const _aiLine = buildAiIdentityLine(lastUserMsg, displayText);
       if (_aiLine) displayText = displayText + "\n\n" + _aiLine;
-      if (displayText.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode }]);
+      // ADR «17 Οκτωβρίου»: the first reply of a Stage A session carries the app's method line (display only, never on the safety path).
+      const _methodLine = stageAMethodLineDue({ active: stageAActive.current, auraBefore: msgs.some(m => m && m.role === "assistant"), supportive: currentMode === "SUPPORTIVE", riskKind: riskSignalKind.current, safetyMode, lastUserText: lastUserMsg });
+      if (displayText.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode, ...(_methodLine ? { methodLine: true } : {}) }]);
       // PASSIVE MEASUREMENT ONLY — fires after display, never blocks or alters anything. See
       // detectsPossibleAraPatternViolation's comment for full context (Measurement Before
       // Modification, heuristic proxy, visibility during real testing only). Deliberately logs
@@ -8150,6 +8167,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     // read it. What still gates this turn is unchanged — needsFirstWhy, including the γρ. 377
     // binary fast-path, still decides whether asking is appropriate at all.
     if (messages.length === 0 && !firstWhyPending && needsFirstWhy(userText)) {
+      // ADR «17 Οκτωβρίου»: this fixed question IS the session's first reply — the method line goes above it, by the same rule.
+      firstWhyMethodLine.current = stageAMethodLineDue({ active: stageAActive.current, auraBefore: false, supportive: false, riskKind: riskSignalKind.current, safetyMode, lastUserText: userText });
       setFirstWhyMessage(userText);
       setMessages([{ id: nextMsgId(), role: "user", content: userText }]);
       setFirstWhyPending(true);
@@ -8170,7 +8189,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       setActiveLens(inferred);
       const initMsgs = [
         { id: nextMsgId(), role: "user", content: firstWhyMessage },
-        { id: nextMsgId(), role: "assistant", content: "Γιατί έχει σημασία αυτό για σένα τώρα;" },
+        { id: nextMsgId(), role: "assistant", content: "Γιατί έχει σημασία αυτό για σένα τώρα;", ...(firstWhyMethodLine.current ? { methodLine: true } : {}) },
         { id: nextMsgId(), role: "user", content: userText },
       ];
       setMessages(initMsgs);
@@ -8505,6 +8524,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setError(null);
     setCrisisFallback(null);
     setTesterCopy(null);
+    firstWhyMethodLine.current = false; // ADR «17 Οκτωβρίου»
     setClaritySurge(false);
     setIllumLevel(0);
     setFinalDistillation(null);
@@ -9036,6 +9056,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           {/* First-Why pause — AURA asks one question before entering conversation */}
           {firstWhyPending && (
             <div className="first-why-card">
+              {firstWhyMethodLine.current && <div className="method-line" style={{fontSize:"15px",lineHeight:1.6,color:"#c4c0b8",marginBottom:"14px"}}>{STAGE_A_TEXTS.methodLine}</div>}
               <div className="first-why-q">
                 Γιατί έχει σημασία αυτό για σένα τώρα;
               </div>
@@ -9265,6 +9286,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                   </div>
                   {stageAPhase === "card" ? (
                     <>
+                      <div className="warning-text" style={{marginBottom:"8px"}}>{STAGE_A_TEXTS.cardOwn}</div>
                       <div className="warning-text" style={{fontSize:"12px",opacity:0.8}}>{buildRootCardLine(riskSignalKind.current === 2 || riskSignalKind.current === 3)}</div>
                       <div className="choice-btns">
                         <button className="choice-btn" onClick={() => stageADispatch({ type: "correctStart" })}>{STAGE_A_TEXTS.correct}</button>

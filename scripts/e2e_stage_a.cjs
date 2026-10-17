@@ -13,7 +13,7 @@
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
-// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W | X | Y | Z | … | R4 | TX (μόνο μία ενότητα)
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only W | X | Y | Z | … | R4 | TX | VO (μόνο μία ενότητα)
 // ΣΤΡΕΣ ΤΕΣΤ (Μέρος Β, 10/10): --stress (ψεύτικα, κόστος 0) · --stress --real --dry (σχέδιο + εκτίμηση) · --stress --real --yes (ΠΡΑΓΜΑΤΙΚΟ,
 //   όριο --budget έως $25, προεπιλογή $25) · --sessions 14,15,1 (μόνο αυτοί) · --minutes 75 (καμία νέα συνεδρία μετά). Τρέχει και από το
 //   GitHub (.github/workflows/stress.yml): η αναφορά γράφεται και στη σελίδα της εκτέλεσης. Δες την ενότητα «ΣΤΡΕΣ ΤΕΣΤ» πιο κάτω.
@@ -501,9 +501,9 @@ async function runMock() {
       await send(s.page, 'Ευχαριστώ');
       ok('U1 (John): «Ευχαριστώ» → NO model call that turn, the closing\'s root question with «Δεν το βρήκα ακόμα»',
         s.calls.length === before && await s.page.getByText(LEAVING).count() === 1 && await btnN(s.page, BACK).count() === 1);
-      // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 for door 4
-      ok('U1: the new wording, exactly — «Πριν φύγεις: αν κάτι ξεκαθάρισε, γράψ\' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;»',
-        await s.page.getByText("Πριν φύγεις: αν κάτι ξεκαθάρισε, γράψ' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;", { exact: true }).count() === 1);
+      // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 for door 4. UPDATED (17/10): without «Πριν φύγεις:».
+      ok('U1: the new wording, exactly — «Αν κάτι ξεκαθάρισε, γράψ\' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;»',
+        await s.page.getByText("Αν κάτι ξεκαθάρισε, γράψ' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;", { exact: true }).count() === 1);
       ok('U1 (John): the model\'s closing reply («Το σήμα είναι ξεκάθαρο…», the friend question) never appears',
         await s.page.getByText('Το σήμα είναι ξεκάθαρο').count() === 0 && await s.page.getByText('Αν ένας φίλος σου').count() === 0);
       await send(s.page, 'Ίσως η κενοδοξια των χρημάτων');
@@ -573,7 +573,7 @@ async function runMock() {
     for (const vp of [{ width: 390, height: 700 }, { width: 390, height: 430 }]) {
       const s = await start('?stageA=1', [JR[0], JR[1], 'Τι σε κρατάει εκεί;', JR[3]], vp);
       await send(s.page, 'Ευχαριστώ'); await s.page.waitForTimeout(900);
-      ok(`U5 (phone ${vp.width}×${vp.height}): the closing's root question and «Δεν το βρήκα ακόμα» fully visible above the input`, await visible(s.page, 'Πριν φύγεις: αν κάτι ξεκαθάρισε')); // UPDATED (16/10)
+      ok(`U5 (phone ${vp.width}×${vp.height}): the closing's root question and «Δεν το βρήκα ακόμα» fully visible above the input`, await visible(s.page, 'Αν κάτι ξεκαθάρισε, γράψ')); // UPDATED (16/10, 17/10)
       await btnN(s.page, BACK).click(); await s.page.waitForTimeout(500);
       await send(s.page, 'Ίσως η κενοδοξια των χρημάτων');
       await btnN(s.page, 'Νομίζω βρήκα τι με απασχολεί').click(); await s.page.waitForTimeout(900);
@@ -655,6 +655,7 @@ async function runMock() {
   await runMockR3();
   await runMockR4();
   await runMockTX();
+  await runMockVO();
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -1189,7 +1190,7 @@ async function runMockTX() {
     ai: 'Είμαι τεχνητή νοημοσύνη. Δεν σου λέω τι να κάνεις πριν βρεις τι πραγματικά ρωτάς.',
     invite: 'Γράψε ό,τι σε απασχολεί, όπως έρχεται. Μπερδεμένο είναι μια χαρά.',
     placeholder: 'Γράψ\' το όπως έρχεται…',
-    leaving: 'Πριν φύγεις: αν κάτι ξεκαθάρισε, γράψ\' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;',
+    leaving: 'Αν κάτι ξεκαθάρισε, γράψ\' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;', // UPDATED (17/10)
     back: 'Δεν το βρήκα ακόμα, συνέχισε',
     retry: 'Πες το λίγο πιο ολοκληρωμένα — όπως θα το έλεγες σε έναν φίλο.',
     notReady: 'Σε ευχαριστώ. Το AURA Coach δεν είναι ακόμα έτοιμο — δεν χρεώθηκες τίποτα. Η απάντησή σου θα καθορίσει τι θα φτιαχτεί πρώτο:',
@@ -1299,6 +1300,142 @@ async function runMockTX() {
     const log = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
     ok(`TX5 (${tag}): the first choice is still recorded as 1 (same telemetry)`, log.filter(r => r.ev === 'coach_help_choice').map(r => r.choice).join(',') === '1');
     await browser.close();
+  }
+}
+
+// ── VO: John, 17/10/2026 (ADR «17 Οκτωβρίου»), phone 390×844 (and 360×640 for the fit), fake model. VO1 a short first message:
+// the app's first question opens with the method line above it; the model's reply after it has none; no request ever carries the
+// line. VO2 a long first message (no First-WHY): the model's first reply carries the line as its first line, once. VO3 a crisis
+// first message and VO4 a distress one: no line; the crisis request carries neither the line nor «ΦΩΝΗ ΤΗΣ AURA», which only the
+// main requests carry. VO5 switch closed: no line. VO6 the root card: «Αυτά είναι δικά σου λόγια…» between the root and the note
+// above the buttons, whole on the phone; not while correcting. VO7 door 4 without «Πριν φύγεις:». Screenshots VO-1-first-reply,
+// VO-2-first-reply-model, VO-3-card (-390 / -360). The texts are written out here on purpose, so the old code fails. Alone: --only VO.
+async function runMockVO() {
+  const METHOD = 'Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.';
+  const OWN = 'Αυτά είναι δικά σου λόγια, όχι δικά μου. Είναι αυτό που πραγματικά σε απασχολεί;';
+  const LEAV = 'Αν κάτι ξεκαθάρισε, γράψ\' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;';
+  const FW = 'Γιατί έχει σημασία αυτό για σένα τώρα;';
+  const LONG = 'Γεια. Δουλεύω δώδεκα χρόνια λογίστρια στην ίδια εταιρεία και τελευταία κάθε πρωί που ξυπνάω σκέφτομαι ότι δεν θέλω να πάω. ' +
+    'Ο μισθός είναι καλός, έχουμε δάνειο για το σπίτι και δύο παιδιά στο σχολείο, και ο άντρας μου λέει να κάνω υπομονή μέχρι τη σύνταξη. ' +
+    'Εγώ όμως νιώθω ότι κάτι μέσα μου σβήνει κάθε μέρα που περνάει εκεί μέσα και δεν ξέρω τι να κάνω με όλο αυτό.';
+  const open = async (query, replies, vp) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vp || { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    const bodies = [];
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      let b = {}; try { b = JSON.parse(route.request().postData() || '{}'); } catch (e) {}
+      bodies.push(b);
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    const aura = async () => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+    const lines = async () => page.locator('.method-line').count();
+    // the history sent to the model (the prompt itself names the line on purpose: «never repeat or paraphrase it»)
+    const sent = () => JSON.stringify(bodies.map(b => b.messages || []));
+    return { browser, page, bodies, aura, lines, sent, btn: name => page.getByRole('button', { name, exact: true }) };
+  };
+  const fit = async (page, text) => page.evaluate(t => {
+    const el = [...document.querySelectorAll('.method-line, .warning-text, .first-why-q')].find(e => e.innerText.replace(/\s+/g, ' ').trim() === t);
+    if (!el) return null;
+    const r = el.getBoundingClientRect(), p = el.parentElement.getBoundingClientRect();
+    return { ok: r.left >= 0 && r.right <= innerWidth + 0.5 && r.left >= p.left - 0.5 && r.right <= p.right + 0.5 && document.documentElement.scrollWidth <= innerWidth,
+      top: Math.round(r.top), bottom: Math.round(r.bottom), h: innerHeight };
+  }, text);
+
+  for (const vp of [{ width: 390, height: 844 }, { width: 360, height: 640 }]) {
+    const tag = `${vp.width}×${vp.height}`, sfx = '-' + vp.width;
+    // ── VO1: short first message → the app's first question, with the line above it ──
+    {
+      const s = await open('?stageA=1&rec=1', ['Μια φωτογραφία. Τι είδες σε αυτήν;', 'Και τι σκέφτηκες τότε;'], vp);
+      await send(s.page, 'Δεν ξέρω αν πρέπει να αλλάξω δουλειά.');
+      const f = await fit(s.page, METHOD), q = await fit(s.page, FW);
+      ok(`VO1 (${tag}): a short first message → the app's question «${FW}» with the method line above it, word for word, whole on the screen`,
+        !!f && f.ok && !!q && f.bottom <= q.top && f.top >= 0 && q.bottom <= f.h && s.bodies.length === 0);
+      await s.page.screenshot({ path: path.join(OUT, 'VO-1-first-reply' + sfx + '.png'), fullPage: false });
+      await send(s.page, 'Γιατί κάθε πρωί δεν θέλω να πάω.');
+      const a = await s.aura();
+      ok(`VO1 (${tag}): after the answer the first bubble keeps it as its first line; the model's reply has none; once on the screen`,
+        a.length === 2 && a[0] === METHOD + '\n' + FW && a[1] === 'Μια φωτογραφία. Τι είδες σε αυτήν;' && await s.lines() === 1);
+      ok(`VO1 (${tag}): the line is in no history sent to the model`, s.bodies.length === 1 && !s.sent().includes('Δεν θα σου δώσω λίστα με αιτίες'));
+      await s.browser.close();
+    }
+    // ── VO2: long first message → the model's first reply carries the line ──
+    {
+      const s = await open('?stageA=1&rec=1', ['Δώδεκα χρόνια. Τι είναι αυτό που σβήνει;', 'Και τι θα άλλαζε αν το έλεγες;'], vp);
+      await send(s.page, LONG);
+      let a = await s.aura();
+      ok(`VO2 (${tag}): a long first message (no First-WHY) → the model's first reply opens with the method line`,
+        s.bodies.length === 1 && a.length === 1 && a[0] === METHOD + '\n' + 'Δώδεκα χρόνια. Τι είναι αυτό που σβήνει;' && await s.lines() === 1);
+      ok(`VO2 (${tag}): the request carries «ΦΩΝΗ ΤΗΣ AURA» (main prompt); the history does not carry the line`,
+        (s.bodies[0].system || [])[0] && /ΦΩΝΗ ΤΗΣ AURA/.test(s.bodies[0].system[0].text) && !s.sent().includes('Δεν θα σου δώσω λίστα με αιτίες'));
+      await s.page.screenshot({ path: path.join(OUT, 'VO-2-first-reply-model' + sfx + '.png'), fullPage: false });
+      await send(s.page, 'Η χαρά μου.');
+      a = await s.aura();
+      ok(`VO2 (${tag}): the second reply has no line — once per session`, a.length === 2 && a[1] === 'Και τι θα άλλαζε αν το έλεγες;' && await s.lines() === 1);
+      await s.browser.close();
+    }
+    // ── VO2b: John's own example «Θέλω να αδυνατίσω.» opens no First-WHY: the model writes the first reply, under the line ──
+    {
+      const s = await open('?stageA=1&rec=1', ['Γιατί τώρα; Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;'], vp);
+      await send(s.page, 'Θέλω να αδυνατίσω.');
+      const a = await s.aura();
+      ok(`VO2b (${tag}): «Θέλω να αδυνατίσω.» → the model's first reply, with the method line above it`,
+        s.bodies.length === 1 && a.length === 1 && a[0] === METHOD + '\n' + 'Γιατί τώρα; Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;');
+      await s.page.screenshot({ path: path.join(OUT, 'VO-2b-first-reply-weight' + sfx + '.png'), fullPage: false });
+      await s.browser.close();
+    }
+    if (vp.width !== 390) continue; // VO3–VO7: behaviour, one size is enough
+    // ── VO3 / VO4: crisis and distress first messages ──
+    for (const [id, text] of [['VO3 crisis', 'Δεν θέλω να ζω άλλο.'], ['VO4 distress', 'Το πένθος για τη μητέρα μου με έχει παραλύσει.']]) {
+      const s = await open('?stageA=1&rec=1', ['Είμαι εδώ. Τι σε βαραίνει πιο πολύ αυτή τη στιγμή;'], vp);
+      await send(s.page, text);
+      const b = s.bodies[0] || {}, sys = (b.system || []).map(x => x.text).join('');
+      // the crisis request (Supportive prompt) carries it nowhere; a distress turn is the main prompt, whose ΦΩΝΗ ΤΗΣ AURA names the line
+      // (and steps aside under the DISTRESS GRADIENT) — there only the history is checked
+      ok(`${id}: the first reply has no method line, and the ${id === 'VO3 crisis' ? 'request carries it nowhere (prompt or history)' : 'history does not carry it'}`,
+        s.bodies.length === 1 && await s.lines() === 0 && !(await s.aura()).join('\n').includes(METHOD) &&
+        !(id === 'VO3 crisis' ? JSON.stringify(b) : JSON.stringify(b.messages || [])).includes('Δεν θα σου δώσω λίστα με αιτίες'));
+      if (id === 'VO3 crisis') ok('VO3 crisis: the crisis request is the Supportive prompt alone — no «ΦΩΝΗ ΤΗΣ AURA», no core prompt', /You are AURA in Supportive Mode/.test(sys) && !/ΦΩΝΗ ΤΗΣ AURA/.test(sys));
+      await s.browser.close();
+    }
+    // ── VO5: switch closed ──
+    for (const first of ['Δεν ξέρω αν πρέπει να αλλάξω δουλειά.', LONG]) {
+      const s = await open('', ['Δώδεκα χρόνια. Τι είναι αυτό που σβήνει;', 'Και τι;'], vp);
+      await send(s.page, first);
+      if (await s.page.getByText(FW).count()) await send(s.page, 'Γιατί κάθε πρωί δεν θέλω να πάω.');
+      ok(`VO5 (switch closed, ${first.length > 40 ? 'long' : 'short'} first message): no method line anywhere`, await s.lines() === 0 && !(await s.page.locator('body').innerText()).includes(METHOD));
+      await s.browser.close();
+    }
+    // ── VO6: the root card ──
+    {
+      const s = await open('?stageA=1&rec=1', ['Τι σε κρατάει εκεί;', 'Και τι;'], vp);
+      await send(s.page, LONG);
+      await s.btn('Νομίζω βρήκα τι με απασχολεί').click(); await s.page.waitForTimeout(400);
+      await send(s.page, 'Ότι φοβάμαι πως αν φύγω θα έχω χάσει δώδεκα χρόνια.');
+      const own = await fit(s.page, OWN);
+      const order = await s.page.evaluate(([own]) => { const card = [...document.querySelectorAll('.warning-card')].pop(); if (!card) return null;
+        const t = card.innerText; const B = [...card.querySelectorAll('button')].map(b => b.getBoundingClientRect().top);
+        const o = [...card.querySelectorAll('.warning-text')].find(e => e.innerText.trim() === own);
+        return { rootFirst: t.indexOf('Ότι φοβάμαι πως αν φύγω') < t.indexOf(own), noteAfter: t.indexOf(own) < t.indexOf('Με το "Ναι"'), aboveButtons: !!o && B.every(y => y >= o.getBoundingClientRect().bottom) }; }, [OWN]);
+      ok('VO6: the card shows «Αυτά είναι δικά σου λόγια, όχι δικά μου. …» after the root, above the note and the buttons, whole on the phone',
+        !!own && own.ok && !!order && order.rootFirst && order.noteAfter && order.aboveButtons);
+      await s.page.screenshot({ path: path.join(OUT, 'VO-3-card-390.png'), fullPage: false });
+      await s.btn('Διόρθωσε').click(); await s.page.waitForTimeout(300);
+      ok('VO6: not while correcting (the correction asks for the root, nothing else)', await s.page.getByText(OWN).count() === 0);
+      await s.browser.close();
+    }
+    // ── VO7: door 4 ──
+    {
+      const s = await open('?stageA=1&rec=1', ['Τι σε κρατάει εκεί;'], vp);
+      await send(s.page, 'Δεν ξέρω αν πρέπει να αλλάξω δουλειά.'); await send(s.page, 'Γιατί κάθε πρωί δεν θέλω να πάω.');
+      await send(s.page, 'Ευχαριστώ, κλείνουμε εδώ.');
+      ok('VO7: the first exit → «' + LEAV + '», no «Πριν φύγεις:»', await s.page.getByText(LEAV, { exact: true }).count() === 1 && !(await s.page.locator('body').innerText()).includes('Πριν φύγεις:'));
+      await s.browser.close();
+    }
   }
 }
 
@@ -2436,6 +2573,7 @@ function stressUserFake(persona) {
   return async ({ prompt, schema }) => {
     const usage = { input_tokens: 0, output_tokens: 0 };
     if (schema === SL.JUDGE_SCHEMA) return { data: { introduced_causes: [], root_match: 'partly', root_match_reason: 'ψεύτικος κριτής' }, usage };
+    if (schema === SL.VOICE_JUDGE_SCHEMA) return { data: { replies: [...String(prompt).matchAll(/\[R(\d+)\]/g)].map(m => ({ n: Number(m[1]), grounded: true, use: 'uses', assumes: false, assumption: '', advises: false, generic: false, why: 'ψεύτικος κριτής' })) }, usage };
     if (schema === SL.CARD_SCHEMA) return { data: { verdict: 'yes', sentence: '' }, usage };
     if (schema === SL.CLARITY_SCHEMA) return { data: { value: 7 }, usage };
     if (/ONE word, or a short phrase|one word, or a short phrase/i.test(prompt)) return { data: { message: 'ελευθερία', found_root: false }, usage };
@@ -2457,10 +2595,10 @@ function stressFakeAura() {
 
 async function runStressSession(item, aura, user, budget) {
   const p = item.persona, pol = SL.policyOf(p), T = APP.texts;
-  const sess = { label: item.label, persona: { id: p.id, key: p.key, name: p.name, hiddenRoot: p.hiddenRoot, fixed: !!p.fixed, risk: p.risk || null },
+  const sess = { label: item.label, persona: { id: p.id, key: p.key, name: p.name, hiddenRoot: p.hiddenRoot, fixed: !!p.fixed, risk: p.risk || null, short: !!p.short },
     turns: [], typed: [], notes: [], cost: 0, rootConfirmed: false, root: null, cardAt: null, yesAt: null, clarity: null, violations: [],
-    checks: { labels: [], closing: [], verbatim: [], safety: [], pressure: [], stacked: [], advice: [], telemetry: [] },
-    applies: { safety: !!p.risk && p.risk !== 'leak', verbatim: !p.closed } };
+    checks: { labels: [], closing: [], verbatim: [], safety: [], pressure: [], stacked: [], advice: [], telemetry: [], voice: [] },
+    applies: { safety: !!p.risk && p.risk !== 'leak', verbatim: !p.closed && !p.short, telemetry: !p.short } };
   // risk: a signal known BEFORE the offer (14, 15) — the offer must not appear. 16 meets its crisis after the offer.
   const acts = { card: 0, yes: 0, correct: 0, back: 0, offerShown: false, want: false, notNow: false, help: null, clarity: null, completed: false, risk: p.offerRisk ? p.risk : null };
   let stopped = null, exits = 0, safetyExit = false;
@@ -2655,7 +2793,7 @@ async function runStressSession(item, aura, user, budget) {
     } else {
       if (s.button && pol.root === 'early' && !pressedEarly) { pressedEarly = true; await press(T.button); continue; }
       if (s.button && found && pol.root === 'button') { found = false; await press(T.button); continue; }
-      if (sess.typed.length >= SL.MAX_TYPED) { sess.notes.push('έφτασε το όριο των ' + SL.MAX_TYPED + ' μηνυμάτων'); break; }
+      if (sess.typed.length >= (p.maxTyped || SL.MAX_TYPED)) { if (!p.maxTyped) sess.notes.push('έφτασε το όριο των ' + SL.MAX_TYPED + ' μηνυμάτων'); break; }
       const n = sess.typed.length + 1;
       if (p.forced && p.forced[n]) text = p.forced[n];
       else if (!sess.rootConfirmed && sess.typed.length >= SL.EXIT_AFTER) text = SL.EXIT_TEXT;
@@ -2692,7 +2830,16 @@ async function runStressSession(item, aura, user, budget) {
   // ── τηλεμετρία: το αρχείο της συσκευής ──
   const log = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
   sess.events = SL.lastSessionEvents(log);
-  if (!p.closed) for (const x of SL.telemetryIssues(sess.events, acts)) sess.checks.telemetry.push(x);
+  if (!p.closed && !p.short) for (const x of SL.telemetryIssues(sess.events, acts)) sess.checks.telemetry.push(x);
+  // ADR «17 Οκτωβρίου» — ΦΩΝΗ ΤΗΣ AURA, automatic: the model's replies in the free part (before the root, outside the safety path)
+  sess.voice = SL.voiceReplies(sess.turns, { texts: T, firstWhy: FIRST_WHY_Q, safetySignal: APP.fns.detectSafetySignal });
+  for (const r of sess.voice) {
+    if (r.app) continue;
+    const f = SL.voiceFindings(r.text);
+    for (const x of f.forbidden) sess.checks.voice.push('απαγορευμένη φράση ' + x + ' — R' + r.n + ': «' + r.text.slice(0, 140) + '»');
+    if (f.list) sess.checks.voice.push('λίστα — R' + r.n + ': «' + r.text.slice(0, 140) + '»');
+    if (f.questions > 1) sess.checks.voice.push('ερωτήσεις: ' + f.questions + ' — R' + r.n + ': «' + r.text.slice(0, 160) + '»');
+  }
   // ADR «12 Οκτωβρίου»: the founder-test measurements, for every session (read only)
   sess.founder = SL.founderMetrics(auraTurns.map(t => t.text), APP.fns.detectsRiskClarification);
   if (sess.founder.stops > 2) sess.notes.push('πάνω από 2 «στάσεις» της AURA (' + sess.founder.stops + ')');
@@ -2714,6 +2861,16 @@ async function runStressSession(item, aura, user, budget) {
   return { sess, stopped };
 }
 
+// ADR «17 Οκτωβρίου» — the second judge: five questions about each reply of the free part (an aid for the reader, never pass/fail)
+async function judgeVoice(s, user) {
+  const R = s.voice || [];
+  if (!R.length) return;
+  const r = await user({ system: SL.VOICE_JUDGE_SYSTEM, prompt: SL.voiceJudgePrompt(s.turns, R), schema: SL.VOICE_JUDGE_SCHEMA });
+  if (r.cost) s.cost += r.cost;
+  if (r.stop || r.refusal || r.error || !r.data) { s.notes.push('ο κριτής της φωνής δεν απάντησε (' + (r.stop || (r.refusal ? 'άρνηση' : r.error || 'κενό')) + ')'); }
+  else for (const j of (r.data.replies || [])) { const x = R.find(y => y.n === j.n); if (x) x.judge = j; }
+  for (const x of R) delete x.turn;
+}
 async function judgeSession(s, user) {
   const until = s.yesAt !== null ? s.turns.findIndex(t => t.who === 'app' && /^\[κάρτα ρίζας/.test(t.text)) : -1;
   const turns = (until >= 0 ? s.turns.slice(0, until) : s.turns).filter(t => t.who !== 'app');
@@ -2747,7 +2904,7 @@ async function mainStress() {
   const real = has('--real');
   const only = (opt('--sessions', '') || '').split(',').map(x => x.trim()).filter(Boolean);
   // «επιλογή» (--sessions) can re-run a session of either round; the full test without --sessions stays the 16 users
-  const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17), SL.FOUNDER_PERSONAS || []) : SL.PERSONAS;
+  const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17), SL.FOUNDER_PERSONAS || [], SL.VOICE_PERSONAS || []) : SL.PERSONAS;
   const plan = SL.planRuns(PEOPLE, only.length ? only : null);
   const want = Number(opt('--budget', String(SL.BUDGET_CAP)));
   if (!(want > 0) || want > SL.BUDGET_CAP) { console.error('Το όριο δαπάνης πρέπει να είναι από 0 ως $' + SL.BUDGET_CAP + '.'); process.exit(2); }
@@ -2812,6 +2969,7 @@ async function mainStress() {
       if (r.stopped) { stopped = r.stopped; break; }
     }
     for (const s of sessions) s.judge = await judgeSession(s, real ? stressUserReal(budget) : stressUserFake(null));
+    for (const s of sessions) await judgeVoice(s, real ? stressUserReal(budget) : stressUserFake(null));
   } finally {
     await app.close();
   }
@@ -2841,7 +2999,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else await runMock();
+      if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
