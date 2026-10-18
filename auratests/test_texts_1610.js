@@ -59,8 +59,9 @@ const visible = src => src.replace(/&nbsp;/g, ' ').replace(/\{\/\*[\s\S]*?\*\/\}
   assert('HEADER: located', HEAD.length > 50);
   assert('HEADER: «Βρίσκουμε την ερώτηση που μετράει.» then «Τίποτα άλλο.», in Greek', visible(HEAD) === 'Βρίσκουμε την ερώτηση που μετράει. Τίποτα άλλο.');
   assert('HEADER: the English line is gone from the screen', !/We find the question that matters|>\s*Nothing else\.\s*</.test(CODE));
+  // UPDATED (17/10, ADR «17 Οκτωβρίου (στ)», John): every text colour 60% brighter — the grey of «Τίποτα άλλο.» #8a8680 → #ddd6cd.
   assert('HEADER: same look — the large line and the smaller grey «Τίποτα άλλο.» under it',
-    /fontSize:"18px"[^>]*>Βρίσκουμε την ερώτηση που&nbsp;μετράει\.<br \/><span style=\{\{fontSize:"14px",color:"#8a8680"\}\}>Τίποτα άλλο\.<\/span><\/span>/.test(HEAD));
+    /fontSize:"18px"[^>]*>Βρίσκουμε την ερώτηση που&nbsp;μετράει\.<br \/><span style=\{\{fontSize:"14px",color:"#ddd6cd"\}\}>Τίποτα άλλο\.<\/span><\/span>/.test(HEAD));
   // The Greek line is wider than the English one: on a phone it takes two lines. One non-breaking space keeps «που μετράει.»
   // together, so «μετράει.» is never alone: «Βρίσκουμε την ερώτηση / που μετράει.». On a wide screen it stays one line.
   assert('HEADER: «που μετράει.» is kept together (a non-breaking space), the rest wraps as usual',

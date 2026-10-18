@@ -5984,13 +5984,13 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
           <div className="msg-aura" style={{marginBottom:"10px"}}>
             {rm.roads.map((r, k) => (
               <div key={k} style={{border:"1px solid rgba(201,168,76,0.22)",borderRadius:"4px",padding:"12px 14px",marginBottom:"8px"}}>
-                <div style={{color:"#d8d4cc",fontSize:"14px",marginBottom:"6px"}}>{r.name}</div>
-                <div style={{color:"#a8a49c",fontSize:"12.5px",lineHeight:1.6}}>κερδίζεις · {r.gain}</div>
-                <div style={{color:"#a8a49c",fontSize:"12.5px",lineHeight:1.6}}>κοστίζει · {r.cost}</div>
+                <div style={{color:"#fffaf1",fontSize:"14px",marginBottom:"6px"}}>{r.name}</div>
+                <div style={{color:"#fff9ed",fontSize:"12.5px",lineHeight:1.6}}>κερδίζεις · {r.gain}</div>
+                <div style={{color:"#fff9ed",fontSize:"12.5px",lineHeight:1.6}}>κοστίζει · {r.cost}</div>
               </div>
             ))}
             {rm.unknown && (
-              <div style={{color:"#8a8680",fontSize:"12.5px",lineHeight:1.6,marginTop:"10px",fontStyle:"italic"}}>
+              <div style={{color:"#ddd6cd",fontSize:"12.5px",lineHeight:1.6,marginTop:"10px",fontStyle:"italic"}}>
                 άγνωστο · {rm.unknown}
               </div>
             )}
@@ -8715,10 +8715,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         html,body{min-height:100vh;background:#0d0c0a !important;}
         :root{
           --bg:transparent;--border:#141414;--border-mid:#1e1e1e;
-          --text-primary:#dedad2;--text-secondary:#565250;
-          --text-dim:#252320;--text-user:#68645e;
-          --gold:#c9a84c;--gold-dim:#6b5a28;
-          --green:#4a7a4a;--red:#7a4a4a;--red-dim:#3a1a1a;
+          --text-primary:#fffaf1;--text-secondary:#8a8380;
+          --text-dim:#8a8380;--text-user:#a6a096;
+          --gold:#c9a84c;--gold-text:#ffd560;--gold-dim:#6b5a28;--gold-dim-text:#ab9040;
+          --green:#4a7a4a;--green-text:#76c376;--red:#7a4a4a;--red-text:#c37676;--red-dim:#3a1a1a;
           --field-base:transparent;--field-clear:transparent;
         }
         body{color:var(--text-primary);font-family:'DM Mono',monospace;background:transparent;min-height:100vh;}
@@ -8745,7 +8745,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         .gallery-peak{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;color:var(--text-secondary);line-height:1.6;margin-bottom:8px}
         .gallery-aura-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.15em;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;display:block}
         .gallery-aura{font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:10px}
-        .gallery-kept-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.15em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:5px;display:block}
+        .gallery-kept-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.15em;text-transform:uppercase;color:var(--gold-dim-text);margin-bottom:5px;display:block}
         .gallery-kept{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:300;font-size:19px;color:var(--text-primary);line-height:1.45}
 
         /* ── AURA LIGHT FIELD ── */
@@ -8788,11 +8788,11 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         .light-field.clear::after{ opacity:0.7; }
         .light-field.surge::after{ opacity:1; transition:opacity .35s ease; }
 
-        .root{height:100vh;height:100dvh;max-width:650px;margin:0 auto;padding:0 18px 0 90px;display:flex;flex-direction:column;position:relative;overflow:hidden}
+        .root{height:100vh;height:100dvh;max-width:650px;margin:0 auto;padding:0 18px;display:flex;flex-direction:column;position:relative;overflow:hidden}
 
         /* Header */
         .header{padding:26px 0 18px;display:flex;align-items:center;justify-content:space-between}
-        .wordmark{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:300;font-style:italic;letter-spacing:.2em;color:#ddd8d0}
+        .wordmark{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:300;font-style:italic;letter-spacing:.2em;color:#fff9f0}
         .header-right{display:flex;align-items:center;gap:12px}
         .mode-pill{display:flex;align-items:center;gap:6px;font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-secondary)}
         .mode-dot{width:4px;height:4px;border-radius:50%;background:#333;transition:background .5s}
@@ -8812,8 +8812,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         .anchor-actions{display:flex;gap:5px;flex-shrink:0}
         .anchor-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;padding:2px 6px;cursor:pointer;border-radius:1px;transition:all .2s;white-space:nowrap}
         .anchor-btn:hover{color:var(--text-secondary);border-color:var(--border-mid)}
-        .anchor-btn.done:hover{color:var(--green);border-color:var(--green)}
-        .anchor-btn.release:hover{color:#888;border-color:#444}
+        .anchor-btn.done:hover{color:var(--green-text);border-color:var(--green)}
+        .anchor-btn.release:hover{color:#dadada;border-color:#444}
 
         /* Memory panel */
         .mem-panel{padding:14px 0;border-bottom:1px solid var(--border);font-size:10px;color:var(--text-dim);line-height:1.8;animation:fadeUp .3s ease}
@@ -8831,15 +8831,15 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         .return-anchor-card{padding:28px 0 20px;animation:fadeUp .6s ease;border-bottom:1px solid var(--border)}
         .return-label{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px}
         .return-text{font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:6px}
-        .return-question{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;font-style:italic;color:#3a3632}
+        .return-question{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;font-style:italic;color:#8a8380}
 
         /* First-Why */
         .first-why-card{padding:32px 0 24px;animation:fadeUp .4s ease}
-        .first-why-q{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:300;font-style:italic;color:#5a5650;line-height:1.5}
+        .first-why-q{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:300;font-style:italic;color:#908a80;line-height:1.5}
 
         /* Empty */
         .empty{flex:1;display:flex;flex-direction:column;justify-content:center;padding:56px 0;animation:fadeUp .8s ease}
-        .empty-headline{font-family:'Cormorant Garamond',serif;font-size:40px;font-weight:300;font-style:italic;line-height:1.12;color:#1d1b18;margin-bottom:18px}
+        .empty-headline{font-family:'Cormorant Garamond',serif;font-size:40px;font-weight:300;font-style:italic;line-height:1.12;color:#2e2b26;margin-bottom:18px}
         .empty-sub{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);line-height:2.2}
         .empty-hint{font-size:11px;color:var(--text-dim);line-height:1.9;margin-top:20px;font-style:italic;opacity:.6}
 
@@ -8853,41 +8853,41 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         .msg-aura::before{content:'';position:absolute;left:0;top:4px;width:1px;height:calc(100% - 4px);background:var(--border-mid);transition:background .5s}
         .msg-aura.obs::before{background:var(--green);opacity:.45}
         .msg-aura.ins::before{background:var(--gold);opacity:.65}
-        .msg-aura.ins{color:#ddd8cf}
-        .msg-aura.term{color:#c9c4ba;font-style:normal;font-family:'Cormorant Garamond',serif;font-size:17px;line-height:1.75;background:rgba(201,168,76,0.05);border:1px solid rgba(201,168,76,0.18);border-radius:6px;padding:22px 24px}
-        .msg-aura.term strong{color:#c9a84c;font-weight:600}
+        .msg-aura.ins{color:#fff9ef}
+        .msg-aura.term{color:#fff9ec;font-style:normal;font-family:'Cormorant Garamond',serif;font-size:17px;line-height:1.75;background:rgba(201,168,76,0.05);border:1px solid rgba(201,168,76,0.18);border-radius:6px;padding:22px 24px}
+        .msg-aura.term strong{color:#ffd560;font-weight:600}
         .msg-aura.term::before{background:#333;opacity:.4}
-        .msg-aura.safe{color:#b8a8a8}
+        .msg-aura.safe{color:#ffe9e9}
         .msg-aura.safe::before{background:var(--red);opacity:.35}
 
         .msg-badge{display:inline-flex;align-items:center;gap:5px;font-size:7px;letter-spacing:.18em;text-transform:uppercase;margin-top:7px}
-        .msg-badge.compress{color:var(--gold-dim)}
-        .msg-badge.snapshot{color:#7a8a7a;letter-spacing:.16em}
+        .msg-badge.compress{color:var(--gold-dim-text)}
+        .msg-badge.snapshot{color:#c3ddc3;letter-spacing:.16em}
         .msg-aura.snapshot-msg::before{background:#7a8a7a;opacity:.5}
-        .msg-badge.term{color:#3a3a3a}
-        .msg-badge.safe{color:#7a5a5a}
+        .msg-badge.term{color:#8a8380}
+        .msg-badge.safe{color:#c39090}
         .misfire-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;cursor:pointer;border-radius:1px;transition:all .2s;margin-top:6px;display:inline-block}
         .misfire-btn:hover{color:var(--text-secondary);border-color:var(--border-mid)}
 
         /* Choice cards */
         .choice-card{animation:slideIn .35s ease;padding-left:14px}
         .choice-label{font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px}
-        .choice-prompt{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:300;font-style:italic;color:#8a8680;line-height:1.65;margin-bottom:16px}
+        .choice-prompt{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:300;font-style:italic;color:#ddd6cd;line-height:1.65;margin-bottom:16px}
         .choice-btns{display:flex;gap:8px;flex-wrap:wrap}
         .choice-btn{background:none;border:1px solid var(--border-mid);color:var(--text-secondary);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:8px 14px;cursor:pointer;border-radius:2px;transition:all .2s}
         .choice-btn:hover{color:var(--text-primary);border-color:#383530}
-        .choice-btn.prim{border-color:var(--gold-dim);color:var(--gold-dim)}
-        .choice-btn.prim:hover{border-color:var(--gold);color:var(--gold);animation:goldGlow .4s ease}
+        .choice-btn.prim{border-color:var(--gold-dim);color:var(--gold-dim-text)}
+        .choice-btn.prim:hover{border-color:var(--gold);color:var(--gold-text);animation:goldGlow .4s ease}
 
         /* Warning card */
         .warning-card{animation:slideIn .35s ease;padding-left:14px;border-left:1px solid #3a3a3a}
-        .warning-label{font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:#3a3a3a;margin-bottom:10px}
-        .warning-text{font-size:12px;color:#9a958c;line-height:1.75;margin-bottom:14px}
+        .warning-label{font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:#8a8380;margin-bottom:10px}
+        .warning-text{font-size:12px;color:#f6eee0;line-height:1.75;margin-bottom:14px}
 
         /* Memory prompt */
         .mem-card{animation:fadeUp .4s ease;padding-left:14px;border-left:1px solid var(--gold-dim)}
-        .mem-label{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:9px}
-        .mem-text{font-size:12px;color:#7a7670;line-height:1.7;margin-bottom:10px}
+        .mem-label{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-dim-text);margin-bottom:9px}
+        .mem-text{font-size:12px;color:#c3bdb3;line-height:1.7;margin-bottom:10px}
         .mem-note{font-size:10px;color:var(--text-dim);margin-bottom:14px;letter-spacing:.04em;line-height:1.7}
 
         /* Typing */
@@ -8909,25 +8909,25 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         .input-row{display:flex;align-items:flex-end;gap:10px}
         .textarea{flex:1;background:rgba(10,9,8,0.35) !important;border:1px solid rgba(201,168,76,0.2) !important;border-radius:4px;color:var(--text-primary);font-family:'DM Mono',monospace;font-size:16px;font-weight:400;line-height:1.9;padding:14px;resize:none;outline:none !important;min-height:80px;max-height:160px;box-shadow:none !important;backdrop-filter:blur(4px);}
         .textarea:focus{border:1px solid rgba(201,168,76,0.35) !important;outline:none !important;background:rgba(10,9,8,0.4) !important;}
-        .textarea::placeholder{color:#4a4845;font-size:15px}
+        .textarea::placeholder{color:#76736e;font-size:15px}
         .textarea:disabled{opacity:.3;cursor:not-allowed}
-        .send-btn{background:rgba(10,9,8,0.7);border:1px solid rgba(201,168,76,0.5);color:#c9a84c;font-family:'DM Mono',monospace;font-size:16px;padding:12px 18px;cursor:pointer;border-radius:4px;transition:all .2s;flex-shrink:0;margin-bottom:2px;min-width:48px;min-height:44px}
-        .send-btn.ready{color:#c9a84c;border-color:rgba(201,168,76,0.6);background:rgba(10,9,8,0.7)}
-        .send-btn.ready:hover{color:#e8d890;border-color:#c9a84c}
+        .send-btn{background:rgba(10,9,8,0.7);border:1px solid rgba(201,168,76,0.5);color:#ffd560;font-family:'DM Mono',monospace;font-size:16px;padding:12px 18px;cursor:pointer;border-radius:4px;transition:all .2s;flex-shrink:0;margin-bottom:2px;min-width:48px;min-height:44px}
+        .send-btn.ready{color:#ffd560;border-color:rgba(201,168,76,0.6);background:rgba(10,9,8,0.7)}
+        .send-btn.ready:hover{color:#ffed9e;border-color:#c9a84c}
         .send-btn:disabled{opacity:.65;cursor:not-allowed}
         .intro-screen{position:fixed;inset:0;background:#100f0d;z-index:200;display:flex;flex-direction:column;align-items:center;padding:40px 32px 80px;overflow-y:auto;}
-        .intro-text{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:300;color:#c4c0b8;line-height:1.9;max-width:480px;}
-        .intro-tagline{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#c9a84c;opacity:.7;margin-bottom:32px;}
+        .intro-text{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:300;color:#fffaef;line-height:1.9;max-width:480px;}
+        .intro-tagline{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#ffd560;opacity:.7;margin-bottom:32px;}
         .intro-actions{display:flex;align-items:center;gap:24px;margin-top:40px;position:sticky;bottom:20px;}
-        .intro-continue{background:none;border:1px solid #3a3632;color:#c4c0b8;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;padding:10px 28px;cursor:pointer;border-radius:2px;transition:all .2s;}
-        .intro-continue:hover{border-color:#c9a84c;color:#c9a84c;}
-        .intro-skip{background:none;border:none;color:#3a3632;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;cursor:pointer;transition:color .2s;}
-        .intro-skip:hover{color:#6a6660;}
-        .mic-btn{background:rgba(10,9,8,0.7);border:1px solid rgba(201,168,76,0.25);color:#8a7a52;font-family:'DM Mono',monospace;font-size:16px;padding:12px 18px;cursor:pointer;border-radius:4px;min-width:48px;min-height:44px}
-        .mic-btn.active{border-color:#c9a84c;color:#e8d890;background:rgba(201,168,76,0.1);}
+        .intro-continue{background:none;border:1px solid #3a3632;color:#fffaef;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;padding:10px 28px;cursor:pointer;border-radius:2px;transition:all .2s;}
+        .intro-continue:hover{border-color:#c9a84c;color:#ffd560;}
+        .intro-skip{background:none;border:none;color:#8a8380;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;cursor:pointer;transition:color .2s;}
+        .intro-skip:hover{color:#aaa39a;}
+        .mic-btn{background:rgba(10,9,8,0.7);border:1px solid rgba(201,168,76,0.25);color:#ddc383;font-family:'DM Mono',monospace;font-size:16px;padding:12px 18px;cursor:pointer;border-radius:4px;min-width:48px;min-height:44px}
+        .mic-btn.active{border-color:#c9a84c;color:#ffed9e;background:rgba(201,168,76,0.1);}
         .turn-counter{font-size:8px;letter-spacing:.1em;color:var(--text-dim);text-align:right;margin-top:5px}
-        .crisis-fallback{font-size:13px;line-height:1.5;color:#e8e4dc;margin-top:7px;padding:8px 10px;border-left:2px solid rgba(201,168,76,0.7);background:rgba(10,9,8,0.5)}
-        .err{font-size:10px;color:#e8a0a0;margin-top:7px;padding:6px 10px;border:1px solid #6b2c2c;border-radius:2px;background:rgba(74,26,26,0.25)}
+        .crisis-fallback{font-size:13px;line-height:1.5;color:#fffbf2;margin-top:7px;padding:8px 10px;border-left:2px solid rgba(201,168,76,0.7);background:rgba(10,9,8,0.5)}
+        .err{font-size:10px;color:#ffb0b0;margin-top:7px;padding:6px 10px;border:1px solid #6b2c2c;border-radius:2px;background:rgba(74,26,26,0.25)}
 
         ::-webkit-scrollbar{width:2px}
         ::-webkit-scrollbar-track{background:transparent}
@@ -8942,13 +8942,13 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           <div style={{width:"100%",maxWidth:"480px"}}>
             <div className="intro-tagline">Αύρα</div>
             <div className="intro-text" style={{textAlign:"left",maxWidth:"340px"}}>
-              <div style={{marginBottom:"16px",color:"#9a9690"}}>Πολλές φορές έχεις ένα πρόβλημα, ένα δίλημμα, ή κάτι που δεν μπορείς να εκφράσεις ακριβώς.</div>
-              <div style={{marginBottom:"16px"}}>Κάθε ερώτηση της εφαρμογής είναι <span style={{color:"#c9a84c"}}>δική σου ερώτηση</span> — μία που δεν έχεις κάνει ακόμα στον εαυτό σου, ή δεν σκέφτηκες να την κάνεις.</div>
-              <div style={{marginBottom:"16px",color:"#9a9690"}}>Γιατί πολλές φορές το πρόβλημα έχει <span style={{color:"#c9c5bc"}}>άλλη ρίζα</span> από αυτό που ζούμε και εκφράζουμε.</div>
-              <div style={{marginBottom:"16px",color:"#9a9690"}}>Μετά βλέπεις τις επιλογές σου καθαρά: <span style={{color:"#c9c5bc"}}>τι κερδίζεις, τι πληρώνεις.</span> Και αποφασίζεις τι κρατάς και τι αφήνεις.</div>
-              <div style={{marginBottom:"6px",color:"#9a9690"}}>Στόχος δεν είναι η μασημένη λύση που δίνουν όλοι.</div>
+              <div style={{marginBottom:"16px",color:"#f6f0e6"}}>Πολλές φορές έχεις ένα πρόβλημα, ένα δίλημμα, ή κάτι που δεν μπορείς να εκφράσεις ακριβώς.</div>
+              <div style={{marginBottom:"16px"}}>Κάθε ερώτηση της εφαρμογής είναι <span style={{color:"#ffd560"}}>δική σου ερώτηση</span> — μία που δεν έχεις κάνει ακόμα στον εαυτό σου, ή δεν σκέφτηκες να την κάνεις.</div>
+              <div style={{marginBottom:"16px",color:"#f6f0e6"}}>Γιατί πολλές φορές το πρόβλημα έχει <span style={{color:"#fffaef"}}>άλλη ρίζα</span> από αυτό που ζούμε και εκφράζουμε.</div>
+              <div style={{marginBottom:"16px",color:"#f6f0e6"}}>Μετά βλέπεις τις επιλογές σου καθαρά: <span style={{color:"#fffaef"}}>τι κερδίζεις, τι πληρώνεις.</span> Και αποφασίζεις τι κρατάς και τι αφήνεις.</div>
+              <div style={{marginBottom:"6px",color:"#f6f0e6"}}>Στόχος δεν είναι η μασημένη λύση που δίνουν όλοι.</div>
               <div style={{marginBottom:"18px"}}>Στόχος είναι να βγεις από το χάος του μυαλού σου.</div>
-              <div style={{color:"#c9a84c",fontFamily:"'Cormorant Garamond',serif",fontSize:"20px",lineHeight:1.35,marginTop:"22px"}}>Εσύ στο τιμόνι,<br/>στα δικά σου προβλήματα.</div>
+              <div style={{color:"#ffd560",fontFamily:"'Cormorant Garamond',serif",fontSize:"20px",lineHeight:1.35,marginTop:"22px"}}>Εσύ στο τιμόνι,<br/>στα δικά σου προβλήματα.</div>
             </div>
             <div className="intro-actions">
               <button className="intro-continue" onClick={() => { setIntroShown(true); try { localStorage.setItem("aura_intro_seen","1"); } catch {} }}>Ξεκίνα</button>
@@ -8984,20 +8984,20 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             <div style={{maxWidth:"380px",width:"100%",margin:"0 auto",textAlign:"center"}}>
               {/* AI DISCLOSURE (EU AI Act, Art. 50 — founder-approved wording, 2026-10-04). On the entry
                   screen because it is shown at the start of EVERY new session; the intro can be skipped. */}
-              <div style={{fontSize:"13px",color:"#c4c0b8",lineHeight:1.6,marginBottom:"10px",textAlign:"left"}}>
+              <div style={{fontSize:"13px",color:"#fffaef",lineHeight:1.6,marginBottom:"10px",textAlign:"left"}}>
                 Είμαι τεχνητή νοημοσύνη. Δεν σου λέω τι να κάνεις πριν βρεις τι πραγματικά ρωτάς.
               </div>
-              <div style={{fontSize:"13px",color:"#8a8680",lineHeight:1.6,marginBottom:"18px",textAlign:"left"}}>
+              <div style={{fontSize:"13px",color:"#ddd6cd",lineHeight:1.6,marginBottom:"18px",textAlign:"left"}}>
                 Γράψε ό,τι σε απασχολεί, όπως έρχεται. Μπερδεμένο είναι μια χαρά.
               </div>
               <button onClick={()=>{setIntroChoice("direct");setSessionStarted(true);recordTelemetry("session_started");setTimeout(()=>textareaRef.current?.focus(),50);}}
-                style={{display:"block",width:"100%",background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.35)",color:"rgba(201,168,76,0.85)",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",cursor:"pointer",borderRadius:"4px"}}>
+                style={{display:"block",width:"100%",background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.35)",color:"rgba(255,213,96,0.85)",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",cursor:"pointer",borderRadius:"4px"}}>
                 Ξεκίνα με το πρόβλημά σου
               </button>
               {recMode.current && storedTelemetryCount() > 0 && (
                 <div style={{marginTop:"22px",textAlign:"left"}}>
-                  <div style={{fontSize:"11px",color:"#8a8680",lineHeight:1.5,marginBottom:"6px"}}>{TESTER_TEXTS.line}</div>
-                  <button onClick={handleTesterExport} style={{background:"transparent",border:"1px solid rgba(201,168,76,0.3)",color:"rgba(201,168,76,0.75)",fontSize:"11px",padding:"6px 10px",cursor:"pointer"}}>{TESTER_TEXTS.button}</button>
+                  <div style={{fontSize:"11px",color:"#ddd6cd",lineHeight:1.5,marginBottom:"6px"}}>{TESTER_TEXTS.line}</div>
+                  <button onClick={handleTesterExport} style={{background:"transparent",border:"1px solid rgba(201,168,76,0.3)",color:"rgba(255,213,96,0.75)",fontSize:"11px",padding:"6px 10px",cursor:"pointer"}}>{TESTER_TEXTS.button}</button>
                   {testerCopy && <div role="status" style={{fontSize:"12px",lineHeight:1.5,marginTop:"6px",color:testerCopy === "ok" ? "rgba(201,168,76,0.9)" : "#c8c4bc"}}>{testerCopy === "ok" ? TESTER_TEXTS.copied : TESTER_TEXTS.notCopied}</div>}
                 </div>
               )}
@@ -9011,13 +9011,13 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
 
         {/* ── Header ── */}
         <header className="header" style={{flexDirection:"column",alignItems:"flex-end",gap:"2px",paddingBottom:"6px"}}>
-          <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"18px",fontWeight:300,color:"#d8d4cc",letterSpacing:".04em",lineHeight:1.4,textAlign:"right"}}>Βρίσκουμε την ερώτηση που&nbsp;μετράει.<br /><span style={{fontSize:"14px",color:"#8a8680"}}>Τίποτα άλλο.</span></span>
+          <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"18px",fontWeight:300,color:"#fffaf1",letterSpacing:".04em",lineHeight:1.4,textAlign:"right"}}>Βρίσκουμε την ερώτηση που&nbsp;μετράει.<br /><span style={{fontSize:"14px",color:"#ddd6cd"}}>Τίποτα άλλο.</span></span>
           <div className="header-right">
             {/* Lens is invisible — no indicator shown to user */}
             {safetyMode && (
               <div className="mode-pill">
                 <span className="mode-dot safe" />
-                <span style={{color:"var(--red)"}}>υποστήριξη</span>
+                <span style={{color:"var(--red-text)"}}>υποστήριξη</span>
               </div>
             )}
             <button className="icon-btn" onClick={() => { setShowMemoryPanel(v => !v); setShowArchivePanel(false); }} title="Ρυθμίσεις μνήμης">μνήμη</button>
@@ -9072,7 +9072,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               {memory.storageEnabled && (
                 <button className="toggle-btn" onClick={() => exportMemory(memory)}>εξαγωγή (.json)</button>
               )}
-              <button className="toggle-btn" style={{color:"var(--red)"}} onClick={() => {
+              <button className="toggle-btn" style={{color:"var(--red-text)"}} onClick={() => {
                 const u = EMPTY_MEMORY();
                 setMemory(u);
                 try { localStorage.removeItem(MEMORY_KEY); } catch {}
@@ -9127,7 +9127,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             naturally whenever `messages` changes, since that's this component's own render
             trigger — no interval, no dedicated state. ── */}
         {debugMode.current && (
-          <div style={{position:"fixed",bottom:"8px",right:"8px",zIndex:9999,pointerEvents:"none",background:"rgba(0,0,0,0.55)",color:"#d8d4cc",fontSize:"11px",lineHeight:1.5,padding:"6px 9px",borderRadius:"4px",fontFamily:"monospace",maxWidth:"220px"}}>
+          <div style={{position:"fixed",bottom:"8px",right:"8px",zIndex:9999,pointerEvents:"none",background:"rgba(0,0,0,0.55)",color:"#fffaf1",fontSize:"11px",lineHeight:1.5,padding:"6px 9px",borderRadius:"4px",fontFamily:"monospace",maxWidth:"220px"}}>
             <div>turn: {turnCount.current}</div>
             {Object.keys(violationCounts.current).length === 0 ? (
               <div>καμία παραβίαση</div>
@@ -9156,7 +9156,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                 sessions on 2026-09-26, when the measurement existed and was uncollectable. */}
             <button
               onClick={exportTelemetry}
-              style={{pointerEvents:"auto",marginTop:"5px",background:"transparent",color:"#d8d4cc",border:"1px solid #6b665e",borderRadius:"3px",fontSize:"11px",fontFamily:"monospace",padding:"2px 6px",cursor:"pointer"}}
+              style={{pointerEvents:"auto",marginTop:"5px",background:"transparent",color:"#fffaf1",border:"1px solid #6b665e",borderRadius:"3px",fontSize:"11px",fontFamily:"monospace",padding:"2px 6px",cursor:"pointer"}}
             >τηλεμετρία (.json)</button>
           </div>
         )}
@@ -9287,7 +9287,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           {/* Compression offer */}
           {pivotPending && !layerGatePending && (
             <div className="choice-card" style={{borderLeft:"1px solid var(--gold-dim)",paddingLeft:14}}>
-              <div className="choice-label" style={{color:"var(--gold-dim)"}}>συμπίεση</div>
+              <div className="choice-label" style={{color:"var(--gold-dim-text)"}}>συμπίεση</div>
               <div className="choice-prompt">
                 Μπορώ να συνεχίσω να αναλύω.<br />
                 Ή μπορώ να αφαιρέσω ό,τι δεν είναι ουσιαστικό και να δούμε τι μένει.<br />
@@ -9563,14 +9563,14 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           {!stageAActive.current && riskSignalKind.current === 0 && sessionEnded && !loading && finalDistillation && !valueUnlocked && (
             <div style={{border:"1px solid rgba(201,168,76,0.3)",borderRadius:"4px",padding:"18px 20px",margin:"14px 0",maxWidth:"440px"}}>
               {earlyReliefValue !== null && lateReliefValue !== null ? (
-                <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.7,marginBottom:"16px"}}>
+                <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#fffaef",lineHeight:1.7,marginBottom:"16px"}}>
                   Η δική σου αναφορά σαφήνειας: {earlyReliefValue}/10 → {lateReliefValue}/10.
                   {ownershipValue !== null && <> Πόσο δικό σου το νιώθεις: {ownershipValue}/10.</>}<br/><br/>
                   Δεν σου λέμε αν η απόφαση είναι σωστή. Μπορείς όμως πλέον να δεις ποια είναι.<br/>
                   Πληρώνεις για τη διαδικασία που σε βοήθησε να ξεκαθαρίσεις τη δική σου σκέψη — όχι για μια λύση που έδωσε η AURA.
                 </div>
               ) : (
-                <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#c9c5bc",lineHeight:1.7,marginBottom:"16px"}}>
+                <div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"15px",color:"#fffaef",lineHeight:1.7,marginBottom:"16px"}}>
                   Η συζήτηση τελειώνει εδώ.<br/>
                   Οι λέξεις θα χαθούν. Όχι όμως αυτό που βρήκες.<br/><br/>
                   Το Blueprint κρατά μόνο το αποτύπωμα της διαδρομής σου.
@@ -9579,9 +9579,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                 </div>
               )}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",color:"rgba(201,168,76,0.9)"}}>6€</span>
+                <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",color:"rgba(255,213,96,0.9)"}}>6€</span>
                 <button onClick={() => setValueUnlocked(true) /* TODO: replace with real Lemon Squeezy checkout redirect */}
-                  style={{background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.4)",color:"rgba(201,168,76,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"12px",letterSpacing:".08em",padding:"9px 20px",cursor:"pointer",borderRadius:"3px"}}>
+                  style={{background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.4)",color:"rgba(255,213,96,0.9)",fontFamily:"'DM Mono',monospace",fontSize:"12px",letterSpacing:".08em",padding:"9px 20px",cursor:"pointer",borderRadius:"3px"}}>
                   ξεκλείδωσε
                 </button>
               </div>

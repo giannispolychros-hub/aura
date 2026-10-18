@@ -732,6 +732,9 @@ async function runMockOF() {
     if (!el) return null;
     const r = el.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), h: window.innerHeight };
   }, text);
+  // the message area (.feed): where its visible part starts, and whether it is scrolled as far down as it goes
+  const feedState = async page => page.evaluate(() => { const f = document.querySelector('.feed'); if (!f) return null;
+    return { top: Math.round(f.getBoundingClientRect().top), atEnd: f.scrollTop + f.clientHeight >= f.scrollHeight - 2 }; });
   // the tester button: the download, the result on screen, what the clipboard holds
   const sendData = async (page, wait) => {
     let file = null;
@@ -758,8 +761,12 @@ async function runMockOF() {
       ok('OF1 (offer closed): after «Ναι» the screen shows John\'s step text, in order, character for character — no €6', JSON.stringify(shown) === JSON.stringify(STEPL) && !(await s.page.locator('body').innerText()).includes('€6'));
       const first = await inView(s.page, STEPL[0]), q = await inView(s.page, T.stepQ);
       const ub = await btn(s.page, T.stepUnknown).boundingBox({ timeout: 2000 }).catch(() => null);
-      ok('OF1 (offer closed): on the phone the root line is seen first, near the top; the question and «Δεν ξέρω ακόμα» on the same screen',
-        !!first && first.top >= 0 && first.top < 200 && !!q && q.bottom <= q.h && !!ub && ub.y + ub.height <= q.h);
+      // UPDATED (18/10, ADR «17 Οκτωβρίου (στ)»): the text now takes the full width, so the page can be too short to lift the root to
+      // 200px (390×844: it stops at ~248px, the area scrolled to its end). What matters is unchanged: the message is seen from its first
+      // line — the root, whole, not under the top edge of the message area — as high as the page allows, with the question and the button.
+      const fs1 = await feedState(s.page);
+      ok('OF1 (offer closed): on the phone the root line is seen first, near the top (or as high as the page goes); the question and «Δεν ξέρω ακόμα» on the same screen',
+        !!first && !!fs1 && first.top >= fs1.top - 1 && (first.top < 200 || fs1.atEnd) && !!q && q.bottom <= q.h && !!ub && ub.y + ub.height <= q.h);
       await s.page.screenshot({ path: path.join(OUT, 'OF-1-after-yes' + (VP ? '-' + VP.width + 'x' + VP.height : '') + '.png'), fullPage: false });
       await say(s.page, 'Να του πω ότι δεν θέλω να γίνω τραπεζίτης.'); await tap(s.page, T.fitsYes); await say(s.page, 'Την Κυριακή.');
       ok('OF2 (offer closed): no not-ready text, no one-tap question — the step card, then the clarity scale',
@@ -1323,8 +1330,11 @@ async function runMockTX() {
         const W = window.innerWidth, rs = [...m.children].map(c => c.getBoundingClientRect()).filter(r => r.width > 0);
         return { inside: rs.every(r => r.left >= 0 && r.right <= W + 0.5), noSideScroll: document.documentElement.scrollWidth <= W, top: Math.round(m.getBoundingClientRect().top), bottom: Math.round(m.getBoundingClientRect().bottom), h: window.innerHeight }; });
       const ub = await btn('Δεν ξέρω ακόμα').boundingBox({ timeout: 2000 }).catch(() => null);
-      ok(`TX4 (${tag}, offer closed): every line inside the width, the root first near the top, the whole text and «Δεν ξέρω ακόμα» on one screen`,
-        !!g4 && g4.inside && g4.noSideScroll && g4.top >= 0 && g4.top < 200 && g4.bottom <= g4.h && !!ub && ub.y + ub.height <= vp.height);
+      // UPDATED (18/10, ADR «17 Οκτωβρίου (στ)»): as OF1 — the root first, whole, as high as the page allows (not a fixed 200px).
+      const fs4 = await page.evaluate(() => { const f = document.querySelector('.feed'); if (!f) return null;
+        return { top: Math.round(f.getBoundingClientRect().top), atEnd: f.scrollTop + f.clientHeight >= f.scrollHeight - 2 }; });
+      ok(`TX4 (${tag}, offer closed): every line inside the width, the root first near the top (or as high as the page goes), the whole text and «Δεν ξέρω ακόμα» on one screen`,
+        !!g4 && !!fs4 && g4.inside && g4.noSideScroll && g4.top >= fs4.top - 1 && (g4.top < 200 || fs4.atEnd) && g4.bottom <= g4.h && !!ub && ub.y + ub.height <= vp.height);
       await page.screenshot({ path: path.join(OUT, 'TX-4-step' + sfx + '.png'), fullPage: false });
       await send(page, 'Να του στείλω ένα μήνυμα.');
       const fq = await fit(page, 'Είναι τόσο μικρό που χωράει σε μία μέρα;');

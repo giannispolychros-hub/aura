@@ -20,7 +20,7 @@ class ErrorBoundary extends Component {
       return (
         <div style={{
           minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: '#080808', color: '#c4c0b8', fontFamily: "'DM Mono', monospace",
+          background: '#080808', color: '#fffaef', fontFamily: "'DM Mono', monospace",
           fontSize: '12px', fontWeight: 300, letterSpacing: '0.02em', textAlign: 'center', padding: '24px'
         }}>
           Κάτι σταμάτησε να λειτουργεί.
