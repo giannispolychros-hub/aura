@@ -163,8 +163,9 @@ async function runMock() {
     await send(page, 'Να του πω ότι δεν θέλω να γίνω τραπεζίτης.');
     await page.getByRole('button', { name: APP.texts.fitsYes, exact: true }).click(); await page.waitForTimeout(300);
     await send(page, 'Την Κυριακή.');
+    // UPDATED (18/10, ADR «18 Οκτωβρίου», 3 — John): «Αντίγραψε την κάρτα» / «Κατέβασε την κάρτα»
     ok('A: the step card, then the copy / download', await page.locator('[data-step-card="1"]').count() === 1 &&
-      await page.getByRole('button', { name: 'Αντίγραψε τη ρίζα' }).count() === 1 && await page.getByRole('button', { name: 'Κατέβασε τη ρίζα' }).count() === 1);
+      await page.getByRole('button', { name: 'Αντίγραψε την κάρτα' }).count() === 1 && await page.getByRole('button', { name: 'Κατέβασε την κάρτα' }).count() === 1);
     ok('A: nothing of the step was sent to the model', calls.length === callsBefore);
     await page.screenshot({ path: path.join(OUT, 'stageA-4-card.png'), fullPage: false });
     ok('A: clarity question with 10 buttons', await page.getByText('Τώρα, πόσο ξεκάθαρο είναι ποιο ακριβώς είναι το πρόβλημα, από το 1 έως το 10;').count() === 1 && await page.getByRole('button', { name: '10', exact: true }).count() === 1);
@@ -1282,6 +1283,34 @@ async function runMockTX() {
     await page.waitForTimeout(500);
     const btn = name => page.getByRole('button', { name, exact: true });
 
+    // ── TX0 (ADR «18 Οκτωβρίου», 6–7): the intro, at the top and scrolled to its end — «ΞΕΚΙΝΑ» lies on no line of text; the
+    // emphasised words in gold, the rest bright ──
+    {
+      const ip = await browser.newPage({ viewport: vp, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+      await ip.goto(BASE + '/?stageA=1&rec=1'); await ip.waitForTimeout(600);
+      const over = () => ip.evaluate(() => {
+        const b = [...document.querySelectorAll('.intro-screen button')].find(x => /ξεκίνα/i.test(x.textContent)); if (!b) return null;
+        const br = b.getBoundingClientRect(), hits = [];
+        const w = document.createTreeWalker(document.querySelector('.intro-screen'), NodeFilter.SHOW_TEXT); let n;
+        while ((n = w.nextNode())) { if (b.contains(n) || !n.textContent.trim() || n.parentElement.closest('button')) continue;
+          const r = document.createRange(); r.selectNodeContents(n);
+          for (const q of r.getClientRects()) if (q.bottom > br.top + 0.5 && q.top < br.bottom - 0.5 && q.right > br.left && q.left < br.right) hits.push(n.textContent.trim().slice(0, 30)); }
+        return hits; });
+      const top = await over();
+      await ip.evaluate(() => { const sc = document.querySelector('.intro-screen'); if (sc) sc.scrollTop = sc.scrollHeight; }); await ip.waitForTimeout(300);
+      const end = await over();
+      ok(`TX0 (${tag}): the intro — «ΞΕΚΙΝΑ» lies on no line of text, at the top or scrolled to the end` + (top && top.length ? ' — over: ' + top.join(' | ') : '') + (end && end.length ? ' — over: ' + end.join(' | ') : ''),
+        Array.isArray(top) && Array.isArray(end) && !top.length && !end.length);
+      const col = await ip.evaluate(() => { const c = t => { const e = [...document.querySelectorAll('.intro-screen span, .intro-screen div')].find(x => x.textContent.trim() === t); return e ? getComputedStyle(e).color : null; };
+        return { root: c('άλλη ρίζα'), gain: c('τι κερδίζεις, τι πληρώνεις.'), goal: c('Στόχος είναι να βγεις από το χάος του μυαλού σου.'), plain: c('Στόχος δεν είναι η μασημένη λύση που δίνουν όλοι.') }; });
+      const GOLD = 'rgb(255, 213, 96)', bright = c => { const v = (c || '').match(/\d+/g); return !!v && 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2] >= 200; };
+      ok(`TX0 (${tag}): the emphasised words in gold («άλλη ρίζα», «τι κερδίζεις, τι πληρώνεις.», «Στόχος είναι να βγεις…»), the rest bright`,
+        col.root === GOLD && col.gain === GOLD && col.goal === GOLD && bright(col.plain) && col.plain !== GOLD);
+      await ip.evaluate(() => { const sc = document.querySelector('.intro-screen'); if (sc) sc.scrollTop = 0; }); await ip.waitForTimeout(200);
+      await ip.screenshot({ path: path.join(OUT, 'TX-0-intro' + sfx + '.png'), fullPage: false });
+      await ip.close();
+    }
+
     // ── TX1: the first screen ──
     const ai = await fit(page, W.ai), inv = await fit(page, W.invite);
     const startBtn = await page.getByText('Ξεκίνα με το πρόβλημά σου').boundingBox().catch(() => null);
@@ -1826,7 +1855,8 @@ async function runMockST() {
     const s = await sess('?stageA=1&rec=1', [Q1, END]);
     const knew = await toStep(s);
     await say(s.page, BIG); await tap(s.page, T.fitsNo);
-    ok('ST4 (γ): «Τότε ποιο είναι το πρώτο μικρό κομμάτι του;», the box to write in, no button under it', await has(s.page, T.smallerQ) && await inputOn(s.page) && await btn(s.page, T.stepUnknown).count() === 0);
+    // UPDATED (18/10, ADR «18 Οκτωβρίου», 2 — John): «Δεν ξέρω ακόμα» under it now (ST14 takes it)
+    ok('ST4 (γ): «Τότε ποιο είναι το πρώτο μικρό κομμάτι του;», the box to write in, «Δεν ξέρω ακόμα» under it', await has(s.page, T.smallerQ) && await inputOn(s.page) && await btn(s.page, T.stepUnknown).count() === 1);
     await shot(s.page, 'ST4-smaller');
     await say(s.page, SMALL);
     ok('ST4 (γ): then «Πότε;» — no second size question, no second smaller-piece question', await has(s.page, T.whenQ) && await count(s.page, T.fitsQ) === 1 && await count(s.page, T.smallerQ) === 1);
@@ -2029,6 +2059,44 @@ async function runMockST() {
     ok('ST12: … nor at «Πότε;», and nothing was sent', await has(s.page, T.whenQ) && await btn(s.page, 'Δες την πορεία').count() === 0 && s.calls.length === 1);
     await say(s.page, WHEN);
     ok('ST12: the step goes on to its card as usual', await card(s.page).count() === 1 && s.calls.length === 1);
+    await s.browser.close();
+  }
+  // ── ST13 (ADR «18 Οκτωβρίου», 5): at this phone size, each question of the step, «Δεν ξέρω ακόμα» and the box are seen together, without
+  // scrolling — after «Ναι» the root at the start of the message too (6/10). ST14 (2): «Δεν ξέρω ακόμα» under the smaller piece. ──
+  {
+    const seen = (page, q, withRoot) => page.evaluate(([qt, rt]) => {
+      const at = t => { const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n, hit = null;
+        while ((n = w.nextNode())) { const i = n.textContent.lastIndexOf(t); if (i >= 0) hit = { n, i }; }
+        if (!hit) return null; const r = document.createRange(); r.setStart(hit.n, hit.i); r.setEnd(hit.n, hit.i + t.length); return r.getBoundingClientRect(); };
+      // seen = inside the messages AND above the input area's top edge (it sits a little over the messages), and nothing lies on the button
+      const f = document.querySelector('.feed'), fr = f && f.getBoundingClientRect(), ia = document.querySelector('.input-area');
+      const bottom = fr ? Math.min(fr.bottom, ia ? ia.getBoundingClientRect().top : fr.bottom) : 0;
+      const ta = document.querySelector('textarea.textarea'), tr = ta && ta.getBoundingClientRect();
+      const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === 'Δεν ξέρω ακόμα'), br = b && b.getBoundingClientRect();
+      const inFeed = r => !!r && !!fr && r.height > 0 && r.top >= fr.top - 1 && r.bottom <= bottom + 1;
+      const onTop = !!br && [br.top + 2, br.top + br.height / 2, br.bottom - 2].every(y => { const e = document.elementFromPoint(br.left + br.width / 2, y); return !!e && (e === b || b.contains(e)); });
+      const q2 = at(qt), root = rt ? at(rt) : null;
+      return { q: inFeed(q2), btn: inFeed(br) && onTop, box: !!tr && tr.top >= 0 && tr.bottom <= window.innerHeight, root: rt ? inFeed(root) : true };
+    }, [q, withRoot ? '«' + ROOT.slice(0, 12) : null]);
+    const all4 = v => !!v && v.q && v.btn && v.box && v.root;
+    const s = await sess('?stageA=1&rec=1', [Q1, END]);
+    const knew = await toStep(s); await s.page.waitForTimeout(900);
+    ok(`ST13 (${VP ? VP.width + '×' + VP.height : '390×844'}): after «Ναι» — the root, the step question, «Δεν ξέρω ακόμα» and the box on one screen, no scrolling`, all4(await seen(s.page, T.stepQ, true)));
+    await shot(s.page, 'ST13-step');
+    await say(s.page, BIG); await tap(s.page, T.fitsNo); await s.page.waitForTimeout(700);
+    ok(`ST13 (${VP ? VP.width + '×' + VP.height : '390×844'}): «${T.smallerQ}», «Δεν ξέρω ακόμα» and the box on one screen`, all4(await seen(s.page, T.smallerQ, false)));
+    await shot(s.page, 'ST13-smaller');
+    await tap(s.page, T.stepUnknown); await s.page.waitForTimeout(700);
+    ok('ST14 (2): «Δεν ξέρω ακόμα» under the smaller piece → «Πότε;», nothing typed, no request', await has(s.page, T.whenQ) && await count(s.page, T.smallerQ) === 1 && s.calls.length === 1);
+    ok(`ST13 (${VP ? VP.width + '×' + VP.height : '390×844'}): «Πότε;», «Δεν ξέρω ακόμα» and the box on one screen`, all4(await seen(s.page, T.whenQ, false)));
+    await shot(s.page, 'ST13-when');
+    await say(s.page, WHEN);
+    const ct = await cardText(s.page);
+    ok('ST14 (2): the card keeps the step as first written', ct === 'Τι ήξερες: «' + knew + '»\nΤι βρήκες: «' + ROOT + '»\nΤι θα κάνεις: «' + BIG + '»\nΠότε: «' + WHEN + '»');
+    const L = await log(s.page);
+    ok('ST14 (2): smaller_piece_written 0 · step_fits_day 0 · step_written 1 · when_written 1 — each once', evs(L, 'smaller_piece_written').length === 1 && evs(L, 'smaller_piece_written')[0].value === 0 &&
+      evs(L, 'step_fits_day').length === 1 && evs(L, 'step_fits_day')[0].value === 0 && evs(L, 'step_written')[0].value === 1 && evs(L, 'when_written')[0].value === 1);
+    ok('ST14: nothing of the step reached a request', ![BIG, WHEN].some(x => reqText(s.calls).includes(x)));
     await s.browser.close();
   }
   ok('ST: every request the app made in this section passed the REAL api guard — no 403, no 413 (' + statuses.length + ' requests)', statuses.length >= 20 && statuses.every(x => x === 200));
@@ -3237,7 +3305,7 @@ async function runStressSession(item, aura, user, budget) {
     applies: { safety: !!p.risk && p.risk !== 'leak', verbatim: !p.closed && !p.short, telemetry: !p.short } };
   // risk: a signal known BEFORE the offer (14, 15) — the offer must not appear. 16 meets its crisis after the offer.
   const acts = { card: 0, yes: 0, correct: 0, back: 0, offerShown: false, want: false, notNow: false, help: null, clarity: null, completed: false, risk: p.offerRisk ? p.risk : null,
-    stepShown: false, stepEnd: null, stepWritten: null, fits: null, smaller: false, whenWritten: null }; // ADR «17 Οκτωβρίου (δ)»: the step
+    stepShown: false, stepEnd: null, stepWritten: null, fits: null, smaller: null, whenWritten: null }; // ADR «17 Οκτωβρίου (δ)»: the step
   let stopped = null, exits = 0, safetyExit = false;
   const humanAt = [];
   const browser = await launch();
@@ -3405,16 +3473,16 @@ async function runStressSession(item, aura, user, budget) {
       let val = null, smark = null;
       if (fixed) { if (st && s.stepPhase in st) { val = st[s.stepPhase]; smark = st.mark || null; fixedIdx++; } }
       else if (s.stepPhase === 'smaller' || pol.onStep === 'write') { const d = await ask(s.stepPhase); if (!d) break; val = d.message; }
-      if ((val === null || val === undefined) && s.stepPhase !== 'smaller') {
-        if (s.stepPhase === 'step') { acts.stepEnd = 'none'; acts.stepWritten = 0; } else { acts.stepEnd = 'card'; acts.whenWritten = 0; }
+      if (val === null || val === undefined) { // «Δεν ξέρω ακόμα» (under the smaller piece too since ADR «18 Οκτωβρίου», 2)
+        if (s.stepPhase === 'step') { acts.stepEnd = 'none'; acts.stepWritten = 0; } else if (s.stepPhase === 'smaller') acts.smaller = 0; else { acts.stepEnd = 'card'; acts.whenWritten = 0; }
         await press(T.stepUnknown); continue;
       }
       if (!val || !String(val).trim()) { sess.notes.push('κενή απάντηση στο βήμα — η συνεδρία σταματά εδώ'); break; }
       app('[' + ({ step: 'βήμα', smaller: 'μικρό κομμάτι', when: 'πότε' })[s.stepPhase] + ' — φαίνεται μόνο στην οθόνη, δεν στέλνεται]');
       await type(String(val).trim());
-      if (smark === 'crisis') { crisisAt = sess.typed.length; acts.stepEnd = 'stopped'; acts.stepWritten = null; acts.fits = null; acts.smaller = false; acts.whenWritten = null; continue; }
+      if (smark === 'crisis') { crisisAt = sess.typed.length; acts.stepEnd = 'stopped'; acts.stepWritten = null; acts.fits = null; acts.smaller = null; acts.whenWritten = null; continue; }
       if (s.stepPhase === 'step') acts.stepWritten = 1;
-      if (s.stepPhase === 'smaller') acts.smaller = true;
+      if (s.stepPhase === 'smaller') acts.smaller = 1;
       if (s.stepPhase === 'when') { acts.whenWritten = 1; acts.stepEnd = 'card'; }
       continue;
     }

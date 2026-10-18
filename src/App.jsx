@@ -1667,9 +1667,9 @@ const STAGE_A_TEXTS = {
   helpSkip: "Συνέχεια",
   clarityQ: "Τώρα, πόσο ξεκάθαρο είναι ποιο ακριβώς είναι το πρόβλημα, από το 1 έως το 10;",
   word: "Πριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.",
-  copy: "Αντίγραψε τη ρίζα",
+  copy: "Αντίγραψε την κάρτα",
   copied: "Αντιγράφηκε",
-  download: "Κατέβασε τη ρίζα",
+  download: "Κατέβασε την κάρτα",
   // ADR «17 Οκτωβρίου (δ)» (John's decision for the test of the 20): the step after «Ναι», John's texts word for word. «Κι αν όχι τώρα…» is endKeep.
   stepFound: "Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή. Τώρα ξέρεις τι γίνεται.",
   stepWhy: "Το πρώτο βήμα είναι το πιο δύσκολο. Γι' αυτό δεν θέλω το τέλειο ούτε το πιο γενναίο. Θέλω το πιο εύκολό σου.",
@@ -2232,6 +2232,10 @@ function stageAStep(state, ev) {
       if (!t) return s;
       return next({ phase: "when", step: t, smallerWritten: 1 });
     }
+    // ADR «18 Οκτωβρίου», 2: «Δεν ξέρω ακόμα» under the smaller-piece question — the step stays as first written, on to «Πότε;».
+    case "smallerUnknown":
+      if (s.phase !== "smaller") return s;
+      return next({ phase: "when", smallerWritten: 0 });
     case "whenText": {
       if (s.phase !== "when") return s;
       const t = typeof e.text === "string" ? e.text.trim() : "";
@@ -2337,7 +2341,7 @@ function stageAFlowTelemetry(prev, next, ev) {
 // path kept it away. The rest ONCE, when the step's questions end (the card, or «Δεν ξέρω ακόμα» at the step): never while they are
 // under way, never at a safety stop, never when the user leaves half way — so a step or a «Πότε» is never counted twice, nor after a
 // crisis. A question that did not appear has NO value, never a 0 standing for an answer that was not given: step_written 1 wrote · 0
-// «Δεν ξέρω ακόμα»; step_fits_day 1 «Ναι» · 0 «Όχι, είναι μεγάλο»; smaller_piece_written 1 (that question has no other way on);
+// «Δεν ξέρω ακόμα»; step_fits_day 1 «Ναι» · 0 «Όχι, είναι μεγάλο»; smaller_piece_written 1 wrote · 0 «Δεν ξέρω ακόμα» (ADR «18 Οκτωβρίου», 2);
 // when_written 1 wrote · 0 «Δεν ξέρω ακόμα». Built from the state's flags — never from the words.
 function stageAStepTelemetry(prev, next, ev) {
   const out = [];
@@ -2348,7 +2352,7 @@ function stageAStepTelemetry(prev, next, ev) {
   } else if (next.phase === "clarity" && (prev.phase === "step" || prev.phase === "when")) {
     out.push({ event: "step_written", fields: { value: next.stepWritten === 1 ? 1 : 0 } });
     if (v(next.fitsDay)) out.push({ event: "step_fits_day", fields: { value: next.fitsDay } });
-    if (next.smallerWritten === 1) out.push({ event: "smaller_piece_written", fields: { value: 1 } });
+    if (v(next.smallerWritten)) out.push({ event: "smaller_piece_written", fields: { value: next.smallerWritten } });
     if (v(next.whenWritten)) out.push({ event: "when_written", fields: { value: next.whenWritten } });
   }
   return out;
@@ -7137,7 +7141,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // caution already established for this app applies even to local, ephemeral browser
         // console output". The road counters stay unconditional precisely because they carry
         // numbers and booleans only, never a word the user or AURA wrote.
-        if (debugMode.current) console.log('[AURA RAW]', rawTextWithTags);
+        if (debugMode.current) console.log('[AURA RAW] length', String(rawTextWithTags || '').length); // ADR «18 Οκτωβρίου», 1: numbers only
         const _traceRoads = t => { const p = parseRoadMap(t); return p ? p.roads.length : 0; };
         // ONE SOURCE OF TRUTH for the label patterns — see structuralLabelsIn. This used to spell
         // the road regex out a second time, and two patterns for one question drift.
@@ -7180,23 +7184,23 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       } catch (e) { /* diagnostics must never affect the session */ }
       try {
         if (window.__auraLastCollision && window.__auraLastCollision.turn === msgCount) {
-          console.log('[AURA outcome] turn', msgCount, '| produced:',
-                      String(rawTextWithTags || '').replace(/\[\[[^\]]*\]\]/g, '').trim().slice(0, 110));
+          console.log('[AURA outcome] turn', msgCount, '| produced length:',
+                      String(rawTextWithTags || '').replace(/\[\[[^\]]*\]\]/g, '').trim().length);
         }
         const viol = detectOutputViolation(String(rawTextWithTags || '').replace(/\[\[[^\]]*\]\]/g, ''), { roadDiscoveryDue: !!userStagnationCtx });
         if (viol) {
-          console.warn('[AURA VIOLATION]', viol, '| turn', msgCount, '|',
-                       String(rawTextWithTags || '').trim().slice(0, 130));
+          console.warn('[AURA VIOLATION]', viol, '| turn', msgCount, '| length',
+                       String(rawTextWithTags || '').trim().length);
         }
         if (viol) violationCounts.current[viol] = (violationCounts.current[viol] || 0) + 1;
         const _clean = String(rawTextWithTags || '').replace(/\[\[[^\]]*\]\]/g, '');
         if (detectsUnsourcedOptionOffer(_clean, msgs.filter(m => m && m.role === "user").map(m => m.content), parseRoadMap)) {
           unsourcedOptionOffers.current += 1;
-          console.warn('[AURA VIOLATION] UNSOURCED_OPTIONS | turn', msgCount, '|', _clean.trim().slice(0, 130));
+          console.warn('[AURA VIOLATION] UNSOURCED_OPTIONS | turn', msgCount, '| length', _clean.trim().length);
         }
         if (detectsClaimAboutUser(_clean)) {
           claimsAboutUser.current += 1;
-          console.warn('[AURA VIOLATION] USER_CLAIM | turn', msgCount, '|', _clean.trim().slice(0, 130));
+          console.warn('[AURA VIOLATION] USER_CLAIM | turn', msgCount, '| length', _clean.trim().length);
         }
         // STAGE A (step 3.0) — violation checks for the free-part rule, only while the switch is open.
         if (stageAActive.current) {
@@ -7210,7 +7214,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         const _threeBeat = parseThreeBeatShift(_clean);
         if (_threeBeat && detectsUnverifiedFoundClaim(_threeBeat.found, msgs.filter(m => m && m.role === "user").map(m => m.content))) {
           unverifiedFoundClaims.current += 1;
-          console.warn('[AURA VIOLATION] UNVERIFIED_FOUND | turn', msgCount, '|', _threeBeat.found.trim().slice(0, 130));
+          console.warn('[AURA VIOLATION] UNVERIFIED_FOUND | turn', msgCount, '| length', _threeBeat.found.trim().length);
         }
         // GATES DUE vs DELIVERED. Judged with the detectors that already exist, on the same
         // tag-stripped text as every other observer here. A gate that was due and does not appear in
@@ -8390,15 +8394,15 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           const _viol = detectOutputViolation(_clean, { roadDiscoveryDue: false });
           if (_viol) {
             violationCounts.current[_viol] = (violationCounts.current[_viol] || 0) + 1;
-            console.warn('[AURA VIOLATION]', _viol, '| First-WHY turn |', _clean.trim().slice(0, 130));
+            console.warn('[AURA VIOLATION]', _viol, '| First-WHY turn | length', _clean.trim().length);
           }
           if (detectsUnsourcedOptionOffer(_clean, initMsgs.filter(m => m && m.role === "user").map(m => m.content), parseRoadMap)) {
             unsourcedOptionOffers.current += 1;
-            console.warn('[AURA VIOLATION] UNSOURCED_OPTIONS | First-WHY turn |', _clean.trim().slice(0, 130));
+            console.warn('[AURA VIOLATION] UNSOURCED_OPTIONS | First-WHY turn | length', _clean.trim().length);
           }
           if (detectsClaimAboutUser(_clean)) {
             claimsAboutUser.current += 1;
-            console.warn('[AURA VIOLATION] USER_CLAIM | First-WHY turn |', _clean.trim().slice(0, 130));
+            console.warn('[AURA VIOLATION] USER_CLAIM | First-WHY turn | length', _clean.trim().length);
           }
         } catch (e) { /* observation must never affect the session */ }
         // AI IDENTITY BACKSTOP on the entry turn too — «Είσαι άνθρωπος;» is a natural FIRST message, and
@@ -8910,6 +8914,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         .textarea{flex:1;background:rgba(10,9,8,0.35) !important;border:1px solid rgba(201,168,76,0.2) !important;border-radius:4px;color:var(--text-primary);font-family:'DM Mono',monospace;font-size:16px;font-weight:400;line-height:1.9;padding:14px;resize:none;outline:none !important;min-height:80px;max-height:160px;box-shadow:none !important;backdrop-filter:blur(4px);}
         .textarea:focus{border:1px solid rgba(201,168,76,0.35) !important;outline:none !important;background:rgba(10,9,8,0.4) !important;}
         .textarea::placeholder{color:#76736e;font-size:15px}
+        .textarea.textarea-step{max-height:88px}
         .textarea:disabled{opacity:.3;cursor:not-allowed}
         .send-btn{background:rgba(10,9,8,0.7);border:1px solid rgba(201,168,76,0.5);color:#ffd560;font-family:'DM Mono',monospace;font-size:16px;padding:12px 18px;cursor:pointer;border-radius:4px;transition:all .2s;flex-shrink:0;margin-bottom:2px;min-width:48px;min-height:44px}
         .send-btn.ready{color:#ffd560;border-color:rgba(201,168,76,0.6);background:rgba(10,9,8,0.7)}
@@ -8918,7 +8923,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         .intro-screen{position:fixed;inset:0;background:#100f0d;z-index:200;display:flex;flex-direction:column;align-items:center;padding:40px 32px 80px;overflow-y:auto;}
         .intro-text{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:300;color:#fffaef;line-height:1.9;max-width:480px;}
         .intro-tagline{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#ffd560;opacity:.7;margin-bottom:32px;}
-        .intro-actions{display:flex;align-items:center;gap:24px;margin-top:40px;position:sticky;bottom:20px;}
+        .intro-actions{display:flex;align-items:center;gap:24px;margin-top:40px;}
         .intro-continue{background:none;border:1px solid #3a3632;color:#fffaef;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;padding:10px 28px;cursor:pointer;border-radius:2px;transition:all .2s;}
         .intro-continue:hover{border-color:#c9a84c;color:#ffd560;}
         .intro-skip{background:none;border:none;color:#8a8380;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;cursor:pointer;transition:color .2s;}
@@ -8944,10 +8949,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             <div className="intro-text" style={{textAlign:"left",maxWidth:"340px"}}>
               <div style={{marginBottom:"16px",color:"#f6f0e6"}}>Πολλές φορές έχεις ένα πρόβλημα, ένα δίλημμα, ή κάτι που δεν μπορείς να εκφράσεις ακριβώς.</div>
               <div style={{marginBottom:"16px"}}>Κάθε ερώτηση της εφαρμογής είναι <span style={{color:"#ffd560"}}>δική σου ερώτηση</span> — μία που δεν έχεις κάνει ακόμα στον εαυτό σου, ή δεν σκέφτηκες να την κάνεις.</div>
-              <div style={{marginBottom:"16px",color:"#f6f0e6"}}>Γιατί πολλές φορές το πρόβλημα έχει <span style={{color:"#fffaef"}}>άλλη ρίζα</span> από αυτό που ζούμε και εκφράζουμε.</div>
-              <div style={{marginBottom:"16px",color:"#f6f0e6"}}>Μετά βλέπεις τις επιλογές σου καθαρά: <span style={{color:"#fffaef"}}>τι κερδίζεις, τι πληρώνεις.</span> Και αποφασίζεις τι κρατάς και τι αφήνεις.</div>
+              <div style={{marginBottom:"16px",color:"#f6f0e6"}}>Γιατί πολλές φορές το πρόβλημα έχει <span style={{color:"#ffd560"}}>άλλη ρίζα</span> από αυτό που ζούμε και εκφράζουμε.</div>
+              <div style={{marginBottom:"16px",color:"#f6f0e6"}}>Μετά βλέπεις τις επιλογές σου καθαρά: <span style={{color:"#ffd560"}}>τι κερδίζεις, τι πληρώνεις.</span> Και αποφασίζεις τι κρατάς και τι αφήνεις.</div>
               <div style={{marginBottom:"6px",color:"#f6f0e6"}}>Στόχος δεν είναι η μασημένη λύση που δίνουν όλοι.</div>
-              <div style={{marginBottom:"18px"}}>Στόχος είναι να βγεις από το χάος του μυαλού σου.</div>
+              <div style={{marginBottom:"18px",color:"#ffd560"}}>Στόχος είναι να βγεις από το χάος του μυαλού σου.</div>
               <div style={{color:"#ffd560",fontFamily:"'Cormorant Garamond',serif",fontSize:"20px",lineHeight:1.35,marginTop:"22px"}}>Εσύ στο τιμόνι,<br/>στα δικά σου προβλήματα.</div>
             </div>
             <div className="intro-actions">
@@ -9463,10 +9468,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                   </div>
                 </div>
               )}
-              {/* ADR «17 Οκτωβρίου (δ)» — the step's buttons, under its questions. No «Δεν ξέρω ακόμα» under the smaller piece. */}
-              {(stageAPhase === "step" || stageAPhase === "when") && (
+              {/* ADR «17 Οκτωβρίου (δ)» — the step's buttons, under its questions; «18 Οκτωβρίου», 2: under the smaller piece too. */}
+              {(stageAPhase === "step" || stageAPhase === "smaller" || stageAPhase === "when") && (
                 <div className="choice-btns">
-                  <button className="choice-btn" style={{opacity:0.75}} onClick={() => handleStageAStepButton(stageAPhase === "step" ? "stepUnknown" : "whenUnknown")}>{STAGE_A_TEXTS.stepUnknown}</button>
+                  <button className="choice-btn" style={{opacity:0.75}} onClick={() => handleStageAStepButton({ step: "stepUnknown", smaller: "smallerUnknown", when: "whenUnknown" }[stageAPhase])}>{STAGE_A_TEXTS.stepUnknown}</button>
                 </div>
               )}
               {stageAPhase === "fits" && (
@@ -9688,9 +9693,12 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             )}
             {/* STAGE A BUTTON — END */}
             <div className="input-row" style={{flexDirection:"column",gap:"4px",alignItems:"stretch"}}>
+              {/* ADR «18 Οκτωβρίου», 5 (John's choice, «Α»): while a question of the step is open the box is ~2 lines, so on a 360×640 phone
+                  the question, «Δεν ξέρω ακόμα» and the box are seen together (after «Ναι», the root too) — measured above the input area,
+                  which sits 2% of the screen over the messages; ~3 lines left the button half covered. The conversation's box is unchanged. */}
               <textarea
                 ref={textareaRef}
-                className="textarea"
+                className={`textarea${stageAActive.current && stageAStepOpen(stageAPhase) ? " textarea-step" : ""}`}
                 maxLength={4000}
                 value={input}
                 onChange={e => setInput(e.target.value)}

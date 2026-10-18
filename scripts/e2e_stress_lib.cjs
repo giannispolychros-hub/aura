@@ -668,7 +668,8 @@ function telemetryIssues(events, acts) {
   [one('step_shown', yes && !a.offerShown ? (a.stepShown ? 1 : 0) : null),
     one('step_written', ended ? (a.stepEnd === 'card' ? 1 : 0) : null),
     one('step_fits_day', ended && (a.fits === 0 || a.fits === 1) ? a.fits : null),
-    one('smaller_piece_written', ended && a.smaller ? 1 : null),
+    // ADR «18 Οκτωβρίου», 2: 1 the smaller piece typed · 0 «Δεν ξέρω ακόμα» under it · none if that question did not appear
+    one('smaller_piece_written', ended && (a.smaller === true || a.smaller === 1) ? 1 : ended && a.smaller === 0 ? 0 : null),
     one('when_written', a.stepEnd === 'card' ? a.whenWritten : null)].forEach(x => { if (x) out.push(x); });
   if (a.risk && all('step_shown').some(r => r.value === 1)) out.push('βήμα σε συνεδρία με σήμα κινδύνου');
   if (idx('step_shown') >= 0 && idx('step_shown') < E.findIndex(r => r && r.ev === 'root_answer' && r.answer === 1)) out.push('βήμα πριν από το «Ναι»');

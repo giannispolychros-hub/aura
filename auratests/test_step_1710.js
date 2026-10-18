@@ -240,8 +240,9 @@ const Y = T('stageAStep', CARD, { type: 'yes', riskKind: 0, step: true });
   const yes = HANDLERS.slice(HANDLERS.indexOf('const handleStageAYes = useCallback('), HANDLERS.indexOf('const handleStageAClarity = useCallback('));
   assert('(α)/(ια): the step\'s question after «Ναι» is a UI-only bubble too (the old end text still goes to `messages` when the step is not asked)',
     yes.includes('addUiBubble(buildRootStepLines(_found).join("\\n"), messages.length, { role: "assistant", stageAEnd: true });') && yes.includes('buildRootEndLines(stageARef.current.found, _riskOffer)'));
-  assert('(β)/(δ): «Δεν ξέρω ακόμα» under the step question and under «Πότε;» — not under the smaller piece (no such button was asked for)',
-    /stageAPhase === "step" \|\| stageAPhase === "when"/.test(UI) && UI.includes('{STAGE_A_TEXTS.stepUnknown}') && !/stageAPhase === "smaller"[^\n]*stepUnknown/.test(UI));
+  // UPDATED (18/10, ADR «18 Οκτωβρίου», 2 — John): «Δεν ξέρω ακόμα» is now under the smaller-piece question too (test_decisions_1810.js).
+  assert('(β)/(δ): «Δεν ξέρω ακόμα» under the step question and under «Πότε;» (and, since 18/10, under the smaller piece)',
+    /stageAPhase === "step" \|\| stageAPhase === "smaller" \|\| stageAPhase === "when"/.test(UI) && UI.includes('{STAGE_A_TEXTS.stepUnknown}'));
   assert('(γ): the two buttons of the size question', UI.includes('{stageAPhase === "fits" && (') && UI.includes('{STAGE_A_TEXTS.fitsYes}') && UI.includes('{STAGE_A_TEXTS.fitsNo}'));
   assert('(ια): nothing of the step is ever handed to storage, the console or a request', !/(localStorage|sessionStorage|indexedDB|document\.cookie|console\.|saveMemory|recordTelemetry|callAura)[^\n]*(\.step\b|\.when\b|uiBubbles|stepCard|buildStepCardText)/.test(CODE));
   assert('(ια): the UI-only bubbles are cleared by «Νέα συνεδρία», with the Stage A state', /stageARef\.current = initialStageAState\(\);[^\n]*\n\s*setUiBubbles\(\[\]\);/.test(CODE));
@@ -279,8 +280,9 @@ const Y = T('stageAStep', CARD, { type: 'yes', riskKind: 0, step: true });
   const inv = INVF ? fs.readFileSync(INVF, 'utf8') : '';
   const a = inv.indexOf('```\n'), b = inv.lastIndexOf('\n```');
   const block = a >= 0 && b > a ? inv.slice(a + 4, b) : '';
+  // UPDATED (18/10, ADR «18 Οκτωβρίου», 4 — John): the "memory" sentence now says what the code does.
   assert('INVITATION (α): the new sentence about the conversation and the «μνήμη», word for word; the old one gone',
-    block.includes('Η εφαρμογή δεν αποθηκεύει τη συζήτηση· χάνεται όταν κλείσεις την καρτέλα. Στο κινητό σου μένουν μόνο οι αριθμοί της δοκιμής. Τη "μνήμη" μην την ανοίξεις: αν την ανοίξεις, κρατά λίγες φράσεις σου στο κινητό σου (ποτέ σε server).') &&
+    block.includes('Η εφαρμογή δεν αποθηκεύει τη συζήτηση· χάνεται όταν κλείσεις την καρτέλα. Στο κινητό σου μένουν μόνο οι αριθμοί της δοκιμής. Τη "μνήμη" μην την ανοίξεις: αν την ανοίξεις, κρατά στο κινητό σου κομμάτια από όσα έγραψες, και μπορεί να τα ξαναστείλει στο μοντέλο σε επόμενη συνεδρία.') &&
     !block.includes('Η ίδια η εφαρμογή δεν κρατά τη συζήτηση.'));
   assert('INVITATION (β): «Η ερώτηση στο τέλος είναι ξεχωριστή και προαιρετική.»; the old line gone',
     block.includes('Κανένα κείμενο της συζήτησης. Η ερώτηση στο τέλος είναι ξεχωριστή και προαιρετική.') && !block.includes('Οι ερωτήσεις στο τέλος είναι ξεχωριστές και προαιρετικές'));
