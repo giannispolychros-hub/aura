@@ -678,6 +678,7 @@ async function runMock() {
   await runMockZ();
   await runMockCX();
   await runMockSN();
+  await runMockAR();
   await runMockMC();
   await runMockMH();
   await runMockPV();
@@ -3120,6 +3121,46 @@ async function runMockSN() {
     ok(`SN normal flow (switch open, no crisis): every request sends exactly what it sent before, the First-WHY note aside (${ho})`, ho === SN_BASELINE.open);
   }
 }
+// ── AR: the «Άρα» clean-up, on the screen (ADR «19 Οκτωβρίου (ζ)», John): only a sentence that starts with the whole word «Άρα» goes;
+// «-άρα» inside a word stays (run 37, session 41 showed «Βαρεμ»); a crisis reply keeps its risk question, and the app's line follows it.
+async function runMockAR() {
+  const L1018 = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
+  const R1 = 'Βαρεμάρα και φόβος μαζί.\n\nΤι φαντάζεσαι για την καινούργια θέση;';
+  const R2 = 'Η λαχτάρα σου είναι εκεί. Άρα το θέμα είναι ο φόβος. Τι σε κρατάει;';
+  const RC = 'Σε ακούω. Αυτή η τρομάρα είναι βαριά. Άρα σκέφτεσαι να κάνεις κακό στον εαυτό σου; Είμαι εδώ.';
+  const run = async (query, pre) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 700 }) });
+    const replies = [R1, R2, RC]; let n = 0;
+    await page.route('**/api/aura', async route => {
+      const text = replies[Math.min(n++, replies.length - 1)];
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    for (const t of pre) await send(page, t);
+    await page.waitForTimeout(500);
+    return { browser, page };
+  };
+  const auraTexts = async page => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+  for (const [query, sw, pre] of [['?stageA=1&rec=1', 'open', ['Θέλω να αλλάξω δουλειά αλλά βαριέμαι και φοβάμαι.']],
+    ['?rec=1', 'closed', ['Θέλω να αλλάξω δουλειά αλλά βαριέμαι και φοβάμαι.', 'Γιατί κάθε μέρα είναι ίδια.']]]) {
+    const s = await run(query, pre);
+    const a1 = (await auraTexts(s.page)).slice(-1)[0] || '';
+    ok(`AR (switch ${sw}): «Βαρεμάρα και φόβος μαζί.» reaches the screen whole — no «Βαρεμ» (run 37, 41)`, a1.includes('Βαρεμάρα και φόβος μαζί.') && !/Βαρεμ\s*\n/.test(a1));
+    await send(s.page, 'Δεν ξέρω, κάθε πρωί το ίδιο.'); await s.page.waitForTimeout(600);
+    const a2 = (await auraTexts(s.page)).slice(-1)[0] || '';
+    ok(`AR (switch ${sw}): «λαχτάρα» stays, the sentence that starts with «Άρα» goes, the question stays`,
+      a2.includes('Η λαχτάρα σου είναι εκεί.') && !a2.includes('Άρα το θέμα') && a2.includes('Τι σε κρατάει;'));
+    await send(s.page, 'Θέλω να πεθάνω.'); await s.page.waitForTimeout(800);
+    const a3 = (await auraTexts(s.page)).slice(-1)[0] || '';
+    ok(`AR (switch ${sw}): a crisis reply with «τρομάρα» and a «Άρα …;» risk question reaches the screen whole, then the 1018 line`,
+      a3.includes(RC) && a3.includes(L1018) && a3.indexOf(L1018) > a3.indexOf('Άρα σκέφτεσαι να κάνεις κακό στον εαυτό σου;'));
+    await s.page.screenshot({ path: path.join(OUT, 'AR-' + sw + '-' + (VP ? VP.width : 390) + '.png'), fullPage: false }).catch(() => {});
+    await s.browser.close();
+  }
+}
 // Recorded on 013a4de (before ADR «19 Οκτωβρίου (δ)»), with the SN scripts above.
 const SN_BASELINE = { closed: '9cc0489d84cd11e3 a4c883a93feb0f09 599d159dd7d6e616 56c94429f4ecc181 1311a6c72dc7db4b 04d947de9e723755',
   open: 'b7117c3a6d998739 319083b10b16b87e 6ebd5644c901c40e 61bf3231070537bc 967978c1d9b0572c' };
@@ -4080,7 +4121,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

@@ -138,6 +138,13 @@ assert('CARD: on the card (phase «card»), right after the root and before the 
   assert('VOICE: John\'s example, as style and not a template — since 19/10 without «Γιατί τώρα;»; the second example unchanged',
     sec.includes('«Θέλω να αδυνατίσω» → «Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;»') && !sec.includes('Γιατί τώρα') &&
     sec.includes('«Καιρό. Αλλά χθες είδα μια φωτογραφία μου.» → «Μια φωτογραφία. Τι είδες σε αυτήν;»') && /not a template/.test(sec));
+  // ADR «19 Οκτωβρίου (ζ)» (John): the model copied «Πέντε χρόνια έτσι» and invented numbers («Πέντε λέξεις», «Πέντε μήνες»). The example now
+  // says the number is the user's, and rule (4) carries John's sentence about numbers, word for word.
+  assert('VOICE (4), 19/10 (ζ): the example shows the number is the user\'s — «όταν ο χρήστης έχει πει "πέντε χρόνια": «Πέντε χρόνια έτσι. Δεν είναι λίγο.»»',
+    sec.includes('(e.g. όταν ο χρήστης έχει πει "πέντε χρόνια": «Πέντε χρόνια έτσι. Δεν είναι λίγο.»)') && sec.split('Πέντε χρόνια έτσι').length === 2);
+  assert('VOICE (4), 19/10 (ζ): «Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης, με τα δικά του λόγια· ποτέ μη μετράς ή υπολογίζεις εσύ.» — in the same rule, once',
+    sec.includes('when they do not, none. Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης, με τα δικά του λόγια· ποτέ μη μετράς ή υπολογίζεις εσύ. It never approves') &&
+    PROMPT.split('ποτέ μη μετράς ή υπολογίζεις εσύ').length === 2 && sec.indexOf('ποτέ μη μετράς') > sec.indexOf('(4) Empathy') && sec.indexOf('ποτέ μη μετράς') < sec.indexOf('(5) No assumption'));
   // ADR «19 Οκτωβρίου (ε)», John's change 2: a new rule in ΦΩΝΗ, word for word, after (5) and before the Stage A method line
   assert('VOICE (6), 19/10: always the singular («εσύ»), never the plural of politeness — John\'s words, in ΦΩΝΗ, once',
     sec.includes(' (6) Μιλάς πάντα στον ενικό ("εσύ"), ποτέ στον πληθυντικό ευγενείας ("εσείς", "Πέστε").') && PROMPT.split('πληθυντικό ευγενείας').length === 2 &&

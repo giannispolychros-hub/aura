@@ -155,7 +155,10 @@ assert('ROBUST: no state, no reply, a non-string → false, never a crash',
 // ADR «19 Οκτωβρίου (ε)» (John, 19/10): the prompt changed on purpose by exactly two voice edits — the first example without «Γιατί τώρα;»,
 // and the singular rule (6). Undo them and the prompt must be a6d7fe7a… byte for byte: nothing else moved.
 const VOICE_1910 = [['«Θέλω να αδυνατίσω» → «Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;»', '«Θέλω να αδυνατίσω» → «Γιατί τώρα; Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;»'],
-  [' (6) Μιλάς πάντα στον ενικό ("εσύ"), ποτέ στον πληθυντικό ευγενείας ("εσείς", "Πέστε").', '']];
+  [' (6) Μιλάς πάντα στον ενικό ("εσύ"), ποτέ στον πληθυντικό ευγενείας ("εσείς", "Πέστε").', ''],
+  // ADR «19 Οκτωβρίου (ζ)» (John): the number in the example is the user's, and the rule about numbers — two more edits, undone the same way
+  ['(e.g. όταν ο χρήστης έχει πει "πέντε χρόνια": «Πέντε χρόνια έτσι. Δεν είναι λίγο.»); when they do not, none. Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης, με τα δικά του λόγια· ποτέ μη μετράς ή υπολογίζεις εσύ.',
+    '(e.g. «Πέντε χρόνια έτσι. Δεν είναι λίγο.»); when they do not, none.']];
 const undoVoice1910 = p => VOICE_1910.reduce((t, [now, before]) => (t.split(now).length === 2 ? t.replace(now, before) : 'MISSING ' + now), String(p || ''));
 assert('UNCHANGED: the prompt (no prompt change by this fix), the parser, the closing decision and its Stage A gate, the leaving door, the marker',
   sha(undoVoice1910(PROMPT)) === 'a6d7fe7ae33515a0' && sha(fullFnSrc('parseThreeBeatShift')) === '7bceea7040494611' && sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' &&
