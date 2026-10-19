@@ -129,9 +129,15 @@ const FIRST_REPLY = '\n[STAGE A, FIRST REPLY — CODE-VERIFIED: in this flow the
       'closingDriftCtx', 'firstReplyFloorCtx', 'safetyPathCtx', 'stageAMarkerCtx'].every(n => new RegExp('\\b' + n + '\\b').test(arr)));
 }
 // ── Unchanged, by John's word: the fixed prompt, the crisis prompt, the detectors, the crisis lines ──────────────────────
+// ADR «19 Οκτωβρίου (ε)» (John, 19/10): the prompt changed on purpose by exactly two voice edits — the first example without «Γιατί τώρα;»,
+// and the singular rule (6). Undo them and the prompt must be a6d7fe7a… byte for byte: nothing else moved.
+const VOICE_1910 = [['«Θέλω να αδυνατίσω» → «Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;»', '«Θέλω να αδυνατίσω» → «Γιατί τώρα; Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;»'],
+  [' (6) Μιλάς πάντα στον ενικό ("εσύ"), ποτέ στον πληθυντικό ευγενείας ("εσείς", "Πέστε").', '']];
+const undoVoice1910 = p => VOICE_1910.reduce((t, [now, before]) => (t.split(now).length === 2 ? t.replace(now, before) : 'MISSING ' + now), String(p || ''));
 {
   const h = s => crypto.createHash('sha256').update(s || '').digest('hex').slice(0, 16);
-  assert('UNCHANGED: the fixed prompt (as in 013a4de)', h(raw.slice(_s, _e)) === 'a6d7fe7ae33515a0');
+  // UPDATED (19/10, ADR «19 Οκτωβρίου (ε)»): commit A changed no prompt; commit B moved it only by John's two voice edits
+  assert('UNCHANGED: the fixed prompt (as in 013a4de), apart from John\'s two voice edits of 19/10 (ε)', h(undoVoice1910(raw.slice(_s, _e))) === 'a6d7fe7ae33515a0' && h(raw.slice(_s, _e)) !== 'a6d7fe7ae33515a0');
   const sup = (raw.match(/const SYSTEM_SUPPORTIVE = `([\s\S]*?)`;/) || ['', ''])[1];
   assert('UNCHANGED: the crisis prompt (SYSTEM_SUPPORTIVE)', h(sup) === 'c7815b96d83ebae8' && sup.length === 851);
   const PIN = { detectSafetySignal: 'dfaf34c6e1e44e6b', classifyCrisisTier: 'f724a0db0c1a5bf9', buildCrisisLine: 'd359e22dd7cf9a95',

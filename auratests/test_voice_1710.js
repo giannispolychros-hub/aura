@@ -133,8 +133,15 @@ assert('CARD: on the card (phase «card»), right after the root and before the 
   assert('VOICE (5): no assumption the user did not state; on weight, food or the body never a push toward more restriction',
     sec.includes('«τι σε κρατάει πίσω τόσο καιρό»') && /weight, food or the body/.test(sec) && /more restriction/.test(sec));
   assert('VOICE: the app\'s method line is not repeated by the model', sec.includes('«Δεν θα σου δώσω λίστα με αιτίες και λύσεις…»') && /never repeat or paraphrase it/.test(sec));
-  assert('VOICE: John\'s example, as style and not a template',
-    sec.includes('«Θέλω να αδυνατίσω» → «Γιατί τώρα; Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;»') && sec.includes('«Μια φωτογραφία. Τι είδες σε αυτήν;»') && /not a template/.test(sec));
+  // UPDATED (19/10, ADR «19 Οκτωβρίου (ε)», John's change 1): the example's first reply no longer opens with «Γιατί τώρα;» (it taught the
+  // generic «why»); the second example stays as it was.
+  assert('VOICE: John\'s example, as style and not a template — since 19/10 without «Γιατί τώρα;»; the second example unchanged',
+    sec.includes('«Θέλω να αδυνατίσω» → «Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;»') && !sec.includes('Γιατί τώρα') &&
+    sec.includes('«Καιρό. Αλλά χθες είδα μια φωτογραφία μου.» → «Μια φωτογραφία. Τι είδες σε αυτήν;»') && /not a template/.test(sec));
+  // ADR «19 Οκτωβρίου (ε)», John's change 2: a new rule in ΦΩΝΗ, word for word, after (5) and before the Stage A method line
+  assert('VOICE (6), 19/10: always the singular («εσύ»), never the plural of politeness — John\'s words, in ΦΩΝΗ, once',
+    sec.includes(' (6) Μιλάς πάντα στον ενικό ("εσύ"), ποτέ στον πληθυντικό ευγενείας ("εσείς", "Πέστε").') && PROMPT.split('πληθυντικό ευγενείας').length === 2 &&
+    sec.indexOf('(6) Μιλάς') > sec.indexOf('more restriction.') && sec.indexOf('(6) Μιλάς') < sec.indexOf('In Stage A the app itself writes'));
   const SUP = constText('SYSTEM_SUPPORTIVE');
   assert('VOICE: never in the crisis prompt — SYSTEM_SUPPORTIVE is unchanged and is sent without the core prompt',
     sha(SUP) === 'c7815b96d83ebae8' && SUP.length === 851 && !/ΦΩΝΗ ΤΗΣ AURA/.test(SUP) && /currentMode === "SUPPORTIVE"  \? SYSTEM_SUPPORTIVE :/.test(CODE));

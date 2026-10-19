@@ -211,9 +211,12 @@ assert('CLOSING: Part 2 is still told not to repeat the summary',
 // you or want to leave, let them go warmly, with no new question». +637 characters, one cache write. See test_round3_1210.js.
 // CHANGED AGAIN, DELIBERATELY, on 2026-10-17 (51cb2a83305f605b → a6d7fe7ae33515a0). John (ADR «17 Οκτωβρίου»): a new paragraph
 // ΦΩΝΗ ΤΗΣ AURA, right before the closing block. +2093 characters, one cache write. See test_voice_1710.js.
+// CHANGED AGAIN, DELIBERATELY, on 2026-10-19 (a6d7fe7ae33515a0 → 48da19e62b337f55). John (ADR «19 Οκτωβρίου (ε)»): two voice edits in
+// ΦΩΝΗ — the first example without «Γιατί τώρα;», and the rule (6) «Μιλάς πάντα στον ενικό…». +75 characters, one cache write.
+// See test_voice_1710.js (and test_after_crisis_1910.js: undone, the two edits give a6d7fe7a… back).
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 a6d7fe7ae33515a0…)',
-  PROMPT_SHA.slice(0, 16) === 'a6d7fe7ae33515a0');
+assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 48da19e62b337f55…)',
+  PROMPT_SHA.slice(0, 16) === '48da19e62b337f55');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',
