@@ -679,6 +679,7 @@ async function runMock() {
   await runMockCX();
   await runMockSN();
   await runMockAR();
+  await runMockPM();
   await runMockMC();
   await runMockMH();
   await runMockPV();
@@ -3161,6 +3162,47 @@ async function runMockAR() {
     await s.browser.close();
   }
 }
+// ── PM: «Πέστε μου» / «Πείτε μου» at the start of a sentence are SHOWN as «Πες μου» (ADR «19 Οκτωβρίου (θ)», John) — on the screen only:
+// the history sent back to the model keeps what the model wrote; a crisis reply changes in those two words and nothing else.
+async function runMockPM() {
+  const L1018 = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
+  const R1 = 'Πέστε μου τι συμβαίνει στη δουλειά που έχεις τώρα.';
+  const R2 = 'Αν θέλεις, πέστε μου κι άλλο. «Πείτε μου» έγραψες. Τι εννοείς;';
+  const RC = 'Πείτε μου τι γίνεται τώρα. Σκέφτεσαι να βλάψεις τον εαυτό σου;';
+  for (const [query, sw, pre] of [['?stageA=1&rec=1', 'open', ['Θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει, νιώθω κολλημένος.']],
+    ['?rec=1', 'closed', ['Θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει, νιώθω κολλημένος.', 'Γιατί κάθε μέρα είναι ίδια.']]]) {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 700 }) });
+    const replies = [R1, R2, RC], bodies = []; let n = 0;
+    await page.route('**/api/aura', async route => {
+      try { bodies.push(JSON.parse(route.request().postData() || '{}')); } catch (e) { bodies.push({}); }
+      const text = replies[Math.min(n++, replies.length - 1)];
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    for (const t of pre) await send(page, t);
+    await page.waitForTimeout(500);
+    const aura = async () => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+    const a1 = (await aura()).slice(-1)[0] || '';
+    ok(`PM (switch ${sw}): «Πέστε μου …» at the start is shown «Πες μου …», the rest word for word`, a1.endsWith('Πες μου τι συμβαίνει στη δουλειά που έχεις τώρα.') && !a1.includes('Πέστε'));
+    await send(page, 'Πέστε μου εσείς, εγώ δεν ξέρω.'); await page.waitForTimeout(600);
+    const a2 = (await aura()).slice(-1)[0] || '';
+    const users = await page.locator('.turn-user').allInnerTexts();
+    ok(`PM (switch ${sw}): inside a sentence and inside «…» nothing changes; the user's own «Πέστε μου» is shown as typed`,
+      a2 === R2 && users.some(u => u.includes('Πέστε μου εσείς, εγώ δεν ξέρω.')));
+    const hist = (bodies[bodies.length - 1] || {}).messages || [];
+    ok(`PM (switch ${sw}): screen only — the history sent to the model keeps «Πέστε μου» as the model wrote it`,
+      hist.some(m => m.role === 'assistant' && typeof m.content === 'string' && m.content.includes(R1)));
+    await send(page, 'Θέλω να πεθάνω.'); await page.waitForTimeout(800);
+    const a3 = (await aura()).slice(-1)[0] || '';
+    ok(`PM (switch ${sw}): a crisis reply — only «Πείτε μου» → «Πες μου»; the risk question and the 1018 line exactly as they were`,
+      a3.startsWith('Πες μου' + (RC + '\n\n' + L1018).slice('Πείτε μου'.length)) && /^(?:\s*υποστηριξη)?\s*$/i.test(a3.slice(('Πες μου' + (RC + '\n\n' + L1018).slice('Πείτε μου'.length)).length).normalize('NFD').replace(/[\u0300-\u036f]/g, '')));
+    await page.screenshot({ path: path.join(OUT, 'PM-' + sw + '-' + (VP ? VP.width : 390) + '.png'), fullPage: false }).catch(() => {});
+    await browser.close();
+  }
+}
 // Recorded on 013a4de (before ADR «19 Οκτωβρίου (δ)»), with the SN scripts above.
 const SN_BASELINE = { closed: '9cc0489d84cd11e3 a4c883a93feb0f09 599d159dd7d6e616 56c94429f4ecc181 1311a6c72dc7db4b 04d947de9e723755',
   open: 'b7117c3a6d998739 319083b10b16b87e 6ebd5644c901c40e 61bf3231070537bc 967978c1d9b0572c' };
@@ -4121,7 +4163,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

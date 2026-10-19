@@ -2068,6 +2068,15 @@ function replaceBareGoodbye(content) {
   if (!paras.slice(1).every(p => lines.includes(p.trim()))) return content;
   return [BARE_GOODBYE_TEXT, ...paras.slice(1)].join("\n\n");
 }
+// ADR «19 Οκτωβρίου (θ)» (John, before the 20): the model sometimes opens with the plural of politeness — «Πέστε μου …», «Πείτε μου …»
+// (run 37/40, session 41: twice in three runs, in the first reply, always with the singular right after it). At the start of a sentence
+// (start of the text or of a line, or after . ! ; ? … and the Greek ; ·) these two phrases, and only these, are SHOWN as «Πες μου».
+// Never inside a sentence or inside quotation marks, never another word; on the screen only (MessageBubble) — the history sent to the
+// model keeps what the model wrote.
+function singularTellMe(text) {
+  if (typeof text !== "string") return text;
+  return text.replace(/(?<=(?:^|[.!;?…\u037e\u0387\n])[ \t]*)Π(?:έστε|είτε) μου(?![\p{L}\p{N}])/gu, "Πες μου");
+}
 function stripRootDeclaration(text) {
   return dropModelSentences(text, (f, p) => !/[;?]\s*["»”']*\s*$/.test(p) && ROOT_DECLARATION.test(f.replace(/«[^»]*»|"[^"]*"|“[^”]*”/g, " ")));
 }
@@ -6021,6 +6030,7 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
         .trim()
     : (isUser ? msg.content : replaceBareGoodbye(msg.content)));
   if (!roadMap && !displayContent && typeof msg.content === "string" && msg.content.trim()) return null;
+  const shownContent = isUser ? displayContent : singularTellMe(displayContent); // ADR «19 Οκτωβρίου (θ)»: «Πέστε μου» → «Πες μου», screen only
 
   return (
     <div className={`turn ${isUser ? "turn-user" : "turn-aura"}`} data-stage-a-end={msg.stageAEnd ? "1" : undefined}>
@@ -6052,7 +6062,7 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
       {displayContent && (
         <div className={isUser ? "msg-user" : `msg-aura ${isObs ? "obs" : ""} ${isInsight ? "ins" : ""} ${isTermination ? "term" : ""} ${isSafe ? "safe" : ""} ${isSnapshot ? "snapshot-msg" : ""}`}>
           {msg.methodLine && !isUser && <span className="method-line" style={{display:"block",marginBottom:"8px"}}>{STAGE_A_TEXTS.methodLine}</span>}
-          {displayContent.split("\n").map((line, j, arr) => (
+          {shownContent.split("\n").map((line, j, arr) => (
             <span key={j}>
               {isTermination
                 ? line.split(/(\*\*[^*]+\*\*)/g).map((part, k) =>

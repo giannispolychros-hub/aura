@@ -83,8 +83,11 @@ assert('METHOD: never when the first message itself carries a crisis or distress
     HS.includes('{ id: nextMsgId(), role: "assistant", content: "Γιατί έχει σημασία αυτό για σένα τώρα;" },'));
   assert('METHOD: the question card draws no line above the question',
     /\{firstWhyPending && \(\s*<div className="first-why-card">\s*<div className="first-why-q">/.test(CODE));
+  // UPDATED (19/10, ADR «19 Οκτωβρίου (θ)»): the text drawn after the line is now `shownContent` — the same displayContent, passed through
+  // singularTellMe («Πέστε μου» → «Πες μου» at a sentence start, screen only). The method line is still drawn first, from the flag.
   assert('METHOD: the reply bubble draws it as its FIRST line, from the flag (display only)',
-    /\{msg\.methodLine && !isUser && <span className="method-line"[^>]*>\{STAGE_A_TEXTS\.methodLine\}<\/span>\}\s*\{displayContent\.split\("\\n"\)/.test(CODE));
+    /\{msg\.methodLine && !isUser && <span className="method-line"[^>]*>\{STAGE_A_TEXTS\.methodLine\}<\/span>\}\s*\{shownContent\.split\("\\n"\)/.test(CODE) &&
+    /const shownContent = isUser \? displayContent : singularTellMe\(displayContent\);/.test(CODE));
   assert('METHOD: never sent anywhere — the API gets only role and content, and the line is used in no other place (no prompt, no history)',
     CODE.includes('messages: capMessageHistory(messages, systemPrompt).map(m => ({ role: m.role, content: m.content }))') &&
     (CODE.match(/STAGE_A_TEXTS\.methodLine/g) || []).length === 1 && !constText('SYSTEM_SUPPORTIVE').includes('Δεν θα σου δώσω λίστα')); // UPDATED (δ): one place
