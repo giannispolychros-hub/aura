@@ -1405,13 +1405,15 @@ function computeOpeningLensChoice(currentMode, msgCount, lensSwitchesSoFar, last
 // the caller supplies a plain boolean/number snapshot. This ONLY produces prompt-injected text — it
 // changes no lens, no basePrompt, no routing, never repeats Phase 1's mistake of writing state that
 // stands until something else clears it.
-function computeEscalationLevel(prevLevel, stuckSignalFired) {
+function computeEscalationLevel(prevLevel, stuckSignalFired, max) {
   // Movement resumed (none of the three stuck-signals fired this turn) — silent return to
   // Baseline, exactly as the ladder's own AUTO-KILL & Graceful Exit step describes it.
   if (!stuckSignalFired) return 0;
   // Never skip levels (the ladder's own rule) — one step at a time, capped at 4 (AUTO-KILL) so a
   // long stall does not keep counting past the point where Graceful Exit is already due.
-  return Math.min((prevLevel || 0) + 1, 4);
+  // ADR «19 Οκτωβρίου (δ)», 4: with the switch open and before a confirmed root the caller passes 3 — AUTO-KILL («offer Graceful Exit
+  // now») would say goodbye before the root and can send a user away before it.
+  return Math.min((prevLevel || 0) + 1, max === 3 ? 3 : 4);
 }
 function describeEscalationCtx(level) {
   switch (level) {
@@ -1452,6 +1454,25 @@ function computeMasterPriorityStage(safetyMode, msgCount, userSignalsClosing) {
   if (userSignalsClosing) return 'GRACEFUL_EXIT';
   if (msgCount === 1) return 'OPENING';
   return 'PERSPECTIVE_SWAP'; // steps 4-5 fold in here, see SCOPE above
+}
+// ADR «19 Οκτωβρίου (δ)» (John, a safety exception (α)) — which turn the per-turn notes are built for. They read the session's risk
+// latch (riskSignalKind: 1 crisis A, 2 crisis B — set at the very start of handleSubmit, before any branch), not `safetyMode`, a React
+// state that changes only after the call returns: the crisis turn itself got OPENING, «PERSPECTIVE SWAP … none of SAFETY … apply» or
+// «GRACEFUL EXIT … governs now», and crisis B, which never sets safetyMode, never got SAFETY at all. On the safety path (the crisis turn
+// and every turn after the crisis line) the stage is SAFETY and the notes that pull against it are held: escalation and AUTO-KILL,
+// gates, «run the closing now», the root and the post-map closing, the road question. On the crisis turn itself, also the loop and
+// strategy notes (clarity pivot, self-repetition, stagnation, strategy switch, last fired family, coverage, premise inversion, tension)
+// and the first-reply floor — the crisis prompt answers alone. DISTRESS (3) shows no crisis line: not the safety path.
+function perTurnSafety(currentMode, riskKind) {
+  const crisisTurn = currentMode === "SUPPORTIVE";
+  return { crisisTurn, safetyPath: crisisTurn || riskKind === 1 || riskKind === 2 };
+}
+// ADR «19 Οκτωβρίου (δ)», 5 (John): with the switch open the app does not ask First-WHY (ADR «17 Οκτωβρίου (δ)»), but the fixed prompt
+// still says ENTRY — FIRST-WHY PROTOCOL. On the session's first reply only — never on a crisis turn, never with the switch closed — one
+// note says so; the fixed prompt is untouched.
+function describeStageAFirstReplyCtx(active, msgCount, crisisTurn) {
+  if (active !== true || msgCount !== 1 || crisisTurn) return '';
+  return `\n[STAGE A, FIRST REPLY — CODE-VERIFIED: in this flow the app does NOT ask First-WHY, so ENTRY — FIRST-WHY PROTOCOL and First-WHY above do not apply to this reply. Do not ask «Γιατί έχει σημασία αυτό για σένα τώρα;» and no generic «γιατί» question («Γιατί;», «Γιατί τώρα;», «Γιατί σε απασχολεί;»). Your first question stands on something specific from the user's own message.]\n`;
 }
 function describeMasterPriorityStageCtx(stage) {
   switch (stage) {
@@ -4811,7 +4832,7 @@ const INTERNAL_LABEL_HEADS = [
   "MASTER PRIORITY RULE", "STAGE:", "FREE PART", "CODE-VERIFIED", "SESSION COVERAGE", "STRUCTURAL EVIDENCE",
   "MEMORY CONTEXT", "SILENT PROFILE", "SYSTEM CONTEXT REFRESH", "EXPLICIT PAUSE AVAILABLE", "INFORMATION MODE ACTIVE",
   "FIRST REPLY OF THIS SESSION", "FIRST REPLY FLOOR", "ROAD QUESTION", "GATES DUE CHECK", "ESCALATION LEVEL", "AUTO-KILL",
-  "MISFIRE RECOVERY", "The user just confirmed", "The user just answered", "The user has now used", "Deliver Part",
+  "MISFIRE RECOVERY", "The user just confirmed", "The user just answered", "The user has now used", "Deliver Part", "STAGE A, FIRST REPLY",
   "User indicated the observation", "Final compression pass", "Signal:",
 ];
 function stripInternalLabels(raw) {
@@ -6690,6 +6711,9 @@ export default function AURAv2() {
       // clarification reached
       }
       // U1/U3: Build memory context for current category (injected silently, never shown)
+      // ADR «19 Οκτωβρίου (δ)» (John, a safety exception (α)): the notes below read the session's risk latch, set before any branch.
+      const _turnSafety = perTurnSafety(currentMode, riskSignalKind.current);
+      const _crisisTurn = _turnSafety.crisisTurn, _safetyPath = _turnSafety.safetyPath;
       const memCtx = buildMemoryContext(memory, currentDomain);
       if (memCtx) setIllumLevel(prev => Math.min(11, prev + 1));
 
@@ -6756,14 +6780,16 @@ A line missing above means only that one pattern was not matched — the absence
           latchFlips: !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1 &&
             (detectsSpontaneousCoreRecognition(lastUserText) || (coreReadinessAsked.current && detectsAffirmativeShort(lastUserText))),
         })));
-        return describeMasterPriorityStageCtx(stage);
+        // ADR «19 Οκτωβρίου (δ)»: the crisis turn and every turn after the crisis line are SAFETY — `safetyMode` above is the state
+        // of the previous render (it changes only after this call), and crisis B never sets it.
+        return describeMasterPriorityStageCtx(_safetyPath ? 'SAFETY' : stage);
       })();
 
       // LAST FIRED FAMILY ctx — reads lastFiredFamily.current as it stood at the END of the
       // PREVIOUS turn (same deliberate one-turn-behind timing as familiesUsed/coverageReportCtx
       // above): this turn's own update happens later, inside the existing collision-logger
       // try/catch, after this turn's `fired` array exists.
-      const lastFiredFamilyCtx = describeLastFiredFamilyCtx(lastFiredFamily.current.family, lastFiredFamily.current.streak);
+      const lastFiredFamilyCtx = _crisisTurn ? '' : describeLastFiredFamilyCtx(lastFiredFamily.current.family, lastFiredFamily.current.streak);
 
       // ── Explicit Pause injection (#5 fix) ──
       // Max 1 per 5 sessions. Injected as system instruction — AURA decides when to use it naturally.
@@ -6775,6 +6801,7 @@ A line missing above means only that one pattern was not matched — the absence
       // same way the bare-emoji rule did until it was moved into code. Computed here and injected
       // at the moment it matters.
       const closingDriftCtx = (() => {
+        if (_safetyPath) return ''; // ADR «19 Οκτωβρίου (δ)»: never «run the closing sequence NOW» on the safety path
         // ROAD QUESTIONS STAND-DOWN: while a road question is pending this turn, two "ask this"
         // instructions in one prompt is the collision this repo has already paid for once. Scoped
         // strictly to this condition — nothing changes when no road question is pending.
@@ -6793,13 +6820,13 @@ A line missing above means only that one pattern was not matched — the absence
         // Referencing it here threw ReferenceError on every free-text entry. The last user message
         // is the same value and IS in scope, exactly as closingDriftCtx above already reads it.
         ([...msgs].reverse().find(m => m.role === "user") || {}).content || ""
-      )
+      ) && !_crisisTurn
         ? `\n[CODE-VERIFIED: the user placed an opposition marker ("αλλά"/"όμως") with first-person stance on BOTH sides of it. They marked the tension themselves — this is not AURA inferring one. CHECK whether the two sides are genuinely pulling against each other; often they are not, and if not, ignore this entirely and continue normally. If they are, naming it is available now rather than after some other approach has failed: reflect both halves in their own words and ask which one holds more. Both poles must be quoted or near-quoted — supplying the second pole yourself is construction wearing the shape of reflection, which the dispatch entry above forbids by name.]\n`
         : '';
       // Reads familiesUsed as it stood at the END of the previous turn — this turn's own
       // families are accumulated after the reply exists, which is the correct meaning of
       // "already used". Deliberately reads no state from the road-map exit contract.
-      const coverageReportCtx = buildCoverageReport(msgs, familiesUsed.current,
+      const coverageReportCtx = _crisisTurn ? '' : buildCoverageReport(msgs, familiesUsed.current,
         t => { const l = structuralLabelsIn(t); return l.road || l.beat; });
       const explicitPauseCtx = canUseExplicitPause(memory) && currentMode === "ANSWER" &&
         msgs.filter(m => m.role === "user").length >= 3 ?
@@ -6850,7 +6877,8 @@ A line missing above means only that one pattern was not matched — the absence
       // this inline and methodFailureCtx below knew nothing about it, which is how the two came to
       // name the same three families in opposite directions on the same turn.
       const firstReplyFloorActive = (msgCount === 1 && !showDemo);
-      const firstReplyFloorCtx = firstReplyFloorActive
+      const stageAFirstReplyCtx = describeStageAFirstReplyCtx(stageAActive.current, msgCount, _crisisTurn);
+      const firstReplyFloorCtx = firstReplyFloorActive && !_crisisTurn
         ? `\n[FIRST REPLY OF THIS SESSION — code-enforced floor, not a suggestion: Assumption Surfacing, Premise Inversion, Contradiction Detection, and any binary-choice framing ("X, ή Y;") are not available on this specific turn, regardless of how the material seems. Respond only with open, natural material-gathering per OPEN BEFORE PROBE. These mechanisms become available starting the next reply, based on your own evidence-based judgment as already described above — this floor applies only to this one turn.]\n`
         : '';
       // ROAD QUESTIONS — the code decides WHICH ROAD, the model composes the question. Selection is
@@ -6859,6 +6887,7 @@ A line missing above means only that one pattern was not matched — the absence
       // section NAME exactly as the other ctx blocks do — which is why the mechanism needs no prompt
       // text at all and the cached prefix stays byte-identical.
       const roadQuestionCtx = (() => {
+        if (_safetyPath) return ''; // ADR «19 Οκτωβρίου (δ)»: «this reply is that one question and nothing else» never on the safety path
         const st = roadQuestionState.current;
         if (!st) return '';
         // ONE TURN OF SILENCE after the map. CHECK BEFORE ADDING records a real session where AURA
@@ -6903,6 +6932,7 @@ NOTHING SIGNIFICANT IS MISSING is a valid outcome for this road: if their own ma
       // referenced BY SECTION NAME, so this mechanism needs no prompt text at all and the cached
       // prefix stays byte-identical.
       const postMapCloseCtx = deliverOnce((() => {
+        if (_safetyPath) return ''; // ADR «19 Οκτωβρίου (δ)»: no closing sequence on the safety path (no delivery budget is spent)
         const _st = roadQuestionState.current;
         // "Road questions are done" counts an EXHAUSTED run as well as a cleared one. The state
         // is nulled only on completion or exit, so a run that armed and then never engaged —
@@ -6932,6 +6962,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // instructions in one prompt is the collision this repo has already paid for once. Scoped
         // strictly to this condition — nothing changes when no road question is pending.
         if (roadQuestionState.current) return '';
+        if (_safetyPath) return ''; // ADR «19 Οκτωβρίου (δ)»: no gate «takes priority» on the safety path
         if (msgCount < 3) return ''; // too early — matches existing 2-4 exchange timing elsewhere
         // CLOSING SUPPRESSION (forensic trace of the next-question authority map). On the turn the
         // user actually closes, this block was the ONLY code voice in the ctx zone — and what it
@@ -6997,10 +7028,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // post-API block, so this ctx was still emitted on the very turn the user named their step —
       // the wrong reply at exactly the wrong moment. The guard itself is unchanged and predates
       // today; only its timing tightened.
-      const coreReadinessCtx = (coreReadinessConfirmed.current && !concreteStepStated.current)
+      const coreReadinessCtx = (coreReadinessConfirmed.current && !concreteStepStated.current) && !_safetyPath
         ? `\n[The user just confirmed readiness to name the core themselves — proceed now to ROOT RE-FOCUS's Step Two, the voice-first compression/paper invitation, in your own natural wording.]\n`
         : '';
-      const shiftCheckCtx = deliverOnce(shiftCheckConfirmed.current
+      const shiftCheckCtx = deliverOnce(shiftCheckConfirmed.current && !_safetyPath
         ? `\n[The user just confirmed they feel something changed — proceed now to "Πες το με μία φράση: τι σου ξεκαθάρισε σήμερα;" and, once answered, the three-beat structure, per STATE SHIFT RECOGNITION above.]\n`
         : '', shiftCheckCtxDelivered, 2);
       // BUDGET 2, NOT 1 (corrected the same day it was introduced): this ctx was swept into the
@@ -7013,13 +7044,13 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // resets, so a single missed turn lost a code-verified signal for the whole session. Two
       // consecutive emissions widen that window while staying far inside the unbounded behaviour
       // this replaced.
-      const premiseInversionCtx = deliverOnce((binaryOppositionCount.current >= 2)
+      const premiseInversionCtx = deliverOnce((binaryOppositionCount.current >= 2) && !_crisisTurn
         ? `\n[The user has now used binary-opposition phrasing ("ή...ή", "μπρος-πίσω" style) more than once this session — PREMISE INVERSION's own trigger condition is objectively confirmed, not something to re-judge from memory. If the two sides ALSO already have specific, named costs (not just repeated options), VERBATIM COST COLLISION is the more grounded choice — prefer it over PREMISE INVERSION whenever concrete costs are already in hand.]\n`
         : '', premiseInversionCtxDelivered, 2);
-      const friendPerspectiveCtx = deliverOnce(friendPerspectiveConfirmed.current
+      const friendPerspectiveCtx = deliverOnce(friendPerspectiveConfirmed.current && !_safetyPath
         ? `\n[The user just answered "yes" to the friend-perspective question — per CONTENT FIX above, this feeds directly into the Reflection Summary sequence now. Do NOT ask another exploratory question first — a real transcript showed exactly this mistake, continuing to probe after the pivot point had already surfaced.]\n`
         : '', friendPerspectiveCtxDelivered, 1);
-      const clarityPivotCtx = clarityPivotHint.current
+      const clarityPivotCtx = clarityPivotHint.current && !_crisisTurn
         ? `\n[CODE-VERIFIED: this turn matches CLARITY PIVOT's "${clarityPivotHint.current}" case above (detected structurally, not psychologically inferred) — use that specific response, not a generic one.]\n`
         : '';
       if (clarityPivotHint.current) clarityPivotHint.current = null; // one-shot, applies only to this turn
@@ -7036,7 +7067,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // The other families are still named, so the switch instruction stays useful on the exact turn
       // the user is already frustrated. premiseInversionCtx also names PREMISE INVERSION but cannot
       // collide: it needs binaryOppositionCount >= 2 and that counter rises at most once per turn.
-      const methodFailureCtx = methodFailureHint.current
+      const methodFailureCtx = methodFailureHint.current && !_crisisTurn
         ? `\n[CODE-VERIFIED: the user's own words this turn signal the CURRENT APPROACH is not producing movement for them — they are NOT asking for an answer (informationMode's territory, which did not fire here). This is CONVERSATION STRATEGY SWITCH's Level 1 trigger. TREAT AS CANDIDATE SIGNAL, NOT VERDICT: it means the previous interaction mode stopped producing movement, never that AURA failed or that you should apologize or evaluate your own performance. Per LEAP PERMISSION above: simply move, no meta-commentary, do not announce the switch. WHAT IT REQUIRES: do not produce another question from the same family, reworded. Switch to a genuinely different family — per EXPLORATION COVERAGE PRINCIPLE prefer one not yet used this session. ${firstReplyFloorActive
           ? `Families, named here so no recall is needed: VERBATIM COST COLLISION, THIRD TRIGGER's perspective form, EXPRESSIVE VARIATION's counterfactual, the CHALLENGE lens, the PERSPECTIVE lens. THIS IS THE FIRST REPLY OF THE SESSION, so that list is deliberately shorter than usual: the FIRST REPLY FLOOR below rules the remaining families out for this one turn, and they become available again from the next reply on. Nothing is missing by accident.`
           : `Families, named here so no recall is needed: Contradiction Detection, Premise Inversion / Assumption Surfacing, VERBATIM COST COLLISION, THIRD TRIGGER's perspective form, EXPRESSIVE VARIATION's counterfactual, the CHALLENGE lens, the PERSPECTIVE lens.`} WHAT IT IS NOT: not permission to give advice, propose solutions, or supply strategy — that is the exact No-Advice violation this switch exists to prevent. The output is a different QUESTION, not an answer. If enough material already exists, showing the shape of what they gave (PROBLEM STRUCTURE MAP / ROAD DISCOVERY) is also valid. ANTI-THRASHING GUARD still applies: if several switches in a row produced no movement, stop switching and use GENERAL EXIT CRITERIA instead.]\n`
@@ -7047,7 +7078,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // structural, never about the user. Checked against msgs (prior turns) before this turn's reply
       // is generated, so it warns proactively rather than after the fact.
       const selfRepCheck = detectAssistantSelfRepetition(msgs);
-      const selfRepetitionCtx = selfRepCheck.repeated
+      const selfRepetitionCtx = selfRepCheck.repeated && !_crisisTurn
         ? `\n[CODE-VERIFIED: ${selfRepCheck.sameQuestion ? "you have now asked the SAME CLOSING QUESTION in three consecutive replies, word for word" : `your own last 2 replies were structurally similar (${selfRepCheck.sameOpening ? "same opening phrase" : "high word overlap"})`} — this is exactly the kind of "no genuine movement" evidence that should trigger the Strategy Change pillar (see STRATEGY SWITCH TIMING/WHICH FAMILY TO SWITCH TO above), not just a wording tweak. Draw from a region of INTERVENTION SPACE you have not used yet this session.]\n`
         : '';
       // ADR «12 Οκτωβρίου» — NEW MATERIAL, STOP MOMENT, RISK CHECKS: three notes built from what was already said this session.
@@ -7062,7 +7093,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // ROAD QUESTIONS STAND-DOWN (see gatesCtx above): this block tells the model to switch region
       // or show the map — but the map has already been shown, and a short answer to a road question
       // is an answer, not stagnation.
-      const userStagnationCtx = (!roadQuestionState.current && detectUserStagnation(msgs).stagnant)
+      const userStagnationCtx = (!_crisisTurn && !roadQuestionState.current && detectUserStagnation(msgs).stagnant)
         ? `\n[CODE-VERIFIED: the user's own last 2 replies introduced almost no new material AND became markedly shorter than their earlier ones. This is observed from what they actually wrote, not inferred about how they feel. It is direct evidence that the current approach has stopped producing movement FOR THEM — the strongest possible input to STRATEGY PRE-MORTEM GATE's "is this strategy failing here?" check. Do not wait for them to repeat themselves further or to say so explicitly: switch to a genuinely different region of INTERVENTION SPACE now, or if enough material already exists, stop gathering and reflect the shape of what they have already given (PROBLEM STRUCTURE MAP / VERBATIM COST COLLISION). AND IF GENUINELY DISTINCT DIRECTIONS ARE ALREADY IMPLIED BY WHAT THEY HAVE SAID, THIS IS THE MOMENT FOR ROAD DISCOVERY — THE ONE NAMED EXCEPTION's PATH TWO, with all its output tests (distinctness, consequence, level, completeness) and their QUALITY BAILOUT clauses intact. A user who has stopped producing new material is not asking for another question; they have given what they have. Showing them the actual shape of their decision space is the work. If the material genuinely does not support distinct directions, say that plainly instead — that is also a real finding, never a reason to invent one. TWO MOVES THAT BELONG SPECIFICALLY TO THIS MOMENT, available here and nowhere else (founder's framing — the product is not an AI that asks good questions, it is one that works out which question this person's thinking needs now; both of these become possible precisely because the evidence above shows the problem has stopped being understanding of the topic and has become inability to move): (a) ASK WHY IT IS STILL OPEN rather than asking more about the topic — "τι είναι αυτό που σε κάνει να το σκέφτεσαι ακόμα;" targets the stuckness itself, not its content, and it works on any subject because it presupposes nothing about what kind of problem this is. (b) QUESTION THE FRAME, but only where their own material contradicts it — when someone has described a decision at length while everything they actually said points elsewhere, "μήπως δεν προσπαθείς να αποφασίσεις αυτό, αλλά κάτι άλλο;" is legitimate. HARD CONDITION on (b): only when the evidence for the mismatch is in their own words, never as a general-purpose move, and always as a question they can reject outright — if they say no, that is the end of it and the frame stands. Offered as a question, never as an interpretation stated.]\n`
         : '';
       // ESCALATION LEVEL (founder's instruction: build on the existing ladder, not a parallel one).
@@ -7072,8 +7103,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // none of the three fire, the level silently returns to Baseline (0) — matching the ladder's
       // own "AUTO-KILL & Graceful Exit ... silent return to Baseline" description exactly.
       const stuckSignalFired = !!(clarityPivotCtx || selfRepetitionCtx || userStagnationCtx);
-      escalationLevel.current = computeEscalationLevel(escalationLevel.current, stuckSignalFired);
-      const escalationCtx = describeEscalationCtx(escalationLevel.current);
+      // ADR «19 Οκτωβρίου (δ)»: with the switch open and before a confirmed root, never AUTO-KILL (the level stops at 3); on the safety
+      // path, no escalation note at all.
+      escalationLevel.current = computeEscalationLevel(escalationLevel.current, stuckSignalFired, stageAActive.current && stageARef.current.stats.rootConfirmed !== 1 ? 3 : 4);
+      const escalationCtx = _safetyPath ? '' : describeEscalationCtx(escalationLevel.current);
       // ATTENTION-ORDER FIX (decision-architecture audit finding): position inside injected context
       // affects how reliably an instruction is followed, and firstReplyFloorCtx — a HARD floor
       // constraint ("do not press on the very first reply") — previously sat 6th of 13, buried
@@ -7087,7 +7120,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         memCtx, profileCtx, materialEvidenceCtx, goalObstacleStakesCtx, masterPriorityStageCtx, lastFiredFamilyCtx, coverageReportCtx, demoCtx, informationModeCtx, explicitPauseCtx,
         coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, repeatedElementsCtx, stopMomentCtx, riskClarificationCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, stageAActive.current ? '' : roadQuestionCtx,
         stageAActive.current ? '' : postMapCloseCtx,
-        gatesCtx, closingDriftCtx, firstReplyFloorCtx, safetyPathCtx, stageAMarkerCtx,
+        gatesCtx, closingDriftCtx, stageAFirstReplyCtx, firstReplyFloorCtx, safetyPathCtx, stageAMarkerCtx,
       ].filter(Boolean).join('\n');
       // PROTOCOL COLLISION LOGGER (red-team gap: nothing recorded when two or more families fired on
       // the same turn, or which one won — so arbitration was asserted by the rules and never observed.

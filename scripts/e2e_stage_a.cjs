@@ -13,7 +13,7 @@
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
-// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only MAIN | ST | W | X | Y | Z | … | R4 | TX | VO | AP | CX (μόνο μία ενότητα· MAIN = A–V)
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only MAIN | ST | W | X | Y | Z | … | R4 | TX | VO | AP | CX | SN (μόνο μία ενότητα· MAIN = A–V)
 //   --viewport 390x844 | 360x640 (17/10 (δ): όλος ο έλεγχος σε αυτό το μέγεθος κινητού· οι ενότητες με δικά τους μεγέθη τα κρατούν)
 // ΣΤΡΕΣ ΤΕΣΤ (Μέρος Β, 10/10): --stress (ψεύτικα, κόστος 0) · --stress --real --dry (σχέδιο + εκτίμηση) · --stress --real --yes (ΠΡΑΓΜΑΤΙΚΟ,
 //   όριο --budget έως $25, προεπιλογή $25) · --sessions 14,15,1 (μόνο αυτοί) · --minutes 75 (καμία νέα συνεδρία μετά). Τρέχει και από το
@@ -677,6 +677,7 @@ async function runMock() {
   await runMockY();
   await runMockZ();
   await runMockCX();
+  await runMockSN();
   await runMockMC();
   await runMockMH();
   await runMockPV();
@@ -2982,6 +2983,147 @@ async function runMockCX() {
   }
 }
 
+// ── SN: ADR «19 Οκτωβρίου (δ)» (John, a safety exception (α)): the per-turn notes put safety first. The EXACT text of every request
+// is recorded (the part after the fixed prompt) — not the screen only. (Α) the crisis turn, (Β) the turns after it, (Γ) crisis B,
+// (Δ) crisis with «ευχαριστώ» / «αντίο» / «κλείνουμε», (Ε) crisis after repetitions or stagnation, (ΣΤ) crisis once the escalation is
+// active, (Ζ) crisis when many notes fire together: the SAFETY stage and none of the notes that pull against it. (4) with the switch
+// open and before a confirmed root, no AUTO-KILL — the escalation stops at level 3. (5) with the switch open, the first reply carries
+// the note that the app does not ask First-WHY here. And the flow with no crisis sends exactly what it sent before (SHA-256 of each
+// request's per-turn part, recorded on 013a4de). Phone size (390×844 unless --viewport). Alone: --only SN.
+async function runMockSN() {
+  const T = APP.texts;
+  const crypto = require('crypto');
+  const sha = t => crypto.createHash('sha256').update(String(t), 'utf8').digest('hex').slice(0, 16);
+  const SAFETY = '[MASTER PRIORITY RULE — STAGE: SAFETY (code-verified). Per MASTER PRIORITY RULE step 1 above, all other protocols pause; this is absolute and unconditional.]';
+  const SAFETY_PATH = '[CODE-VERIFIED: the safety path was activated earlier in this session';
+  const FIRST_REPLY = '[STAGE A, FIRST REPLY — CODE-VERIFIED: in this flow the app does NOT ask First-WHY, so ENTRY — FIRST-WHY PROTOCOL and First-WHY above do not apply to this reply. Do not ask «Γιατί έχει σημασία αυτό για σένα τώρα;» and no generic «γιατί» question («Γιατί;», «Γιατί τώρα;», «Γιατί σε απασχολεί;»). Your first question stands on something specific from the user\'s own message.]';
+  // never on the safety path (the crisis turn and every turn after the crisis line)
+  const HELD = [['GRACEFUL EXIT stage', '[MASTER PRIORITY RULE — STAGE: GRACEFUL EXIT'], ['OPENING stage', '[MASTER PRIORITY RULE — STAGE: OPENING'],
+    ['PERSPECTIVE SWAP stage', '[MASTER PRIORITY RULE — STAGE: PERSPECTIVE SWAP'], ['escalation', '[ESCALATION LEVEL'], ['AUTO-KILL', '[AUTO-KILL'],
+    ['gates', '[GATES DUE CHECK'], ['closing drift', 'the user gave a closing signal'], ['root readiness', 'proceed now to ROOT RE-FOCUS'],
+    ['shift check', 'proceed now to "Πες το με μία φράση'], ['friend perspective', 'friend-perspective question'], ['road question', '[ROAD QUESTION'],
+    ['post-map close', 'map has already been delivered in this session']];
+  // never on the crisis turn itself
+  const CRISIS_ONLY = [['clarity pivot', 'matches CLARITY PIVOT'], ['self-repetition', 'your own last 2 replies were structurally similar'],
+    ['same question ×3', 'SAME CLOSING QUESTION'], ['stagnation', 'the user\'s own last 2 replies introduced almost no new material'],
+    ['strategy switch', 'CONVERSATION STRATEGY SWITCH\'s Level 1 trigger'], ['last fired family', 'has been the highest-attention signal'],
+    ['coverage', '[SESSION COVERAGE'], ['premise inversion', 'binary-opposition phrasing'], ['tension', 'placed an opposition marker'],
+    ['first-reply floor', '[FIRST REPLY OF THIS SESSION'], ['first reply, Stage A', '[STAGE A, FIRST REPLY']];
+  const found = (d, list) => list.filter(([, m]) => d.includes(m)).map(([n]) => n);
+  const REPLY = 'Τι σε δυσκολεύει πιο πολύ σε αυτό;';
+  const F1 = 'Δεν ξέρω αν πρέπει να αλλάξω δουλειά, κάθε μέρα είναι ίδια.', WHY = 'Γιατί κουράστηκα.';
+  const LOOP = ['Ο προϊστάμενός μου με φορτώνει με όλη τη δουλειά και δεν λέω τίποτα.', 'Με φορτώνει με όλη τη δουλειά και δεν λέω τίποτα.',
+    'Ε, με φορτώνει με όλη τη δουλειά, δεν λέω τίποτα.', 'δεν ξέρω', 'Τέλος πάντων, το σπίτι είναι χάλια κι αυτό.'];
+  // a session: every message typed, every request recorded with its kind and per-turn part
+  const run = async (query, msgs) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true });
+    const bodies = [];
+    await page.route('**/api/aura', async route => {
+      let b = {}; try { b = JSON.parse(route.request().postData() || '{}'); } catch (e) {}
+      bodies.push(b);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: REPLY }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    const turns = [];
+    for (const m of msgs) {
+      const before = bodies.length;
+      if (await page.locator('textarea.textarea').count()) await send(page, m);
+      await page.waitForTimeout(500);
+      turns.push({ msg: m, reqs: bodies.slice(before).map(b => { const c = LIB.classifyRequest(b, APP); return { kind: c.kind, d: c.dynamic || '' }; }) });
+    }
+    const body = await page.locator('body').innerText();
+    const ui = { ask: body.includes(T.ask) || body.includes(T.askLeaving), card: await page.getByRole('button', { name: T.yes, exact: true }).count() > 0,
+      step: body.includes(T.stepQ), closingCard: await page.getByRole('button', { name: 'Δείξε μου', exact: true }).count() > 0, word: body.includes('Πριν φύγεις — μία λέξη') };
+    await browser.close();
+    return { turns, ui, req: m => (turns.find(t => t.msg === m) || { reqs: [] }).reqs };
+  };
+  const crisisReq = (s, m) => s.req(m).find(r => r.kind === 'supportive') || { kind: 'none', d: '' };
+  const okCrisis = (tag, s, m) => {
+    const r = crisisReq(s, m), held = [...found(r.d, HELD), ...found(r.d, CRISIS_ONLY)];
+    ok(`SN ${tag}: «${m}» — the crisis turn carries the SAFETY stage, word for word`, r.kind === 'supportive' && r.d.includes(SAFETY));
+    ok(`SN ${tag}: … and none of the notes that pull against it` + (held.length ? ' — sent: ' + held.join(', ') : ''), r.kind === 'supportive' && !held.length);
+  };
+  const okAfter = (tag, s, m) => {
+    const rs = s.req(m).filter(r => r.kind === 'main'), held = rs.flatMap(r => found(r.d, HELD));
+    ok(`SN ${tag}: «${m}» after the crisis line — SAFETY stage and the safety-path note, word for word`, rs.length > 0 && rs.every(r => r.d.includes(SAFETY) && r.d.includes(SAFETY_PATH)));
+    ok(`SN ${tag}: … no escalation, AUTO-KILL, GRACEFUL EXIT, gates, closing or root note` + (held.length ? ' — sent: ' + [...new Set(held)].join(', ') : ''), rs.length > 0 && !held.length);
+  };
+  const okUi = (tag, s) => ok(`SN ${tag}: on the safety path the app shows no root question, no card, no step, no closing card, no word question`,
+    !s.ui.ask && !s.ui.card && !s.ui.step && !s.ui.closingCard && !s.ui.word);
+
+  // (Α) the crisis turn — as the first message, mid-session, and with the switch closed
+  { const s = await run('?stageA=1&rec=1', ['Θέλω να πεθάνω.']); okCrisis('Α (switch open, first message)', s, 'Θέλω να πεθάνω.'); okUi('Α (first message)', s); }
+  { const s = await run('?stageA=1&rec=1', [F1, 'Θέλω να πεθάνω.']); okCrisis('Α (switch open, mid-session)', s, 'Θέλω να πεθάνω.'); okUi('Α (mid-session)', s); }
+  { const s = await run('?rec=1', [F1, WHY, 'Θέλω να πεθάνω.']); okCrisis('Α (switch closed)', s, 'Θέλω να πεθάνω.'); okUi('Α (switch closed)', s); }
+  // (Β) the turns after crisis A
+  { const s = await run('?stageA=1&rec=1', [F1, 'Θέλω να πεθάνω.', 'δεν ξέρω', 'Η δουλειά με κουράζει.']);
+    okAfter('Β (switch open)', s, 'δεν ξέρω'); okAfter('Β (switch open)', s, 'Η δουλειά με κουράζει.'); okUi('Β', s); }
+  // (Γ) crisis B — the turn and the turns after, which never had SAFETY
+  { const s = await run('?stageA=1&rec=1', [F1, 'Δεν αντέχω άλλο.', 'εντάξει', 'δεν ξέρω']);
+    okCrisis('Γ (crisis B)', s, 'Δεν αντέχω άλλο.'); okAfter('Γ (crisis B)', s, 'εντάξει'); okAfter('Γ (crisis B)', s, 'δεν ξέρω'); okUi('Γ', s); }
+  { const s = await run('?rec=1', [F1, WHY, 'Δεν αντέχω άλλο.', 'Η δουλειά με κουράζει.']);
+    okCrisis('Γ (crisis B, switch closed)', s, 'Δεν αντέχω άλλο.'); okAfter('Γ (crisis B, switch closed)', s, 'Η δουλειά με κουράζει.'); }
+  // (Δ) crisis together with a goodbye
+  for (const m of ['Θέλω να πεθάνω, ευχαριστώ.', 'Δεν θέλω να ζω άλλο, αντίο.', 'Δεν αντέχω άλλο, κλείνουμε εδώ.']) {
+    const s = await run('?stageA=1&rec=1', [F1, m, 'Εντάξει.']);
+    okCrisis('Δ (with a goodbye)', s, m); okAfter('Δ (with a goodbye)', s, 'Εντάξει.'); okUi('Δ «' + m.slice(0, 18) + '…»', s);
+  }
+  { const s = await run('?rec=1', [F1, WHY, 'Δεν αντέχω άλλο, κλείνουμε εδώ.', 'Εντάξει.']);
+    okCrisis('Δ (switch closed)', s, 'Δεν αντέχω άλλο, κλείνουμε εδώ.'); okAfter('Δ (switch closed)', s, 'Εντάξει.'); }
+  // (Ε) crisis after repetitions and stagnation
+  { const s = await run('?stageA=1&rec=1', [...LOOP.slice(0, 4), 'Θέλω να πεθάνω.']);
+    ok('SN Ε: before the crisis, the loop notes were really firing (self-repetition / escalation)', s.req(LOOP[3]).some(r => found(r.d, [...HELD, ...CRISIS_ONLY]).length >= 2));
+    okCrisis('Ε (after repetitions)', s, 'Θέλω να πεθάνω.'); okUi('Ε', s); }
+  // (ΣΤ) crisis once the escalation is active
+  { const s = await run('?stageA=1&rec=1', [...LOOP, 'Δεν θέλω να ζω άλλο, ευχαριστώ.', 'εντάξει', 'δεν ξέρω τι να πω']);
+    ok('SN ΣΤ: before the crisis, the escalation was active (level 2 or more)', s.req(LOOP[4]).some(r => /\[ESCALATION LEVEL [23]/.test(r.d)));
+    okCrisis('ΣΤ (escalation active)', s, 'Δεν θέλω να ζω άλλο, ευχαριστώ.'); okAfter('ΣΤ (escalation active)', s, 'εντάξει'); okAfter('ΣΤ (escalation active)', s, 'δεν ξέρω τι να πω'); okUi('ΣΤ', s); }
+  // (Ζ) crisis when many notes fire together — switch open and closed
+  for (const q of ['?stageA=1&rec=1', '?rec=1']) {
+    const pre = q === '?rec=1' ? [F1, WHY] : [];
+    const s = await run(q, [...pre, 'Ή θα μείνω ή θα φύγω από τη δουλειά.', 'Ή θα μείνω ή θα φύγω, δεν ξέρω.', ...LOOP.slice(0, 4),
+      'Θέλω να φύγω αλλά φοβάμαι, γυρίζουμε γύρω γύρω, θέλω να πεθάνω, ευχαριστώ.', 'εντάξει']);
+    const sw = q === '?rec=1' ? 'closed' : 'open';
+    ok(`SN Ζ (switch ${sw}): before the crisis, three or more of these notes were firing together`, s.req(LOOP[3]).some(r => found(r.d, [...HELD, ...CRISIS_ONLY]).length >= 3));
+    okCrisis(`Ζ (switch ${sw}, many notes)`, s, 'Θέλω να φύγω αλλά φοβάμαι, γυρίζουμε γύρω γύρω, θέλω να πεθάνω, ευχαριστώ.');
+    okAfter(`Ζ (switch ${sw}, many notes)`, s, 'εντάξει');
+  }
+  // (4) switch open, before the root: no AUTO-KILL, the escalation stops at 3 — switch closed: as before
+  { const msgs = [...LOOP, 'δεν ξέρω ακόμα', 'Με φορτώνει, δεν λέω τίποτα.', 'δεν ξέρω'];
+    const o = await run('?stageA=1&rec=1', msgs), c = await run('?rec=1', [F1, WHY, ...msgs]);
+    const lv = s => s.turns.flatMap(t => t.reqs).map(r => (r.d.match(/\[ESCALATION LEVEL ([1-3])/) || [])[1] || (r.d.includes('[AUTO-KILL') ? 'K' : '0')).join('');
+    ok(`SN 4 (switch open, before the root): the escalation climbs to 3 and stays there — never AUTO-KILL (levels: ${lv(o)})`, /3/.test(lv(o)) && !/K/.test(lv(o)));
+    ok(`SN 4 (switch closed): unchanged — AUTO-KILL still comes after level 3 (levels: ${lv(c)})`, /3K/.test(lv(c)));
+  }
+  // (5) switch open: the first reply carries the First-WHY note, once; never with the switch closed; never on a crisis turn
+  { const o = await run('?stageA=1&rec=1', [F1, LOOP[0]]), c = await run('?rec=1', [F1, WHY, LOOP[0]]);
+    const first = o.req(F1)[0] || { d: '' };
+    ok('SN 5 (switch open): the first reply\'s request carries the note, word for word, once', first.kind === 'main' && first.d.split(FIRST_REPLY).length === 2);
+    ok('SN 5: … and only the first: not the second request', !(o.req(LOOP[0])[0] || { d: FIRST_REPLY }).d.includes('[STAGE A, FIRST REPLY'));
+    ok('SN 5 (switch closed): never sent — the normal flow keeps its First-WHY', c.turns.flatMap(t => t.reqs).every(r => !r.d.includes('[STAGE A, FIRST REPLY')));
+    // a first message that needs no First-WHY: the normal flow sends it to the model at once (OPENING) — still no Stage A note there
+    const F2 = 'Είμαι τρία χρόνια με τον Νίκο και τελευταία νιώθω ότι μιλάμε μόνο για τα πρακτικά.';
+    const c2 = await run('?rec=1', [F2]), r2 = c2.req(F2)[0] || { d: FIRST_REPLY };
+    ok('SN 5 (switch closed, no First-WHY): the first message goes straight to the model, OPENING — and without the Stage A note',
+      r2.kind === 'main' && r2.d.includes('STAGE: OPENING') && !r2.d.includes('[STAGE A, FIRST REPLY'));
+  }
+  // The flow with no crisis: the same per-turn part, request by request, as 013a4de sent (SHA-256, first 16 hex). With the switch open,
+  // the first request is compared without the new First-WHY note (5), the only intended difference on that path.
+  { const NF = [F1, ...LOOP.slice(0, 3), 'Ή θα μείνω ή θα φύγω.', 'Θέλω να φύγω αλλά φοβάμαι να φύγω.'];
+    const c = await run('?rec=1', [F1, WHY, ...NF.slice(1)]), o = await run('?stageA=1&rec=1', NF.slice(0, 5));
+    const hc = c.turns.flatMap(t => t.reqs).map(r => sha(r.d)).join(' ');
+    const ho = o.turns.flatMap(t => t.reqs).map((r, i) => sha(i === 0 ? r.d.replace('\n' + '\n' + FIRST_REPLY + '\n', '') : r.d)).join(' ');
+    ok(`SN normal flow (switch closed, no crisis): every request sends exactly what it sent before (${hc})`, hc === SN_BASELINE.closed);
+    ok(`SN normal flow (switch open, no crisis): every request sends exactly what it sent before, the First-WHY note aside (${ho})`, ho === SN_BASELINE.open);
+  }
+}
+// Recorded on 013a4de (before ADR «19 Οκτωβρίου (δ)»), with the SN scripts above.
+const SN_BASELINE = { closed: '9cc0489d84cd11e3 a4c883a93feb0f09 599d159dd7d6e616 56c94429f4ecc181 1311a6c72dc7db4b 04d947de9e723755',
+  open: 'b7117c3a6d998739 319083b10b16b87e 6ebd5644c901c40e 61bf3231070537bc 967978c1d9b0572c' };
+
 // ── MC: the MODEL's own closing summary before the root (ADR «11 Οκτωβρίου (β)», found by the stress test with the real model,
 // run 10, sessions 2.1 and 4.1). Switch open: the summary is not shown, door 1's question is; the card it opens is door 5 in
 // the log; the model never sees its summary again. Switch closed, and a safety turn: as today. Phone size.
@@ -3893,7 +4035,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

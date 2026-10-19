@@ -269,7 +269,7 @@ assert('The extracted block is the real one — it still contains all three gate
 // has to supply every ref the real code reads, exactly as it already supplies the four gate flags —
 // without it the evaluated template throws ReferenceError and this whole suite silently produces no
 // output at all, which is how it first showed up: not as a failure, as an absent count.
-function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = false, anchors = false, stakes = false, roadPending = false, sharedSnapshot = null, stageA = false }) {
+function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = false, anchors = false, stakes = false, roadPending = false, sharedSnapshot = null, stageA = false, safetyPath = false }) {
   const msgs = [
     { role: 'user',      content: 'Έχω ένα δίλημμα με τη δουλειά μου και δεν ξεκαθαρίζει.' },
     { role: 'assistant', content: 'Τι σε κρατάει εκεί;' },
@@ -292,6 +292,9 @@ function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = 
   // Stage A switch (SPEC_FREE_END §3.1, step 3.0) joined the refs this block reads on 2026-10-06 —
   // same lesson as roadPending and gatesDueSnapshot above.
   const stageAActive       = { current: stageA };
+  // UPDATED 19/10 (ADR «19 Οκτωβρίου (δ)»): the block reads one more input, `_safetyPath` (the crisis turn and every turn after the
+  // crisis line) — same lesson as roadPending and stageAActive above. Default false: every assertion below runs exactly as before.
+  const _safetyPath        = safetyPath;
   const _text = eval(gatesTemplate);
   gatesTextWhen.lastSnapshot = gatesDueSnapshot.current;
   return _text;
@@ -324,6 +327,13 @@ assert('SNAPSHOT: the Scale is due exactly when a concrete step was stated and i
   assert('STAGE A: the Scale is not recorded as due with the switch open', gatesTextWhen.lastSnapshot.scale === false);
   assert('STAGE A: and it is not in the reminder, while Anchors still is',
     !/Clarity \+ Ownership Scale/.test(_sa) && /Decision Space Anchors/.test(_sa));
+}
+// ADR «19 Οκτωβρίου (δ)»: on the safety path no gate «takes priority» — nothing injected, nothing recorded as due.
+{
+  const _shared = { current: { anchors: true, stakes: true, scale: true } };
+  const _safe = gatesTextWhen({ ...TWO_DUE, lastUserText: SUBSTANTIVE, safetyPath: true, sharedSnapshot: _shared });
+  assert('SAFETY PATH: the same two-due turn injects no gate after a crisis line', _safe === '' && /Decision Space Anchors/.test(gatesTextWhen({ ...TWO_DUE, lastUserText: SUBSTANTIVE })));
+  assert('SAFETY PATH: … and the snapshot is cleared, so no gate is ever counted ignored', _shared.current.anchors === false && _shared.current.stakes === false && _shared.current.scale === false);
 }
 gatesTextWhen({ ...TWO_DUE, lastUserText: 'Θα το σκεφτώ. Κλείνουμε.' });
 assert('SNAPSHOT: a closing turn records nothing as due, so a withheld gate is never counted ignored',
