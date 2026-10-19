@@ -3300,7 +3300,7 @@ function stressFakeAura() {
 async function runStressSession(item, aura, user, budget) {
   const p = item.persona, pol = SL.policyOf(p), T = APP.texts;
   const sess = { label: item.label, persona: { id: p.id, key: p.key, name: p.name, hiddenRoot: p.hiddenRoot, fixed: !!p.fixed, risk: p.risk || null, short: !!p.short, firstWhyType: !!p.firstWhyType },
-    turns: [], typed: [], notes: [], cost: 0, rootConfirmed: false, root: null, cardAt: null, yesAt: null, clarity: null, violations: [],
+    turns: [], typed: [], notes: [], cost: 0, calls: [], rootConfirmed: false, root: null, cardAt: null, yesAt: null, clarity: null, violations: [],
     checks: { labels: [], closing: [], verbatim: [], safety: [], pressure: [], stacked: [], advice: [], telemetry: [], voice: [] },
     applies: { safety: !!p.risk && p.risk !== 'leak', verbatim: !p.closed && !p.short, telemetry: !p.short } };
   // risk: a signal known BEFORE the offer (14, 15) — the offer must not appear. 16 meets its crisis after the offer.
@@ -3318,6 +3318,9 @@ async function runStressSession(item, aura, user, budget) {
     const cls = LIB.classifyRequest(body, APP);
     if (!budget.canSpend('aura')) { stopped = stopped || 'όριο δαπάνης'; return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"budget"}' }); }
     const r = await aura(body, cls, { risk: 'stress' });
+    // ADR «19 Οκτωβρίου» (John): the HTTP code of every call and the cache it wrote / read — numbers only, for the report
+    const u = (r.data && r.data.usage) || {};
+    sess.calls.push({ kind: cls.kind, status: r.status, cacheWrite: u.cache_creation_input_tokens || 0, cacheRead: u.cache_read_input_tokens || 0 });
     if (r.data && r.data.usage) sess.cost += budget.add(r.data.usage, 'aura');
     return route.fulfill({ status: r.status, contentType: 'application/json', body: JSON.stringify(r.data || {}) });
   });

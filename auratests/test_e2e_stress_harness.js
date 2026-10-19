@@ -120,6 +120,19 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
     ['UNSOURCED_OPTIONS', 'STAGE_A_FREE_ACTION'].every(t => appViol.includes(t)) && /return "ADVICE";/.test(raw) && /return "ROLE";/.test(raw) && raw.includes('"ADVICE_CASCADE"'));
 }
 
+// ── ADR «19 Οκτωβρίου» (John): every AURA call's HTTP code and cache, in the report — numbers only ──
+{
+  const t = S.callTally([{ calls: [{ kind: 'main', status: 200, cacheWrite: 80000, cacheRead: 0 }, { kind: 'main', status: 200, cacheWrite: 0, cacheRead: 80000 }] },
+    { calls: [{ kind: 'supportive', status: 200, cacheWrite: 70000, cacheRead: 0 }, { kind: 'main', status: 403, cacheWrite: 0, cacheRead: 0 }] }, {}]);
+  assert('CALLS: the tally counts calls, HTTP codes, cache writes (and their tokens) and cache reads', t.calls === 4 && t.codes[200] === 3 && t.codes[403] === 1 &&
+    t.cacheWrites === 2 && t.cacheWriteTokens === 150000 && t.cacheReads === 1);
+  const md = S.buildStressReport([{ label: '1', persona: { name: 'x' }, checks: {}, calls: [{ kind: 'main', status: 200, cacheWrite: 80000, cacheRead: 0 }, { kind: 'main', status: 413, cacheWrite: 0, cacheRead: 0 }] }], { mode: 'm', budget: 3, spent: 0.5 });
+  assert('CALLS: the report says it — codes, cache writes, cache reads, the average cost per session', /Κλήσεις AURA: 2 · κωδικοί: 200 ×1, 413 ×1 · εγγραφές cache: 1 \(80000 tokens\) · αναγνώσεις cache: 0 · μέσο κόστος ανά συνεδρία: \$0\.50\./.test(md));
+  const run = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'e2e_stage_a.cjs'), 'utf8');
+  assert('CALLS: the stress session records every AURA call it routes — kind, code, cache — and no text',
+    /sess\.calls\.push\(\{ kind: cls\.kind, status: r\.status, cacheWrite: u\.cache_creation_input_tokens \|\| 0, cacheRead: u\.cache_read_input_tokens \|\| 0 \}\)/.test(run));
+}
+
 // ── Telemetry order ──────────────────────────────────────────────────────────
 {
   const ev = (e, f) => Object.assign({ ev: e, t: 1 }, f || {});

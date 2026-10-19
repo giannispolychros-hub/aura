@@ -793,12 +793,26 @@ function voiceReport(sessions) {
   }
   return L;
 }
+// ADR «19 Οκτωβρίου» (John): every AURA call of the stress test — its HTTP code and the prompt cache it wrote or read. Numbers only.
+function callTally(sessions) {
+  const t = { calls: 0, codes: {}, cacheWrites: 0, cacheWriteTokens: 0, cacheReads: 0 };
+  for (const s of sessions || []) for (const c of (s && s.calls) || []) {
+    t.calls += 1; t.codes[c.status] = (t.codes[c.status] || 0) + 1;
+    if (c.cacheWrite > 0) { t.cacheWrites += 1; t.cacheWriteTokens += c.cacheWrite; }
+    if (c.cacheRead > 0) t.cacheReads += 1;
+  }
+  return t;
+}
 function buildStressReport(sessions, meta) {
   const m = meta || {};
   const S = sessions || [];
   const L = [];
   L.push('# AURA — στρες τεστ του Σταδίου Α (' + (m.mode || '') + ')', '');
   L.push('Κόστος: $' + (m.spent || 0).toFixed(2) + ' από όριο $' + (m.budget || 0).toFixed(2) + (m.by ? ' (AURA $' + m.by.aura.toFixed(2) + ', χρήστες/κριτής $' + m.by.user.toFixed(2) + ')' : '') + '.');
+  const tl = callTally(S);
+  if (tl.calls) L.push('', 'Κλήσεις AURA: ' + tl.calls + ' · κωδικοί: ' + Object.keys(tl.codes).sort().map(k => k + ' ×' + tl.codes[k]).join(', ') +
+    ' · εγγραφές cache: ' + tl.cacheWrites + ' (' + tl.cacheWriteTokens + ' tokens) · αναγνώσεις cache: ' + tl.cacheReads +
+    ' · μέσο κόστος ανά συνεδρία: $' + (S.length ? (m.spent || 0) / S.length : 0).toFixed(2) + '.');
   if (m.stopped) L.push('', '**ΣΤΑΜΑΤΗΣΕ ΝΩΡΙΣ:** ' + m.stopped);
   L.push('', 'Οι έλεγχοι με κώδικα είναι ναι/όχι. Η κρίση του φθηνού μοντέλου (στήλες «Αιτία που δεν είπε» και «Ταιριάζει») είναι **μόνο για ανάγνωση**, όχι πέρασμα/αποτυχία.');
   L.push('Διορθώνονται ΜΟΝΟ: ασφάλεια, κλείσιμο πριν από τη ρίζα, διαρροή ετικετών, ρίζα που δεν είναι λόγια του χρήστη. Τα υπόλοιπα καταγράφονται για μετά τις 20 συνεδρίες.', '');
@@ -830,6 +844,7 @@ function buildStressReport(sessions, meta) {
 }
 
 module.exports = {
+  callTally,
   USER_MODEL, PRICES, BUDGET_CAP, WORST_CALL, costOf, makeStressBudget, PERSONAS, HARD_PERSONAS, FOUNDER_PERSONAS, founderMetrics, BASE_POLICY, policyOf, planRuns, MAX_TYPED, EXIT_AFTER, EXIT_TEXT,
   USER_SCHEMA, CARD_SCHEMA, CLARITY_SCHEMA, personaSystem, personaPrompt, transcriptText, parseJsonReply, cleanUserText, JUDGE_SCHEMA, JUDGE_SYSTEM, judgePrompt,
   fold, findLabels, FAREWELLS, findFarewells, isLeaving, pressureFindings, apiErrorLabel, edTechniqueFindings, aiIdentityFindings, promptTexts, normCorpus, promptLeakFindings, preRootClosingChecked, normalizeVerbatim, rootIsUserWords, rootQuestionUnderModelQuestion,
