@@ -1682,6 +1682,10 @@ const STAGE_A_TEXTS = {
   whenQ: "Πότε;",
   doLabel: "Τι θα κάνεις",
   whenLabel: "Πότε",
+  // ADR «19 Οκτωβρίου (β)» (John, a safety exception (α)): after the crisis line, the reply to a goodbye — word for word, nothing else.
+  // No number shown in the session: the first sentence only.
+  afterCrisis: "Είμαι εδώ όταν χρειαστεί να συνεχίσουμε. Κι αν βαρύνει, οι αριθμοί που σου έδωσα είναι εκεί.",
+  afterCrisisNoNumbers: "Είμαι εδώ όταν χρειαστεί να συνεχίσουμε.",
 };
 // ADR «17 Οκτωβρίου (δ)», (θ): the €6 screen and the one-tap question after it are closed for the test of the 20 — the step comes
 // after «Ναι» instead. Their code and texts stay exactly as they were: true brings them back, and the step is then not asked.
@@ -2065,6 +2069,24 @@ function stageALeavingDoorOpens(st) {
   const u = typeof o.lastUserText === "string" ? o.lastUserText : "";
   return o.active === true && !o.used && !o.rootPhase && !o.armed &&
     !o.rootConfirmed && !o.closingStarted && o.riskKind !== 1 && !o.safetyMode && !detectSafetySignal(u) && (isExplicitClosure(u) || declaresClosing(u));
+}
+// ADR «19 Οκτωβρίου (β)» (John, a safety exception (α); real-model run 32, session 34: after the crisis line, «ευχαριστώ» got «Ευχαριστώ
+// που το μοιράστηκες. Να είσαι καλά.»). Once a crisis line was shown in this session (a SUPPORTIVE reply, or the line of a failed crisis
+// call), a goodbye gets John's phrase, word for word, and nothing else; no number shown → its first sentence. A goodbye is (1) the user's
+// message, by the app's own exit test on the whole message AND on each of its sentences («Νιώθω χάλια. Ευχαριστώ.» is still talking:
+// the safety path as today), or (2) the MODEL's reply when it is only a goodbye — for a goodbye the exit test does not know («ευχαριστώ
+// για όλα»). A safety signal in the message, or the switch closed: null. The detectors themselves are unchanged.
+function stageAAfterCrisisText(st) {
+  const o = st || {};
+  const u = typeof o.lastUserText === "string" ? o.lastUserText.trim() : "";
+  if (o.active !== true || !u || detectSafetySignal(u)) return null;
+  const aura = (Array.isArray(o.messages) ? o.messages : []).filter(m => m && m.role === "assistant" && typeof m.content === "string");
+  if (!o.fallbackLine && !aura.some(m => m.msgMode === "SUPPORTIVE")) return null;
+  const leaving = (isExplicitClosure(u) || declaresClosing(u)) &&
+    u.split(/[.;!?\n…]+/).map(x => x.trim()).filter(Boolean).every(x => isExplicitClosure(x) || declaresClosing(x) || matchesClosingWord(x));
+  const modelBye = typeof o.reply === "string" && replaceBareGoodbye(o.reply).includes(BARE_GOODBYE_TEXT);
+  if (!leaving && !modelBye) return null;
+  return o.fallbackLine || aura.some(m => /(?<!\d)(?:1018|10306|112)(?!\d)/.test(m.content)) ? STAGE_A_TEXTS.afterCrisis : STAGE_A_TEXTS.afterCrisisNoNumbers;
 }
 // ADR «11 Οκτωβρίου (β)» — the MODEL's own closing before the root. Found by the stress test with the real model (run 10,
 // sessions 2.1 and 4.1): after «Νιώθεις ότι κάτι άλλαξε…;» → «Ναι, άλλαξε…», the model wrote the old closing summary
@@ -7446,6 +7468,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         closingStarted: reflectionDelivered.current, riskKind: riskSignalKind.current, safetyMode, supportive: currentMode === "SUPPORTIVE",
       });
       if (_saModelClose) displayText = "";
+      // ADR «19 Οκτωβρίου (β)»: after the crisis line, a bare goodbye from the model (or a goodbye of the user's) → John's phrase instead.
+      const _afterCrisis = stageAAfterCrisisText({ active: stageAActive.current, messages: msgs, lastUserText: lastUserMsg, reply: displayText });
+      if (_afterCrisis) displayText = _afterCrisis;
       // AI IDENTITY BACKSTOP — last step before the reply is written, so no earlier rewrite of displayText
       // can drop it. See buildAiIdentityLine.
       const _aiLine = buildAiIdentityLine(lastUserMsg, displayText);
@@ -8421,6 +8446,13 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       return;
     }
 
+    // ADR «19 Οκτωβρίου (β)» (John, a safety exception (α)): after the crisis line, a goodbye gets the app's fixed phrase, word for word,
+    // and nothing else — no model call, no leaving door, no root question. A message with a safety signal took its path above.
+    const _afterCrisis = stageAAfterCrisisText({ active: stageAActive.current, messages, fallbackLine: crisisFallback, lastUserText: userText });
+    if (_afterCrisis) {
+      setMessages(prev => [...prev, { id: nextMsgId(), role: "user", content: userText }, { id: nextMsgId(), role: "assistant", content: _afterCrisis, msgMode: "STAGE_A" }]);
+      return;
+    }
     // STAGE A — «Πριν φύγεις:» BEFORE the model (ADR «8 Οκτωβρίου»): the FIRST explicit closing before the root no
     // longer goes to the model. Its reply carried the old closing (GRACEFUL EXIT stage + THIRD TRIGGER's friend question)
     // stacked above the door. Same gate and same decision as after a reply; crisis and DISTRESS returned above (safety
@@ -8534,7 +8566,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     } finally {
       submittingRef.current = false; // RT-15: release guard regardless of which path returned
     }
-  }, [input, loading, sessionEnded, messages, mode, generateResponse, awaitingRememberedWord, deliverFinalClosure, memory, currentDomain, stageAStepEvent]);
+  }, [input, loading, sessionEnded, messages, mode, generateResponse, awaitingRememberedWord, deliverFinalClosure, memory, currentDomain, stageAStepEvent, crisisFallback]);
 
   // STAGE A handlers (§1.5, §2.1, §2.1α). Fixed texts only; the model is called only by «back» from door 2's card,
   // so the captured answer gets the reply it would have had — the conversation continues, nothing is lost.

@@ -240,8 +240,12 @@ assert('the pair is still pushed when the message is a real answer — the guard
 // two detectors (`isExplicitClosure(u) || declaresClosing(u)`), here as an EXCLUSION: when the user's own message is an
 // explicit exit, the model's closing summary is left to the old closing (the second exit, ADR «10 Οκτωβρίου», 1). Stage A
 // only (switch closed: never true). Additive, replaces nothing.
-assert('exactly thirteen call sites are wired, matching the current stated scope',
-  (raw.match(/declaresClosing\s*\(/g) || []).length === 14); // 13 call sites + the definition
+// UPDATED AGAIN (2026-10-19, ADR «19 Οκτωβρίου (β)», John's safety exception (α)): a 14th and a 15th call site joined inside
+// stageAAfterCrisisText — the SAME two detectors (`isExplicitClosure(u) || declaresClosing(u)`) on the whole message, and again on
+// each of its sentences, to tell a goodbye after the crisis line from a message that still talks about the difficulty. Stage A
+// only (switch closed: null). Additive, replaces nothing; the detector itself is unchanged (test_after_crisis_1910.js pins it).
+assert('exactly fifteen call sites are wired, matching the current stated scope',
+  (raw.match(/declaresClosing\s*\(/g) || []).length === 16); // 15 call sites + the definition
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);
