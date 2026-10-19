@@ -1,0 +1,676 @@
+{
+  "meta": {
+    "mode": "πραγματικό μοντέλο",
+    "budget": 1.5,
+    "spent": 0.2828532999999999,
+    "by": {
+      "aura": 0.27979199999999993,
+      "user": 0.0030613
+    },
+    "stopped": null
+  },
+  "sessions": [
+    {
+      "label": "40",
+      "persona": {
+        "id": 40,
+        "key": "voice_weight",
+        "name": "Σύντομη (2 γύροι): βάρος",
+        "fixed": false,
+        "risk": null,
+        "short": true,
+        "firstWhyType": false
+      },
+      "turns": [
+        {
+          "who": "user",
+          "text": "Θέλω να αδυνατίσω."
+        },
+        {
+          "who": "aura",
+          "text": "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.\nΓιατί τώρα; Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;"
+        },
+        {
+          "who": "user",
+          "text": "Χθες είδα μια φωτογραφία μου από ένα τραπέζι με φίλους και δεν μου άρεσε. Δεν ξέρω ακριβώς τι με ενόχλησε, απλά το σκέφτομαι από τότε."
+        },
+        {
+          "who": "aura",
+          "text": "Μια φωτογραφία. Τι είδες σε αυτήν;"
+        }
+      ],
+      "typed": [
+        "Θέλω να αδυνατίσω.",
+        "Χθες είδα μια φωτογραφία μου από ένα τραπέζι με φίλους και δεν μου άρεσε. Δεν ξέρω ακριβώς τι με ενόχλησε, απλά το σκέφτομαι από τότε."
+      ],
+      "notes": [],
+      "cost": 0.0557323,
+      "calls": [
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 83642
+        },
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 83642
+        }
+      ],
+      "rootConfirmed": false,
+      "root": null,
+      "cardAt": null,
+      "yesAt": null,
+      "clarity": null,
+      "violations": [],
+      "checks": {
+        "labels": [],
+        "closing": [],
+        "verbatim": [],
+        "safety": [],
+        "pressure": [],
+        "stacked": [],
+        "advice": [],
+        "telemetry": [],
+        "voice": [
+          "ερωτήσεις: 2 — R1: «Γιατί τώρα; Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;»"
+        ]
+      },
+      "applies": {
+        "safety": false,
+        "verbatim": false,
+        "telemetry": false
+      },
+      "otherDetectors": [],
+      "events": [
+        {
+          "ev": "session_started",
+          "t": 1792396510509
+        }
+      ],
+      "voice": [
+        {
+          "n": 1,
+          "text": "Γιατί τώρα; Έγινε κάτι πρόσφατα ή το σκέφτεσαι καιρό;",
+          "method": true,
+          "app": false,
+          "judge": {
+            "n": 1,
+            "grounded": true,
+            "use": "uses",
+            "assumes": false,
+            "assumption": "",
+            "advises": false,
+            "generic": false,
+            "why": "Στέκεται στο «Θέλω να αδυνατίσω» και ρωτά για τον χρόνο, χωρίς να προσθέτει αίτιο που ο χρήστης δεν είπε."
+          }
+        },
+        {
+          "n": 2,
+          "text": "Μια φωτογραφία. Τι είδες σε αυτήν;",
+          "method": false,
+          "app": false,
+          "judge": {
+            "n": 2,
+            "grounded": true,
+            "use": "uses",
+            "assumes": false,
+            "assumption": "",
+            "advises": false,
+            "generic": false,
+            "why": "Παίρνει τη φωτογραφία και το τραπέζι που ανέφερε ο χρήστης και ζητά την εικόνα που είδε, χωρίς να υποθέτει αιτία."
+          }
+        }
+      ],
+      "founder": {
+        "stops": 0,
+        "gentle": 0,
+        "riskChecks": 0,
+        "choice": 0,
+        "bareGoodbye": 0,
+        "rootClaims": 0,
+        "stepTime": 0,
+        "foreignHelp": 0,
+        "stopExamples": [],
+        "choiceExamples": [],
+        "riskExamples": []
+      },
+      "judge": {
+        "introduced_causes": [],
+        "root_match": "none",
+        "root_match_reason": "Δεν υπήρχε κρυφό θέμα ούτε κάρτα στη συνομιλία, οπότε δεν υπάρχει σύγκριση."
+      }
+    },
+    {
+      "label": "41",
+      "persona": {
+        "id": 41,
+        "key": "voice_work",
+        "name": "Σύντομη (2 γύροι): δουλειά",
+        "fixed": false,
+        "risk": null,
+        "short": true,
+        "firstWhyType": true
+      },
+      "turns": [
+        {
+          "who": "user",
+          "text": "Θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει."
+        },
+        {
+          "who": "aura",
+          "text": "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.\nΠέστε μου τι συμβαίνει τώρα στη δουλειά — τι σε έφερε σε αυτή τη σκέψη;"
+        },
+        {
+          "who": "user",
+          "text": "Μου πρότειναν μια θέση σε μικρή εταιρεία. Θα βγάζω λιγότερα λεφτά αλλά η δουλειά φαίνεται πιο ενδιαφέρουσα. Εγώ είμαι έξι χρόνια στην ασφαλιστική και δεν ξέρω τι θέλω πραγματικά."
+        },
+        {
+          "who": "aura",
+          "text": "Έξι χρόνια στην ασφαλιστική — και τώρα μια πρόταση που φέρνει λιγότερα χρήματα αλλά κάτι που φαίνεται πιο ενδιαφέρον.\n\nΤι είναι αυτό που κάνει την τωρινή δουλειά να μην αρκεί πια;"
+        }
+      ],
+      "typed": [
+        "Θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει.",
+        "Μου πρότειναν μια θέση σε μικρή εταιρεία. Θα βγάζω λιγότερα λεφτά αλλά η δουλειά φαίνεται πιο ενδιαφέρουσα. Εγώ είμαι έξι χρόνια στην ασφαλιστική και δεν ξέρω τι θέλω πραγματικά."
+      ],
+      "notes": [],
+      "cost": 0.0580817,
+      "calls": [
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 83642
+        },
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 83642
+        }
+      ],
+      "rootConfirmed": false,
+      "root": null,
+      "cardAt": null,
+      "yesAt": null,
+      "clarity": null,
+      "violations": [],
+      "checks": {
+        "labels": [],
+        "closing": [],
+        "verbatim": [],
+        "safety": [],
+        "pressure": [],
+        "stacked": [],
+        "advice": [],
+        "telemetry": [],
+        "voice": []
+      },
+      "applies": {
+        "safety": false,
+        "verbatim": false,
+        "telemetry": false
+      },
+      "otherDetectors": [],
+      "events": [
+        {
+          "ev": "session_started",
+          "t": 1792396517176
+        }
+      ],
+      "voice": [
+        {
+          "n": 1,
+          "text": "Πέστε μου τι συμβαίνει τώρα στη δουλειά — τι σε έφερε σε αυτή τη σκέψη;",
+          "method": true,
+          "app": false,
+          "judge": {
+            "n": 1,
+            "grounded": false,
+            "use": "none",
+            "assumes": false,
+            "assumption": "",
+            "advises": false,
+            "generic": true,
+            "why": "Η ερώτηση «τι συμβαίνει τώρα στη δουλειά» θα μπορούσε να ειπωθεί σε οποιονδήποτε που αναρωτιέται για τη δουλειά του· δεν πατά σε κάτι συγκεκριμένο που είπε ο χρήστης."
+          }
+        },
+        {
+          "n": 2,
+          "text": "Έξι χρόνια στην ασφαλιστική — και τώρα μια πρόταση που φέρνει λιγότερα χρήματα αλλά κάτι που φαίνεται πιο ενδιαφέρον.\n\nΤι είναι αυτό που κάνει την τωρινή δουλειά να μην αρκεί πια;",
+          "method": false,
+          "app": false,
+          "judge": {
+            "n": 2,
+            "grounded": true,
+            "use": "uses",
+            "assumes": false,
+            "assumption": "",
+            "advises": false,
+            "generic": false,
+            "why": "Πατά στα έξι χρόνια στην ασφαλιστική, στη λιγότερη αμοιβή και στο «πιο ενδιαφέρον» που είπε ο χρήστης, και ρωτά τι ακριβώς δεν αρκεί πια, χωρίς να προσθέτει αιτία που δεν ειπώθηκε."
+          }
+        }
+      ],
+      "founder": {
+        "stops": 0,
+        "gentle": 0,
+        "riskChecks": 0,
+        "choice": 0,
+        "bareGoodbye": 0,
+        "rootClaims": 0,
+        "stepTime": 0,
+        "foreignHelp": 0,
+        "stopExamples": [],
+        "choiceExamples": [],
+        "riskExamples": []
+      },
+      "judge": {
+        "introduced_causes": [
+          {
+            "aura_sentence": "Τι είναι αυτό που κάνει την τωρινή δουλειά να μην αρκεί πια;",
+            "cause": "Η ερώτηση προϋποθέτει ότι η τωρινή δουλειά δεν αρκεί πια, κάτι που ο χρήστης δεν είπε· ο χρήστης ανέφερε μόνο ότι δεν ξέρει τι θέλει και ότι η νέα θέση φαίνεται πιο ενδιαφέρουσα."
+          }
+        ],
+        "root_match": "none",
+        "root_match_reason": "Η συνομιλία δεν έχει κρυφό θέμα ούτε κάρτα, οπότε δεν υπάρχει σύγκριση."
+      }
+    },
+    {
+      "label": "42",
+      "persona": {
+        "id": 42,
+        "key": "voice_relationship",
+        "name": "Σύντομη (2 γύροι): σχέση",
+        "fixed": false,
+        "risk": null,
+        "short": true,
+        "firstWhyType": false
+      },
+      "turns": [
+        {
+          "who": "user",
+          "text": "Είμαι τρία χρόνια με τον Νίκο και τελευταία νιώθω ότι μιλάμε μόνο για τα πρακτικά."
+        },
+        {
+          "who": "aura",
+          "text": "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.\nΤρία χρόνια. Και τώρα η κουβέντα σταμάτησε στα πρακτικά.\n\nΤι σου λείπει πιο πολύ;"
+        },
+        {
+          "who": "user",
+          "text": "Να με ρωτάει πώς είμαι, χωρίς να είναι κάτι για το σπίτι. Δεν ξέρω αν το θέλω από εκείνον ή απλά θέλω να νιώσω ότι με βλέπει ακόμα."
+        },
+        {
+          "who": "aura",
+          "text": "«Να με βλέπει ακόμα.»\n\nΑυτό το «ακόμα» — τι έχει αλλάξει;"
+        }
+      ],
+      "typed": [
+        "Είμαι τρία χρόνια με τον Νίκο και τελευταία νιώθω ότι μιλάμε μόνο για τα πρακτικά.",
+        "Να με ρωτάει πώς είμαι, χωρίς να είναι κάτι για το σπίτι. Δεν ξέρω αν το θέλω από εκείνον ή απλά θέλω να νιώσω ότι με βλέπει ακόμα."
+      ],
+      "notes": [],
+      "cost": 0.05689279999999999,
+      "calls": [
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 83642
+        },
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 83642
+        }
+      ],
+      "rootConfirmed": false,
+      "root": null,
+      "cardAt": null,
+      "yesAt": null,
+      "clarity": null,
+      "violations": [],
+      "checks": {
+        "labels": [],
+        "closing": [],
+        "verbatim": [],
+        "safety": [],
+        "pressure": [],
+        "stacked": [],
+        "advice": [],
+        "telemetry": [],
+        "voice": []
+      },
+      "applies": {
+        "safety": false,
+        "verbatim": false,
+        "telemetry": false
+      },
+      "otherDetectors": [],
+      "events": [
+        {
+          "ev": "session_started",
+          "t": 1792396525626
+        }
+      ],
+      "voice": [
+        {
+          "n": 1,
+          "text": "Τρία χρόνια. Και τώρα η κουβέντα σταμάτησε στα πρακτικά.\n\nΤι σου λείπει πιο πολύ;",
+          "method": true,
+          "app": false,
+          "judge": {
+            "n": 1,
+            "grounded": true,
+            "use": "uses",
+            "assumes": false,
+            "assumption": "",
+            "advises": false,
+            "generic": false,
+            "why": "Παίρνει το «τρία χρόνια» και το «πρακτικά» από τον χρήστη και ρωτά για κάτι που ο χρήστης έχει ήδη ονομάσει (τι λείπει)."
+          }
+        },
+        {
+          "n": 2,
+          "text": "«Να με βλέπει ακόμα.»\n\nΑυτό το «ακόμα» — τι έχει αλλάξει;",
+          "method": false,
+          "app": false,
+          "judge": {
+            "n": 2,
+            "grounded": true,
+            "use": "uses",
+            "assumes": false,
+            "assumption": "",
+            "advises": false,
+            "generic": false,
+            "why": "Χρησιμοποιεί τη λέξη «ακόμα» που είπε ο χρήστης και ρωτά τι άλλαξε, χωρίς να προσθέτει αιτία που δεν ειπώθηκε."
+          }
+        }
+      ],
+      "founder": {
+        "stops": 0,
+        "gentle": 0,
+        "riskChecks": 0,
+        "choice": 0,
+        "bareGoodbye": 0,
+        "rootClaims": 0,
+        "stepTime": 0,
+        "foreignHelp": 0,
+        "stopExamples": [],
+        "choiceExamples": [],
+        "riskExamples": []
+      },
+      "judge": {
+        "introduced_causes": [],
+        "root_match": "none",
+        "root_match_reason": "Δεν υπήρχε κρυφό θέμα ούτε κάρτα να συγκριθεί."
+      }
+    },
+    {
+      "label": "43",
+      "persona": {
+        "id": 43,
+        "key": "voice_children",
+        "name": "Σύντομη (2 γύροι): παιδιά",
+        "fixed": false,
+        "risk": null,
+        "short": true,
+        "firstWhyType": true
+      },
+      "turns": [
+        {
+          "who": "user",
+          "text": "Δεν ξέρω τι να κάνω με τον γιο μου."
+        },
+        {
+          "who": "aura",
+          "text": "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.\nΠες μου τι συμβαίνει."
+        },
+        {
+          "who": "user",
+          "text": "Ο γιος μου είναι 15 και από τον Σεπτέμβριο κλείνεται στο δωμάτιό του. Μου απαντάει μονολεκτικά, αν μου απαντήσει καν. Η κόρη μου είναι 11 και είναι όπως πάντα, οπότε δεν ξέρω αν φταίω εγώ ή αν απλώς έτσι είναι η ηλικία του."
+        },
+        {
+          "who": "aura",
+          "text": "Από τον Σεπτέμβριο — έγινε κάτι τότε που θυμάσαι, ή ήταν σταδιακό;"
+        }
+      ],
+      "typed": [
+        "Δεν ξέρω τι να κάνω με τον γιο μου.",
+        "Ο γιος μου είναι 15 και από τον Σεπτέμβριο κλείνεται στο δωμάτιό του. Μου απαντάει μονολεκτικά, αν μου απαντήσει καν. Η κόρη μου είναι 11 και είναι όπως πάντα, οπότε δεν ξέρω αν φταίω εγώ ή αν απλώς έτσι είναι η ηλικία του."
+      ],
+      "notes": [],
+      "cost": 0.0560677,
+      "calls": [
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 83642
+        },
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 83642
+        }
+      ],
+      "rootConfirmed": false,
+      "root": null,
+      "cardAt": null,
+      "yesAt": null,
+      "clarity": null,
+      "violations": [],
+      "checks": {
+        "labels": [],
+        "closing": [],
+        "verbatim": [],
+        "safety": [],
+        "pressure": [],
+        "stacked": [],
+        "advice": [],
+        "telemetry": [],
+        "voice": []
+      },
+      "applies": {
+        "safety": false,
+        "verbatim": false,
+        "telemetry": false
+      },
+      "otherDetectors": [],
+      "events": [
+        {
+          "ev": "session_started",
+          "t": 1792396535158
+        }
+      ],
+      "voice": [
+        {
+          "n": 1,
+          "text": "Πες μου τι συμβαίνει.",
+          "method": true,
+          "app": false,
+          "judge": {
+            "n": 1,
+            "grounded": false,
+            "use": "none",
+            "assumes": false,
+            "assumption": "",
+            "advises": false,
+            "generic": true,
+            "why": "Η ερώτηση «Πες μου τι συμβαίνει» θα μπορούσε να ειπωθεί σε οποιονδήποτε πρώτο μήνυμα και δεν πατά σε κάτι που είπε ο χρήστης."
+          }
+        },
+        {
+          "n": 2,
+          "text": "Από τον Σεπτέμβριο — έγινε κάτι τότε που θυμάσαι, ή ήταν σταδιακό;",
+          "method": false,
+          "app": false,
+          "judge": {
+            "n": 2,
+            "grounded": true,
+            "use": "uses",
+            "assumes": false,
+            "assumption": "",
+            "advises": false,
+            "generic": false,
+            "why": "Πατά στη φράση «από τον Σεπτέμβριο» που είπε ο χρήστης και ρωτά τι έγινε τότε ή αν ήταν σταδιακό, χωρίς να προσθέτει αιτία."
+          }
+        }
+      ],
+      "founder": {
+        "stops": 0,
+        "gentle": 0,
+        "riskChecks": 0,
+        "choice": 0,
+        "bareGoodbye": 0,
+        "rootClaims": 0,
+        "stepTime": 0,
+        "foreignHelp": 0,
+        "stopExamples": [],
+        "choiceExamples": [],
+        "riskExamples": []
+      },
+      "judge": {
+        "introduced_causes": [],
+        "root_match": "none",
+        "root_match_reason": "Δεν υπήρχε κρυφό θέμα ούτε κάρτα στη συνομιλία, οπότε δεν υπάρχει σύγκριση."
+      }
+    },
+    {
+      "label": "44",
+      "persona": {
+        "id": 44,
+        "key": "voice_money",
+        "name": "Σύντομη (2 γύροι): χρήματα",
+        "fixed": false,
+        "risk": null,
+        "short": true,
+        "firstWhyType": true
+      },
+      "turns": [
+        {
+          "who": "user",
+          "text": "Δεν ξέρω αν πρέπει να πω στη γυναίκα μου για τα λεφτά."
+        },
+        {
+          "who": "aura",
+          "text": "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.\nΤι είδους λεφτά είναι αυτά — κάτι που έγινε ήδη, ή κάτι που σκέφτεσαι να κάνεις;"
+        },
+        {
+          "who": "user",
+          "text": "Κάτι που ήδη συμβαίνει. Ο μισθός μου τελειώνει πριν τις 20 του μήνα εδώ και μήνες, και δεν ξέρω πώς να το πω χωρίς να νιώθω ότι την απογοητεύω."
+        },
+        {
+          "who": "aura",
+          "text": "Πόσους μήνες;"
+        }
+      ],
+      "typed": [
+        "Δεν ξέρω αν πρέπει να πω στη γυναίκα μου για τα λεφτά.",
+        "Κάτι που ήδη συμβαίνει. Ο μισθός μου τελειώνει πριν τις 20 του μήνα εδώ και μήνες, και δεν ξέρω πώς να το πω χωρίς να νιώθω ότι την απογοητεύω."
+      ],
+      "notes": [],
+      "cost": 0.05607879999999999,
+      "calls": [
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 83642
+        },
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 83642
+        }
+      ],
+      "rootConfirmed": false,
+      "root": null,
+      "cardAt": null,
+      "yesAt": null,
+      "clarity": null,
+      "violations": [],
+      "checks": {
+        "labels": [],
+        "closing": [],
+        "verbatim": [],
+        "safety": [],
+        "pressure": [],
+        "stacked": [],
+        "advice": [],
+        "telemetry": [],
+        "voice": []
+      },
+      "applies": {
+        "safety": false,
+        "verbatim": false,
+        "telemetry": false
+      },
+      "otherDetectors": [],
+      "events": [
+        {
+          "ev": "session_started",
+          "t": 1792396542408
+        }
+      ],
+      "voice": [
+        {
+          "n": 1,
+          "text": "Τι είδους λεφτά είναι αυτά — κάτι που έγινε ήδη, ή κάτι που σκέφτεσαι να κάνεις;",
+          "method": true,
+          "app": false,
+          "judge": {
+            "n": 1,
+            "grounded": true,
+            "use": "uses",
+            "assumes": false,
+            "assumption": "",
+            "advises": false,
+            "generic": false,
+            "why": "Στηρίζεται στο «κάτι που έγινε ήδη ή κάτι που σκέφτεσαι», διάκριση που ο χρήστης δεν έχει κάνει ακόμα· δεν έχει αναφορά σε λέξη του, αλλά ζητά να διευκρινιστεί το ίδιο το θέμα χωρίς συμβουλή."
+          }
+        },
+        {
+          "n": 2,
+          "text": "Πόσους μήνες;",
+          "method": false,
+          "app": false,
+          "judge": {
+            "n": 2,
+            "grounded": true,
+            "use": "uses",
+            "assumes": false,
+            "assumption": "",
+            "advises": false,
+            "generic": false,
+            "why": "Παίρνει τη λέξη «μήνες» από τον χρήστη και τη χρησιμοποιεί για να προχωρήσει· η ερώτηση στηρίζεται σε στοιχείο που ο χρήστης είπε."
+          }
+        }
+      ],
+      "founder": {
+        "stops": 0,
+        "gentle": 0,
+        "riskChecks": 0,
+        "choice": 0,
+        "bareGoodbye": 0,
+        "rootClaims": 0,
+        "stepTime": 0,
+        "foreignHelp": 0,
+        "stopExamples": [],
+        "choiceExamples": [],
+        "riskExamples": []
+      },
+      "judge": {
+        "introduced_causes": [],
+        "root_match": "none",
+        "root_match_reason": "Δεν υπήρχε κρυφό θέμα ούτε κάρτα για να συγκριθεί."
+      }
+    }
+  ]
+}
