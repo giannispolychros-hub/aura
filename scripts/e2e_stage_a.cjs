@@ -3935,7 +3935,7 @@ async function runStressSession(item, aura, user, budget) {
       memCard: await count(page.getByText('Θέλεις να το κρατήσω')) > 0, rootCard: await count(btn(T.yes)) > 0,
       button: await count(btn(T.button)) > 0, ended: await count(page.getByText('η συνομιλία σταμάτησε εδώ')) > 0,
       input: await count(page.locator('textarea.textarea')) > 0,
-      ask: has(T.ask) || has(T.askLeaving), leaving: has(T.askLeaving), correct: has(T.correctAsk),
+      ask: has(T.ask) || has(T.askLeaving), leaving: has(T.askLeaving), correct: has(T.correctAsk), retry: has(T.retry),
       offer: await count(btn(T.wantMore)) > 0, help: has(T.helpQ), clarity: has(T.clarityQ),
       word: !!last && last.who === 'aura' && SL.fold(last.text).includes('μια λεξη'),
       crisisLine: /1018|10306/.test(await page.locator('body').innerText()),
@@ -4005,6 +4005,8 @@ async function runStressSession(item, aura, user, budget) {
       if (SL.rootQuestionUnderModelQuestion(f[f.length - 1])) sess.checks.stacked.push('η ερώτηση της ρίζας ακριβώς κάτω από: «' + f[f.length - 1].text.slice(-140) + '»');
     }
     if (!s.ask) askSeen = false;
+    // 22/10 (the targeted test): the app's «Πες το λίγο πιο ολοκληρωμένα…» under the root question is not a bubble — written down once per typed message
+    if (p.targeted && s.retry && retrySeenAt !== sess.typed.length) { retrySeenAt = sess.typed.length; app('[η εφαρμογή ζητά ξανά] ' + T.retry); }
   };
   // «Τι βρήκες» is the LAST «…» on the card («Τι ήξερες», when shown, comes first); the labels are drawn in capitals by the style
   const cardRoot = s => {
@@ -4015,6 +4017,7 @@ async function runStressSession(item, aura, user, budget) {
 
   let whyDone = false;
   let notYetDone = false;
+  let retrySeenAt = -1;
   let steps = 0, found = false, pressedEarly = false, corrections = 0, leftOnce = false, pendingCorrect = false, fixedIdx = 0, crisisAt = -1, crisisK = 0;
   const fixed = p.fixed || null;
   while (steps++ < 60 && !stopped) {
@@ -4132,8 +4135,11 @@ async function runStressSession(item, aura, user, budget) {
       app('[διόρθωση — φαίνεται μόνο στην κάρτα] «' + String(text || '').trim() + '»');
     } else if (s.ask) {
       if (s.leaving && pol.onLeavingQuestion === 'back' && !leftOnce) { leftOnce = true; acts.back += 1; await press(T.back); continue; }
+      // 22/10 (the targeted test, 86): a forced message is typed even under the root question — «γεια» after «σταματάμε εδώ»
+      if (p.targeted && sess.typed.length >= (p.maxTyped || SL.MAX_TYPED)) { sess.notes.push('έφτασε το όριο των ' + p.maxTyped + ' μηνυμάτων (στην ερώτηση της ρίζας)'); break; }
+      if (p.targeted && p.forced && p.forced[sess.typed.length + 1]) text = p.forced[sess.typed.length + 1]; else {
       if (s.leaving && pol.onLeavingQuestion === 'close') { sess.left = sess.typed.length; sess.notes.push('ο χρήστης έκλεισε την εφαρμογή στην ερώτηση της ρίζας, μετά από ' + sess.typed.length + ' μηνύματα'); break; }
-      const d = await ask('root'); if (!d) break; text = d.message;
+      const d = await ask('root'); if (!d) break; text = d.message; }
     } else if (s.word) {
       const d = await ask('word'); if (!d) break; text = d.message;
     } else {
@@ -4299,7 +4305,7 @@ async function mainStress() {
   const real = has('--real');
   const only = (opt('--sessions', '') || '').split(',').map(x => x.trim()).filter(Boolean);
   // «επιλογή» (--sessions) can re-run a session of either round; the full test without --sessions stays the 16 users
-  const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17), SL.FOUNDER_PERSONAS || [], SL.VOICE_PERSONAS || [], SL.LOOP_PERSONAS || [], SL.REHEARSAL_PERSONAS || []) : SL.PERSONAS;
+  const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17), SL.FOUNDER_PERSONAS || [], SL.VOICE_PERSONAS || [], SL.LOOP_PERSONAS || [], SL.REHEARSAL_PERSONAS || [], SL.TARGETED_PERSONAS || []) : SL.PERSONAS;
   const plan = SL.planRuns(PEOPLE, only.length ? only : null);
   const want = Number(opt('--budget', String(SL.BUDGET_CAP)));
   if (!(want > 0) || want > SL.BUDGET_CAP) { console.error('Το όριο δαπάνης πρέπει να είναι από 0 ως $' + SL.BUDGET_CAP + '.'); process.exit(2); }
@@ -4362,6 +4368,12 @@ async function mainStress() {
       const bad = SL.CHECKS.filter(c => (r.sess.checks[c.key] || []).length).map(c => c.key);
       console.log('   ρίζα: ' + (r.sess.rootConfirmed ? '«' + r.sess.root + '»' : '—') + ' | έλεγχοι με ✗: ' + (bad.join(', ') || 'κανένας') + ' | $' + r.sess.cost.toFixed(2) + ' (σύνολο $' + budget.spent().toFixed(2) + ')');
       if (r.stopped) { stopped = r.stopped; break; }
+      // 22/10 (John, the targeted test): a critical finding in a targeted session stops the whole test — (α) safety, (β) the root's
+      // measurement (closing before the root, a card not in the user's words), (γ) the prompt's text on the screen. Reported at once.
+      if (item.persona.targeted) {
+        const crit = ['safety', 'closing', 'verbatim', 'labels'].filter(k => (r.sess.checks[k] || []).length);
+        if (crit.length) { stopped = 'κρίσιμο εύρημα στη ' + item.label + ' (' + crit.join(', ') + ') — οι επόμενες συνεδρίες δεν ξεκίνησαν'; break; }
+      }
     }
     for (const s of sessions) s.judge = await judgeSession(s, real ? stressUserReal(budget) : stressUserFake(null));
     for (const s of sessions) await judgeVoice(s, real ? stressUserReal(budget) : stressUserFake(null));
