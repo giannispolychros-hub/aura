@@ -35,6 +35,7 @@ function extract(name) {
   if (s < 0) throw new Error('MISSING DEPENDENCY: ' + name);
   return raw.slice(s, raw.indexOf('\n}', s) + 2);
 }
+eval(extract('lookBehind')); // UPDATED (22/10, old iPhones, Γ3): the functions below look back through lookBehind (no lookbehind regex), so it is loaded with them
 // Same six dependencies test_first_why_session.js pins from decideTermination's own source — not
 // a hand-picked subset, so this cannot silently omit a real dependency and fail misleadingly.
 const DEPS = ['matchesClosingWord', 'isBareEmojiOrAcknowledgment', 'wasThirdTriggerAsked',

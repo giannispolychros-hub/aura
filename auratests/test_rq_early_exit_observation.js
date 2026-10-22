@@ -29,6 +29,7 @@ function extract(name) {
   if (s < 0) throw new Error('MISSING DEPENDENCY: ' + name);
   return raw.slice(s, raw.indexOf('\n}', s) + 2);
 }
+eval(extract('lookBehind')); // UPDATED (22/10, old iPhones, Γ3): the functions below look back through lookBehind (no lookbehind regex), so it is loaded with them
 // Same six dependencies decideTermination's own source pins — not a hand-picked subset.
 const DEPS = ['matchesClosingWord', 'isBareEmojiOrAcknowledgment', 'wasThirdTriggerAsked',
               'isExplicitClosure', 'isModelPreClosing', 'declaresClosing',

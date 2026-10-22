@@ -49,7 +49,7 @@ function extractBlock(startToken, from) {
 }
 const sha = s => crypto.createHash('sha256').update(s || '', 'utf8').digest('hex').slice(0, 16);
 const NAMES = ['detectSafetySignal', 'classifyCrisisTier', 'stageACaptureAllowed', 'substanceOfSentence', 'splitSentences', 'rootTextHasSubstance',
-  'pickKnewSnippet', 'detectsSpontaneousCoreRecognition', 'initialStageAState', 'stageAStep', 'stageATelemetry'];
+  'pickKnewSnippet', 'detectsSpontaneousCoreRecognition', 'initialStageAState', 'stageAStep', 'stageATelemetry', 'lookBehind']; // UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex)
 const consts = ['KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_MIN_SUBSTANCE_WORDS', 'ROOT_FILLER_WORDS'].map(n => {
   const a = CODE.indexOf('const ' + n + ' = ');
   return a < 0 ? `const ${n} = undefined;` : CODE.slice(a, CODE.indexOf(';\n', a) + 1);

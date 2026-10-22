@@ -39,7 +39,7 @@ const constSrc = n => { const a = CODE.indexOf('const ' + n + ' = '); return a >
 const NAMES = ['stageALeavingDoorOpens', 'decideTermination', 'detectsConcreteStep', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord',
   'isModelPreClosing', 'isBareEmojiOrAcknowledgment', 'wasThirdTriggerAsked', 'detectSafetySignal', 'replaceBareGoodbye', 'buildCrisisLine',
   'rootAnswerIsUnsure', 'rootTextHasSubstance', 'substanceOfSentence', 'splitSentences', 'stageAFlowTelemetry',
-  'isOpeningGreeting']; // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): a bare «γεια» before any conversation is an opening, not an exit
+  'isOpeningGreeting', 'lookBehind']; // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): a bare «γεια» before any conversation is an opening, not an exit — and UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex)
 let F = {};
 try {
   const consts = ['BARE_GOODBYE_TEXT', 'ROOT_MIN_SUBSTANCE_WORDS', 'ROOT_FILLER_WORDS', 'KNEW_MIN_SUBSTANCE_WORDS'].map(constSrc).join('\n');

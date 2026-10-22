@@ -14,7 +14,7 @@ const fs = require('fs');
   // fixtures never reach (their placeholder AURA reply is never a question). Omitting it here is
   // exactly the omission this repo has already been burned by: a missing dependency does not fail
   // loudly, it crashes the whole suite with no result line, which the runner treats as fatal.
-  const names = ['isBareEmojiOrAcknowledgment','matchesClosingWord','endsWithClosingSignal','wasThirdTriggerAsked','isModelPreClosing','isExplicitClosure','declaresClosing','isOpeningGreeting','decideTermination','stripAraDeclarative','detectPattern','detectAssistantSelfRepetition','sanitizeForPromptContext','capMessageHistory','detectsBinaryOppositionPhrasing','parseThreeBeatShift','parseRoadMap','detectUserStagnation','normalizeGreekText'];
+  const names = ['isBareEmojiOrAcknowledgment','matchesClosingWord','endsWithClosingSignal','wasThirdTriggerAsked','isModelPreClosing','isExplicitClosure','declaresClosing','isOpeningGreeting','decideTermination','stripAraDeclarative','detectPattern','detectAssistantSelfRepetition','sanitizeForPromptContext','capMessageHistory','detectsBinaryOppositionPhrasing','parseThreeBeatShift','parseRoadMap','detectUserStagnation','normalizeGreekText','lookBehind']; // UPDATED (22/10, old iPhones, Γ3): + lookBehind — the closing and «Άρα» functions look back through it
   let src = '';
   for (const n of names) {
     const s = raw.indexOf('function ' + n + '(');

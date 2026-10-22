@@ -81,7 +81,7 @@ assert('2: the only supportive call is the crisis branch (so «supportive turn»
     // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
     // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
     sha(fullFnSrc('decideTermination')) === '60778a7e90295a31' && fnSha('matchesClosingWord') === 'c3d044cc974bb7ac' &&
-    fnSha('isExplicitClosure') === '09da70474755ef40' && fnSha('declaresClosing') === '25fe9be3bbcfaa57'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24); again (ADR «12 Οκτωβρίου (β)»): «αντίο», «τα λέμε» too; (γ): not right after a negation
+    fnSha('isExplicitClosure') === '09da70474755ef40' && fnSha('declaresClosing') === '53de60c064a4125d'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24); again (ADR «12 Οκτωβρίου (β)»): «αντίο», «τα λέμε» too; (γ): not right after a negation; UPDATED (22/10, old iPhones, Γ3): declaresClosing's tier-A lookbehinds written as lookBehind notAfter — same result on every input (test_regex_compat.js)
 }
 {
   const d = GEN.indexOf('const decision = stageAPreRootDecision(currentMode === "SUPPORTIVE"'); // UPDATED 10/10: see above

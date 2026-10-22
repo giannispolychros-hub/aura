@@ -22,7 +22,8 @@ const CODE = raw.slice(0, _i) + raw.slice(raw.indexOf('`;', _s));
 
 // eval στο module scope — μέσα σε forEach οι συναρτήσεις δεν διαρρέουν έξω από το callback
 const _src = ['detectsSpontaneousShiftRecognition','detectsSpontaneousCoreRecognition',
-  'detectsAffirmativeShort','detectsConcreteStep','matchesClosingWord','detectDomain']
+  'detectsAffirmativeShort','detectsConcreteStep','matchesClosingWord','detectDomain',
+  'lookBehind'] // UPDATED (22/10, old iPhones, Γ3): the two recognition detectors look back through lookBehind (no lookbehind regex)
   .map(n => { const s = raw.indexOf('function ' + n + '('); return s < 0 ? '' : raw.slice(s, raw.indexOf('\n}', s) + 2); })
   .join('\n');
 eval(_src);

@@ -46,7 +46,7 @@ function fullFnSrc(name, src) {
 const constSrc = n => { const a = CODE.indexOf('const ' + n + ' = '); return a >= 0 ? CODE.slice(a, CODE.indexOf(';\n', a) + 1) : ''; };
 const NAMES = ['describeSafetyPathCtx', 'stripPressurePhrases', 'replaceBareGoodbye', 'detectsSpontaneousCoreRecognition',
   'detectsSpontaneousShiftRecognition', 'declaresClosing', 'detectsAffirmativeShort', 'rootAnswerIsUnsure', 'buildCrisisLine',
-  'detectSafetySignal', 'classifyCrisisTier', 'isExplicitClosure', 'matchesClosingWord'];
+  'detectSafetySignal', 'classifyCrisisTier', 'isExplicitClosure', 'matchesClosingWord', 'lookBehind']; // UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex)
 let F = {};
 try {
   const consts = ['PRESSURE_SENTENCE', 'PRESSURE_OPENER', 'BARE_GOODBYE_TEXT'].map(constSrc).join('\n');

@@ -52,6 +52,7 @@ function extract(name) {
   if (s < 0) return null;
   return raw.slice(s, raw.indexOf('\n}', s) + 2);
 }
+eval(extract('lookBehind')); // UPDATED (22/10, old iPhones, Γ3): the functions below look back through lookBehind (no lookbehind regex), so it is loaded with them
 function lift(name) {
   const src = extract(name);
   if (!src) { console.log('FAIL — ' + name + ' is defined in App.jsx'); failed++; return null; }

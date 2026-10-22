@@ -44,6 +44,7 @@ assert("decideTermination's module-level dependencies are exactly the six this h
   + (CALLED.length ? " (" + CALLED.join(", ") + ")" : ""),
   CALLED.length === EXPECTED.length && EXPECTED.every(n => CALLED.includes(n)));
 for (const f of EXPECTED.concat(['detectsConcreteStep', 'decideTermination'])) eval(extract(f));
+eval(extract('lookBehind')); // UPDATED (22/10, old iPhones, Γ3): declaresClosing looks back through lookBehind (no lookbehind regex)
 
 // ── 2. EVERY LATCH THE ENTRY TURN LEAVES UNSET IS READ AS A GATE ──────────
 // If any were read arithmetically, indexed, or dereferenced, "unset" would be a bug rather than
