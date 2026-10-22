@@ -131,7 +131,8 @@ assert('CARD: on the card (phase «card»), right after the root and before the 
     /something specific the user said/.test(sec) && /move forward/.test(sec) && /ritual or echo/.test(sec));
   assert('VOICE (4): empathy by precision — one short acknowledgement in their words only when they show weight; John\'s example; the clichés listed verbatim',
     // UPDATED (22/10, ADR «22 Οκτωβρίου»): the acknowledgement example carries no number any more
-    sec.includes('«Μόνη σου, εδώ και καιρό. Δεν είναι λίγο.»') && ['«Σίγουρα!»', '«Πολύ καλή ερώτηση»', '«Είναι απολύτως κατανοητό/φυσιολογικό»', '«Λυπάμαι πολύ»',
+    // UPDATED (22/10, ADR «22 Οκτωβρίου (στ)», John after run 45): the example was copied («Μόνη σου», «εδώ και καιρό») — now the user's words only
+    sec.includes('«Και τα Σαββατοκύριακα.»') && ['«Σίγουρα!»', '«Πολύ καλή ερώτηση»', '«Είναι απολύτως κατανοητό/φυσιολογικό»', '«Λυπάμαι πολύ»',
       '«Καταλαβαίνω απόλυτα»', '«Σε ακούω»', '«Αυτό που μοιράζεσαι είναι πολύτιμο»', '«Ακολουθούν μερικά…»', '«Ελπίζω να βοήθησα»', '«Θέλεις να σου…;»'].every(w => sec.includes(w)) &&
     /UNIVERSAL NO-EVALUATION/.test(sec));
   assert('VOICE (5): no assumption the user did not state; on weight, food or the body never a push toward more restriction',
@@ -146,8 +147,9 @@ assert('CARD: on the card (phase «card»), right after the root and before the 
   // says the number is the user's, and rule (4) carries John's sentence about numbers, word for word.
   // UPDATED (22/10, ADR «22 Οκτωβρίου», John): the model still copied the number of the example («Πέντε μήνες» in 43 twice, «Πέντε λέξεις»,
   // a prediction in a real session) — the example now has NO number at all, and the words in it are the user's.
-  assert('VOICE (4), 22/10: the example has no number — «όταν ο χρήστης γράφει "τα κουβαλάω μόνη μου εδώ και καιρό": «Μόνη σου, εδώ και καιρό. Δεν είναι λίγο.»»',
-    sec.includes('(e.g. όταν ο χρήστης γράφει "τα κουβαλάω μόνη μου εδώ και καιρό": «Μόνη σου, εδώ και καιρό. Δεν είναι λίγο.»)') && !/Πέντε|πέντε/.test(sec) &&
+  // UPDATED (22/10, ADR «22 Οκτωβρίου (στ)»): the example is now the user's own words said back — no gender, no length of time, no judgement
+  assert('VOICE (4), 22/10 (στ): the example has no number — «όταν ο χρήστης γράφει "δουλεύω και τα Σαββατοκύριακα": «Και τα Σαββατοκύριακα.»»',
+    sec.includes('(e.g. όταν ο χρήστης γράφει "δουλεύω και τα Σαββατοκύριακα": «Και τα Σαββατοκύριακα.»)') && !/Πέντε|πέντε/.test(sec) &&
     !/\d/.test(sec.slice(sec.indexOf('(4) Empathy') + 3, sec.indexOf('(5) No assumption'))));   // + 3: the «(4)» of the heading itself
   assert('VOICE (4), 19/10 (ζ): «Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης, με τα δικά του λόγια· ποτέ μη μετράς ή υπολογίζεις εσύ.» — in the same rule, once',
     // UPDATED (22/10): the number rule stays word for word; the prediction rule follows it (next check)
