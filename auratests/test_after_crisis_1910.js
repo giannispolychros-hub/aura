@@ -139,10 +139,10 @@ const undoVoice1910 = p => VOICE_1910.reduce((t, [now, before]) => (t.split(now)
   // ear, additive; the phrase list, the crisis lines and the numbers are unchanged (pinned in test_crisis_greeklish_2210.js).
   const PIN = { detectSafetySignal: '7fd94cacc250c6e2', classifyCrisisTier: '448481fd3885da83', buildCrisisLine: 'd359e22dd7cf9a95',
     crisisLineAfterFailedCall: 'c87733effcebde7e', isExplicitClosure: '09da70474755ef40', declaresClosing: '53de60c064a4125d', // UPDATED (22/10, old iPhones, Γ3): declaresClosing's tier-A lookbehinds written as lookBehind notAfter — same result on every input (test_regex_compat.js)
-    matchesClosingWord: 'c3d044cc974bb7ac', stripForeignHelplines: '3a30e4f861a39022', replaceBareGoodbye: 'e6351d2cb8e28ab5',
+    matchesClosingWord: 'c3d044cc974bb7ac', stripForeignHelplines: 'dc29d4631ac847d9', /* UPDATED (22/10, A5): the numbers come from HELPLINES */ replaceBareGoodbye: 'e6351d2cb8e28ab5',
     detectsMentalHealthReferral: 'd03b71d681025b79' };
   for (const [n, v] of Object.entries(PIN)) assert(`UNCHANGED: ${n} (as in 9efe1fa)`, h(fullFnSrc(n, raw)) === v);
-  assert('UNCHANGED: the help organisations and phone words of the helpline filter', h(constLine('HELP_ORGS')) === '45305152b8fc343f' && h(constLine('HELP_WORDS')) === '72ccdbaf7c453351');
+  assert('UNCHANGED: the help organisations and phone words of the helpline filter', h(constLine('HELP_ORGS')) === '0a7e408fff4b45a3' /* UPDATED (22/10, A5): ΕΚΑΒ and Χαμόγελο του Παιδιού moved to HELPLINES, beside their numbers */ && h(constLine('HELP_WORDS')) === '72ccdbaf7c453351');
   assert('UNCHANGED: the approved goodbye of the normal case', h(constLine('BARE_GOODBYE_TEXT')) === 'acc0d288e40d9606');
   // UPDATED (19/10, ADR «19 Οκτωβρίου (ε)»): the prompt moved only by John's two voice edits
   assert('UNCHANGED: the prompt, apart from John\'s voice edits of 19/10 (ε) and (ζ)', h(undoVoice1910(raw.slice(_s, _e))) === 'a6d7fe7ae33515a0' && h(raw.slice(_s, _e)) !== 'a6d7fe7ae33515a0');
