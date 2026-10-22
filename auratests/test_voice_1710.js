@@ -130,7 +130,8 @@ assert('CARD: on the card (phase «card»), right after the root and before the 
   assert('VOICE (3): precision — grounded in something specific, used to move forward; a quote in «» only when it is the reason; never ritual or echo',
     /something specific the user said/.test(sec) && /move forward/.test(sec) && /ritual or echo/.test(sec));
   assert('VOICE (4): empathy by precision — one short acknowledgement in their words only when they show weight; John\'s example; the clichés listed verbatim',
-    sec.includes('«Πέντε χρόνια έτσι. Δεν είναι λίγο.»') && ['«Σίγουρα!»', '«Πολύ καλή ερώτηση»', '«Είναι απολύτως κατανοητό/φυσιολογικό»', '«Λυπάμαι πολύ»',
+    // UPDATED (22/10, ADR «22 Οκτωβρίου»): the acknowledgement example carries no number any more
+    sec.includes('«Μόνη σου, εδώ και καιρό. Δεν είναι λίγο.»') && ['«Σίγουρα!»', '«Πολύ καλή ερώτηση»', '«Είναι απολύτως κατανοητό/φυσιολογικό»', '«Λυπάμαι πολύ»',
       '«Καταλαβαίνω απόλυτα»', '«Σε ακούω»', '«Αυτό που μοιράζεσαι είναι πολύτιμο»', '«Ακολουθούν μερικά…»', '«Ελπίζω να βοήθησα»', '«Θέλεις να σου…;»'].every(w => sec.includes(w)) &&
     /UNIVERSAL NO-EVALUATION/.test(sec));
   assert('VOICE (5): no assumption the user did not state; on weight, food or the body never a push toward more restriction',
@@ -143,11 +144,18 @@ assert('CARD: on the card (phase «card»), right after the root and before the 
     sec.includes('«Καιρό. Αλλά χθες είδα μια φωτογραφία μου.» → «Μια φωτογραφία. Τι είδες σε αυτήν;»') && /not a template/.test(sec));
   // ADR «19 Οκτωβρίου (ζ)» (John): the model copied «Πέντε χρόνια έτσι» and invented numbers («Πέντε λέξεις», «Πέντε μήνες»). The example now
   // says the number is the user's, and rule (4) carries John's sentence about numbers, word for word.
-  assert('VOICE (4), 19/10 (ζ): the example shows the number is the user\'s — «όταν ο χρήστης έχει πει "πέντε χρόνια": «Πέντε χρόνια έτσι. Δεν είναι λίγο.»»',
-    sec.includes('(e.g. όταν ο χρήστης έχει πει "πέντε χρόνια": «Πέντε χρόνια έτσι. Δεν είναι λίγο.»)') && sec.split('Πέντε χρόνια έτσι').length === 2);
+  // UPDATED (22/10, ADR «22 Οκτωβρίου», John): the model still copied the number of the example («Πέντε μήνες» in 43 twice, «Πέντε λέξεις»,
+  // a prediction in a real session) — the example now has NO number at all, and the words in it are the user's.
+  assert('VOICE (4), 22/10: the example has no number — «όταν ο χρήστης γράφει "τα κουβαλάω μόνη μου εδώ και καιρό": «Μόνη σου, εδώ και καιρό. Δεν είναι λίγο.»»',
+    sec.includes('(e.g. όταν ο χρήστης γράφει "τα κουβαλάω μόνη μου εδώ και καιρό": «Μόνη σου, εδώ και καιρό. Δεν είναι λίγο.»)') && !/Πέντε|πέντε/.test(sec) &&
+    !/\d/.test(sec.slice(sec.indexOf('(4) Empathy') + 3, sec.indexOf('(5) No assumption'))));   // + 3: the «(4)» of the heading itself
   assert('VOICE (4), 19/10 (ζ): «Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης, με τα δικά του λόγια· ποτέ μη μετράς ή υπολογίζεις εσύ.» — in the same rule, once',
-    sec.includes('when they do not, none. Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης, με τα δικά του λόγια· ποτέ μη μετράς ή υπολογίζεις εσύ. It never approves') &&
+    // UPDATED (22/10): the number rule stays word for word; the prediction rule follows it (next check)
+    sec.includes('when they do not, none. Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης, με τα δικά του λόγια· ποτέ μη μετράς ή υπολογίζεις εσύ. Ποτέ πρόβλεψη') &&
     PROMPT.split('ποτέ μη μετράς ή υπολογίζεις εσύ').length === 2 && sec.indexOf('ποτέ μη μετράς') > sec.indexOf('(4) Empathy') && sec.indexOf('ποτέ μη μετράς') < sec.indexOf('(5) No assumption'));
+  assert('VOICE (4), 22/10: «Ποτέ πρόβλεψη για το μέλλον του χρήστη ή άλλου ανθρώπου, ούτε γενίκευση που μεγαλώνει τον φόβο του.» — in the same rule, once, right after the number rule',
+    sec.includes('ποτέ μη μετράς ή υπολογίζεις εσύ. Ποτέ πρόβλεψη για το μέλλον του χρήστη ή άλλου ανθρώπου, ούτε γενίκευση που μεγαλώνει τον φόβο του. It never approves') &&
+    PROMPT.split('Ποτέ πρόβλεψη για το μέλλον').length === 2);
   // ADR «19 Οκτωβρίου (ε)», John's change 2: a new rule in ΦΩΝΗ, word for word, after (5) and before the Stage A method line
   assert('VOICE (6), 19/10: always the singular («εσύ»), never the plural of politeness — John\'s words, in ΦΩΝΗ, once',
     sec.includes(' (6) Μιλάς πάντα στον ενικό ("εσύ"), ποτέ στον πληθυντικό ευγενείας ("εσείς", "Πέστε").') && PROMPT.split('πληθυντικό ευγενείας').length === 2 &&

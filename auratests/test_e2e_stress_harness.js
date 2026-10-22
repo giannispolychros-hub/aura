@@ -504,9 +504,13 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
 // ── ΦΩΝΗ ΤΗΣ AURA (John, 17/10/2026, ADR «17 Οκτωβρίου») ─────────────────────────────────────────────────────────────────
 {
   const V = S.VOICE_PERSONAS || [];
-  assert('VOICE: five short sessions of two rounds — weight, work, relationship, children, money; ids 40–44, no root flow',
-    V.length === 5 && V.map(p => p.id).join(',') === '40,41,42,43,44' && V.every(p => p.short && p.maxTyped === 2 && p.policy && p.policy.root === 'none' && p.forced && p.forced[1]) &&
-    ['βάρος', 'δουλειά', 'σχέση', 'παιδιά', 'χρήματα'].every((w, i) => V[i].name.endsWith(w)));
+  // UPDATED (22/10, ADR «22 Οκτωβρίου», John's item 3): a sixth, 45 — a parent of a bored 11-year-old, both messages pre-written
+  assert('VOICE: six short sessions of two rounds — weight, work, relationship, children, money, a bored child; ids 40–45, no root flow',
+    V.length === 6 && V.map(p => p.id).join(',') === '40,41,42,43,44,45' && V.every(p => p.short && p.maxTyped === 2 && p.policy && p.policy.root === 'none' && p.forced && p.forced[1]) &&
+    ['βάρος', 'δουλειά', 'σχέση', 'παιδιά', 'χρήματα', 'παιδί που βαριέται'].every((w, i) => V[i].name.endsWith(w)));
+  assert('VOICE 45 (22/10): the parent of an 11-year-old who is bored with everything; the second message, pre-written, is the fear of screens',
+    !!V[5] && /11/.test(V[5].forced[1]) && /βαριέται/.test(V[5].forced[1]) && /οθόν/.test(V[5].forced[2]) && /φοβ/i.test(V[5].forced[2]) &&
+    !!(APP && APP.fns.detectSafetySignal) && !APP.fns.detectSafetySignal(V[5].forced[2]));
   // UPDATED (19/10, ADR «19 Οκτωβρίου (ε)», John's change 3): the weight session no longer opens with the prompt's own ΦΩΝΗ example — the same
   // subject in other words, and a situation without the example's photo or «καιρό», so the second answer does not copy it either.
   assert('VOICE: the weight session opens with John\'s new message (19/10), not the prompt\'s example; its situation has no photo and no «καιρό»',
@@ -606,8 +610,9 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
     for (const k of new Set(code.match(/\b[A-Z][A-Z_0-9]{3,}\b/g) || [])) { const m = new RegExp('\\nconst ' + k + ' = ').exec(C); if (m) code = C.slice(m.index + 1, C.indexOf(';\n', m.index + 1) + 1) + '\n' + code; }
     return new Function(code + '\nreturn needsFirstWhy;')(); } catch (e) { return () => 'error'; } })();
   const V = S.VOICE_PERSONAS || [];
-  assert('VOICE: five sessions, at least three openings of the First-WHY type — and the app\'s own needsFirstWhy agrees with every flag',
-    V.length === 5 && V.filter(p => p.firstWhyType).length >= 3 && V.every(p => nfw(p.forced[1]) === !!p.firstWhyType));
+  // UPDATED (22/10): six sessions (45 added)
+  assert('VOICE: six sessions, at least three openings of the First-WHY type — and the app\'s own needsFirstWhy agrees with every flag',
+    V.length === 6 && V.filter(p => p.firstWhyType).length >= 3 && V.every(p => nfw(p.forced[1]) === !!p.firstWhyType));
   assert('VOICE: John\'s example is one of them, word for word', V.some(p => p.forced[1] === 'Θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει.' && p.firstWhyType));
   assert('VOICE: the report says which message was written beforehand and which was simulated, and marks the First-WHY type',
     /γραμμένο από πριν/.test(S.voiceReport.toString()) && /προσομοιωμένο/.test(S.voiceReport.toString()) && /τύπου First-WHY/.test(S.voiceReport.toString()));

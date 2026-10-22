@@ -15,7 +15,7 @@ import { createHash } from "node:crypto";
 // The fingerprints below are length + SHA-256 only, never the text; «npm run build» rewrites them from src/App.jsx.
 // BEGIN PROMPT FINGERPRINTS — written by scripts/gen_prompt_fingerprints.cjs from src/App.jsx («npm run build»). Do not edit by hand.
 const PROMPT_FINGERPRINTS = {
-  core: { length: 311696, sha256: "e1e56e0c962656b049a3f045952bc42622df8a592e3e619a7ae0f1498f27d772" },
+  core: { length: 311822, sha256: "b5f303cc9405aa216e92e481f24507b03f6d878c2475733063c42733074c5b01" },
   supportive: { length: 851, sha256: "c7815b96d83ebae85ab1dd6856ae343c7ba114f0e8ba20362d26ce853266b298" },
   termination: { length: 20032, sha256: "d5a77ca926f9490b1d1a38c7164474c6935747964cac778a0f60754eef8e279a" },
 };

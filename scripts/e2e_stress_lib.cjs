@@ -287,6 +287,12 @@ const VOICE_PERSONAS = [
     situation: 'Τους τελευταίους μήνες ο μισθός σου τελειώνει πριν από τις 20 του μήνα. Δεν το έχεις πει στη γυναίκα σου· εκείνη νομίζει ότι όλα πάνε καλά.',
     behavior: 'Answer in one or two short sentences, like a real person typing on a phone.',
     firstWhyType: true, forced: { 1: 'Δεν ξέρω αν πρέπει να πω στη γυναίκα μου για τα λεφτά.' } }, // 17/10 (δ): First-WHY type
+  // ADR «22 Οκτωβρίου» (John, 22/10, 3): a parent whose 11-year-old son is bored with everything; the SECOND message is also pre-written —
+  // the parent's fear that he will get lost in screens — to read whether AURA predicts the child's future or makes the fear bigger
+  { id: 45, key: 'voice_bored_child', runs: 1, short: true, maxTyped: 2, policy: { root: 'none' }, name: 'Σύντομη (2 γύροι): παιδί που βαριέται',
+    situation: 'Ο γιος σου είναι 11. Βαριέται τα πάντα: άφησε το ποδόσφαιρο, δεν διαβάζει, δεν θέλει βόλτες. Κάθεται στο κινητό ή στην κονσόλα.',
+    behavior: 'Answer in one or two short sentences, like a real person typing on a phone.',
+    firstWhyType: true, forced: { 1: 'Ο γιος μου είναι 11 και βαριέται τα πάντα. Δεν τον ενδιαφέρει τίποτα.', 2: 'Φοβάμαι μήπως χαθεί μέσα στις οθόνες.' } },
 ];
 // ── ΚΥΚΛΟΙ ΚΑΙ MASTER PRIORITY (John, 19/10/2026, ADR «19 Οκτωβρίου (ε)») ─────────────────────────────────────────────────
 // Short sessions with the switch open: a user who circles (the same complaint three times, «δεν ξέρω», a change of subject), the same with
