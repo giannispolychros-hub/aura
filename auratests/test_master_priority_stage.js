@@ -90,7 +90,8 @@ assert('PURITY: describeMasterPriorityStageCtx contains no \'.current\'', !/\.cu
 // ── WIRING: derived fresh every turn, same architecture as goalObstacleStakesCtx/materialEvidenceCtx
 // — no new ref, no reset-block edit ────────────────────────────────────────────────────────────
 assert('WIRING: masterPriorityStageCtx composes userSignalsClosing from the three EXISTING closing detectors, none dropped',
-  /const userSignalsClosing = isExplicitClosure\(lastUserText\) \|\| declaresClosing\(lastUserText\) \|\| matchesClosingWord\(lastUserText\);/.test(raw));
+  // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): the same three detectors, + a bare «γεια» before any conversation is not a closing
+  /const userSignalsClosing = \(isExplicitClosure\(lastUserText\) \|\| declaresClosing\(lastUserText\) \|\| matchesClosingWord\(lastUserText\)\) && !isOpeningGreeting\(lastUserText, _earlierUserTexts\);/.test(raw));
 assert('WIRING: masterPriorityStageCtx is part of dynamicSuffix', /dynamicSuffix = \[[^\]]*masterPriorityStageCtx/s.test(raw));
 // DELIBERATELY NOT in the fired/familiesUsed collision logger: unlike every other ctx there, this
 // one is non-empty on EVERY turn (there is no "quiet" stage), so counting it would make fired.length

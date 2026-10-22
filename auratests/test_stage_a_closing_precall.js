@@ -110,11 +110,16 @@ assert('A: tier A earlier in the session / safety mode → no door', G('Ευχα
 assert('A: the gate after the reply is still there (second closing → old closing; any case not caught before)',
   /if \(stageALeavingDoorOpens\(\{\s*active: stageAActive\.current, decision,/.test(GEN));
 assert('A: the old closing itself is unchanged (decideTermination, the T1/T2 detectors byte for byte)',
-  sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && sha(extractBlock('function isExplicitClosure(')) === '09da70474755ef40' &&
+  // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
+  // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
+  sha(fullFnSrc('decideTermination')) === '60778a7e90295a31' && sha(extractBlock('function isExplicitClosure(')) === '09da70474755ef40' &&
   sha(extractBlock('function declaresClosing(')) === '25fe9be3bbcfaa57' && sha(extractBlock('function matchesClosingWord(')) === 'c3d044cc974bb7ac'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24); again (ADR «12 Οκτωβρίου (β)»): «αντίο», «τα λέμε» too; (γ): not right after a negation
-assert('A: the gate function itself is unchanged', sha(extractBlock('function stageALeavingDoorOpens(')) === 'f33ed155faa93145' && // UPDATED (8/10): + !detectSafetySignal(u), ADR «8 Οκτωβρίου (β)», 4; (δ): the leaving door no longer reads the decision
+// UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
+// (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
+assert('A: the gate function itself is unchanged', sha(extractBlock('function stageALeavingDoorOpens(')) === 'e55ba1a0d4c46f3c' && // UPDATED (8/10): + !detectSafetySignal(u), ADR «8 Οκτωβρίου (β)», 4; (δ): the leaving door no longer reads the decision
   
-  /\(isExplicitClosure\(u\) \|\| declaresClosing\(u\)\);/.test(extractBlock('function stageALeavingDoorOpens(') || ''));
+  // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): + the opening «γεια» (isOpeningGreeting) — the line is otherwise as before
+  /\(isExplicitClosure\(u\) \|\| declaresClosing\(u\)\) &&\s*!isOpeningGreeting\(u, o\.earlierUserTexts\);/.test(extractBlock('function stageALeavingDoorOpens(') || ''));
 
 // ── C: the root question is scrolled into view when it opens ─────────────────
 {

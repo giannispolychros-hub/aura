@@ -1655,12 +1655,19 @@ function buildAiIdentityLine(userText, modelText) {
 // can bypass the gate. ?stageA=1 opens Stage A for one visit, for John's phone test, and is never
 // stored; it can never turn telemetry on. ?debug=1 marks a test device, which never sends.
 // Consent (step 2.3) will be added to isRemoteTelemetryActive, not beside it.
+// ADR «22 Οκτωβρίου (ε)» (John: the testers and main must not see different apps): STAGE_A_ENABLED is now the DEFAULT flow of a visit with
+// no parameter — true: Stage A. ?stageA=1 opens Stage A and ?stageA=0 the old flow, for that visit only, never stored. Back to the old
+// default: set it to false (then ?stageA=1 opens Stage A as before). The device log of numbers stays ?rec=1 / ?debug=1 only
+// (recordTelemetry); nothing leaves the device while REMOTE_TELEMETRY_ENABLED is false.
 // ─────────────────────────────────────────────
-const STAGE_A_ENABLED = false;
+const STAGE_A_ENABLED = true;
 const REMOTE_TELEMETRY_ENABLED = false;
 function isStageAActive(search) {
-  if (STAGE_A_ENABLED) return true;
-  try { return new URLSearchParams(search).get("stageA") === "1"; } catch (e) { return false; }
+  let p = null;
+  try { p = new URLSearchParams(search).get("stageA"); } catch (e) { return STAGE_A_ENABLED; }
+  if (p === "1") return true;
+  if (p === "0") return false;
+  return STAGE_A_ENABLED;
 }
 function isRemoteTelemetryActive(search) {
   if (!REMOTE_TELEMETRY_ENABLED) return false;
@@ -2116,6 +2123,17 @@ function stageARootButtonVisible(st) {
   const o = st || {};
   return o.active === true && o.assistantReplies >= 1 && !o.loading && o.riskKind !== 1 && !o.closingStarted && !o.rootPhase && !o.sessionEnded;
 }
+// ADR «22 Οκτωβρίου (ε)» (John; the rehearsal of the 20, session 8): «γεια» opens a conversation as often as it closes one. A bare «γεια»
+// («Γεια», «γεια!», «Γεια.», «γειά») while nothing has been said yet — every EARLIER user message of the session is itself only a greeting —
+// is an OPENING, not an exit: no exit check counts it, and it goes to the model like any first message. After a conversation it is an exit,
+// as before. The history must be passed: with no list (a caller that does not know it), «γεια» stays an exit. The exit detectors themselves
+// are unchanged. See auratests/test_hello_default_2210.js.
+function isOpeningGreeting(text, earlierUserTexts) {
+  if (!Array.isArray(earlierUserTexts)) return false;
+  const f = t => String(t == null ? "" : t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const greetingOnly = t => /^(?:γεια(?: σου| σας| χαρα)?|καλημερα|καλησπερα|χαιρετε|hello|hi|hey)[\s.,!…]*$/.test(f(t));
+  return /^γεια[\s.!…]*$/.test(f(text)) && earlierUserTexts.every(greetingOnly);
+}
 // ADR «6 Οκτωβρίου (λ)» — «Πριν φύγεις:»: instead of the old closing, door 1 ONCE. Only where the old closing would
 // open now, only for an EXPLICIT closing (T2: the same two detectors decideTermination uses for userDeclaredExit —
 // never a short agreement, T1), before a confirmed root, with no closing started, never in tier A or safety mode.
@@ -2128,7 +2146,8 @@ function stageALeavingDoorOpens(st) {
   const o = st || {};
   const u = typeof o.lastUserText === "string" ? o.lastUserText : "";
   return o.active === true && !o.used && !o.rootPhase && !o.armed &&
-    !o.rootConfirmed && !o.closingStarted && o.riskKind !== 1 && !o.safetyMode && !detectSafetySignal(u) && (isExplicitClosure(u) || declaresClosing(u));
+    !o.rootConfirmed && !o.closingStarted && o.riskKind !== 1 && !o.safetyMode && !detectSafetySignal(u) && (isExplicitClosure(u) || declaresClosing(u)) &&
+    !isOpeningGreeting(u, o.earlierUserTexts);
 }
 // ADR «19 Οκτωβρίου (β)» (John, a safety exception (α); real-model run 32, session 34: after the crisis line, «ευχαριστώ» got «Ευχαριστώ
 // που το μοιράστηκες. Να είσαι καλά.»). Once a crisis line was shown in this session (a SUPPORTIVE reply, or the line of a failed crisis
@@ -2158,7 +2177,7 @@ function stageAModelClosesBeforeRoot(st) {
   const o = st || {};
   const u = typeof o.lastUserText === "string" ? o.lastUserText : "";
   return o.active === true && !o.rootConfirmed && !o.rootPhase && !o.armed && !o.closingStarted && !o.safetyMode && !o.supportive &&
-    o.riskKind !== 1 && !detectSafetySignal(u) && !(isExplicitClosure(u) || declaresClosing(u)) &&
+    o.riskKind !== 1 && !detectSafetySignal(u) && !((isExplicitClosure(u) || declaresClosing(u)) && !isOpeningGreeting(u, o.earlierUserTexts)) &&
     typeof o.reply === "string" && parseThreeBeatShift(o.reply) !== null;
 }
 // ADR «8 Οκτωβρίου (δ)», 1 — with the switch open and before a confirmed root, the MASTER PRIORITY RULE stage
@@ -2191,7 +2210,7 @@ function stageAPreRootDecision(decision, st) {
   if (o.active !== true || o.rootConfirmed === true) return decision;
   if (decision !== "confirm" && decision !== "terminate" && decision !== "warn" && decision !== "await_outcome_scale") return decision;
   const u = typeof o.lastUserText === "string" ? o.lastUserText : "";
-  return isExplicitClosure(u) || declaresClosing(u) ? decision : "none";
+  return (isExplicitClosure(u) || declaresClosing(u)) && !isOpeningGreeting(u, o.earlierUserTexts) ? decision : "none";
 }
 // STAGE A — the whole flow as one pure step function (SPEC_FREE_END.md §1.5, §2.1, §2.1α, §2.2, §4, §6.1).
 // phase: null (conversation) · "ask" (door 1's fixed question) · "card" · "correct" · "offer" · "notReady" ·
@@ -4518,7 +4537,8 @@ function decideTermination(msgs, text, { safetyMode, currentMode, warningIssued,
   // ending. Safety, onboarding and the decline cooldown still return "none" above this line and
   // are unaffected.
   const userDeclaredExit = !!lastUserMsg && lastUserMsg.role === "user" &&
-    (isExplicitClosure(lastUserMsg.content || "") || declaresClosing(lastUserMsg.content || ""));
+    (isExplicitClosure(lastUserMsg.content || "") || declaresClosing(lastUserMsg.content || "")) &&
+    !isOpeningGreeting(lastUserMsg.content || "", msgs.slice(0, -1).filter(m => m && m.role === "user").map(m => String(m.content || "")));
   if (userDeclaredExit || naturalExitReady || thirdTriggerJustAnswered) {
     decision = "confirm";
   } else if (currentMode === "ANSWER" && userMsgsAll.length >= 2 && !warningIssued && isModelPreClosing(text)) {
@@ -6560,7 +6580,8 @@ export default function AURAv2() {
         // closings-with-content this whole detector exists for, so this telemetry field under-
         // reported explicitClosure on exactly those sessions. Telemetry only — no consumer reads
         // _declared to change behaviour.
-        if (messages[i].role === "user" && (isExplicitClosure(messages[i].content || "") || declaresClosing(messages[i].content || ""))) { _declared = true; break; }
+        // ADR «22 Οκτωβρίου (ε)»: an opening «γεια» (nothing said before it) is not a closing
+        if (messages[i].role === "user" && (isExplicitClosure(messages[i].content || "") || declaresClosing(messages[i].content || "")) && !isOpeningGreeting(messages[i].content || "", messages.slice(0, i).filter(m => m.role === "user").map(m => String(m.content || "")))) { _declared = true; break; }
       }
       // PASSIVE COUNTER (founder decision, 2026-10-01): uncertain intent that never became a step and closed with no
       // road. Computed here from `messages` like roadMap — no ref, no consumer, never shown to the model. (β) reads
@@ -6645,6 +6666,8 @@ export default function AURAv2() {
 
   // ── Generate response ──
   const generateResponse = useCallback(async (msgs, currentMode) => {
+    // ADR «22 Οκτωβρίου (ε)»: the user's messages before the latest one — an opening «γεια» is not an exit (isOpeningGreeting)
+    const _earlierUserTexts = msgs.filter(m => m && m.role === "user").slice(0, -1).map(m => String(m.content || ""));
     // EARLY PERSONAL WORD CAPTURE — captures the user's verbatim answer to the varied-wording
     // word question asked last turn, signaled via the [[EARLY_WORD:yes]] tag.
     if (awaitingEarlyWord.current) {
@@ -6811,7 +6834,7 @@ A line missing above means only that one pattern was not matched — the absence
       const masterPriorityStageCtx = (() => {
         const userMsgs = msgs.filter(m => m.role === "user");
         const lastUserText = userMsgs.length > 0 ? (userMsgs[userMsgs.length - 1].content || "") : "";
-        const userSignalsClosing = isExplicitClosure(lastUserText) || declaresClosing(lastUserText) || matchesClosingWord(lastUserText);
+        const userSignalsClosing = (isExplicitClosure(lastUserText) || declaresClosing(lastUserText) || matchesClosingWord(lastUserText)) && !isOpeningGreeting(lastUserText, _earlierUserTexts);
         // ADR «8 Οκτωβρίου (δ)», 1: with the switch open, before the root, GRACEFUL EXIT only when the old closing really
         // opens on this turn. The closing decision is the user-side one (this message, no reply text, no model signal).
         const stage = computeMasterPriorityStage(safetyMode, msgCount, userSignalsClosing && (!stageAActive.current || stageAKeepsGracefulExit({
@@ -6820,7 +6843,7 @@ A line missing above means only that one pattern was not matched — the absence
             safetyMode, currentMode, warningIssued: warningIssued.current, compressionCount: compressionCount.current, modelJudgesEnd: false,
             concreteStepStated: concreteStepStated.current, outcomeScaleAsked: outcomeScaleAsked.current, outcomeScaleBlockUsed: outcomeScaleBlockUsed.current,
             duringOnboarding: false, duringDeclineCooldown: closureDeclineCooldown.current > 0,
-          }), { active: true, rootConfirmed: stageARef.current.stats.rootConfirmed === 1, lastUserText }),
+          }), { active: true, rootConfirmed: stageARef.current.stats.rootConfirmed === 1, lastUserText, earlierUserTexts: _earlierUserTexts }),
           armed: stageARootArmed.current, rootPhase: stageARef.current.phase,
           latchFlips: !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1 &&
             (detectsSpontaneousCoreRecognition(lastUserText) || (coreReadinessAsked.current && detectsAffirmativeShort(lastUserText))),
@@ -6856,7 +6879,8 @@ A line missing above means only that one pattern was not matched — the absence
         // declaresClosing ADDED (2026-09-26): same soft-advisory risk class as the sites already
         // wired below — a false positive here only affects the TIMING of a reminder about not
         // reciprocating farewells, never a forced reply.
-        const idx = userMsgs.findIndex(m => matchesClosingWord(m.content) || endsWithClosingSignal(m.content) || declaresClosing(m.content));
+        const idx = userMsgs.findIndex((m, i) => !isOpeningGreeting(m.content, userMsgs.slice(0, i).map(x => String(x.content || ""))) &&
+          (matchesClosingWord(m.content) || endsWithClosingSignal(m.content) || declaresClosing(m.content)));
         if (idx < 0 || idx === userMsgs.length - 1) return '';
         return `\n[CODE-VERIFIED: the user gave a closing signal ${userMsgs.length - 1 - idx} message(s) ago and the exchange is still going. Do not reciprocate farewells, emoji, or pleasantries — that is what extended this. If the closing sequence has not run yet, run it NOW, in this reply. If it has already run, end here with nothing further: no summary, no anchor question, no second closing. Starting a fresh closing sequence after farewells have already been exchanged reads as not having noticed the conversation ended.]\n`;
       })();
@@ -7038,7 +7062,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // not withheld, and AURA asked another question after the close. declaresClosing is added
         // beside it rather than replacing it — the narrow detector's measured trade-off (13 of 15
         // mid-session acknowledgments) is exactly why it is not simply widened.
-        if (isExplicitClosure(lastUserMsgForGates) || declaresClosing(lastUserMsgForGates)) return '';
+        if ((isExplicitClosure(lastUserMsgForGates) || declaresClosing(lastUserMsgForGates)) && !isOpeningGreeting(lastUserMsgForGates, _earlierUserTexts)) return '';
         const due = [];
         // LIVE-EVIDENCE FIX (real session, the clearest instance of a code-verified gate beating a
         // prompt-only rule): the moment the user named their options — "Έχω 2 επιλογές" —
@@ -7489,7 +7513,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // AURA's OWN reply this turn is ALSO bare-emoji, a narrow double condition.
         // CHANGED (8/10/2026, ADR «8 Οκτωβρίου (γ)»): "Καληνύχτα." → "Καλή συνέχεια." — the choice reads no clock and
         // not whether the user said goodnight (any closing word picks it, e.g. «Ευχαριστώ» at noon). Rule otherwise unchanged.
-        const userWasClosing = matchesClosingWord(lastUserMsg) || declaresClosing(lastUserMsg);
+        const userWasClosing = (matchesClosingWord(lastUserMsg) || declaresClosing(lastUserMsg)) && !isOpeningGreeting(lastUserMsg, _earlierUserTexts);
         // CHANGED (12/10/2026, ADR «12 Οκτωβρίου (β)», John's approved text): never a bare «Καλή συνέχεια.».
         const addition = userWasClosing ? "Ευχαριστώ που το μοιράστηκες. Να είσαι καλά." : "Τι σκέφτεσαι τώρα;";
         // ADR «8 Οκτωβρίου (δ)», 2: when the closing card opens on this same reply, no farewell is added — a goodbye, then the
@@ -7500,7 +7524,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             modelJudgesEnd,
             concreteStepStated: concreteStepStated.current, outcomeScaleAsked: outcomeScaleAsked.current, outcomeScaleBlockUsed: outcomeScaleBlockUsed.current,
             duringOnboarding: showDemo, duringDeclineCooldown: closureDeclineCooldown.current > 0,
-          }), { active: stageAActive.current, rootConfirmed: stageARef.current.stats.rootConfirmed === 1, lastUserText: lastUserMsg }),
+          }), { active: stageAActive.current, rootConfirmed: stageARef.current.stats.rootConfirmed === 1, lastUserText: lastUserMsg, earlierUserTexts: _earlierUserTexts }),
           active: stageAActive.current, armed: stageARootArmed.current, rootPhase: stageARef.current.phase,
         });
         // ADR «10 Οκτωβρίου», 1: switch open, before the root, a closing word that opens no closing is not a goodbye — the
@@ -7541,7 +7565,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // history; door 1's question opens below, after the reply's bookkeeping. Before the AI-identity backstop, so its line
       // still shows (§0.1). Switch closed: never true.
       const _saModelClose = stageAModelClosesBeforeRoot({
-        active: stageAActive.current, reply: text, lastUserText: lastUserMsg,
+        active: stageAActive.current, reply: text, lastUserText: lastUserMsg, earlierUserTexts: _earlierUserTexts,
         rootConfirmed: stageARef.current.stats.rootConfirmed === 1, rootPhase: stageARef.current.phase, armed: stageARootArmed.current,
         closingStarted: reflectionDelivered.current, riskKind: riskSignalKind.current, safetyMode, supportive: currentMode === "SUPPORTIVE",
       });
@@ -7771,7 +7795,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         outcomeScaleBlockUsed: outcomeScaleBlockUsed.current,
         duringOnboarding: showDemo,
         duringDeclineCooldown: closureDeclineCooldown.current > 0,
-      }), { active: stageAActive.current, rootConfirmed: stageARef.current.stats.rootConfirmed === 1, lastUserText: _saLastText });
+      }), { active: stageAActive.current, rootConfirmed: stageARef.current.stats.rootConfirmed === 1, lastUserText: _saLastText, earlierUserTexts: _earlierUserTexts });
       if (closureDeclineCooldown.current > 0) closureDeclineCooldown.current -= 1;
 
       // ROAD QUESTIONS — EMIT. Placed after the termination decision so an early exit is visible
@@ -7823,7 +7847,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       const _saLast = msgs.length ? msgs[msgs.length - 1] : null;
       if (stageALeavingDoorOpens({
         active: stageAActive.current, decision,
-        lastUserText: _saLast && _saLast.role === "user" ? String(_saLast.content || "") : "",
+        lastUserText: _saLast && _saLast.role === "user" ? String(_saLast.content || "") : "", earlierUserTexts: _earlierUserTexts,
         used: stageARef.current.stats.rootDoorFromClosing > 0,
         rootPhase: stageARef.current.phase, armed: stageARootArmed.current,
         rootConfirmed: stageARef.current.stats.rootConfirmed === 1,
@@ -8542,7 +8566,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         modelJudgesEnd: false, concreteStepStated: concreteStepStated.current, outcomeScaleAsked: outcomeScaleAsked.current,
         outcomeScaleBlockUsed: outcomeScaleBlockUsed.current, duringOnboarding: false, duringDeclineCooldown: closureDeclineCooldown.current > 0,
       }),
-      lastUserText: userText,
+      lastUserText: userText, earlierUserTexts: messages.filter(m => m.role === "user").map(m => String(m.content || "")),
       used: stageARef.current.stats.rootDoorFromClosing > 0,
       rootPhase: stageARef.current.phase, armed: stageARootArmed.current,
       rootConfirmed: stageARef.current.stats.rootConfirmed === 1,

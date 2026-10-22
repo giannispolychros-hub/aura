@@ -54,7 +54,9 @@ function constDecl(name) {
 
 // ── 1. The switches exist and are closed ─────────────────────────────────────
 assert('SWITCH: STAGE_A_ENABLED is declared at top level', constDecl('STAGE_A_ENABLED') !== null);
-assert('SWITCH: STAGE_A_ENABLED is false on main', constDecl('STAGE_A_ENABLED') === 'false');
+// UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): Stage A is the DEFAULT flow — the constant is the default of a visit with no parameter;
+// ?stageA=0 opens the old flow (test_hello_default_2210.js). Back to the old default = false.
+assert('SWITCH: STAGE_A_ENABLED is true on main (Stage A is the default, John 22/10)', constDecl('STAGE_A_ENABLED') === 'true');
 assert('SWITCH: REMOTE_TELEMETRY_ENABLED is declared at top level', constDecl('REMOTE_TELEMETRY_ENABLED') !== null);
 assert('SWITCH: REMOTE_TELEMETRY_ENABLED is false on main', constDecl('REMOTE_TELEMETRY_ENABLED') === 'false');
 assert('SWITCH: each is declared exactly once',
@@ -119,8 +121,10 @@ assert('COMPONENT: the switch is read once, from the URL, into a ref (like debug
 
 // ── 5. No bypass ─────────────────────────────────────────────────────────────
 const usesOf = name => (CODE_NC.match(new RegExp('\\b' + name + '\\b', 'g')) || []).length;
-assert('NO BYPASS: STAGE_A_ENABLED is read only inside isStageAActive (declaration + 1 use)',
-  usesOf('STAGE_A_ENABLED') === 2 && !!stageSrc && /STAGE_A_ENABLED/.test(stageSrc));
+// UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): the function returns the default in two places (an unreadable address, no ?stageA) — still
+// read ONLY inside isStageAActive: every use outside its declaration is inside the function.
+assert('NO BYPASS: STAGE_A_ENABLED is read only inside isStageAActive (declaration + its uses in the function)',
+  !!stageSrc && usesOf('STAGE_A_ENABLED') === 1 + (stageSrc.match(/\bSTAGE_A_ENABLED\b/g) || []).length && /STAGE_A_ENABLED/.test(stageSrc));
 assert('NO BYPASS: REMOTE_TELEMETRY_ENABLED is read only inside isRemoteTelemetryActive (declaration + 1 use)',
   usesOf('REMOTE_TELEMETRY_ENABLED') === 2 && !!telSrc && /REMOTE_TELEMETRY_ENABLED/.test(telSrc));
 

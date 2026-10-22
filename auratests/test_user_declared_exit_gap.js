@@ -38,7 +38,8 @@ function extract(name) {
 // Same six dependencies test_first_why_session.js pins from decideTermination's own source — not
 // a hand-picked subset, so this cannot silently omit a real dependency and fail misleadingly.
 const DEPS = ['matchesClosingWord', 'isBareEmojiOrAcknowledgment', 'wasThirdTriggerAsked',
-              'isExplicitClosure', 'isModelPreClosing', 'declaresClosing'];
+              'isExplicitClosure', 'isModelPreClosing', 'declaresClosing',
+              'isOpeningGreeting']; // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): + isOpeningGreeting — a bare «γεια» before any conversation is an opening, not an exit
 for (const n of DEPS) eval(extract(n));
 eval(extract('decideTermination'));
 

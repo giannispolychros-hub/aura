@@ -51,7 +51,7 @@ function extractBlock(startToken) {
 }
 const NAMES = ['isExplicitClosure', 'declaresClosing', 'matchesClosingWord', 'detectSafetySignal', 'classifyCrisisTier', 'mergeRiskKind',
   'stageALeavingDoorOpens', 'initialStageAState', 'stageAStep', 'stageATelemetry', 'substanceOfSentence', 'splitSentences',
-  'rootTextHasSubstance', 'pickKnewSnippet'];
+  'rootTextHasSubstance', 'pickKnewSnippet', 'isOpeningGreeting']; // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): the opening «γεια»
 const srcs = NAMES.map(n => extractBlock('function ' + n + '(') || `function ${n}(){return undefined}`);
 const consts = ['ROOT_MIN_SUBSTANCE_WORDS', 'KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_FILLER_WORDS'].map(n => {
   const a = CODE.indexOf('const ' + n + ' = ');
@@ -127,7 +127,9 @@ assert('B: the gate does not use the T1 detector (matchesClosingWord) or a new d
   const hash = x => require('crypto').createHash('sha256').update(x || '', 'utf8').digest('hex').slice(0, 16);
   const sha = n => hash(extractBlock('function ' + n + '('));
   assert('B: T1/T2 unchanged — decideTermination, matchesClosingWord, isExplicitClosure, declaresClosing are byte-identical to before',
-    hash(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && sha('matchesClosingWord') === 'c3d044cc974bb7ac' &&
+    // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
+    // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
+    hash(fullFnSrc('decideTermination')) === '60778a7e90295a31' && sha('matchesClosingWord') === 'c3d044cc974bb7ac' &&
     sha('isExplicitClosure') === '09da70474755ef40' && sha('declaresClosing') === '25fe9be3bbcfaa57'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24); again (ADR «12 Οκτωβρίου (β)»): «αντίο», «τα λέμε» too; (γ): not right after a negation
 }
 

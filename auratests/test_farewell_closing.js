@@ -43,8 +43,9 @@ function emojiAddition(lastUserMsg) {
 }
 assert("bare emoji after farewell → close, not reopen", emojiAddition("Καληνύχτα") === CLOSE);
 assert("bare emoji after 'Επίσης' → close", emojiAddition("Επίσης") === CLOSE);
+// UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): the closing check is the same, + a bare «γεια» before any conversation is not a closing
 assert("the mirror above matches App.jsx (same two sentences, same closing check)",
-  raw.includes('const userWasClosing = matchesClosingWord(lastUserMsg) || declaresClosing(lastUserMsg);') &&
+  raw.includes('const userWasClosing = (matchesClosingWord(lastUserMsg) || declaresClosing(lastUserMsg)) && !isOpeningGreeting(lastUserMsg, _earlierUserTexts);') &&
   raw.includes('const addition = userWasClosing ? "Ευχαριστώ που το μοιράστηκες. Να είσαι καλά." : "Τι σκέφτεσαι τώρα;";') &&
   !raw.includes('const addition = userWasClosing ? "Καληνύχτα."') && !raw.includes('const addition = userWasClosing ? "Καλή συνέχεια."'));
 assert("bare emoji mid-conversation → forward question", emojiAddition("Σκέφτομαι κάτι") === "Τι σκέφτεσαι τώρα;");

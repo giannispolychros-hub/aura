@@ -38,7 +38,8 @@ function fullFnSrc(name, src) {
 const constSrc = n => { const a = CODE.indexOf('const ' + n + ' = '); return a >= 0 ? CODE.slice(a, CODE.indexOf(';\n', a) + 1) : ''; };
 const NAMES = ['stageALeavingDoorOpens', 'decideTermination', 'detectsConcreteStep', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord',
   'isModelPreClosing', 'isBareEmojiOrAcknowledgment', 'wasThirdTriggerAsked', 'detectSafetySignal', 'replaceBareGoodbye', 'buildCrisisLine',
-  'rootAnswerIsUnsure', 'rootTextHasSubstance', 'substanceOfSentence', 'splitSentences', 'stageAFlowTelemetry'];
+  'rootAnswerIsUnsure', 'rootTextHasSubstance', 'substanceOfSentence', 'splitSentences', 'stageAFlowTelemetry',
+  'isOpeningGreeting']; // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): a bare «γεια» before any conversation is an opening, not an exit
 let F = {};
 try {
   const consts = ['BARE_GOODBYE_TEXT', 'ROOT_MIN_SUBSTANCE_WORDS', 'ROOT_FILLER_WORDS', 'KNEW_MIN_SUBSTANCE_WORDS'].map(constSrc).join('\n');

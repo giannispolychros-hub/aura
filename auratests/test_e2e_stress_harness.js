@@ -477,7 +477,8 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   assert('FOUNDER METRICS: stops (and how many gentle), risk checks (the app\'s own detector), choice questions, a bare «Καλή συνέχεια.»',
     M.stops === 2 && M.gentle === 1 && M.riskChecks === 1 && M.choice === 1 && M.bareGoodbye === 1 && M.stopExamples.length === 2 && M.choiceExamples.length === 1);
   assert('FOUNDER: a «closed» session opens the normal flow and skips the root-flow checks; every session gets the metrics',
-    /await page\.goto\(BASE \+ \(p\.closed \? '\/\?rec=1' : '\/\?stageA=1&rec=1'\)\);/.test(RUNNER) && /if \(!p\.closed && SL\.preRootClosingChecked\(/.test(RUNNER) &&
+    // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): Stage A is the default now — a «closed» session asks for the old flow with ?stageA=0
+    /await page\.goto\(BASE \+ \(p\.closed \? '\/\?stageA=0&rec=1' : '\/\?stageA=1&rec=1'\)\);/.test(RUNNER) && /if \(!p\.closed && SL\.preRootClosingChecked\(/.test(RUNNER) &&
     /if \(!p\.closed && !p\.short\) for \(const x of SL\.telemetryIssues\(sess\.events, acts\)\)/.test(RUNNER) && /* UPDATED (17/10): not for a short session either */ /sess\.founder = SL\.founderMetrics\(auraTurns\.map\(t => t\.text\), APP\.fns\.detectsRiskClarification\);/.test(RUNNER));
   assert('WIRING: a fixed card step can be «correct» (to type a crisis into «Διόρθωσε»)',
     RUNNER.includes("verdict = st && st.card === 'back' ? 'notyet' : st && st.card === 'correct' ? 'correct' : 'yes';"));

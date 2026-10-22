@@ -165,7 +165,8 @@ const SITES = [
   ['explicitClosure telemetry counts a closing that carries content, too', null, '_declared = true'],
   ['closingDriftCtx\'s index-finder recognises a content-carrying closing', null, 'endsWithClosingSignal(m.content)'],
   ['decidePostMapClose\'s userClosing recognises a content-carrying closing', null, 'userClosing: isExplicitClosure'],
-  ['the bare-emoji reply chooser recognises a content-carrying closing (same trade-off as F015, accepted)', null, 'userWasClosing = matchesClosingWord'],
+  // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): the line now opens with «(» — + «&& !isOpeningGreeting(…)» for a bare «γεια» before any conversation
+  ['the bare-emoji reply chooser recognises a content-carrying closing (same trade-off as F015, accepted)', null, 'userWasClosing = (matchesClosingWord'],
 ];
 SITES.forEach(([label, _re, name]) => {
   // Every executable line that mentions this name, so the check cannot land on a declaration.

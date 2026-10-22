@@ -127,7 +127,9 @@ assert('UNCHANGED: the question text and the «Δεν το βρήκα ακόμα
   CODE.includes('ask: "Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;",') && CODE.includes('back: "Δεν το βρήκα ακόμα, συνέχισε",'));
 assert('UNCHANGED: the crisis capture rule and the root rule (byte for byte)',
   sha(extractBlock('function stageACaptureAllowed(')) === 'e45f98e42434f208' && sha(extractBlock('function rootTextHasSubstance(')) === '11d0cb226862ec80');
-assert('UNCHANGED: the closings (decideTermination byte for byte)', sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6');
+// UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
+// (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
+assert('UNCHANGED: the closings (decideTermination byte for byte)', sha(fullFnSrc('decideTermination')) === '60778a7e90295a31');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);

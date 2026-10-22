@@ -90,7 +90,8 @@ const SHORT = JOHN.slice(0, 4); // two user messages so far
   const at = GEN.indexOf('const masterPriorityStageCtx = (() => {');
   const blk = at >= 0 ? GEN.slice(at, GEN.indexOf('const lastFiredFamilyCtx', at)) : '';
   assert('1: wiring — the three closing detectors line is byte for byte as before',
-    blk.includes('const userSignalsClosing = isExplicitClosure(lastUserText) || declaresClosing(lastUserText) || matchesClosingWord(lastUserText);'));
+    // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): + the opening «γεια» (isOpeningGreeting) — the line is otherwise as before
+    blk.includes('const userSignalsClosing = (isExplicitClosure(lastUserText) || declaresClosing(lastUserText) || matchesClosingWord(lastUserText)) && !isOpeningGreeting(lastUserText, _earlierUserTexts);'));
   assert('1: wiring — switch closed → the old expression only (short-circuit), the gate runs only with the switch open',
     /const stage = computeMasterPriorityStage\(safetyMode, msgCount, userSignalsClosing && \(!stageAActive\.current \|\| stageAKeepsGracefulExit\(\{/.test(blk));
   assert('1: wiring — the decision is decideTermination on THIS message, no reply text, no model signal, same options as the real call',
@@ -166,7 +167,8 @@ const SHORT = JOHN.slice(0, 4); // two user messages so far
   // UPDATED (12/10/2026, ADR «12 Οκτωβρίου (β)», John's approved text): the closing sentence is «Ευχαριστώ που το μοιράστηκες. Να είσαι
   // καλά.», never a bare «Καλή συνέχεια.»; the rule around it is unchanged.
   assert('2: wiring — the rule itself is as before: the closing check, the two sentences',
-    blk.includes('const userWasClosing = matchesClosingWord(lastUserMsg) || declaresClosing(lastUserMsg);') &&
+    // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): + the opening «γεια» (isOpeningGreeting) — the line is otherwise as before
+    blk.includes('const userWasClosing = (matchesClosingWord(lastUserMsg) || declaresClosing(lastUserMsg)) && !isOpeningGreeting(lastUserMsg, _earlierUserTexts);') &&
     blk.includes('const addition = userWasClosing ? "Ευχαριστώ που το μοιράστηκες. Να είσαι καλά." : "Τι σκέφτεσαι τώρα;";'));
   assert('2: wiring — only when the user was closing, the same decision as the real call (this reply, the model signal), supportive → none',
     // UPDATED (10/10, ADR «10 Οκτωβρίου», 1): the same decision now passes through the pre-root gate.
@@ -182,7 +184,9 @@ const SHORT = JOHN.slice(0, 4); // two user messages so far
 
 // ── Not touched ──────────────────────────────────────────────────────────────
 assert('UNCHANGED: the closings and the leaving door (byte for byte)',
-  sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'f33ed155faa93145'); // UPDATED (δ): the leaving door no longer reads the decision
+  // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
+  // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
+  sha(fullFnSrc('decideTermination')) === '60778a7e90295a31' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'e55ba1a0d4c46f3c'); // UPDATED (δ): the leaving door no longer reads the decision
 assert('UNCHANGED: the first-closing door and door 3 before the model are still there',
   SUB.includes('// STAGE A — «Πριν φύγεις:» BEFORE the model') && SUB.includes('// STAGE A — door 3 without substance BEFORE the model'));
 

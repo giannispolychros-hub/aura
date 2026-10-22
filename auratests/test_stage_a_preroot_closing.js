@@ -110,15 +110,17 @@ for (const [name, hist, u, text, o, expect] of CASES) {
 {
   assert('WIRING: the decision after a reply goes through the gate — same call, same options, this message as lastUserText',
     /const decision = stageAPreRootDecision\(currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{\s*safetyMode,\s*currentMode,/.test(GEN) &&
-    /\}\), \{ active: stageAActive\.current, rootConfirmed: stageARef\.current\.stats\.rootConfirmed === 1, lastUserText: _saLastText \}\);/.test(GEN) &&
+    // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): + the opening «γεια» (isOpeningGreeting) — the line is otherwise as before
+    /\}\), \{ active: stageAActive\.current, rootConfirmed: stageARef\.current\.stats\.rootConfirmed === 1, lastUserText: _saLastText, earlierUserTexts: _earlierUserTexts \}\);/.test(GEN) &&
     /const _saLastText = msgs\.length && msgs\[msgs\.length - 1\]\.role === "user" \? String\(msgs\[msgs\.length - 1\]\.content \|\| ""\) : "";/.test(GEN));
   assert('WIRING: GRACEFUL EXIT uses the same gate on the user-side decision',
-    /decision: stageAPreRootDecision\(decideTermination\(msgs, "", \{/.test(GEN) && /\}\), \{ active: true, rootConfirmed: stageARef\.current\.stats\.rootConfirmed === 1, lastUserText \}\),/.test(GEN));
+    /decision: stageAPreRootDecision\(decideTermination\(msgs, "", \{/.test(GEN) && /\}\), \{ active: true, rootConfirmed: stageARef\.current\.stats\.rootConfirmed === 1, lastUserText, earlierUserTexts: _earlierUserTexts \}\),/.test(GEN)); // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): + the opening «γεια» (isOpeningGreeting) — the line is otherwise as before
   const at = GEN.indexOf('if (isBareEmojiOrAcknowledgment(displayText)) {');
   const blk = at >= 0 ? GEN.slice(at, GEN.indexOf('// EXPLICIT STYLE PREFERENCE', at)) : '';
   assert('WIRING: the empty-reply rule sees the same gated decision (a card that does not open does not count)',
     /decision: stageAPreRootDecision\(currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{/.test(blk) &&
-    /\}\), \{ active: stageAActive\.current, rootConfirmed: stageARef\.current\.stats\.rootConfirmed === 1, lastUserText: lastUserMsg \}\),/.test(blk));
+    // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): + the opening «γεια» (isOpeningGreeting) — the line is otherwise as before
+    /\}\), \{ active: stageAActive\.current, rootConfirmed: stageARef\.current\.stats\.rootConfirmed === 1, lastUserText: lastUserMsg, earlierUserTexts: _earlierUserTexts \}\),/.test(blk));
   // UPDATED (12/10/2026, ADR «12 Οκτωβρίου (β)», John's approved text): the closing sentence is «Ευχαριστώ που το μοιράστηκες. Να είσαι
   // καλά.», never a bare «Καλή συνέχεια.»; the rule around it is unchanged.
   assert('WIRING: before the root (switch open) a closing word with no closing opening gets NO farewell — the existing «Τι σκέφτεσαι τώρα;» (no new text)',
@@ -136,7 +138,9 @@ for (const [name, hist, u, text, o, expect] of CASES) {
     /hideReflection=\{stageAActive\.current && \(stageAView\.stats\.rootConfirmed !== 1 \|\| stageAStepOpen\(stageAPhase\)\)\}/.test(CODE) &&
     /onContinueToReflection=\{\(\) => \{ if \(sessionEnded \|\| loading[^\n]*\|\| \(stageAActive\.current && \(stageARef\.current\.stats\.rootConfirmed !== 1 \|\| stageAStepOpen\(stageARef\.current\.phase\)\)\)\) return; handleClosureConfirm\(true\); \}\}/.test(CODE));
   assert('UNCHANGED: decideTermination and the leaving-door gate byte for byte (the T1–T8 logic itself is untouched)',
-    sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'f33ed155faa93145'); // UPDATED (δ): the leaving door no longer reads the decision
+    // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
+    // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
+    sha(fullFnSrc('decideTermination')) === '60778a7e90295a31' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'e55ba1a0d4c46f3c'); // UPDATED (δ): the leaving door no longer reads the decision
   assert('UNCHANGED: the first T2 still opens the root question before the model (the door is not touched)',
     CODE.includes('// STAGE A — «Πριν φύγεις:» BEFORE the model') && /stageADispatch\(\{ type: "leaving" \}\);/.test(CODE));
 }

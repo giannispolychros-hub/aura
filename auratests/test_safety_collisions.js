@@ -78,7 +78,9 @@ assert('2: the only supportive call is the crisis branch (so «supportive turn»
   // T1–T8 themselves are not touched: the same pins as test_stage_a_leaving_door.js (B).
   const fnSha = n => sha(extractBlock('function ' + n + '(') || '');
   assert('2: decideTermination, matchesClosingWord, isExplicitClosure, declaresClosing unchanged (byte for byte)',
-    sha(fullFnSrc('decideTermination')) === 'a8a8f403a2d5adb6' && fnSha('matchesClosingWord') === 'c3d044cc974bb7ac' &&
+    // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
+    // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
+    sha(fullFnSrc('decideTermination')) === '60778a7e90295a31' && fnSha('matchesClosingWord') === 'c3d044cc974bb7ac' &&
     fnSha('isExplicitClosure') === '09da70474755ef40' && fnSha('declaresClosing') === '25fe9be3bbcfaa57'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24); again (ADR «12 Οκτωβρίου (β)»): «αντίο», «τα λέμε» too; (γ): not right after a negation
 }
 {

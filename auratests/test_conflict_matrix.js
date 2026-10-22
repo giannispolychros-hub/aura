@@ -245,6 +245,8 @@ eval(extract('isExplicitClosure'));
 // needs both in scope. Without this the suite does not fail — it CRASHES, producing no result line
 // at all, which the runner treats as fatal precisely because a silent suite is worse than a red one.
 eval(extract('declaresClosing'));
+// UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): + isOpeningGreeting — a bare «γεια» before any conversation is an opening, not an exit
+eval(extract('isOpeningGreeting'));
 
 // gatesCtx is an inline IIFE, not a named function, so it is located by its own opening text and
 // then EVALUATED — the same behavioural approach the first-reply-floor section above uses, and for
@@ -295,6 +297,9 @@ function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = 
   // UPDATED 19/10 (ADR «19 Οκτωβρίου (δ)»): the block reads one more input, `_safetyPath` (the crisis turn and every turn after the
   // crisis line) — same lesson as roadPending and stageAActive above. Default false: every assertion below runs exactly as before.
   const _safetyPath        = safetyPath;
+  // UPDATED 22/10 (ADR «22 Οκτωβρίου (ε)»): one more input, `_earlierUserTexts` (the user's messages before the latest — a bare «γεια»
+  // before any conversation is an opening, not an exit). Here the earlier messages are a real conversation: every assertion runs as before.
+  const _earlierUserTexts  = msgs.filter(m => m.role === 'user').slice(0, -1).map(m => String(m.content || ''));
   const _text = eval(gatesTemplate);
   gatesTextWhen.lastSnapshot = gatesDueSnapshot.current;
   return _text;

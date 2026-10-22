@@ -38,7 +38,8 @@ const CALLED = [...new Set((DT_SRC.match(/\b([a-z][a-zA-Z0-9]{3,})\(/g) || []).m
 // on isExplicitClosure alone. This pin is what forced the harness to be updated rather than letting
 // the simulation fail misleadingly — a missing dependency does not fail loudly, it fails wrong.
 const EXPECTED = ['matchesClosingWord', 'isBareEmojiOrAcknowledgment', 'wasThirdTriggerAsked',
-                  'isExplicitClosure', 'isModelPreClosing', 'declaresClosing'];
+                  'isExplicitClosure', 'isModelPreClosing', 'declaresClosing',
+                  'isOpeningGreeting']; // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): + isOpeningGreeting — a bare «γεια» before any conversation is an opening, not an exit
 assert("decideTermination's module-level dependencies are exactly the six this harness lifts"
   + (CALLED.length ? " (" + CALLED.join(", ") + ")" : ""),
   CALLED.length === EXPECTED.length && EXPECTED.every(n => CALLED.includes(n)));

@@ -64,6 +64,14 @@ async function startApp() {
   const url = (server.resolvedUrls && server.resolvedUrls.local && server.resolvedUrls.local[0] || 'http://localhost:5299/').replace(/\/$/, '');
   return { url, close: async () => { await new Promise(r => server.httpServer.close(r)); fs.rmSync(buildDir, { recursive: true, force: true }); } };
 }
+// ADR «22 Οκτωβρίου (ε)» (John): Stage A is now the DEFAULT flow (the switch in App.jsx is open). The sections below were written when the
+// plain address was the old flow, and «switch closed» in them means the old flow: a query with no stageA asks for it explicitly
+// (stageA=0). Queries that already name stageA are unchanged. A check of the plain address itself (GL, DF) opens it with no helper.
+function oldFlowIfUnnamed(query) {
+  const q = String(query || '');
+  if (/(?:^|[?&])stageA=/.test(q)) return q;
+  return q ? q + '&stageA=0' : '?stageA=0';
+}
 function writeOut(name, text) {
   const t = LIB.redact(text, KEY);
   LIB.assertNoSecret(t, KEY);
@@ -92,7 +100,7 @@ async function session(query, script) {
       body: JSON.stringify({ content: [{ type: 'text', text: reply }], usage: { input_tokens: 10, output_tokens: 10 } }) });
   });
   await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-  await page.goto(BASE + '/' + query);
+  await page.goto(BASE + '/' + oldFlowIfUnnamed(query));
   await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
   return { browser, page, calls };
 }
@@ -681,6 +689,7 @@ async function runMock() {
   await runMockAR();
   await runMockPM();
   await runMockGL();
+  await runMockDF();
   await runMockMC();
   await runMockMH();
   await runMockPV();
@@ -737,7 +746,7 @@ async function runMockOF() {
       const r = replies[Math.min(n, replies.length - 1)]; n++;
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
     });
-    await page.goto(BASE + '/' + query);
+    await page.goto(BASE + '/' + oldFlowIfUnnamed(query));
     return { browser, ctx, page };
   };
   const btn = (page, name) => page.getByRole('button', { name, exact: true });
@@ -899,7 +908,7 @@ async function runMockFT() {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
     });
     await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-    await page.goto(BASE + '/' + query);
+    await page.goto(BASE + '/' + oldFlowIfUnnamed(query));
     await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
     for (const m of msgs) { if (await page.locator('textarea.textarea').count()) await send(page, m); await page.waitForTimeout(300); }
     const aura = async () => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
@@ -1004,7 +1013,7 @@ async function runMockLR() {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
     });
     await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-    await page.goto(BASE + '/' + query);
+    await page.goto(BASE + '/' + oldFlowIfUnnamed(query));
     await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
     for (const m of msgs) { if (await page.locator('textarea.textarea').count()) await send(page, m); await page.waitForTimeout(300); }
     const aura = async () => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
@@ -1090,7 +1099,7 @@ async function runMockR3() {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
     });
     await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-    await page.goto(BASE + '/' + query);
+    await page.goto(BASE + '/' + oldFlowIfUnnamed(query));
     await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
     for (const m of msgs) { if (await page.locator('textarea.textarea').count()) await send(page, m); await page.waitForTimeout(300); }
     const aura = async () => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
@@ -1475,7 +1484,7 @@ async function runMockVO() {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
     });
     await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-    await page.goto(BASE + '/' + query);
+    await page.goto(BASE + '/' + oldFlowIfUnnamed(query));
     await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
     const aura = async () => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
     const lines = async () => page.locator('.method-line').count();
@@ -1698,7 +1707,7 @@ async function runMockST() {
       await route.fulfill({ status: out.status, contentType: 'application/json', body: JSON.stringify(out.data || {}) });
     });
     await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-    await page.goto(BASE + '/' + query);
+    await page.goto(BASE + '/' + oldFlowIfUnnamed(query));
     if (!(o && o.noStart)) await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
     return { browser, ctx, page, calls, cons };
   };
@@ -2574,7 +2583,7 @@ async function runMockY() {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: reply }], usage: { input_tokens: 10, output_tokens: 10 } }) });
     });
     await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-    await page.goto(BASE + '/' + query);
+    await page.goto(BASE + '/' + oldFlowIfUnnamed(query));
     return { browser, ctx, page, calls, reqs };
   };
   const begin = async s => {
@@ -2835,7 +2844,7 @@ async function runMockZ() {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
     });
     await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-    await page.goto(BASE + '/' + query);
+    await page.goto(BASE + '/' + oldFlowIfUnnamed(query));
     await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
     await send(page, F1); if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, WHY);
     return { browser, page, calls: () => n };
@@ -2900,7 +2909,7 @@ async function runMockCX() {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
     });
     await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-    await page.goto(BASE + '/' + query);
+    await page.goto(BASE + '/' + oldFlowIfUnnamed(query));
     await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
     await send(page, F1); if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, 'Γιατί κουράστηκα.');
     await page.waitForTimeout(500);
@@ -3032,7 +3041,7 @@ async function runMockSN() {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: REPLY }], usage: { input_tokens: 10, output_tokens: 10 } }) });
     });
     await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-    await page.goto(BASE + '/' + query);
+    await page.goto(BASE + '/' + oldFlowIfUnnamed(query));
     await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
     const turns = [];
     for (const m of msgs) {
@@ -3143,7 +3152,7 @@ async function runMockAR() {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text }], usage: { input_tokens: 10, output_tokens: 10 } }) });
     });
     await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-    await page.goto(BASE + '/' + query);
+    await page.goto(BASE + '/' + oldFlowIfUnnamed(query));
     await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
     for (const t of pre) await send(page, t);
     await page.waitForTimeout(500);
@@ -3185,7 +3194,7 @@ async function runMockPM() {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text }], usage: { input_tokens: 10, output_tokens: 10 } }) });
     });
     await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-    await page.goto(BASE + '/' + query);
+    await page.goto(BASE + '/' + oldFlowIfUnnamed(query));
     await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
     for (const t of pre) await send(page, t);
     await page.waitForTimeout(500);
@@ -3218,7 +3227,8 @@ async function runMockGL() {
   const F1 = 'Δουλεύω νοσηλεύτρια σε βάρδιες και είμαι συνέχεια κουρασμένη.', WHY = 'Γιατί δεν μου μένει τίποτα για μένα.';
   const PLAIN = 'Oi nyxterines vardies kyriws, den koimamai kala.';
   const RISK = 'Σε ακούω. Σκέφτεσαι να βλάψεις τον εαυτό σου;';
-  for (const [query, sw] of [['?stageA=1&rec=1', 'tester link'], ['?rec=1', 'switch closed'], ['', 'plain address']]) {
+  // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): the switch closed is now asked for with stageA=0; the plain address is Stage A (the default).
+  for (const [query, sw] of [['?stageA=1&rec=1', 'tester link'], ['?stageA=0&rec=1', 'switch closed'], ['', 'plain address']]) {
     // «δεν αντέχω άλλο», in Greek, is the reference for the Greeklish tier B: the same line, the same screen
     for (const [msg, tier] of [['Eimai kourasmeni apo tis vardies kai den antexo allo na zw', 'A'], ['thelo na pethano', 'A'], ['den antexo allo', 'B'], ['δεν αντέχω άλλο', 'B'], ['δεν θελο να ζο', 'A']]) {
       const browser = await launch();
@@ -3252,10 +3262,151 @@ async function runMockGL() {
       ok(`GL (${sw}): «${msg.slice(0, 34)}» → the supportive request, the tier-${tier} line on the screen (${tier === 'A' ? '1018' : '10306'}), not the other one; ` +
         (tier === 'A' ? 'no root button' : 'the root button as for any tier B (§1.5)'),
         bodies.length === n1 + 1 && kind === 'supportive' && last.includes(RISK) && last.includes(want) && !last.includes(other) &&
-        button === (tier === 'B' && sw === 'tester link' ? 1 : 0));
+        button === (tier === 'B' && sw !== 'switch closed' ? 1 : 0));
       if (msg === 'thelo na pethano') await page.screenshot({ path: path.join(OUT, 'GL-' + sw.replace(/ /g, '_') + '-' + (VP ? VP.width : 390) + '.png'), fullPage: false }).catch(() => {});
       await browser.close();
     }
+  }
+}
+// ── DF: Stage A is the DEFAULT flow (ADR «22 Οκτωβρίου (ε)», John: the testers and main must not see different apps). The plain link and
+// ?stageA=1 open Stage A, ?stageA=0 the old flow. For each of the four addresses: which flow opens, EVERY network request of the visit
+// (only the app's own files and the model request /api/aura — nothing recorded is sent anywhere), and whether the device log of numbers
+// is kept (only with rec=1). No service worker, no Cache API, nothing in sessionStorage; a visitor who used the old flow before gets the
+// default on the plain link. Then «Γεια» as the first message: an opening, not an exit — it goes to the model like «Γεια σου», no
+// leaving question, and the next message is a conversation, not a root card; «γεια» after a conversation is still an exit (door 4); the
+// old flow (?stageA=0) shows no closing for a first «Γεια».
+async function runMockDF() {
+  const T = APP.texts;
+  const FIRST_WHY = 'Γιατί έχει σημασία αυτό για σένα τώρα;';
+  const F1 = 'Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.', WHY = 'Γιατί κάθε μέρα είναι ίδια και δεν αλλάζει τίποτα.';
+  const MORE = ['Με κρατάει ο μισθός και ο φόβος.', 'Με τραβάει κάτι δικό μου, κάτι με τα χέρια.', 'Θα σήμαινε ότι ρισκάρω.', 'Δεν ξέρω, μάλλον αυτό.'];
+  const REPLIES = ['Τι σε κρατάει εκεί;', 'Και τι σε τραβάει αλλού;', 'Τι θα σήμαινε αυτό για σένα;', 'Τι άλλο υπάρχει εκεί;', 'Και τότε;', 'Τι γίνεται μετά;', 'Πώς το βλέπεις τώρα;'];
+  const W = VP ? VP.width : 390;
+  const origin = () => new URL(BASE).origin;
+  const open = async (query, ctx0) => {
+    const browser = ctx0 ? null : await launch();
+    const ctx = ctx0 || await browser.newContext({ viewport: vpOr({ width: 390, height: 844 }) });
+    const page = await ctx.newPage();
+    const bodies = [], reqs = [];
+    let n = 0;
+    page.on('request', r => reqs.push({ url: r.url(), method: r.method(), type: r.resourceType() }));
+    await page.route('**/api/aura', async route => {
+      let body = {}; try { body = JSON.parse(route.request().postData() || '{}'); } catch (e) {}
+      bodies.push(body);
+      const text = REPLIES[Math.min(n++, REPLIES.length - 1)];
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    return { browser, ctx, page, bodies, reqs };
+  };
+  const shown = async (page, text) => (await page.getByText(text, { exact: false }).count()) > 0;
+  const rootButton = async page => page.getByRole('button', { name: T.button }).count();
+  // the flow that opened: Stage A answers the first message with the model and shows the root button; the old flow asks First-WHY first
+  const flowOf = async s => {
+    await send(s.page, F1);
+    const firstWhy = await shown(s.page, FIRST_WHY), calls1 = s.bodies.length, btn1 = await rootButton(s.page);
+    if (firstWhy) await send(s.page, WHY);
+    for (const m of MORE.slice(0, 2)) await send(s.page, m);
+    const btnAfter = await rootButton(s.page);
+    if (!firstWhy && calls1 === 1 && btn1 === 1 && btnAfter === 1) return 'Stage A';
+    if (firstWhy && calls1 === 0 && btn1 === 0 && btnAfter === 0) return 'old flow';
+    return 'unclear (First-WHY ' + firstWhy + ', calls ' + calls1 + ', button ' + btn1 + '/' + btnAfter + ')';
+  };
+  // every request of the visit: the app's own files (GET, same origin) and the model request (POST /api/aura); anything else would be a send
+  const network = s => {
+    const o = origin(), api = o + '/api/aura';
+    const own = s.reqs.filter(r => r.method === 'GET' && r.url.startsWith(o + '/') && r.url !== api && ['document', 'script', 'stylesheet', 'font', 'image', 'other'].includes(r.type));
+    const model = s.reqs.filter(r => r.url === api && r.method === 'POST' && r.type === 'fetch');
+    const other = s.reqs.filter(r => !own.includes(r) && !model.includes(r));
+    return { own, model, other, paths: [...new Set(own.map(r => r.type + ' ' + new URL(r.url).pathname.replace(/-[A-Za-z0-9_-]{6,}\./, '-*.')))].sort() };
+  };
+  const storage = async page => page.evaluate(async () => {
+    let log = null; try { log = JSON.parse(localStorage.getItem('aura_telemetry_log') || 'null'); } catch (e) { log = 'unreadable'; }
+    let sw = 'none'; try { sw = navigator.serviceWorker ? (await navigator.serviceWorker.getRegistrations()).length : 'none'; } catch (e) { sw = 'error'; }
+    let cache = 'none'; try { cache = typeof caches !== 'undefined' ? (await caches.keys()).length : 'none'; } catch (e) { cache = 'error'; }
+    return { events: (window.__auraTelemetry || []).length, log: Array.isArray(log) ? log.length : log, session: sessionStorage.length,
+      keys: Object.keys(localStorage).sort(), sw, cache };
+  });
+
+  // ── 1. the four addresses ──
+  for (const [query, label, wantFlow, wantLog] of [['', 'plain link', 'Stage A', false], ['?stageA=1', '?stageA=1', 'Stage A', false],
+    ['?stageA=1&rec=1', '?stageA=1&rec=1', 'Stage A', true], ['?stageA=0', '?stageA=0', 'old flow', false]]) {
+    const s = await open(query);
+    const flow = await flowOf(s);
+    await s.page.waitForTimeout(300);
+    const net = network(s), st = await storage(s.page);
+    const bodiesClean = s.bodies.every(b => !/aura_telemetry|"ev":/.test(JSON.stringify(b)));
+    ok(`DF (${label}, ${W}px): opens ${wantFlow} — ${flow}`, flow === wantFlow);
+    ok(`DF (${label}, ${W}px): every request is the app's own file or the model request — nothing else leaves the device (${net.own.length} files, ${net.model.length} model requests, ${net.other.length} other${net.other.length ? ': ' + net.other.map(r => r.method + ' ' + r.type + ' ' + r.url).join(', ') : ''})`,
+      net.other.length === 0 && net.model.length === s.bodies.length && net.model.length >= 3 && bodiesClean);
+    ok(`DF (${label}, ${W}px): the device log of numbers ${wantLog ? 'IS kept (rec=1)' : 'is NOT kept (no rec=1)'} — ${st.events} events in the page, log ${st.log === null ? 'absent' : st.log + ' entries'}`,
+      st.events > 0 && (wantLog ? typeof st.log === 'number' && st.log === st.events : st.log === null));
+    ok(`DF (${label}, ${W}px): no service worker, no Cache API entry, nothing in sessionStorage, no stored flow flag (localStorage: ${st.keys.join(', ')})`,
+      st.sw === 0 && (st.cache === 0 || st.cache === 'none') && st.session === 0 && !st.keys.some(k => /stage|flow|switch/i.test(k)));
+    results.push(`INFO — DF (${label}, ${W}px): requests: ${net.paths.join(' · ')} · POST /api/aura ×${net.model.length}`);
+    await s.page.screenshot({ path: path.join(OUT, 'DF-' + (query.replace(/[?&=]/g, '_') || 'plain') + '-' + W + '.png'), fullPage: false }).catch(() => {});
+    await s.ctx.close(); await s.browser.close();
+  }
+
+  // ── 2. a visitor who used the old flow before: the same browser, the plain link → the default (nothing remembered) ──
+  {
+    const first = await open('?stageA=0&rec=1');
+    const was = await flowOf(first);
+    await first.page.close();
+    const again = await open('', first.ctx);
+    const now = await flowOf(again);
+    ok(`DF (${W}px): the same browser after a visit to the old flow (${was}) — the plain link opens ${now}: nothing is remembered`, was === 'old flow' && now === 'Stage A');
+    await again.ctx.close(); await first.browser.close();
+  }
+
+  // ── 3. «Γεια» as the first message (the rehearsal of the 20, session 8) ──
+  const firstMessage = async (query, hello) => {
+    const s = await open(query);
+    await send(s.page, hello);
+    const r = { calls: s.bodies.length, kind: s.bodies[0] ? LIB.classifyRequest(s.bodies[0], APP) : null,
+      leaving: await shown(s.page, T.askLeaving), card: await shown(s.page, T.cardOwn), reply: await shown(s.page, REPLIES[0]),
+      firstWhy: await shown(s.page, FIRST_WHY), closing: await s.page.getByRole('button', { name: 'Δείξε μου' }).count() };
+    // the input may be gone (a closing card took the screen — the old behaviour): then the conversation did not go on
+    r.input2 = (await s.page.locator('textarea.textarea').count()) > 0;
+    if (r.input2) await send(s.page, F1);
+    r.calls2 = s.bodies.length; r.card2 = await shown(s.page, T.cardOwn); r.leaving2 = await shown(s.page, T.askLeaving);
+    r.reply2 = await shown(s.page, REPLIES[1]); r.kinds = s.bodies.map(b => LIB.classifyRequest(b, APP).kind);
+    r.closing2 = await s.page.getByRole('button', { name: 'Δείξε μου' }).count();
+    if (hello === 'Γεια' && !query) await s.page.screenshot({ path: path.join(OUT, 'DF-hello-plain-' + W + '.png'), fullPage: false }).catch(() => {});
+    await s.browser.close();
+    return r;
+  };
+  // the plain link (now Stage A) and the tester link ?stageA=1 (where session 8 happened): the same Stage A, the same result
+  for (const [q, where] of [['', 'plain link'], ['?stageA=1', '?stageA=1']]) {
+    const ref = await firstMessage(q, 'Γεια σου');
+    for (const hello of ['Γεια', 'Γεια.', 'γειά']) {
+      const r = await firstMessage(q, hello);
+      ok(`DF (${where}, ${W}px): «${hello}» first → goes to the model like «Γεια σου» (the same request notes), no leaving question, no root card`,
+        r.calls === 1 && r.kind && r.kind.kind === 'main' && r.reply && !r.leaving && !r.card &&
+        JSON.stringify(r.kind.ctx) === JSON.stringify(ref.kind && ref.kind.ctx));
+      ok(`DF (${where}, ${W}px): «${hello}» first, then «${F1.slice(0, 28)}…» → a conversation (the model answers), NOT a root card`,
+        r.input2 && r.calls2 === 2 && r.reply2 && !r.card2 && !r.leaving2 && r.kinds.every(k => k === 'main'));
+    }
+    ok(`DF (${where}, ${W}px): «Γεια σου» first → the model, as before (the reference)`, ref.input2 && ref.calls === 1 && ref.kind && ref.kind.kind === 'main' && !ref.leaving && !ref.card && ref.calls2 === 2 && !ref.card2);
+  }
+  {
+    const r = await firstMessage('?stageA=0', 'Γεια');
+    ok(`DF (?stageA=0, ${W}px): «Γεια» first in the old flow → no closing (no closing request, no «Δείξε μου»), the conversation goes on`,
+      r.input2 && r.closing === 0 && r.closing2 === 0 && r.kinds.every(k => k !== 'termination') && !r.leaving && !r.card);
+    results.push(`INFO — DF (?stageA=0, ${W}px): «Γεια» first → ${r.firstWhy ? 'First-WHY' : 'model reply ' + r.reply} · requests: ${r.kinds.join(', ') || 'none'}`);
+  }
+  // «γεια» after a conversation is still an exit: the 6th message opens door 4 (the leaving question), no model call for it
+  for (const [q, where] of [['', 'plain link'], ['?stageA=1', '?stageA=1']]) {
+    const s = await open(q);
+    for (const m of [F1, ...MORE]) if (await s.page.locator('textarea.textarea').count()) await send(s.page, m);
+    const before = s.bodies.length;
+    await send(s.page, 'γεια');
+    ok(`DF (${where}, ${W}px): «γεια» as the 6th message, after a conversation → still an exit: the leaving root question, no model call for it`,
+      before === 5 && s.bodies.length === before && await shown(s.page, T.askLeaving));
+    if (!q) await s.page.screenshot({ path: path.join(OUT, 'DF-hello-6th-' + W + '.png'), fullPage: false }).catch(() => {});
+    await s.browser.close();
   }
 }
 // Recorded on 013a4de (before ADR «19 Οκτωβρίου (δ)»), with the SN scripts above.
@@ -3284,7 +3435,7 @@ async function runMockMC() {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
     });
     await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-    await page.goto(BASE + '/' + query);
+    await page.goto(BASE + '/' + oldFlowIfUnnamed(query));
     await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
     await send(page, F1); if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, WHY);
     return { browser, page, bodies };
@@ -3763,7 +3914,7 @@ async function runStressSession(item, aura, user, budget) {
   });
   await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
   // ADR «12 Οκτωβρίου»: a persona with `closed` runs the NORMAL flow (switch closed); the root-flow checks do not apply to it.
-  await page.goto(BASE + (p.closed ? '/?rec=1' : '/?stageA=1&rec=1'));
+  await page.goto(BASE + (p.closed ? '/?stageA=0&rec=1' : '/?stageA=1&rec=1')); // 22/10 (ε): the closed personas ask for the old flow
   await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
 
   const btn = name => page.getByRole('button', { name, exact: true });
@@ -4245,7 +4396,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
