@@ -1,0 +1,11 @@
+
+===== A3: πίσω, διπλά πατήματα, λάθος σειρά, κενό, μόνο emoji
+κουμπί «πίσω» στη μέση της συζήτησης: από /?stageA=1&rec=1 → about:blank · «μπροστά» → /?stageA=1&rec=1 · οθόνη: αρχική (η συζήτηση χάθηκε)
+διπλό πάτημα στο «Go»: κλήσεις στο μοντέλο 1 · μηνύματα χρήστη στην οθόνη 1 · {"ok":true,"input":1,"buttons":5,"typing":0,"crash":false,"start":false,"ended":false,"errors":[],"err":""}
+διπλό πάτημα στο «Ναι, αυτό είναι»: root_answer ×1, step_shown ×1 · {"ok":true,"input":1,"buttons":5,"typing":0,"crash":false,"start":false,"ended":false,"errors":[],"err":""}
+«Δεν ξέρω ακόμα» δύο φορές στο βήμα: {"ok":true,"input":0,"buttons":14,"typing":0,"crash":false,"start":false,"ended":false,"errors":[],"err":""}
+κενή υποβολή: κλήσεις 0 · {"ok":true,"input":1,"buttons":4,"typing":0,"crash":false,"start":false,"ended":false,"errors":[],"err":""}
+μόνο κενά: κλήσεις 0
+μόνο emoji «😀» ως 1ο μήνυμα: κλήσεις 1 · οθόνη: «. Τίποτα άλλο. ΜΝΗΜΗ ΑΡΧΕΙΟ 😀 AURA Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ. Τι σε κρατάει εκεί; ΝΟΜΙΖΩ ΒΡΗΚΑ ΤΙ ΜΕ ΑΠΑΣΧΟΛΕΙ 🎙 Go 1 ανταλλαγή» · {"ok":true,"input":1,"buttons":5,"typing":0,"crash":false,"start":false,"ended":false,"errors":[],"err":""}
+μετά «🙏»: κλήσεις 2 · οθόνη: « σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ. Τι σε κρατάει εκεί; 🙏 AURA Και τι φοβάσαι πιο πολύ σε αυτό; ΝΟΜΙΖΩ ΒΡΗΚΑ ΤΙ ΜΕ ΑΠΑΣΧΟΛΕΙ 🎙 Go 2 ανταλλαγές»
+λάθος σειρά (κουμπί ρίζας στην αρχή: δεν υπάρχει; «Ναι, αυτό είναι», «Αύριο το πρωί.», «7» γραμμένα): κλήσεις 3 · {"ok":true,"input":1,"buttons":5,"typing":0,"crash":false,"start":false,"ended":false,"errors":[],"err":""}

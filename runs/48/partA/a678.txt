@@ -1,0 +1,139 @@
+
+===== A6: πλήρης συνεδρία Σταδίου Α, ?stageA=1 — η κάρτα ρίζας φάνηκε: true · τέλος: «ΚΤΗΣΛΕΞΗ AURA Τι σημαίνει αυτό για σένα; ΑΝΤΙΓΡΑΨΕ ΤΗΝ ΚΑΡΤΑ ΚΑΤΕΒΑΣΕ ΤΗΝ ΚΑΡΤΑ Η ΣΥΝΟΜΙΛΙΑ ΣΤΑΜΑΤΗΣΕ ΕΔΩ Επίστρεψε όταν υπάρχει κάτι νέο να δούμε. ΝΕΑ ΣΥΝΕΔΡΙΑ»
+localStorage κλειδιά: ["aura_intro_seen","aura_first_distillation_seen"]
+  aura_intro_seen (1 χαρ.): 1
+  aura_first_distillation_seen (1 χαρ.): 1
+sessionStorage: {} · IndexedDB: {} · Cache API: [] · service workers: 0
+cookies: [] · document.cookie: «»
+ΔΕΙΚΤΕΣ κειμένου χρήστη μέσα στην αποθήκευση: []
+
+===== A6: πλήρης συνεδρία Σταδίου Α, ?stageA=1&rec=1 — η κάρτα ρίζας φάνηκε: true · τέλος: «ΡΤΑ Η ΣΥΝΟΜΙΛΙΑ ΣΤΑΜΑΤΗΣΕ ΕΔΩ Επίστρεψε όταν υπάρχει κάτι νέο να δούμε. ΝΕΑ ΣΥΝΕΔΡΙΑ Μόνο αριθμοί — κανένα κείμενο της συζήτησης. ΣΤΕΙΛΕ ΤΑ ΣΤΟΙΧΕΙΑ ΤΗΣ ΔΟΚΙΜΗΣ»
+localStorage κλειδιά: ["aura_intro_seen","aura_first_distillation_seen","aura_telemetry_log"]
+  aura_intro_seen (1 χαρ.): 1
+  aura_first_distillation_seen (1 χαρ.): 1
+  aura_telemetry_log (1477 χαρ.): [{"ev":"session_started","t":1792699993759},{"ev":"root_card_shown","t":1792699996478,"door":1},{"ev":"root_answer","t":1792699997427,"answer":1,"from":2},{"ev":"step_shown","t":1792699997427,"value":1},{"ev":"root_provenance","t":1792699997428,"auraShare":0,"door":1},{"ev":"step_written","t":1792699999694,"value":1},{"ev":"step_fits_day","t":1792699999694,"value":1},{"ev":"when_written","t":1792699999694,"value":1},{"ev":"clarity_scale","t":1792700000643,"value":7},{"ev":"session_completed","t":1792700001327,"turns":2,"roadMap":false,"intentNoRoads":1,"roadLabels":false,"beatParsed":false,"beatLabels":false,"explicitClosure":false,"declIssued":0,"declAnswered":0,"roadRecoveredEver":false,"unsourcedOptions":0,"userClaims":0,"unverifiedFoundClaims":0,"labelLeaks":0,"violEvaluation":0,"violAdvice":0,"violRole":0,"violRoadMapMissing":0,"violAdviceCascade":0,"explicitRequests":0,"requestStreak":0,"gatesDue":0,"gatesIgnored":0,"lens":0,"lensSwitches":0,"roadRawLabelTurns":0,"roadRawMapTurns":0,"roadStrippedMapTurns":0,"rootDoor":1,"rootShown":1,"rootConfirmed":1,"rootCorrections":0,"rootBack":0,"rootButtonPressed":1,"rootAtReply":2,"coachOfferShown":0,"coachOfferClicked":0,"coachOfferDeclined":0,"coachOfferSuppressed":0,"suppressedBy":0,"rootSuppressedA":0,"coachHelpChoice":0,"lateClarity":7,"wordSameAsRoot":0,"knewHidden":0,"stageReached":4,"rootTooShort":0,"rootDoorFromClosing":0,"freeActionOffered":0,"freeDeferral":0,"askedActionBeforeRoot":0,"stageA":1}]
+sessionStorage: {} · IndexedDB: {} · Cache API: [] · service workers: 0
+cookies: [] · document.cookie: «»
+ΔΕΙΚΤΕΣ κειμένου χρήστη μέσα στην αποθήκευση: []
+
+===== A7: «Στείλε τα στοιχεία της δοκιμής» — πατήθηκε: true
+αρχείο: aura_dokimi_2026-10-22.json (2398 χαρ.)
+ΤΟ ΑΡΧΕΙΟ ΑΥΤΟΥΣΙΟ:
+{
+  "exportedAt": "2026-10-22T20:13:23.093Z",
+  "note": "AURA tester log — counts and flags only, never anything a person typed.",
+  "records": 10,
+  "events": [
+    {
+      "ev": "session_started",
+      "t": 1792699993759
+    },
+    {
+      "ev": "root_card_shown",
+      "t": 1792699996478,
+      "door": 1
+    },
+    {
+      "ev": "root_answer",
+      "t": 1792699997427,
+      "answer": 1,
+      "from": 2
+    },
+    {
+      "ev": "step_shown",
+      "t": 1792699997427,
+      "value": 1
+    },
+    {
+      "ev": "root_provenance",
+      "t": 1792699997428,
+      "auraShare": 0,
+      "door": 1
+    },
+    {
+      "ev": "step_written",
+      "t": 1792699999694,
+      "value": 1
+    },
+    {
+      "ev": "step_fits_day",
+      "t": 1792699999694,
+      "value": 1
+    },
+    {
+      "ev": "when_written",
+      "t": 1792699999694,
+      "value": 1
+    },
+    {
+      "ev": "clarity_scale",
+      "t": 1792700000643,
+      "value": 7
+    },
+    {
+      "ev": "session_completed",
+      "t": 1792700001327,
+      "turns": 2,
+      "roadMap": false,
+      "intentNoRoads": 1,
+      "roadLabels": false,
+      "beatParsed": false,
+      "beatLabels": false,
+      "explicitClosure": false,
+      "declIssued": 0,
+      "declAnswered": 0,
+      "roadRecoveredEver": false,
+      "unsourcedOptions": 0,
+      "userClaims": 0,
+      "unverifiedFoundClaims": 0,
+      "labelLeaks": 0,
+      "violEvaluation": 0,
+      "violAdvice": 0,
+      "violRole": 0,
+      "violRoadMapMissing": 0,
+      "violAdviceCascade": 0,
+      "explicitRequests": 0,
+      "requestStreak": 0,
+      "gatesDue": 0,
+      "gatesIgnored": 0,
+      "lens": 0,
+      "lensSwitches": 0,
+      "roadRawLabelTurns": 0,
+      "roadRawMapTurns": 0,
+      "roadStrippedMapTurns": 0,
+      "rootDoor": 1,
+      "rootShown": 1,
+      "rootConfirmed": 1,
+      "rootCorrections": 0,
+      "rootBack": 0,
+      "rootButtonPressed": 1,
+      "rootAtReply": 2,
+      "coachOfferShown": 0,
+      "coachOfferClicked": 0,
+      "coachOfferDeclined": 0,
+      "coachOfferSuppressed": 0,
+      "suppressedBy": 0,
+      "rootSuppressedA": 0,
+      "coachHelpChoice": 0,
+      "lateClarity": 7,
+      "wordSameAsRoot": 0,
+      "knewHidden": 0,
+      "stageReached": 4,
+      "rootTooShort": 0,
+      "rootDoorFromClosing": 0,
+      "freeActionOffered": 0,
+      "freeDeferral": 0,
+      "askedActionBeforeRoot": 0,
+      "stageA": 1
+    }
+  ]
+}
+ΠΡΟΧΕΙΡΟ (clipboard) ίδιο με το αρχείο: true
+κουτί ανάγνωσης στην οθόνη: όχι
+ΔΕΙΚΤΕΣ μέσα στο αρχείο / πρόχειρο: []
+
+===== A8: τομείς σε κάθε διεύθυνση
+«σκέτο λινκ»: {"localhost:5611":7} · διαδρομές: / /fonts/fonts.css /assets/index-*.js /fonts/cormorant-garamond-latin-300-normal.woff2 /fonts/dm-mono-latin-400-normal.woff2 /api/aura /fonts/dm-mono-latin-300-normal.woff2
+«?stageA=1»: {"localhost:5611":7} · διαδρομές: / /fonts/fonts.css /assets/index-*.js /fonts/cormorant-garamond-latin-300-normal.woff2 /fonts/dm-mono-latin-400-normal.woff2 /api/aura /fonts/dm-mono-latin-300-normal.woff2
+«?stageA=1&rec=1»: {"localhost:5611":7} · διαδρομές: / /fonts/fonts.css /assets/index-*.js /fonts/cormorant-garamond-latin-300-normal.woff2 /fonts/dm-mono-latin-400-normal.woff2 /api/aura /fonts/dm-mono-latin-300-normal.woff2
+«?stageA=0»: {"localhost:5611":8} · διαδρομές: / /fonts/fonts.css /assets/index-*.js /fonts/cormorant-garamond-latin-300-normal.woff2 /fonts/dm-mono-latin-400-normal.woff2 /fonts/cormorant-garamond-latin-300-italic.woff2 /fonts/dm-mono-latin-300-normal.woff2 /api/aura
