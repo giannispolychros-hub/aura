@@ -89,7 +89,9 @@ function loadApp(src) {
     return all;
   };
   const fns = {};
-  APP_FNS.forEach(n => { const b = block('function ' + n + '('); if (b) fns[n] = new Function(b + '\nreturn ' + n + ';')(); });
+  // Each function comes with lookBehind: since the old iPhones (Γ3, 22/10) a function that looks back calls it instead of a lookbehind.
+  const lookBehind = block('function lookBehind(');
+  APP_FNS.forEach(n => { const b = block('function ' + n + '('); if (b) fns[n] = new Function(lookBehind + '\n' + b + '\nreturn ' + n + ';')(); });
   const texts = (() => { try { return new Function(block('const STAGE_A_TEXTS = ') + ';\nreturn STAGE_A_TEXTS;')(); } catch (e) { return {}; } })();
   const marker = fns.buildStageAMarker ? fns.buildStageAMarker(true) : '';
   const arr = (code.match(/const dynamicSuffix = \[([\s\S]*?)\]\.filter\(Boolean\)/) || ['', ''])[1];

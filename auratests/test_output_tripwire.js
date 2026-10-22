@@ -111,6 +111,7 @@ assert('PASSIVE: the window is non-empty, so the assertions above cannot pass by
 
 // ── 5. BEHAVIOUR — only what it uniquely adds, and the limit that remains ──
 function extract(name) { const s = raw.indexOf('function ' + name + '('); return raw.slice(s, raw.indexOf('\n}', s) + 2); }
+eval(extract('lookBehind')); // UPDATED (22/10, old iPhones, Γ3): the functions below look back through lookBehind (no lookbehind regex), so it is loaded with them
 eval(extract('looksLikeAdviceCascade'));
 eval(extract('parseRoadMap'));
 eval(extract('detectOutputViolation'));

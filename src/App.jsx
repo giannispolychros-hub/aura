@@ -2023,6 +2023,64 @@ function describeSafetyPathCtx(riskKind) {
   if (riskKind !== 1 && riskKind !== 2) return '';
   return `\n[CODE-VERIFIED: the safety path was activated earlier in this session, so for the rest of it: support only, in proportion to what the user actually said — no root (neither ask toward it nor name it), no question about a step or a time, no push toward closing, never the same question twice, and if they thank you or want to leave, let them go warmly, with no new question.]\n`;
 }
+// ── Looking back without a lookbehind (iPhones before iOS 16.4) ──────────────────────────────────────────────────────────────
+// Safari before 16.4 cannot read a lookbehind, (?<=…) or (?<!…): a regex with one throws «Invalid regular expression», and on such
+// an iPhone no message could be sent (final stress test before the 20, Γ3). So no regex in this file has one. A pattern that has to
+// look at the text before a position says so here instead. Each argument is one alternative of the old regex, in its order:
+// { after, notAfter, match } matches `match` only where the text up to that point ends with `after` (when given) and with none of
+// `notAfter` — what (?<=after)(?<!notAfter)match did. .test, .split and .replace (global; `by` is a plain string, no $) give what the
+// same calls gave with the old regex: auratests/test_regex_compat.js runs both over the whole test corpus. `after` and `notAfter`
+// never look past the position (no lookahead in them); `match` has no capture group.
+function lookBehind(...alternatives) {
+  const plain = re => re.flags.replace(/[gy]/g, "");
+  const tail = re => new RegExp("(?:" + re.source + ")$", plain(re));
+  const alts = alternatives.map(a => ({ find: new RegExp(a.match.source, plain(a.match) + "g"),
+    after: a.after ? tail(a.after) : null, notAfter: [].concat(a.notAfter || []).map(tail) }));
+  const unicode = alternatives.some(a => a.match.unicode);
+  const step = (s, i) => i + (unicode && s.codePointAt(i) > 0xffff ? 2 : 1);
+  const fits = (a, s, i) => { const head = s.slice(0, i); return (!a.after || a.after.test(head)) && !a.notAfter.some(r => r.test(head)); };
+  // The first match that starts at or after `from`, as [start, end], or null. At the same start the earlier alternative wins.
+  const next = (s, from) => {
+    let best = null;
+    for (const a of alts) {
+      for (let i = from; i <= s.length; i = step(s, i)) {
+        a.find.lastIndex = i;
+        const m = a.find.exec(s);
+        if (!m || (best && m.index >= best[0])) break;
+        if (fits(a, s, m.index)) { best = [m.index, m.index + m[0].length]; break; }
+        i = m.index;
+      }
+    }
+    return best;
+  };
+  return {
+    test: text => next(String(text), 0) !== null,
+    replace(text, by) {
+      const s = String(text);
+      let out = "", last = 0, from = 0, m;
+      while (from <= s.length && (m = next(s, from))) {
+        out += s.slice(last, m[0]) + by;
+        last = m[1];
+        from = m[1] > m[0] ? m[1] : step(s, m[1]);
+      }
+      return out + s.slice(last);
+    },
+    // String.prototype.split as the standard defines it: an empty match right where the last piece began does not split.
+    split(text) {
+      const s = String(text);
+      if (!s.length) return next(s, 0) ? [] : [s];
+      const out = [];
+      let p = 0, q = 0, m;
+      while (q < s.length && (m = next(s, q)) && m[0] < s.length) {
+        if (m[1] === p) { q = step(s, m[0]); continue; }
+        out.push(s.slice(p, m[0]));
+        p = q = m[1];
+      }
+      out.push(s.slice(p));
+      return out;
+    },
+  };
+}
 // Removes the sentences of a MODEL reply that `test` (given the sentence folded: no accents, lower case, ς → σ) flags, and leaves
 // everything else byte for byte. A sentence ends at . ! ; ? … followed by a space and something that is not a digit (so «τηλ. 210…»
 // stays one sentence); a line is never joined to another. Nothing flagged → the very same string back.
@@ -2031,7 +2089,7 @@ function dropModelSentences(text, test) {
   const fold = x => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ");
   let hit = false;
   const lines = text.split("\n").map(line => {
-    const parts = line.split(/(?<=[.!;?…])[ \t]+(?=[^\s\d])/);
+    const parts = lookBehind({ after: /[.!;?…]/, match: /[ \t]+(?=[^\s\d])/ }).split(line);
     const kept = parts.filter(p => !(p.trim() && test(fold(p), p)));
     if (kept.length === parts.length) return line;
     hit = true;
@@ -2077,7 +2135,7 @@ function stripPressurePhrases(text) {
   const fold = x => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ").replace(/«[^»]*»|"[^"]*"|“[^”]*”/g, " ");
   let hit = false;
   const lines = text.split("\n").map(line => {
-    const parts = line.split(/(?<=[.!;?…])[ \t]+(?=[^\s\d])/);
+    const parts = lookBehind({ after: /[.!;?…]/, match: /[ \t]+(?=[^\s\d])/ }).split(line);
     const kept = [];
     for (const p of parts) {
       if (p.trim() && PRESSURE_SENTENCE.test(fold(p))) { hit = true; continue; }
@@ -2119,7 +2177,7 @@ function replaceBareGoodbye(content) {
 // model keeps what the model wrote.
 function singularTellMe(text) {
   if (typeof text !== "string") return text;
-  return text.replace(/(?<=(?:^|[.!;?…\u037e\u0387\n])[ \t]*)Π(?:έστε|είτε) μου(?![\p{L}\p{N}])/gu, "Πες μου");
+  return lookBehind({ after: /(?:^|[.!;?…\u037e\u0387\n])[ \t]*/u, match: /Π(?:έστε|είτε) μου(?![\p{L}\p{N}])/u }).replace(text, "Πες μου");
 }
 function stripRootDeclaration(text) {
   return dropModelSentences(text, (f, p) => !/[;?]\s*["»”']*\s*$/.test(p) && ROOT_DECLARATION.test(f.replace(/«[^»]*»|"[^"]*"|“[^”]*”/g, " ")));
@@ -2172,7 +2230,7 @@ function stageAAfterCrisisText(st) {
     u.split(/[.;!?\n…]+/).map(x => x.trim()).filter(Boolean).every(x => isExplicitClosure(x) || declaresClosing(x) || matchesClosingWord(x));
   const modelBye = typeof o.reply === "string" && replaceBareGoodbye(o.reply).includes(BARE_GOODBYE_TEXT);
   if (!leaving && !modelBye) return null;
-  return o.fallbackLine || aura.some(m => /(?<!\d)(?:1018|10306|112)(?!\d)/.test(m.content)) ? STAGE_A_TEXTS.afterCrisis : STAGE_A_TEXTS.afterCrisisNoNumbers;
+  return o.fallbackLine || aura.some(m => /(?:^|\D)(?:1018|10306|112)(?!\d)/.test(m.content)) ? STAGE_A_TEXTS.afterCrisis : STAGE_A_TEXTS.afterCrisisNoNumbers;
 }
 // ADR «11 Οκτωβρίου (β)» — the MODEL's own closing before the root. Found by the stress test with the real model (run 10,
 // sessions 2.1 and 4.1): after «Νιώθεις ότι κάτι άλλαξε…;» → «Ναι, άλλαξε…», the model wrote the old closing summary
@@ -3260,12 +3318,12 @@ function detectsIntentWithoutRoads(messages, stepStated) {
   const fold = x => String(x == null ? "" : x).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ");
   const turns = messages.filter(m => m && typeof m.content === "string");
   const users = turns.filter(m => m.role === "user").map(m => fold(m.content));
-  const sentences = text => text.split(/(?<=[.;!?])\s+|\n+/).filter(Boolean);
+  const sentences = text => lookBehind({ after: /[.;!?]/, match: /\s+/ }, { match: /\n+/ }).split(text).filter(Boolean);
   // (α) uncertain intent, in the user's own words.
   const STATIVE = /^(?:ξερω|νομιζω|πιστευω|νιωθω|αισθανομαι|μπορω|θελω|ξερουμε)$/;
   const uncertain = users.some(t => sentences(t).some(sent => {
     if (/[?;]\s*$/.test(sent)) return false;
-    if (/(?<!δεν )σκεφτομαι να |μαλλον θα /.test(sent)) return true;
+    if (lookBehind({ notAfter: /δεν /, match: /σκεφτομαι να / }, { match: /μαλλον θα / }).test(sent)) return true;
     const at = sent.search(/(?:^|\s)ισωσ(?:\s|$)/);
     if (at < 0) return false;
     const verb = /[α-ω]{3,}(?:ω|ομαι|ουμε)(?![α-ω])/.exec(sent.slice(at + 5, at + 5 + 25));
@@ -4347,7 +4405,8 @@ function declaresClosing(text) {
   // ADR «12 Οκτωβρίου» (run 24, session 33): «μπάι» only as a word of its own — inside «μπαίνει», «μπαίνω» it closed the session.
   // ADR «12 Οκτωβρίου (β)», the same class: «αντίο» (inside «εναντίον», «αντιοικονομικό») and «τα λέμε» (inside «πάντα λέμε»).
   // ADR «12 Οκτωβρίου (γ)»: not right after a negation («δεν τα λέμε αυτά», «δεν κλείνουμε ακόμα») — then the model decides.
-  if (/(?<!(?:^|[^α-ω])(?:δεν|δε|μην|μη|ουτε)(?:\s+[^\s.,;!?…·]+){0,2}\s*)(?<!(?:^|[^α-ω])οχι\s*)(?:κλεινουμε|κλεινω|τελειωσαμε|(?:^|[^α-ω])τα λεμε(?![α-ω])|καλη συνεχεια|καληνυχτα|καλο βραδυ|(?:^|[^α-ω])αντιο(?![α-ω])|(?:^|[^α-ω])μπαι(?![α-ω])|bye|αρκετα για σημερα|ασ το αφησουμε εδω)/.test(fold(t))) return true;
+  if (lookBehind({ notAfter: [/(?:^|[^α-ω])(?:δεν|δε|μην|μη|ουτε)(?:\s+[^\s.,;!?…·]+){0,2}\s*/, /(?:^|[^α-ω])οχι\s*/],
+    match: /(?:κλεινουμε|κλεινω|τελειωσαμε|(?:^|[^α-ω])τα λεμε(?![α-ω])|καλη συνεχεια|καληνυχτα|καλο βραδυ|(?:^|[^α-ω])αντιο(?![α-ω])|(?:^|[^α-ω])μπαι(?![α-ω])|bye|αρκετα για σημερα|ασ το αφησουμε εδω)/ }).test(fold(t))) return true;
   // TIER B. The final sentence, and it must contain a leave-taking phrase before reducing — so a
   // final sentence made only of "Ναι" can never qualify on the reduction alone.
   const parts = t.split(/[.;!?\n]+|\u2026|\.\.\./).map(x => x.trim()).filter(Boolean);
@@ -4722,7 +4781,7 @@ function detectsActionFailureStatement(text, anchorWord) {
   const t = String(text == null ? "" : text)
     .normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ς/g, "σ");
   const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (!new RegExp("(?<![a-zα-ω0-9])" + escaped + "(?![a-zα-ω0-9])", "i").test(t)) return false;
+  if (!new RegExp("(?:^|[^a-zα-ω0-9])" + escaped + "(?![a-zα-ω0-9])", "i").test(t)) return false;
   // NARROW BY APPROVAL (2026-09-29): only a declared failure of the named thing itself — never
   // general frustration ("δύσκολο", "δεν είμαι σίγουρος", "βαρέθηκα"), and never AURA/the
   // conversation itself (that is detectsMethodFailureSignal's separate, already-existing
@@ -4738,7 +4797,7 @@ function detectsContinuationStatement(text, anchorWord) {
   const t = String(text == null ? "" : text)
     .normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ς/g, "σ");
   const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (!new RegExp("(?<![a-zα-ω0-9])" + escaped + "(?![a-zα-ω0-9])", "i").test(t)) return false;
+  if (!new RegExp("(?:^|[^a-zα-ω0-9])" + escaped + "(?![a-zα-ω0-9])", "i").test(t)) return false;
   return /(συνεχιζω|ακομα\s+το\s+κανω|δεν\s+το\s+εχω\s+σταματησει)/.test(t);
 }
 // Pairing, mirroring buildCommitmentSignal's shape exactly: two evidence or nothing. `failure` and
@@ -4855,11 +4914,11 @@ function detectsClaimAboutUser(text) {
     /(νιωθεισ|αισθανεσαι)[^.;!?]{0,25}(απογοητευμεν|θυμωμεν|λυπημεν|φοβισμεν|εξαντλημεν|προδομεν|μοναχ|ενοχ)(?![^.!]*;)|(εισαι|ησουν)[^.;!?]{0,15}(απογοητευμεν|θυμωμεν|λυπημεν|φοβισμεν|εξαντλημεν|προδομεν|μοναχ)(?![^.!]*;)/,
     // KNOWLEDGE ASSERTED WITHOUT "ήδη" (real session, 2026-09-29) — "κάνεις κάτι, αλλά ξέρεις ότι
     // δεν αγγίζει τη ρίζα." FORM 1 needs "ήδη". Indicative only: "αξίζει ΝΑ ξέρεις ότι" is
-    // information offered, not knowledge asserted (excluded by the lookbehind), and a question is
+    // information offered, not knowledge asserted (excluded by notAfter), and a question is
     // excluded the same way as the emotional form above. Form only — it cannot tell a faithful
     // mirror from an invention, by the same measured rule as everything else here.
     // See auratests/test_user_claims.js §2c.
-    /(?<!να )ξερεισ οτι[^.;!?]{0,60}(?![^.!]*;)/,
+    lookBehind({ notAfter: /να /, match: /ξερεισ οτι[^.;!?]{0,60}(?![^.!]*;)/ }),
     // A TENDENCY NAMED IN AURA'S OWN WORDS (real session, 2026-10) — "Εδώ υπάρχει μία τάση: … τα
     // βλέπεις ως παγίδα". The label is AURA's, not the person's, and it is attached to how THEY
     // see things. The second-person verb is what keeps "υπάρχει μία τάση στην αγορά" out: a
@@ -4918,7 +4977,8 @@ function stripInternalLabels(raw) {
   return { text: t, count };
 }
 function stripAraDeclarative(text) {
-  return (text || "")
+  return lookBehind({ after: /(?:^|[.!;?…:\u037e\u0387\n])[ \t]*/iu,
+    match: /Άρα(?![\p{L}\p{N}])(?![^.!;?…\u037e\n]*\d)[^.!;?…\u037e\n]*\.[ \t]*/iu }).replace(text || "", "")
     // CONTAINED TO ONE LINE (bug reproduced executably): [^.]* matches newlines in JS, and the
     // surrounding \s* swallowed them too — so one "Άρα" deleted everything up to the next period
     // however far below it was, and glued the surviving lines together. A complete two-road
@@ -4939,7 +4999,6 @@ function stripAraDeclarative(text) {
     // run 37, session 41: «Βαρεμάρα …» was shown as «Βαρεμ» — the «άρα» at the end of the word matched and the rest up to the period
     // went. Never «-άρα» inside a word («βαρεμάρα», «λαχτάρα», «τρομάρα»), never «Άραγε», never a question, never a sentence with a
     // number: on a crisis turn this runs before the app adds its line, and must never cut a number or the risk question.
-    .replace(/(?<=(?:^|[.!;?…:\u037e\u0387\n])[ \t]*)Άρα(?![\p{L}\p{N}])(?![^.!;?…\u037e\n]*\d)[^.!;?…\u037e\n]*\.[ \t]*/giu, "")
     .replace(/[ \t]*\bSo,?[ \t]+(the[ \t]+)?(real[ \t]+)?(question|issue|problem)[^.\n]*\.[ \t]*/gi, " ")
     .trim();
 }
@@ -5061,21 +5120,23 @@ function detectsContinuationPromiseAsked(text) {
 // νόημα», «δεν ξέρω τι με απασχολεί», «δεν τα λέμε αυτά») — the app is not sure, so it decides nothing and the message goes to the
 // model. A negation is δεν, δε, μην, μη, ούτε up to two words before the phrase, in the same clause (a comma ends it: «Δεν αντέχω
 // άλλο, κλείνουμε» still closes); «όχι» only right before it
-// («όχι αυτό ακριβώς» — «Όχι, …» is an answer). Written as the two lookbehinds (?<!…) in front of each phrase list, so every
-// function stays self-contained. NOT for crisis detection: there, unsure still means the safety path.
+// («όχι αυτό ακριβώς» — «Όχι, …» is an answer). Written as the two notAfter of lookBehind in front of each phrase list (they were
+// two lookbehinds until old iPhones, Γ3). NOT for crisis detection: there, unsure still means the safety path.
 function detectsSpontaneousShiftRecognition(text) {
   const t = String(text == null ? "" : text).trim();
   if (!t || t.split(/\s+/).length > 25) return false; // was 12 — same reason
   // ADR «12 Οκτωβρίου (β)»: only as words of their own — «τώρα κατάλαβα» matched «οι γονείς μου τώρα κατάλαβαν».
   // ADR «12 Οκτωβρίου (γ)»: … and not right after a negation («δεν άλλαξε κάτι»).
-  return /(?:^|[^α-ωά-ώΐ])(?<!(?:^|[^α-ωά-ώΐ])(?:δεν|δε|μην|μη|ούτε|ουτε)(?:\s+[^\s.,;;!?…·]+){0,2}\s*)(?<!(?:^|[^α-ωά-ώΐ])(?:όχι|οχι)\s*)(τώρα κατάλαβα|τώρα το βλέπω|τώρα ξέρω|αυτό ήταν|τώρα καταλαβαίνω|άλλαξε κάτι|το βλέπω αλλιώς|το βλέπω τώρα|άλλαξε η οπτική|σκέφτομαι διαφορετικά)(?![α-ωά-ώΐ])/i.test(t);
+  return lookBehind({ after: /(?:^|[^α-ωά-ώΐ])/i, notAfter: [/(?:^|[^α-ωά-ώΐ])(?:δεν|δε|μην|μη|ούτε|ουτε)(?:\s+[^\s.,;;!?…·]+){0,2}\s*/i,
+    /(?:^|[^α-ωά-ώΐ])(?:όχι|οχι)\s*/i], match: /(τώρα κατάλαβα|τώρα το βλέπω|τώρα ξέρω|αυτό ήταν|τώρα καταλαβαίνω|άλλαξε κάτι|το βλέπω αλλιώς|το βλέπω τώρα|άλλαξε η οπτική|σκέφτομαι διαφορετικά)(?![α-ωά-ώΐ])/i }).test(t);
 }
 function detectsSpontaneousCoreRecognition(text) {
   const t = String(text == null ? "" : text).trim();
   if (!t || t.split(/\s+/).length > 25) return false; // was 12 — genuine recognition often arrives inside a longer sentence
   // ADR «12 Οκτωβρίου (β)»: only as words of their own — «το βρήκα» matched «δεν το βρήκαμε», «τώρα κατάλαβα» «τώρα κατάλαβαν».
   // ADR «12 Οκτωβρίου (γ)»: … and not right after a negation («δεν μου βγάζει νόημα», «δεν ξέρω τι με απασχολεί»).
-  return /(?:^|[^α-ωά-ώΐ])(?<!(?:^|[^α-ωά-ώΐ])(?:δεν|δε|μην|μη|ούτε|ουτε)(?:\s+[^\s.,;;!?…·]+){0,2}\s*)(?<!(?:^|[^α-ωά-ώΐ])(?:όχι|οχι)\s*)(ξέρω τι με απασχολεί|καταλαβαίνω τι είναι|νομίζω ξέρω τι|βρήκα τι με κρατάει|αυτό είναι το πρόβλημα|τώρα κατάλαβα|αυτό ήταν|το βρήκα|αυτό ακριβώς|μου βγάζει νόημα|κατάλαβα τι με κρατάει|ξέρω τι με κρατάει|αυτό με κρατάει)(?![α-ωά-ώΐ])/i.test(t);
+  return lookBehind({ after: /(?:^|[^α-ωά-ώΐ])/i, notAfter: [/(?:^|[^α-ωά-ώΐ])(?:δεν|δε|μην|μη|ούτε|ουτε)(?:\s+[^\s.,;;!?…·]+){0,2}\s*/i,
+    /(?:^|[^α-ωά-ώΐ])(?:όχι|οχι)\s*/i], match: /(ξέρω τι με απασχολεί|καταλαβαίνω τι είναι|νομίζω ξέρω τι|βρήκα τι με κρατάει|αυτό είναι το πρόβλημα|τώρα κατάλαβα|αυτό ήταν|το βρήκα|αυτό ακριβώς|μου βγάζει νόημα|κατάλαβα τι με κρατάει|ξέρω τι με κρατάει|αυτό με κρατάει)(?![α-ωά-ώΐ])/i }).test(t);
 }
 // STRUCTURAL, NOT PSYCHOLOGICAL (real gap found via transcript audit — PREMISE INVERSION already
 // states its own trigger as "user keeps circling the same two options," but nothing tracked this
@@ -5447,10 +5508,10 @@ function detectOutputViolation(text, ctx) {
   // auratests/test_ruler_detectors.js §1, which pins each of those exclusions.
   const ns = n.replace(/ς/g, "σ").replace(/«[^»]*»/g, " ").replace(/\u201c[^\u201d]*\u201d/g, " ").replace(/"[^"]*"/g, " ");
   if (/καλη αρχη|χαιρομαι που[^.;!?]{0,25}(?:καλα|ομορφα)|δεν ειναι (?:μονο )?(?:αισθηση|εντυπωση)(?: μονο)?[^.;!?]{0,6}ειναι (?:πραγματικ|αληθινο)/.test(ns)) return "EVALUATION";
-  if (ns.split(/(?<=[.!?;·])\s*/).some(s =>
+  if (lookBehind({ after: /[.!?;·]/, match: /\s*/ }).split(ns).some(s =>
         !/[?;]$/.test(s) &&
         !/ειπεσ|ειπατε|λεσ οτι|λετε οτι|ανεφερεσ|γραψεσ|εχεισ πει/.test(s) &&
-        (/(?<!δεν )ειναι αρκετ\S* για (?:να|τ)/.test(s) ||
+        (lookBehind({ notAfter: /δεν /, match: /ειναι αρκετ\S* για (?:να|τ)/ }).test(s) ||
          // (2026-10-01, fifth real session) "Καλή ερώτηση", "Εύλογο ερώτημα", "Καλή ιδέα" — the last is on the
          // prompt's own prohibited list. Measured against the prompt's 442 quoted sentences: no prescribed
          // sentence matches. «Καλή τύχη» is NOT here on purpose: the prompt calls "Καλή τύχη αύριο" a clean goodbye.
@@ -8035,7 +8096,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // READS shownText, NOT text: finalDistillation is the last sentence of Part 2 and
       // it gates the paywall block, the Blueprint download and the Νέα συνεδρία button.
       // Taking it from the unfiltered reply could pin it to the word-question just cut.
-      const sentences = shownText.split(/(?<=[.!;])\s+/).map(s => s.trim()).filter(Boolean);
+      const sentences = lookBehind({ after: /[.!;]/, match: /\s+/ }).split(shownText).map(s => s.trim()).filter(Boolean);
       if (sentences.length > 0) setFinalDistillation(sentences[sentences.length - 1]);
     } catch {
       const fallback = "Η σκέψη σου παραμένει δική σου.";

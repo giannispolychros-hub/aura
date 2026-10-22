@@ -9,7 +9,7 @@ const ci = raw.indexOf('const AURA_CORE_PERSONALITY'), cs = raw.indexOf('`', ci)
 const PROMPT = raw.slice(cs, ce), CODE = raw.slice(0, ci) + raw.slice(ce);
 function extract(name) { const s = CODE.indexOf('function ' + name + '('); const e = CODE.indexOf('\n}', s) + 2; return s < 0 ? '' : CODE.slice(s, e); }
 let fn = null;
-try { fn = new Function(extract('singularTellMe') + '\nreturn singularTellMe;')(); } catch (e) { console.log('LOAD ERROR — ' + e.message); }
+try { fn = new Function(extract('lookBehind') + '\n' + extract('singularTellMe') + '\nreturn singularTellMe;')(); } catch (e) { console.log('LOAD ERROR — ' + e.message); } // UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex)
 let passed = 0, failed = 0;
 function assert(label, cond) { if (cond) { passed++; console.log('PASS — ' + label); } else { failed++; console.log('FAIL — ' + label); } }
 const S = t => { try { return fn(t); } catch (e) { return 'threw'; } };

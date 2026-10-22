@@ -44,7 +44,7 @@ const L10306 = 'Υπάρχει η Γραμμή Ψυχοκοινωνικής Υπ
 
 const textsSrc = (() => { const a = CODE.indexOf('const STAGE_A_TEXTS = {'); return a >= 0 ? CODE.slice(a, CODE.indexOf('\n};', a) + 3) : ''; })();
 const constLine = n => (CODE.match(new RegExp('^const ' + n + ' = .*$', 'm')) || [''])[0];
-const NAMES = ['detectSafetySignal', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord', 'buildCrisisLine', 'replaceBareGoodbye', 'stageAAfterCrisisText'];
+const NAMES = ['detectSafetySignal', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord', 'buildCrisisLine', 'replaceBareGoodbye', 'stageAAfterCrisisText', 'lookBehind']; // UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex)
 let F = {};
 try {
   F = new Function(textsSrc + '\n' + constLine('BARE_GOODBYE_TEXT') + '\n' + NAMES.map(n => fullFnSrc(n) || `function ${n}(){return 'missing'}`).join('\n') +
@@ -138,7 +138,7 @@ const undoVoice1910 = p => VOICE_1910.reduce((t, [now, before]) => (t.split(now)
   // UPDATED (22/10, ADR «22 Οκτωβρίου (β)», SAFETY): detectSafetySignal and classifyCrisisTier changed on purpose — Greeklish and spelling by
   // ear, additive; the phrase list, the crisis lines and the numbers are unchanged (pinned in test_crisis_greeklish_2210.js).
   const PIN = { detectSafetySignal: '7fd94cacc250c6e2', classifyCrisisTier: '448481fd3885da83', buildCrisisLine: 'd359e22dd7cf9a95',
-    crisisLineAfterFailedCall: 'c87733effcebde7e', isExplicitClosure: '09da70474755ef40', declaresClosing: '25fe9be3bbcfaa57',
+    crisisLineAfterFailedCall: 'c87733effcebde7e', isExplicitClosure: '09da70474755ef40', declaresClosing: '53de60c064a4125d', // UPDATED (22/10, old iPhones, Γ3): declaresClosing's tier-A lookbehinds written as lookBehind notAfter — same result on every input (test_regex_compat.js)
     matchesClosingWord: 'c3d044cc974bb7ac', stripForeignHelplines: '3a30e4f861a39022', replaceBareGoodbye: 'e6351d2cb8e28ab5',
     detectsMentalHealthReferral: 'd03b71d681025b79' };
   for (const [n, v] of Object.entries(PIN)) assert(`UNCHANGED: ${n} (as in 9efe1fa)`, h(fullFnSrc(n, raw)) === v);

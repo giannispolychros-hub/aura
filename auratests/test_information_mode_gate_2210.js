@@ -103,8 +103,11 @@ assert('3: api/aura.js is a409a47\'s, byte for byte — guard and fingerprints',
 assert('3: the helper is in the file once, outside the prompt, right after perTurnSafety',
   raw.split(HELPER).length === 2 && raw.indexOf(HELPER) > raw.indexOf(fnSrc('perTurnSafety')) && raw.indexOf(HELPER) - (raw.indexOf(fnSrc('perTurnSafety')) + fnSrc('perTurnSafety').length) === 1 &&
   !PROMPT.includes('informationModeNoteDue'));
-assert('3: undo the two edits and App.jsx is a409a47\'s, byte for byte — nothing else in the file moved',
-  raw.split(WIRING_NEW).length === 2 && h(raw.replace(HELPER, '').replace(WIRING_NEW, WIRING_OLD)) === 'b676bb01a68c2bac');
+// UPDATED (22/10, old iPhones Γ3 and after): at 6b3ddae this pinned the whole file — undo the two edits and App.jsx was a409a47's
+// (b676bb01a68c2bac): the change moved nothing else. Since then the file moves on purpose elsewhere (lookBehind, each change with its
+// own tests), so the two edits are checked here as the only trace of the change: in the file once each, and nothing of it left when undone.
+assert('3: the two edits are the whole change — each once in the file, and undone nothing of informationModeNoteDue is left',
+  raw.split(WIRING_NEW).length === 2 && raw.split(HELPER).length === 2 && !raw.replace(HELPER, '').replace(WIRING_NEW, WIRING_OLD).includes('informationModeNoteDue'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);

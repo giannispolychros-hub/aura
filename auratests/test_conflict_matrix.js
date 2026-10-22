@@ -10,6 +10,7 @@ function extract(name) {
   const e = raw.indexOf('\n}', s) + 2;
   return raw.slice(s, e);
 }
+eval(extract('lookBehind')); // UPDATED (22/10, old iPhones, Γ3): the functions below look back through lookBehind (no lookbehind regex), so it is loaded with them
 eval(extract('isBareEmojiOrAcknowledgment'));
 eval(extract('parseThreeBeatShift'));
 eval(extract('matchesClosingWord'));

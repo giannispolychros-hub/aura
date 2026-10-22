@@ -48,7 +48,7 @@ function fullFnSrc(name, src) {
 const NAMES = ['stopOpenerKind', 'countStopMoments', 'detectsRiskClarification', 'countRiskClarifications', 'stopMomentGentleOnly',
   'guardStopMoment', 'describeStopMomentCtx', 'describeRiskClarificationCtx', 'repeatedUserElements', 'describeRepeatedElementsCtx',
   'stripRepeatedThreeBeat', 'dropQuoteOnlyLines', 'parseThreeBeatShift', 'detectSafetySignal', 'classifyCrisisTier', 'buildCrisisLine',
-  'mergeRiskKind', 'stageACaptureAllowed', 'stageARootButtonVisible', 'rootTextHasSubstance', 'detectsCoreReadinessAsked'];
+  'mergeRiskKind', 'stageACaptureAllowed', 'stageARootButtonVisible', 'rootTextHasSubstance', 'detectsCoreReadinessAsked', 'lookBehind']; // UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex)
 let F = {};
 try {
   const consts = ['STOP_OPENER', 'STOP_GENTLE'].map(n => { const a = CODE.indexOf('const ' + n + ' = '); return a >= 0 ? CODE.slice(a, CODE.indexOf(';\n', a) + 1) : ''; }).join('\n');
@@ -216,7 +216,7 @@ assert('QUOTE-ONLY: a message of only «"» becomes empty (not shown); not a str
 // μπαίνει και βγαίνει» read as «the user is closing» — the normal flow closed after two exchanges; in Stage A it would open
 // «Πριν φύγεις:» too early. Now «μπάι» counts only as a word of its own.
 {
-  const dc = (() => { try { return new Function(fullFnSrc('declaresClosing') + '\nreturn declaresClosing;')(); } catch (e) { return () => 'missing'; } })();
+  const dc = (() => { try { return new Function(fullFnSrc('lookBehind') + '\n' + fullFnSrc('declaresClosing') + '\nreturn declaresClosing;')(); /* UPDATED (22/10, Γ3): + lookBehind */ } catch (e) { return () => 'missing'; } })();
   assert('CLOSING: «μπαίνει», «μπαίνω», «μπαίνουμε», «ξαναμπαίνει» are not a goodbye (run 24, session 33)',
     ['το δάνειο και ό,τι μπαίνει και βγαίνει κάθε μήνα', 'μπαίνω στο γραφείο στις οκτώ', 'μπαίνουμε στον μήνα με χρέη', 'ξαναμπαίνει το ίδιο θέμα',
       'ΜΠΑΙΝΕΙ Ο ΜΙΣΘΟΣ', 'μπαινει ο μισθος'].every(t => dc(t) === false));

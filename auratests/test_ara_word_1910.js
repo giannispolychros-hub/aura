@@ -8,7 +8,7 @@ const path = require('path');
 const raw = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
 function extract(name) { const s = raw.indexOf('function ' + name + '('); const e = raw.indexOf('\n}', s) + 2; return s < 0 ? '' : raw.slice(s, e); }
 let stripAraDeclarative = null, buildCrisisLine = null;
-try { stripAraDeclarative = new Function(extract('stripAraDeclarative') + '\nreturn stripAraDeclarative;')(); } catch (e) { console.log('LOAD ERROR — ' + e.message); }
+try { stripAraDeclarative = new Function(extract('lookBehind') + '\n' + extract('stripAraDeclarative') + '\nreturn stripAraDeclarative;')(); } catch (e) { console.log('LOAD ERROR — ' + e.message); } // UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex)
 try { buildCrisisLine = new Function(extract('buildCrisisLine') + '\nreturn buildCrisisLine;')(); } catch (e) { console.log('LOAD ERROR — ' + e.message); }
 let passed = 0, failed = 0;
 function assert(label, cond) { if (cond) { passed++; console.log('PASS — ' + label); } else { failed++; console.log('FAIL — ' + label); } }

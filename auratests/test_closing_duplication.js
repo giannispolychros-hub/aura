@@ -139,7 +139,7 @@ assert("WIRING: reflectionDelivered was NOT reused for this",
 
 // ── 7. CACHE — the cached blocks must be untouched by this fix ──────────────
 const shownVar = (dfc.match(/content:\s*(\w+),\s*msgMode:\s*"TERMINATION"/) || [])[1];
-const splitVar = (dfc.match(/const sentences = (\w+)\.split\(/) || [])[1];
+const splitVar = (dfc.match(/const sentences = lookBehind\([^\n]*?\)\.split\((\w+)\)/) || [])[1]; // UPDATED (22/10, old iPhones, Γ3): the split looks back through lookBehind, so the text it splits is its argument
 assert("WIRING: finalDistillation is derived from the text actually shown, not the unfiltered reply",
   !!shownVar && shownVar === splitVar);
 // The pure filter returns empty when the whole reply was misplaced Part 1 — deliberately,

@@ -51,7 +51,7 @@ function extractBlock(startToken) {
 }
 const NAMES = ['isExplicitClosure', 'declaresClosing', 'matchesClosingWord', 'detectSafetySignal', 'classifyCrisisTier', 'mergeRiskKind',
   'stageALeavingDoorOpens', 'initialStageAState', 'stageAStep', 'stageATelemetry', 'substanceOfSentence', 'splitSentences',
-  'rootTextHasSubstance', 'pickKnewSnippet', 'isOpeningGreeting']; // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): the opening «γεια»
+  'rootTextHasSubstance', 'pickKnewSnippet', 'isOpeningGreeting', 'lookBehind']; // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): the opening «γεια» — and UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex)
 const srcs = NAMES.map(n => extractBlock('function ' + n + '(') || `function ${n}(){return undefined}`);
 const consts = ['ROOT_MIN_SUBSTANCE_WORDS', 'KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_FILLER_WORDS'].map(n => {
   const a = CODE.indexOf('const ' + n + ' = ');
@@ -130,7 +130,7 @@ assert('B: the gate does not use the T1 detector (matchesClosingWord) or a new d
     // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
     // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
     hash(fullFnSrc('decideTermination')) === '60778a7e90295a31' && sha('matchesClosingWord') === 'c3d044cc974bb7ac' &&
-    sha('isExplicitClosure') === '09da70474755ef40' && sha('declaresClosing') === '25fe9be3bbcfaa57'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24); again (ADR «12 Οκτωβρίου (β)»): «αντίο», «τα λέμε» too; (γ): not right after a negation
+    sha('isExplicitClosure') === '09da70474755ef40' && sha('declaresClosing') === '53de60c064a4125d'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24); again (ADR «12 Οκτωβρίου (β)»): «αντίο», «τα λέμε» too; (γ): not right after a negation; UPDATED (22/10, old iPhones, Γ3): declaresClosing's tier-A lookbehinds written as lookBehind notAfter — same result on every input (test_regex_compat.js)
 }
 
 // ── C: second time → the normal closing ──────────────────────────────────────

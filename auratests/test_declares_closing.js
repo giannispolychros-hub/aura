@@ -40,6 +40,7 @@ function extract(name) {
   if (s < 0) return null;
   return raw.slice(s, raw.indexOf('\n}', s) + 2);
 }
+eval(extract('lookBehind')); // UPDATED (22/10, old iPhones, Γ3): the functions below look back through lookBehind (no lookbehind regex), so it is loaded with them
 let passed = 0, failed = 0;
 function assert(label, cond) { if (cond) { passed++; console.log('PASS — ' + label); } else { failed++; console.log('FAIL — ' + label); } }
 
