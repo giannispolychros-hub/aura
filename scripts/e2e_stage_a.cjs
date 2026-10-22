@@ -693,6 +693,7 @@ async function runMock() {
   await runMockMC();
   await runMockMH();
   await runMockPV();
+  await runMockIM();
   await runMockOF();
   await runMockFT();
   await runMockLR();
@@ -3593,6 +3594,97 @@ async function runMockPV() {
   ok('PV (first exit, the root in the user\'s own words): { auraShare: 0, door: 4 }', b.prov.length === 1 && b.prov[0].auraShare === 0 && b.prov[0].door === 4);
 }
 
+// ── IM: ADR «22 Οκτωβρίου (στ)» (John): the INFORMATION MODE note («concise information … no Socratic questions») is not sent on the
+// safety path (the crisis turn and every turn after the crisis line) nor in Stage A before the root; with no crisis the old flow
+// (?stageA=0) sends it exactly as before. «Πες μου τι να κάνω», «χωρίς ερωτήσεις» and «μη με ρωτάς» set the held state; every request
+// is recorded with its kind and per-turn part. --show prints, per request, whether the note went out (the before/after table); --hash
+// adds each request's SHA-256 without the note, and --dump <file> writes each per-turn part, for a text diff against another version.
+async function runMockIM() {
+  const crypto = require('crypto');
+  const sha = t => crypto.createHash('sha256').update(String(t), 'utf8').digest('hex').slice(0, 16);
+  const IM = '[INFORMATION MODE ACTIVE', MARK = '[FREE PART: ENDS AT ROOT]';
+  const SAFETY = '[MASTER PRIORITY RULE — STAGE: SAFETY (code-verified).';
+  const REPLY = 'Τι σε δυσκολεύει πιο πολύ σε αυτό;';
+  const TELL = 'Πες μου τι να κάνω με τη δουλειά μου, ο προϊστάμενος με πιέζει συνέχεια.';
+  const F1 = 'Ο προϊστάμενος με πιέζει συνέχεια και δεν ξέρω αν πρέπει να φύγω από τη δουλειά.', WHY = 'Γιατί κουράστηκα.';
+  const PLAIN = 'the plain address';
+  const run = async (query, msgs) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true });
+    const bodies = [];
+    await page.route('**/api/aura', async route => {
+      let b = {}; try { b = JSON.parse(route.request().postData() || '{}'); } catch (e) {}
+      bodies.push(b);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: REPLY }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + (query === PLAIN ? '' : oldFlowIfUnnamed(query)));
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    const turns = [];
+    for (const m of msgs) {
+      const before = bodies.length;
+      if (await page.locator('textarea.textarea').count()) await send(page, m);
+      await page.waitForTimeout(500);
+      turns.push({ msg: m, reqs: bodies.slice(before).map(b => { const c = LIB.classifyRequest(b, APP); return { kind: c.kind, d: c.dynamic || '' }; }) });
+    }
+    await browser.close();
+    const all = turns.flatMap(t => t.reqs);
+    if (opt('--dump', '')) all.forEach((r, i) => fs.appendFileSync(opt('--dump', ''), '=== ' + query + ' ' + msgs[0].slice(0, 12) + ' #' + i + ' ' + r.kind + '\n' + r.d + '\n'));
+    return { turns, all, req: m => (turns.find(t => t.msg === m) || { reqs: [] }).reqs };
+  };
+  const table = (tag, s) => { if (has('--show')) console.log('IM ' + tag + ': ' + s.turns.map(t => '«' + t.msg.slice(0, 22) + '» ' +
+    (t.reqs.map(r => r.kind + (r.d.includes(IM) ? '+IM' : '') + (r.d.includes(MARK) ? '+A' : '') + (r.d.includes(SAFETY) ? '+S' : '') +
+    (has('--hash') ? ' ' + sha(r.d.replace(/\n\[INFORMATION MODE ACTIVE[^\]]*\]\n\n?/, '')) : '')).join(',') || '—')).join(' | ')); };
+  const withIM = rs => rs.filter(r => r.d.includes(IM)).length;
+  const preRoot = (tag, s) => {
+    table(tag, s);
+    ok(`IM ${tag}: every message reached the model, and every request carries the Stage A marker (before the root)`,
+      s.turns.every(t => t.reqs.length > 0) && s.all.every(r => r.d.includes(MARK)));
+    ok(`IM ${tag}: no request before the root carries INFORMATION MODE (${withIM(s.all)} of ${s.all.length} did)`, s.all.length > 0 && withIM(s.all) === 0);
+  };
+  // (i) Stage A, «Πες μου τι να κάνω» — as the first message, and later in the session
+  preRoot('(i) Stage A, «Πες μου τι να κάνω» first', await run('?stageA=1', [TELL, 'Δεν ξέρω, κάθε μέρα το ίδιο.', 'Πες μου τι να κάνω.', 'Θέλω να φύγω αλλά φοβάμαι.']));
+  preRoot('(i) Stage A, «Πες μου τι να κάνω» later', await run('?stageA=1', [F1, 'Δεν ξέρω, κάθε μέρα το ίδιο.', 'Πες μου τι να κάνω.', 'Θέλω να φύγω αλλά φοβάμαι.', 'Δεν ξέρω.']));
+  // … and the plain address, now Stage A by default (ADR «22 Οκτωβρίου (ε)»), and with ?rec=1
+  preRoot('(i) the plain address', await run(PLAIN, [TELL, 'Δεν ξέρω.', 'Πες μου τι να κάνω.']));
+  preRoot('(i) Stage A, ?rec=1', await run('?stageA=1&rec=1', [TELL, 'Δεν ξέρω.']));
+  // (ii) the same with «χωρίς ερωτήσεις» and «μη με ρωτάς»
+  preRoot('(ii) Stage A, «χωρίς ερωτήσεις»', await run('?stageA=1', [F1, 'Χωρίς ερωτήσεις, σε παρακαλώ.', 'Δεν ξέρω, κάθε μέρα το ίδιο.', 'Θέλω να φύγω αλλά φοβάμαι.']));
+  preRoot('(ii) Stage A, «μη με ρωτάς»', await run('?stageA=1', [F1, 'Μη με ρωτάς άλλο.', 'Δεν ξέρω, κάθε μέρα το ίδιο.', 'Θέλω να φύγω αλλά φοβάμαι.']));
+  // (iii) «Πες μου τι να κάνω», then «Θέλω να πεθάνω»: not on the crisis turn, not on any turn after it — Stage A and the old flow
+  const crisis = (tag, s, cm, after) => {
+    table(tag, s);
+    const c = s.req(cm).find(r => r.kind === 'supportive') || { kind: 'none', d: '' };
+    ok(`IM ${tag}: the crisis turn is the crisis request, with STAGE: SAFETY`, c.kind === 'supportive' && c.d.includes(SAFETY));
+    ok(`IM ${tag}: … and without INFORMATION MODE`, c.kind === 'supportive' && !c.d.includes(IM));
+    const rs = after.flatMap(m => s.req(m));
+    ok(`IM ${tag}: every turn after the crisis line — no INFORMATION MODE (${withIM(rs)} of ${rs.length} did)`, rs.length >= after.length && withIM(rs) === 0);
+  };
+  crisis('(iii) Stage A, crisis after «Πες μου τι να κάνω»', await run('?stageA=1', [TELL, 'Θέλω να πεθάνω.', 'δεν ξέρω', 'Η δουλειά με κουράζει.']),
+    'Θέλω να πεθάνω.', ['δεν ξέρω', 'Η δουλειά με κουράζει.']);
+  crisis('(iii) Stage A, crisis B after «Πες μου τι να κάνω»', await run('?stageA=1', [F1, 'Πες μου τι να κάνω.', 'Δεν αντέχω άλλο.', 'εντάξει']),
+    'Δεν αντέχω άλλο.', ['εντάξει']);
+  { const s = await run('?stageA=0', [TELL, WHY, 'Δεν ξέρω, κάθε μέρα το ίδιο.', 'Θέλω να πεθάνω.', 'δεν ξέρω', 'Η δουλειά με κουράζει.']);
+    ok('IM (iii) old flow: before the crisis the note was really going out (the held state is set)', withIM(s.req('Δεν ξέρω, κάθε μέρα το ίδιο.')) > 0);
+    crisis('(iii) old flow, crisis after «Πες μου τι να κάνω»', s, 'Θέλω να πεθάνω.', ['δεν ξέρω', 'Η δουλειά με κουράζει.']); }
+  // (iv) the old flow (?stageA=0) with no crisis: the note goes out as before — in the same requests, byte for byte as a409a47 sent them
+  { const s = await run('?stageA=0', [TELL, WHY, 'Δεν ξέρω, κάθε μέρα το ίδιο.', 'Θέλω να φύγω αλλά φοβάμαι.', 'Πες μου τι να κάνω.']);
+    table('(iv) old flow, «Πες μου τι να κάνω»', s);
+    const main = s.all.filter(r => r.kind === 'main'), hs = s.all.map(r => sha(r.d)).join(' ');
+    ok(`IM (iv) old flow: the note goes out in every request to the model after «Πες μου τι να κάνω» (${withIM(main)} of ${main.length})`,
+      main.length >= 3 && withIM(main) === main.length && s.all.every(r => !r.d.includes(MARK)));
+    ok(`IM (iv) old flow: every request sends exactly what a409a47 sent (${hs})`, hs === IM_BASELINE.oldFlow); }
+  { const s = await run('?stageA=0', [F1, WHY, 'Χωρίς ερωτήσεις, σε παρακαλώ.', 'Δεν ξέρω.', 'Μη με ρωτάς άλλο.']);
+    table('(iv) old flow, «χωρίς ερωτήσεις»', s);
+    const hs = s.all.map(r => sha(r.d)).join(' ');
+    ok(`IM (iv) old flow: «χωρίς ερωτήσεις» — the note from the next request on, as before (${s.all.map(r => r.d.includes(IM) ? 1 : 0).join('')})`,
+      withIM(s.req('Δεν ξέρω.')) > 0 && withIM(s.req('Μη με ρωτάς άλλο.')) > 0);
+    ok(`IM (iv) old flow: … every request byte for byte as a409a47 sent it (${hs})`, hs === IM_BASELINE.oldFlowNoQ); }
+}
+// the per-turn part of each request of the two old-flow sessions of IM (iv), as a409a47 sent them (SHA-256, first 16 hex)
+const IM_BASELINE = { oldFlow: '9cc0489d84cd11e3 dcce58fc3d30a888 0d3f7589c795f424 8ef1f33c44d365b1',
+  oldFlowNoQ: '9cc0489d84cd11e3 a4c883a93feb0f09 dde96cc9e936a39c bb733972022ad7b8' };
+
 // ═══ ΤΑ 6 ΣΕΝΑΡΙΑ (ψεύτικο ή πραγματικό μοντέλο) ═════════════════════════════
 function fakeModel() {
   let mainCalls = 0;
@@ -4423,7 +4515,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
