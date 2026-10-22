@@ -2101,20 +2101,38 @@ function dropModelSentences(text, test) {
 }
 // SAFETY (§0.1; decision 3: «Ποτέ λάθος αριθμός γραμμής βοήθειας»). The app's helplines come only from code, as fixed text. In the
 // real-model run 21 the crisis reply added «10306 (ΚΕΘΕΑ / γραμμή ψυχικής υγείας)» and «Κύπρος: 1480». A model sentence that names a
-// help organization other than the app's, or a phone number other than 10306 / 1018 / 112, is removed before it is shown — and
+// help organization other than the app's, or a phone number not in HELPLINES, is removed before it is shown — and
 // then buildCrisisLine, seeing the model's number gone, adds the right line. Ordinary numbers stay («4 παιδιά», «10 χρόνια», «18
 // μόρια», «1500 ευρώ»): a number of 3+ digits counts only next to a phone word in the same sentence, or written like a phone
 // number (8+ digits); «Κλίμακα» only next to a phone word («σε μια κλίμακα από το 1 ως το 10» is the scale).
-const HELP_ORGS = /(?:^|[^α-ω])(?:κεθεα|οκανα|εκαβ|επιψυ|ψυχαργ)|σαμαρειτ|samaritan|befrienders|lifeline|childline|χαμογελο του παιδιου/;
+// HELPLINES — the one table of the help numbers a reply may show, each with its name: the app's own three, named as buildCrisisLine
+// names them, and five that the filter used to wipe with their whole sentence, the 112 beside them included (final stress test, A5;
+// run 48, Κ3: «κάλεσε 166 — είναι το ΕΚΑΒ» never reached the screen). `org` is how the filter knew the name as an organisation: such
+// a name now counts only beside its own number — «το ΕΚΑΒ, 166» stays, «το ΕΚΑΒ» alone or «το Χαμόγελο του Παιδιού στο 166» go.
+const HELPLINES = [
+  { number: "1018", name: "γραμμή παρέμβασης για την αυτοκτονία" },
+  { number: "10306", name: "Γραμμή Ψυχοκοινωνικής Υποστήριξης" },
+  { number: "112", name: "άμεσο κίνδυνο" },
+  { number: "166", name: "ΕΚΑΒ", org: /(?:^|[^α-ω])εκαβ/ },
+  { number: "100", name: "Ελληνική Αστυνομία" },
+  { number: "15900", name: "γραμμή SOS για τη βία κατά των γυναικών" },
+  { number: "1056", name: "Χαμόγελο του Παιδιού", org: /χαμογελο του παιδιου/ },
+  { number: "116111", name: "ευρωπαϊκή γραμμή για παιδιά και εφήβους" },
+];
+const HELP_ORGS = /(?:^|[^α-ω])(?:κεθεα|οκανα|επιψυ|ψυχαργ)|σαμαρειτ|samaritan|befrienders|lifeline|childline/;
 const HELP_WORDS = /τηλεφων|τηλ\.|καλεσ(?:ε|εισ|ετε|τε)(?![α-ω])|καλεστε|(?:^|[^α-ω])γραμμ(?:η|ησ|εσ|ων)(?![α-ω])|helpline|hotline|(?:^|[^a-z])sos(?![a-z])|κυπρ|cyprus/;
 function stripForeignHelplines(text) {
+  const listed = n => HELPLINES.some(h => h.number === n);
   return dropModelSentences(text, f => {
     if (HELP_ORGS.test(f)) return true;
+    // a number of the table written in groups («116 111») is that number
+    f = f.replace(/\d+(?: \d+)+/g, m => (listed(m.replace(/ /g, "")) ? m.replace(/ /g, "") : m));
+    if (HELPLINES.some(h => h.org && h.org.test(f) && !new RegExp("(?:^|\\D)" + h.number + "(?!\\d)").test(f))) return true;
     if (/(?:^|[^\d.,])\+?\d(?:[ \t-]?\d){7,}(?![\d.,]?\d)(?!\s*(?:€|ευρω|euro))/.test(f)) return true;
     if (!HELP_WORDS.test(f)) return false;
     // a sum, a duration or a year is not a phone number («300 ευρώ», «120 ώρες», «2024»)
     const nums = [...f.matchAll(/(?:^|[^\d.,])(\d{3,})(?![\d.,]?\d)(?!\s*(?:€|ευρω|euro|χρον|μην|μερ|εβδομαδ|ωρ|λεπτ|%|χιλ|km))/g)].map(m => m[1]);
-    return nums.some(n => !/^(?:10306|1018|112|(?:19|20)\d\d)$/.test(n)) || /κλιμακ/.test(f);
+    return nums.some(n => !listed(n) && !/^(?:19|20)\d\d$/.test(n)) || /κλιμακ/.test(f);
   });
 }
 // §3a (decision 2: «σε κάθε ροή η AURA δεν λέει ποτέ "αυτό είναι η ρίζα"»): the root is the user's phrase and only they confirm

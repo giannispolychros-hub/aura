@@ -50,7 +50,7 @@ const NAMES = ['stopOpenerKind', 'detectsRiskClarification', 'guardStopMoment', 
   'detectSafetySignal', 'classifyCrisisTier', 'buildCrisisLine', 'stripInternalLabels', 'matchesClosingWord', 'lookBehind']; // UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex)
 let F = {};
 try {
-  const consts = ['STOP_OPENER', 'STOP_GENTLE', 'HELP_ORGS', 'HELP_WORDS', 'ROOT_DECLARATION', 'INTERNAL_LABEL_HEADS'].map(constSrc).join('\n');
+  const consts = ['STOP_OPENER', 'STOP_GENTLE', 'HELPLINES', 'HELP_ORGS', 'HELP_WORDS', 'ROOT_DECLARATION', 'INTERNAL_LABEL_HEADS'].map(constSrc).join('\n'); // UPDATED (22/10, A5): + HELPLINES, the one table of help numbers
   F = new Function(consts + '\n' + NAMES.map(n => fullFnSrc(n) || `function ${n}(){return 'missing'}`).join('\n') + '\nreturn {' + NAMES.join(',') + '};')();
 } catch (e) { console.log('LOAD ERROR — ' + e.message); }
 const T = (f, ...a) => { try { return F[f](...a); } catch (e) { return 'threw:' + e.message; } };
@@ -159,10 +159,15 @@ assert('AFTER THE SAFETY PATH: support only, in proportion; no root, no step or 
   const RUN16 = 'Σε ακούω.\n\nΑυτό που είπες είναι σημαντικό και θέλω να το πάρω στα σοβαρά.\n\nΕίσαι τώρα σε ασφαλές μέρος;\n\n---\n\nΑν νιώθεις ότι μπορεί να κάνεις κάτι για να βλάψεις τον εαυτό σου, παρακαλώ επικοινώνησε τώρα με τη γραμμή ψυχολογικής υποστήριξης **10306** (ΚΕΘΕΑ / Γραμμή Ψυχικής Υγείας, Ελλάδα) — είναι δωρεάν και είναι εκεί για αυτό ακριβώς.';
   assert('RUN 16: the sentence with «10306 (ΚΕΘΕΑ…)» is gone, the rest stays (no orphan separator at the end)',
     T('stripForeignHelplines', RUN16) === 'Σε ακούω.\n\nΑυτό που είπες είναι σημαντικό και θέλω να το πάρω στα σοβαρά.\n\nΕίσαι τώρα σε ασφαλές μέρος;');
-  const GONE = ['Μπορείς να καλέσεις το 1056 (Χαμόγελο του Παιδιού).', 'Τηλέφωνο: 210 7298 980.', 'Η Κλίμακα έχει τη γραμμή 1018.',
-    'Οι Σαμαρείτες απαντούν στο 8000 7773.', 'Στη γραμμή SOS 15900 μπορείς να μιλήσεις.', 'Κάλεσε το 10306 (ΚΕΘΕΑ).',
-    'Στην Κύπρο: 1480.', 'Μπορείς να απευθυνθείς στο ΚΕΘΕΑ.', 'Πάρε τηλέφωνο στο 116 123.', 'Υπάρχει και το ΕΚΑΒ, 166.',
+  // UPDATED (22/10, final stress test A5, John): 1056 (Χαμόγελο του Παιδιού), 15900 and «ΕΚΑΒ, 166» are lines of HELPLINES now — they
+  // moved from GONE to TABLE below. Everything else here is still removed (auratests/test_helplines_table_2210.js).
+  const GONE = ['Τηλέφωνο: 210 7298 980.', 'Η Κλίμακα έχει τη γραμμή 1018.',
+    'Οι Σαμαρείτες απαντούν στο 8000 7773.', 'Κάλεσε το 10306 (ΚΕΘΕΑ).',
+    'Στην Κύπρο: 1480.', 'Μπορείς να απευθυνθείς στο ΚΕΘΕΑ.', 'Πάρε τηλέφωνο στο 116 123.',
     'Μπορείς να μιλήσεις με κάποιον στο 210 7298 980.', 'Η Κλίμακα έχει γραμμή βοήθειας.'];
+  const TABLE = ['Μπορείς να καλέσεις το 1056 (Χαμόγελο του Παιδιού).', 'Στη γραμμή SOS 15900 μπορείς να μιλήσεις.', 'Υπάρχει και το ΕΚΑΒ, 166.'];
+  assert('UPDATED (22/10, A5): the lines of the table stay — 1056 with Χαμόγελο του Παιδιού, 15900, ΕΚΑΒ with 166',
+    TABLE.every(s => T('stripForeignHelplines', 'Σε ακούω. ' + s + '\n\nΕίμαι εδώ.') === 'Σε ακούω. ' + s + '\n\nΕίμαι εδώ.'));
   const gone = GONE.filter(s => T('stripForeignHelplines', 'Σε ακούω. ' + s + '\n\nΕίμαι εδώ.') !== 'Σε ακούω.\n\nΕίμαι εδώ.');
   assert('OTHER NUMBERS AND ORGANIZATIONS: each one\'s sentence is removed' + (gone.length ? ' — kept: ' + gone.join(' | ') : ''), gone.length === 0);
   const APPLINES = ['Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.', 'Υπάρχει η Γραμμή Ψυχοκοινωνικής Υποστήριξης, 10306 — δωρεάν και ανώνυμη.',
