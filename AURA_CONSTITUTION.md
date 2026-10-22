@@ -63,6 +63,7 @@ If you notice a conflict: stop, report it to John, change nothing.
 0.4 Target product shape — being tested.
 The target: the free part ends when the user confirms the root. Everything after the root belongs to the paid AURA Coach: a one-time payment, no subscription.
 Today this runs only behind the Stage A switch, as an experiment with an end (ARCHITECTURE_DECISIONS.md). By default the old flow (ΧΑΟΣ → … → ΔΡΟΜΟΙ) is live. John decides, on real-session evidence, which flow stays.
+Note, 22 October 2026: the default became Stage A, by John's decision (ARCHITECTURE_DECISIONS.md, «22 Οκτωβρίου (ε)»). The old flow opens with ?stageA=0. Η προεπιλογή έγινε Στάδιο Α με απόφαση του John στις 22 Οκτωβρίου.
 The sections that describe the root flow (§1–§4) describe the target flow.
 Revenue comes from value delivered per decision, never from dependency (§15).
 The root is the proof. The step is the payoff.
