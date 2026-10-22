@@ -1467,6 +1467,13 @@ function perTurnSafety(currentMode, riskKind) {
   const crisisTurn = currentMode === "SUPPORTIVE";
   return { crisisTurn, safetyPath: crisisTurn || riskKind === 1 || riskKind === 2 };
 }
+// ADR «22 Οκτωβρίου (στ)» (John, a safety exception (α)): the INFORMATION MODE note («concise information … no Socratic questions»)
+// is not sent on the safety path — the crisis turn and every turn after the crisis line, where the crisis reply asks the risk question
+// — nor in Stage A before a confirmed root, where it pulled toward advice and a decision for the user (run 46, session 83). The held
+// state is untouched: informationModeActive keeps its value; only the note is held. Anywhere else the note goes out as before.
+function informationModeNoteDue(active, safetyPath, stageAPreRoot) {
+  return active === true && !safetyPath && !stageAPreRoot;
+}
 // ADR «19 Οκτωβρίου (δ)», 5 (John): with the switch open the app does not ask First-WHY (ADR «17 Οκτωβρίου (δ)»), but the fixed prompt
 // still says ENTRY — FIRST-WHY PROTOCOL. On the session's first reply only — never on a crisis turn, never with the switch closed — one
 // note says so; the fixed prompt is untouched.
@@ -6921,7 +6928,7 @@ A line missing above means only that one pattern was not matched — the absence
       // harmless should the intro ever be revisited.
       const showDemo = false; // demo removed entirely
       const demoCtx = ''; // demo path removed — showDemo can never be true (no button sets it)
-      const informationModeCtx = informationModeActive.current
+      const informationModeCtx = informationModeNoteDue(informationModeActive.current, _safetyPath, stageAActive.current && stageARef.current.stats.rootConfirmed !== 1)
         ? `\n[INFORMATION MODE ACTIVE — the user explicitly asked to stop being questioned ("χωρίς ερωτήσεις" or equivalent). This is a real, held state, set by the application, not something to re-derive from memory each turn: the missing piece here is not clarity of thought, it is data/expertise the user does not have — reflective questioning cannot supply that, no matter how well-phrased. On first entering this state, say so plainly, once: "Από εδώ και πέρα για λίγο βγαίνουμε από τη διερεύνηση — φαίνεται ότι λείπει βασική πληροφορία." Then give concise, categorical information — never statistics, never "η βιβλιογραφία λέει", never "το 80%" — only general, well-known approaches/categories (e.g. "με βάση όσα γνωρίζουμε για marketing νέων εφαρμογών, υπάρχουν μερικές συνήθεις προσεγγίσεις..."), the same restraint already used elsewhere for factual claims. Then say, once: "Τώρα που έχουμε αυτή την πληροφορία, ας επιστρέψουμε στο δικό σου δίλημμα." Knowledge is a bridge back to the mirror, never a new identity for AURA. Do not ask Socratic questions, do not run Cognitive Engine reasoning-operation switches, do not offer Perspective Swap while actually delivering the information. This stays active for the rest of this topic until natural closure — it does not silently lapse after a few replies.]\n`
         : '';
       // CODE-LEVEL FLOOR (architectural lifecycle fix — narrow, 100% deterministic, reuses the
