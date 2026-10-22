@@ -66,8 +66,10 @@ assert('EXAMPLE (4): no digit and no length of time in rule (4)', (() => { const
 // ── 3. Nothing else moved ─────────────────────────────────────────────────────────────────────────────────────────────────
 assert('UNCHANGED: undo the two edits and the prompt is a409a47\'s, byte for byte',
   PROMPT.split(NEW_EX).length === 2 && PROMPT.split(RULE7).length === 2 && h(PROMPT.replace(NEW_EX, OLD_EX).replace(RULE7, '')) === 'b5f303cc9405aa21');
+// UPDATED (22/10): main's logic change 6b3ddae (INFORMATION MODE not sent on the safety path or in Stage A before the root) is merged
+// here; it is the only change outside the prompt, pinned — and undone to a409a47's byte for byte — in test_information_mode_gate_2210.js
 assert('UNCHANGED: every line of App.jsx outside the main prompt (safety, MASTER PRIORITY, perTurnSafety, exit detectors, Stage A texts…)',
-  h(raw.slice(0, _s) + raw.slice(_e)) === '7d60e6075d2471c3');
+  h(raw.slice(0, _s) + raw.slice(_e)) === 'dddc9e8662c3981f');
 assert('UNCHANGED: the crisis prompt, the closing prompt and the honest-uncertainty rule',
   h(lit('SYSTEM_SUPPORTIVE')) === 'c7815b96d83ebae8' && h(lit('SYSTEM_TERMINATION')) === 'd5a77ca926f9490b' && h(lit('HONEST_UNCERTAINTY_RULE')) === '80b2ffd69933aee9');
 assert('UNCHANGED: api/aura.js outside its generated fingerprint block', (() => {

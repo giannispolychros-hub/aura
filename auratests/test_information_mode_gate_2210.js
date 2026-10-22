@@ -96,15 +96,23 @@ assert('3: the held state is set and cleared where it was — after the reply, i
   (raw.match(/informationModeActive\.current = false;/g) || []).length === 1 &&
   (raw.match(/informationModeActive\.current = true/g) || []).length === 2);
 assert('3: … and it still holds the method-failure note back, as before', /if \(!informationModeActive\.current && lastUserMsgForMethodFailure && detectsMethodFailureSignal\(lastUserMsgForMethodFailure\.content\)\) \{/.test(G));
-assert('3: the fixed prompt is a409a47\'s, byte for byte', h(PROMPT) === 'b5f303cc9405aa21');
+// UPDATED (22/10, work branch only): here the prompt carries 8c6bed4's two ΦΩΝΗ edits (pinned, undone to a409a47's byte for byte, in
+// test_voice_words_2210.js); main's version of this file pins a409a47's prompt itself. This change touches neither.
+assert('3: the fixed prompt is the work branch\'s (a409a47 + 8c6bed4), byte for byte', h(PROMPT) === 'b92b55065359eea4');
 assert('3: the crisis prompt, the closing prompt and the honest-uncertainty rule are unchanged',
   h(lit('SYSTEM_SUPPORTIVE')) === 'c7815b96d83ebae8' && h(lit('SYSTEM_TERMINATION')) === 'd5a77ca926f9490b' && h(lit('HONEST_UNCERTAINTY_RULE')) === '80b2ffd69933aee9');
-assert('3: api/aura.js is a409a47\'s, byte for byte — guard and fingerprints', h(api) === 'b11fad3a5d793717');
+// UPDATED (22/10, work branch only): the generated fingerprints follow 8c6bed4's prompt; outside them the file is a409a47's
+assert('3: api/aura.js outside its generated fingerprint block is a409a47\'s, byte for byte — the guard', (() => {
+  const b = api.indexOf('// BEGIN PROMPT FINGERPRINTS'), e = api.indexOf('// END PROMPT FINGERPRINTS');
+  return b > 0 && e > b && h(api.slice(0, b) + api.slice(api.indexOf('\n', e))) === '70ebe4ff38cc98f3'; })());
 assert('3: the helper is in the file once, outside the prompt, right after perTurnSafety',
   raw.split(HELPER).length === 2 && raw.indexOf(HELPER) > raw.indexOf(fnSrc('perTurnSafety')) && raw.indexOf(HELPER) - (raw.indexOf(fnSrc('perTurnSafety')) + fnSrc('perTurnSafety').length) === 1 &&
   !PROMPT.includes('informationModeNoteDue'));
-assert('3: undo the two edits and App.jsx is a409a47\'s, byte for byte — nothing else in the file moved',
-  raw.split(WIRING_NEW).length === 2 && h(raw.replace(HELPER, '').replace(WIRING_NEW, WIRING_OLD)) === 'b676bb01a68c2bac');
+// UPDATED (22/10, work branch only): undone here, the code outside the prompt is a409a47's (the prompt is checked above)
+assert('3: undo the two edits and every line of App.jsx outside the prompt is a409a47\'s, byte for byte — nothing else moved', (() => {
+  const u = raw.replace(HELPER, '').replace(WIRING_NEW, WIRING_OLD);
+  const i = u.indexOf('const AURA_CORE_PERSONALITY = `'), a = u.indexOf('`', i) + 1, b = u.indexOf('`;', a);
+  return raw.split(WIRING_NEW).length === 2 && h(u.slice(0, a) + u.slice(b)) === '7d60e6075d2471c3'; })());
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);
