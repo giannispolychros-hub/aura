@@ -146,7 +146,9 @@ const undoVoice1910 = p => VOICE_1910.reduce((t, [now, before]) => (t.split(now)
   assert('UNCHANGED: the fixed prompt (as in 013a4de), apart from John\'s voice edits of 19/10 (ε) and (ζ)', h(undoVoice1910(raw.slice(_s, _e))) === 'a6d7fe7ae33515a0' && h(raw.slice(_s, _e)) !== 'a6d7fe7ae33515a0');
   const sup = (raw.match(/const SYSTEM_SUPPORTIVE = `([\s\S]*?)`;/) || ['', ''])[1];
   assert('UNCHANGED: the crisis prompt (SYSTEM_SUPPORTIVE)', h(sup) === 'c7815b96d83ebae8' && sup.length === 851);
-  const PIN = { detectSafetySignal: 'dfaf34c6e1e44e6b', classifyCrisisTier: 'f724a0db0c1a5bf9', buildCrisisLine: 'd359e22dd7cf9a95',
+  // UPDATED (22/10, ADR «22 Οκτωβρίου (β)», SAFETY): detectSafetySignal and classifyCrisisTier changed on purpose — Greeklish and spelling by
+  // ear, additive; the phrase list, the crisis lines and the numbers are unchanged (pinned in test_crisis_greeklish_2210.js).
+  const PIN = { detectSafetySignal: '7fd94cacc250c6e2', classifyCrisisTier: '448481fd3885da83', buildCrisisLine: 'd359e22dd7cf9a95',
     crisisLineAfterFailedCall: 'c87733effcebde7e' };
   for (const [n, v] of Object.entries(PIN)) assert(`UNCHANGED: ${n}`, h(fullFnSrc(n, raw)) === v);
   assert('UNCHANGED: the stage note texts (SAFETY / GRACEFUL EXIT / OPENING / PERSPECTIVE SWAP)', h(fullFnSrc('describeMasterPriorityStageCtx', raw)) === 'b9ec012473adece6');

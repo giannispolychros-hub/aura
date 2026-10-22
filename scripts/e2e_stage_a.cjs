@@ -13,7 +13,7 @@
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
-// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only MAIN | ST | W | X | Y | Z | … | R4 | TX | VO | AP | CX | SN (μόνο μία ενότητα· MAIN = A–V)
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only MAIN | ST | W | X | Y | Z | … | R4 | TX | VO | AP | CX | SN | GL (μόνο μία ενότητα· MAIN = A–V)
 //   --viewport 390x844 | 360x640 (17/10 (δ): όλος ο έλεγχος σε αυτό το μέγεθος κινητού· οι ενότητες με δικά τους μεγέθη τα κρατούν)
 // ΣΤΡΕΣ ΤΕΣΤ (Μέρος Β, 10/10): --stress (ψεύτικα, κόστος 0) · --stress --real --dry (σχέδιο + εκτίμηση) · --stress --real --yes (ΠΡΑΓΜΑΤΙΚΟ,
 //   όριο --budget έως $25, προεπιλογή $25) · --sessions 14,15,1 (μόνο αυτοί) · --minutes 75 (καμία νέα συνεδρία μετά). Τρέχει και από το
@@ -680,6 +680,7 @@ async function runMock() {
   await runMockSN();
   await runMockAR();
   await runMockPM();
+  await runMockGL();
   await runMockMC();
   await runMockMH();
   await runMockPV();
@@ -1909,6 +1910,10 @@ async function runMockST() {
     ['(γ) the smaller piece', async p => { await say(p, BIG); await tap(p, T.fitsNo); }, CRISIS, 'supportive'],
     ['(δ) «Πότε»', async p => { await say(p, STEP); await tap(p, T.fitsYes); }, CRISIS, 'supportive'],
     ['(δ) «Πότε», DISTRESS', async p => { await say(p, STEP); await tap(p, T.fitsYes); }, DISTRESS, 'main'],
+    // ADR «22 Οκτωβρίου (β)» (SAFETY): the same crisis phrase in Greeklish, and spelled by ear, in the boxes of the step (John's check 14)
+    ['(β) the step, Greeklish', async p => {}, 'thelo na pethano', 'supportive'],
+    ['(γ) the smaller piece, Greeklish', async p => { await say(p, BIG); await tap(p, T.fitsNo); }, 'den thelw na zw allo', 'supportive'],
+    ['(δ) «Πότε», by ear', async p => { await say(p, STEP); await tap(p, T.fitsYes); }, 'δεν θελο να ζο', 'supportive'],
   ]) {
     const s = await sess('?stageA=1&rec=1', [Q1, SUP, 'Πες μου τι γίνεται τώρα.']);
     await toStep(s);
@@ -3203,6 +3208,56 @@ async function runMockPM() {
     await browser.close();
   }
 }
+// ── GL (ADR «22 Οκτωβρίου (β)», SAFETY, John's checks 13 and 15): a crisis phrase in Greeklish or spelled by ear, in the MIDDLE of a
+// session, takes the same safety path as the Greek phrase — the supportive request, the line of ITS tier on the screen (A: 1018,
+// B: 10306, never the other one), no root button. An ordinary Greeklish message before it is an ordinary message. The tester link,
+// the switch closed, and the plain address.
+async function runMockGL() {
+  const L_A = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
+  const L_B = 'Υπάρχει η Γραμμή Ψυχοκοινωνικής Υποστήριξης, 10306 — δωρεάν και ανώνυμη.';
+  const F1 = 'Δουλεύω νοσηλεύτρια σε βάρδιες και είμαι συνέχεια κουρασμένη.', WHY = 'Γιατί δεν μου μένει τίποτα για μένα.';
+  const PLAIN = 'Oi nyxterines vardies kyriws, den koimamai kala.';
+  const RISK = 'Σε ακούω. Σκέφτεσαι να βλάψεις τον εαυτό σου;';
+  for (const [query, sw] of [['?stageA=1&rec=1', 'tester link'], ['?rec=1', 'switch closed'], ['', 'plain address']]) {
+    // «δεν αντέχω άλλο», in Greek, is the reference for the Greeklish tier B: the same line, the same screen
+    for (const [msg, tier] of [['Eimai kourasmeni apo tis vardies kai den antexo allo na zw', 'A'], ['thelo na pethano', 'A'], ['den antexo allo', 'B'], ['δεν αντέχω άλλο', 'B'], ['δεν θελο να ζο', 'A']]) {
+      const browser = await launch();
+      const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 700 }) });
+      const bodies = []; let n = 0;
+      const replies = ['Τι είναι το πιο βαρύ στις βάρδιες;', 'Τι γίνεται όταν γυρνάς σπίτι;', 'Και τι κάνεις τότε;'];
+      await page.route('**/api/aura', async route => {
+        let body = {}; try { body = JSON.parse(route.request().postData() || '{}'); } catch (e) {}
+        bodies.push(body);
+        // the risk question only to a safety request; any other request gets an ordinary question
+        const text = LIB.classifyRequest(body, APP).kind === 'supportive' ? RISK : replies[Math.min(n++, replies.length - 1)];
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+      });
+      await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+      await page.goto(BASE + '/' + query);
+      await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+      await send(page, F1); if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, WHY);
+      const n0 = bodies.length;
+      await send(page, PLAIN); await page.waitForTimeout(400);
+      const plainKind = bodies[n0] ? LIB.classifyRequest(bodies[n0], APP).kind : 'none';
+      const before = (await page.locator('.turn-aura').allInnerTexts()).join('\n');
+      const n1 = bodies.length;
+      await send(page, msg); await page.waitForTimeout(800);
+      const kind = bodies[n1] ? LIB.classifyRequest(bodies[n1], APP).kind : 'none';
+      const last = ((await page.locator('.turn-aura').allInnerTexts()).slice(-1)[0] || '');
+      const want = tier === 'A' ? L_A : L_B, other = tier === 'A' ? L_B : L_A;
+      ok(`GL (${sw}): an ordinary Greeklish message («${PLAIN.slice(0, 26)}…») is an ordinary message — no safety path, no line`,
+        plainKind === 'main' && !/1018|10306/.test(before) && before.includes('Τι γίνεται όταν γυρνάς σπίτι;'));
+      // the root button: never in tier A; in tier B it stays where the switch is open (§1.5, stageARootButtonVisible) — as for the Greek phrase
+      const button = await page.getByRole('button', { name: 'Νομίζω βρήκα τι με απασχολεί' }).count();
+      ok(`GL (${sw}): «${msg.slice(0, 34)}» → the supportive request, the tier-${tier} line on the screen (${tier === 'A' ? '1018' : '10306'}), not the other one; ` +
+        (tier === 'A' ? 'no root button' : 'the root button as for any tier B (§1.5)'),
+        bodies.length === n1 + 1 && kind === 'supportive' && last.includes(RISK) && last.includes(want) && !last.includes(other) &&
+        button === (tier === 'B' && sw === 'tester link' ? 1 : 0));
+      if (msg === 'thelo na pethano') await page.screenshot({ path: path.join(OUT, 'GL-' + sw.replace(/ /g, '_') + '-' + (VP ? VP.width : 390) + '.png'), fullPage: false }).catch(() => {});
+      await browser.close();
+    }
+  }
+}
 // Recorded on 013a4de (before ADR «19 Οκτωβρίου (δ)»), with the SN scripts above.
 const SN_BASELINE = { closed: '9cc0489d84cd11e3 a4c883a93feb0f09 599d159dd7d6e616 56c94429f4ecc181 1311a6c72dc7db4b 04d947de9e723755',
   open: 'b7117c3a6d998739 319083b10b16b87e 6ebd5644c901c40e 61bf3231070537bc 967978c1d9b0572c' };
@@ -4163,7 +4218,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

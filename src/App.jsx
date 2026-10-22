@@ -1513,7 +1513,7 @@ function describeLastFiredFamilyCtx(family, streak) {
 // SAFETY: crisis / emotional distress detection
 // ─────────────────────────────────────────────
 
-function detectSafetySignal(text) {
+function detectSafetySignal(text, tierB) {
   const crisis = [
     /\b(suicide|suicidal|self.harm|self.hurt|kill myself|end my life|don't want to (live|be here)|want to die|want to disappear|can't go on)\b/i,
     // RT-CRITICAL-fix: \b does not recognize Greek letters as word characters in JS regex —
@@ -1546,6 +1546,35 @@ function detectSafetySignal(text) {
   const fold = s => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const folded = fold(text);
   if (crisis.some(p => new RegExp(fold(p.source), "i").test(folded))) return "CRISIS";
+  // GREEKLISH AND SPELLING BY EAR (2026-10-22, ADR «22 Οκτωβρίου (β)», a safety fix John approved in advance): «thelo na pethano»,
+  // «den antexo allo na zw» or «δεν θελο να ζο» matched nothing, because the phrases above are Greek, spelled right. ADDITIVE ONLY:
+  // no phrase is changed, and everything that matched above still matches. Latin letters are read as Greek; then every word is
+  // compared BY SOUND with the words of the Greek phrases above (ο = ω; ι = η = υ = ει; ε = αι; αυ = αφ; a double letter = a single
+  // one). A word that sounds like a word of the phrases is written in that sound; any other word becomes a blank that no phrase can
+  // match through, so «ζορίσω» is never read as «ζω». The same phrases, written in the same sounds, are tried once more.
+  // `tierB` comes only from classifyCrisisTier: its tier-B phrases are blanked in the same sounds, so «den antexo allo» gets the
+  // tier of «δεν αντέχω άλλο» (B, the 10306 line), as in Greek. See auratests/test_crisis_greeklish_2210.js.
+  const sound = w => w.replace(/([αε])[υβ]/g, "$1φ").replace(/ει/g, "ι").replace(/αι/g, "ε").replace(/[ηυ]/g, "ι").replace(/ω/g, "ο")
+    .replace(/(.)\1+/g, "$1");
+  const LATIN = { th: "θ", ch: "χ", kh: "χ", ps: "ψ", ks: "ξ", ph: "φ", ou: "ου", 8: "θ", 3: "ξ", a: "α", b: "β", c: "κ", d: "δ", e: "ε", f: "φ",
+    g: "γ", h: "η", i: "ι", k: "κ", l: "λ", m: "μ", n: "ν", o: "ο", p: "π", r: "ρ", s: "σ", t: "τ", u: "υ", v: "β", w: "ω", x: "χ", y: "υ", z: "ζ" };
+  const ALSO = [{}, { x: "ξ" }, { h: "χ" }, { u: "ου" }, { x: "ξ", h: "χ" }, { x: "ξ", u: "ου" }, { h: "χ", u: "ου" }, { x: "ξ", h: "χ", u: "ου" }];
+  const asGreek = (w, alt) => w.replace(/th|ch|kh|ps|ks|ph|ou|[a-z38]/g, m => alt[m] || LATIN[m] || m);
+  const greekPhrases = crisis.map(p => fold(p.source).replace(/ς/g, "σ")).filter(s => /[α-ω]/.test(s));
+  const tierPhrases = tierB ? fold(tierB.source).replace(/ς/g, "σ") : "";
+  const heard = new Set(), stems = [];
+  for (const s of greekPhrases.concat(tierPhrases || [])) {
+    for (const w of s.match(/[α-ω]+/g)) heard.add(sound(w));
+    for (const m of s.matchAll(/([α-ω]+)(?=[|)])/g)) if (/[^αεηιουωσ]$/.test(m[1])) stems.push(sound(m[1]));
+  }
+  const byEar = fold(text).toLowerCase().replace(/ς/g, "σ").replace(/[a-z0-9α-ω]+/g, w => {
+    for (const f of /[a-z]/.test(w) ? ALSO.filter(alt => Object.keys(alt).every(k => w.includes(k))).map(alt => asGreek(w, alt)) : [w]) {
+      const k = sound(f);
+      if (heard.has(k) || stems.some(s => k.startsWith(s))) return k;
+    }
+    return "#";
+  }).replace(tierPhrases ? new RegExp(tierPhrases.replace(/[α-ω]+/g, sound), "g") : /$^/, " ");
+  if (greekPhrases.some(s => new RegExp(s.replace(/[α-ω]+/g, sound)).test(byEar))) return "CRISIS";
   if (distress.some(p => p.test(text))) return "DISTRESS";
   return null;
 }
@@ -1560,8 +1589,9 @@ function detectSafetySignal(text) {
 function classifyCrisisTier(text) {
   if (typeof text !== "string" || detectSafetySignal(text) !== "CRISIS") return null;
   const folded = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const rest = folded.replace(/(?:δεν αντεχω αλλο|δεν βλεπω νοημα|δεν αξιζει (?:πια|πλεον)|τι νοημα εχει πια|κουραστηκα να (?:προσπαθω|αγωνιζομαι))(?! να (?:ζω|ζησω|συνεχ|υπαρχ|ειμαι))/g, " ");
-  return detectSafetySignal(rest) === "CRISIS" ? "A" : "B";
+  const tierB = /(?:δεν αντεχω αλλο|δεν βλεπω νοημα|δεν αξιζει (?:πια|πλεον)|τι νοημα εχει πια|κουραστηκα να (?:προσπαθω|αγωνιζομαι))(?! να (?:ζω|ζησω|συνεχ|υπαρχ|ειμαι))/g;
+  const rest = folded.replace(tierB, " ");
+  return detectSafetySignal(rest, tierB) === "CRISIS" ? "A" : "B";
 }
 // THE LINE APPENDED TO A CRISIS REPLY — pure, so it is testable. Tier A: the 1018 + 112 line on EVERY tier-A message,
 // unless the model's own text already contains "1018". Tier B: the 10306 line ONCE per session (`supportLineShown`), and

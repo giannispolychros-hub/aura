@@ -73,7 +73,9 @@ assert('CRISIS: the risk question survives the clean-up in every case above', CR
 {
   const h = s => crypto.createHash('sha256').update(s || '').digest('hex').slice(0, 16);
   assert('UNCHANGED: buildCrisisLine (the crisis lines)', h(extract('buildCrisisLine')) === 'd359e22dd7cf9a95');
-  assert('UNCHANGED: detectSafetySignal, classifyCrisisTier', h(extract('detectSafetySignal')) === 'dfaf34c6e1e44e6b' && h(extract('classifyCrisisTier')) === 'f724a0db0c1a5bf9');
+  // UPDATED (22/10, ADR «22 Οκτωβρίου (β)», SAFETY): detectSafetySignal and classifyCrisisTier changed on purpose — Greeklish and spelling by
+  // ear, additive; the phrase list, the crisis lines and the numbers are unchanged (pinned in test_crisis_greeklish_2210.js).
+  assert('UNCHANGED: detectSafetySignal, classifyCrisisTier', h(extract('detectSafetySignal')) === '7fd94cacc250c6e2' && h(extract('classifyCrisisTier')) === '448481fd3885da83');
   assert('UNCHANGED: the English «So, the real question…» clean-up', extract('stripAraDeclarative').includes(
     '.replace(/[ \\t]*\\bSo,?[ \\t]+(the[ \\t]+)?(real[ \\t]+)?(question|issue|problem)[^.\\n]*\\.[ \\t]*/gi, " ")'));
 }

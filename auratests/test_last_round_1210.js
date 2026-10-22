@@ -59,7 +59,9 @@ const GEN = CODE.slice(CODE.indexOf('const generateResponse = useCallback('), CO
 
 // ── 0. Decision (α): the app's crisis detector and its safety path, byte for byte as before ─────────────────────────────────
 {
-  const PIN = { detectSafetySignal: 'dfaf34c6e1e44e6b', classifyCrisisTier: 'f724a0db0c1a5bf9', buildCrisisLine: 'd359e22dd7cf9a95',
+  // UPDATED (22/10, ADR «22 Οκτωβρίου (β)», SAFETY): detectSafetySignal and classifyCrisisTier changed on purpose — Greeklish and spelling by
+  // ear, additive; the phrase list, the crisis lines and the numbers are unchanged (pinned in test_crisis_greeklish_2210.js).
+  const PIN = { detectSafetySignal: '7fd94cacc250c6e2', classifyCrisisTier: '448481fd3885da83', buildCrisisLine: 'd359e22dd7cf9a95',
     crisisLineAfterFailedCall: 'c87733effcebde7e', mergeRiskKind: 'd3b56f5bad3ae14f', stageACaptureAllowed: 'e45f98e42434f208',
     detectsMentalHealthReferral: 'd03b71d681025b79' };
   for (const [n, h] of Object.entries(PIN)) assert(`(α) UNCHANGED: ${n} is byte for byte the same function`, sha(fullFnSrc(n, raw)) === h);

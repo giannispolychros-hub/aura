@@ -73,9 +73,11 @@ assert('CRISIS: the app\'s crisis lines themselves are untouched', S(L_A) === L_
   // UPDATED (22/10, ADR «22 Οκτωβρίου»): John's voice edit (the example without a number, the prediction rule) — e1e56e0c… → b5f303cc…;
   // «Πες μου» itself is still display-only and never in the prompt
   assert('UNCHANGED by «Πες μου»: the prompt (b5f303cc…, John\'s voice edit of 22/10)', h(PROMPT) === 'b5f303cc9405aa21' && !PROMPT.includes('singularTellMe'));
+  // UPDATED (22/10, ADR «22 Οκτωβρίου (β)», SAFETY): detectSafetySignal and classifyCrisisTier changed on purpose — Greeklish and spelling by
+  // ear, additive; the phrase list, the crisis lines and the numbers are unchanged (pinned in test_crisis_greeklish_2210.js).
   assert('UNCHANGED: buildCrisisLine, detectSafetySignal, classifyCrisisTier, replaceBareGoodbye',
-    h(extract('buildCrisisLine')) === 'd359e22dd7cf9a95' && h(extract('detectSafetySignal')) === 'dfaf34c6e1e44e6b' &&
-    h(extract('classifyCrisisTier')) === 'f724a0db0c1a5bf9' && h(extract('replaceBareGoodbye')) === 'e6351d2cb8e28ab5');
+    h(extract('buildCrisisLine')) === 'd359e22dd7cf9a95' && h(extract('detectSafetySignal')) === '7fd94cacc250c6e2' &&
+    h(extract('classifyCrisisTier')) === '448481fd3885da83' && h(extract('replaceBareGoodbye')) === 'e6351d2cb8e28ab5');
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

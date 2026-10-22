@@ -135,7 +135,9 @@ const VOICE_1910 = [['«Θέλω να αδυνατίσω» → «Έγινε κά
 const undoVoice1910 = p => VOICE_1910.reduce((t, [now, before]) => (t.split(now).length === 2 ? t.replace(now, before) : 'MISSING ' + now), String(p || ''));
 {
   const h = s => crypto.createHash('sha256').update(s || '').digest('hex').slice(0, 16);
-  const PIN = { detectSafetySignal: 'dfaf34c6e1e44e6b', classifyCrisisTier: 'f724a0db0c1a5bf9', buildCrisisLine: 'd359e22dd7cf9a95',
+  // UPDATED (22/10, ADR «22 Οκτωβρίου (β)», SAFETY): detectSafetySignal and classifyCrisisTier changed on purpose — Greeklish and spelling by
+  // ear, additive; the phrase list, the crisis lines and the numbers are unchanged (pinned in test_crisis_greeklish_2210.js).
+  const PIN = { detectSafetySignal: '7fd94cacc250c6e2', classifyCrisisTier: '448481fd3885da83', buildCrisisLine: 'd359e22dd7cf9a95',
     crisisLineAfterFailedCall: 'c87733effcebde7e', isExplicitClosure: '09da70474755ef40', declaresClosing: '25fe9be3bbcfaa57',
     matchesClosingWord: 'c3d044cc974bb7ac', stripForeignHelplines: '3a30e4f861a39022', replaceBareGoodbye: 'e6351d2cb8e28ab5',
     detectsMentalHealthReferral: 'd03b71d681025b79' };
