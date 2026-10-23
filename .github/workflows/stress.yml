@@ -50,7 +50,7 @@ concurrency:
 
 jobs:
   stress:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - name: Υπάρχει το κλειδί; (ελέγχεται χωρίς να διαβαστεί)
