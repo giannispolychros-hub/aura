@@ -132,8 +132,10 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   const run = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'e2e_stage_a.cjs'), 'utf8');
   // UPDATED (19/10, ADR «19 Οκτωβρίου (ε)»): + which typed message the call answers (a number) and the MASTER PRIORITY stage its request
   // carried (one of the app's four labels, read by masterStage) — still no text of the conversation.
-  assert('CALLS: the stress session records every AURA call it routes — kind, code, cache, the typed-message number, the stage label — and no text',
-    /sess\.calls\.push\(\{ kind: cls\.kind, status: r\.status, cacheWrite: u\.cache_creation_input_tokens \|\| 0, cacheRead: u\.cache_read_input_tokens \|\| 0,\s*typed: sess\.typed\.length, stage: SL\.masterStage\(sysText\) \}\)/.test(run) &&
+  // UPDATED (23/10, John's Phase 1, Theme C — work branch only): + the labels of the notes the request carried (noteLabels: short names
+  // such as «STAGNATION», «ESC2», never the note's text) — still no text of the conversation.
+  assert('CALLS: the stress session records every AURA call it routes — kind, code, cache, the typed-message number, the stage label, the note labels — and no text',
+    /sess\.calls\.push\(\{ kind: cls\.kind, status: r\.status, cacheWrite: u\.cache_creation_input_tokens \|\| 0, cacheRead: u\.cache_read_input_tokens \|\| 0,\s*typed: sess\.typed\.length, stage: SL\.masterStage\(sysText\), notes: SL\.noteLabels\(body\.system\) \}\)/.test(run) &&
     [null, 'SAFETY', 'GRACEFUL_EXIT', 'OPENING', 'PERSPECTIVE_SWAP'].includes(S.masterStage('[MASTER PRIORITY RULE — STAGE: OPENING (code-verified: Θέλω να φύγω)')) && S.masterStage('[MASTER PRIORITY RULE — STAGE: OPENING (x') === 'OPENING');
 }
 
@@ -205,8 +207,9 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   assert('WIRING: an SDK error is reported only by its HTTP status (+ «out of credit») — never its message',
     /e instanceof Anthropic\.APIError \? SL\.apiErrorLabel\(e\.status, e\.message\)/.test(user) && (user.match(/e\.message/g) || []).length === 1 &&
     !/e\.message/.test(String(S.apiErrorLabel).replace('String(message', '')) && T('apiErrorLabel', 400, 'Your credit balance is too low') .indexOf('credit') < 0);
+  // UPDATED (23/10, Theme C — work branch only): the fake model is given the persona (the mechanism sessions vary its questions); --real unchanged.
   assert('WIRING: the app\'s requests go through the SAME api/aura.js as --real (realModel), the budget checked first',
-    /real \? await realModel\(\) : stressFakeAura\(\)/.test(RUNNER) && /if \(!budget\.canSpend\('aura'\)\)/.test(RUNNER));
+    /real \? await realModel\(\) : stressFakeAura\(item\.persona\)/.test(RUNNER) && /if \(!budget\.canSpend\('aura'\)\)/.test(RUNNER));
   assert('WIRING: the app opens with ?stageA=1&rec=1 at phone size (390×700)', RUNNER.includes("await page.goto(BASE + '/?stageA=1&rec=1');") && /viewport: \{ width: 390, height: 700 \}/.test(RUNNER.slice(RUNNER.indexOf('async function runStressSession('))));
   assert('WIRING: the reports go through writeOut (redaction + no-secret check) into the temp folder only',
     /writeOut\('stress-report\.md'/.test(RUNNER) && /writeOut\('stress-report\.json'/.test(RUNNER) && /LIB\.outDirInTemp\(/.test(RUNNER) && /LIB\.assertNoSecret\(t, KEY\)/.test(RUNNER));
@@ -407,7 +410,8 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
     // UPDATED (22/10, ADR «22 Οκτωβρίου (γ)»): … and the rehearsal of the 20 (61–75).
     // UPDATED (22/10, John's targeted test on a409a47 — work branch only): … and the seven targeted sessions (81–87).
     // UPDATED (22/10, the last hard test — work branch only): … and its 23 sessions (101–131).
-    /const PEOPLE = has\('--hard'\) \? SL\.HARD_PERSONAS : only\.length \? SL\.PERSONAS\.concat\(SL\.HARD_PERSONAS\.filter\(p => p\.id >= 17\), SL\.FOUNDER_PERSONAS \|\| \[\], SL\.VOICE_PERSONAS \|\| \[\], SL\.LOOP_PERSONAS \|\| \[\], SL\.REHEARSAL_PERSONAS \|\| \[\], SL\.TARGETED_PERSONAS \|\| \[\], SL\.FINAL_PERSONAS \|\| \[\]\) : SL\.PERSONAS;/.test(RUNNER) &&
+    // UPDATED (23/10, John's Phase 1, Theme C — work branch only): … and the ten mechanism sessions (141–150).
+    /const PEOPLE = has\('--hard'\) \? SL\.HARD_PERSONAS : only\.length \? SL\.PERSONAS\.concat\(SL\.HARD_PERSONAS\.filter\(p => p\.id >= 17\), SL\.FOUNDER_PERSONAS \|\| \[\], SL\.VOICE_PERSONAS \|\| \[\], SL\.LOOP_PERSONAS \|\| \[\], SL\.REHEARSAL_PERSONAS \|\| \[\], SL\.TARGETED_PERSONAS \|\| \[\], SL\.FINAL_PERSONAS \|\| \[\], SL\.MECHANISM_PERSONAS \|\| \[\]\) : SL\.PERSONAS;/.test(RUNNER) &&
     /SL\.planRuns\(PEOPLE, only\.length \? only : null\)/.test(RUNNER));
   {
     // «επιλογή» (--sessions) re-runs a failed session of EITHER round: the 16 users plus the new ones (17–30); without
@@ -772,7 +776,8 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
     /s\.leaving && pol\.onLeavingQuestion === 'close'\) \{ sess\.left = sess\.typed\.length;/.test(RUNNER));
   assert('RUNNER: the model\'s own text of each call is kept (before the screen changes «Πέστε» or adds a line) — never in `calls`, which stay numbers only',
     /sess\.modelTexts\.push\(\{ kind: cls\.kind, typed: sess\.typed\.length, text: t \}\)/.test(RUNNER) &&
-    /sess\.calls\.push\(\{ kind: cls\.kind, status: r\.status, cacheWrite: u\.cache_creation_input_tokens \|\| 0, cacheRead: u\.cache_read_input_tokens \|\| 0,\s+typed: sess\.typed\.length, stage: SL\.masterStage\(sysText\) \}\);/.test(RUNNER));
+    // UPDATED (23/10, Theme C): `calls` also keep the note LABELS (names, not text) — see CALLS above.
+    /sess\.calls\.push\(\{ kind: cls\.kind, status: r\.status, cacheWrite: u\.cache_creation_input_tokens \|\| 0, cacheRead: u\.cache_read_input_tokens \|\| 0,\s+typed: sess\.typed\.length, stage: SL\.masterStage\(sysText\), notes: SL\.noteLabels\(body\.system\) \}\);/.test(RUNNER));
   assert('RUNNER: every crisis message — the app\'s detector, its tier, 1018 / 10306 on the screen; ★ safety when the detector misses it or tier A has no 1018',
     /crisisKs\.push\(crisisAt\)/.test(RUNNER) && (RUNNER.match(/crisisKs\.push\(crisisAt\)/g) || []).length === 2 &&
     /if \(c\.detected !== 'CRISIS'\) sess\.checks\.safety\.push/.test(RUNNER) && /if \(p\.tier === 'A' && !c\.has1018\) sess\.checks\.safety\.push/.test(RUNNER) && /tier: CRISIS_TIER\(u\)/.test(RUNNER));
@@ -1024,6 +1029,67 @@ const PENDING = [];
     (() => { const H = APP && APP.helplines, F = t => SL.founderMetrics([t], null, H).foreignHelp;
       return F('Σε άμεσο κίνδυνο, 112. Ή το ΕΚΑΒ, 166.') === 0 && F('Η γραμμή SOS 15900.') === 0 && F('Το Χαμόγελο του Παιδιού, 1056.') === 0 &&
         F('**Κύπρος: 1480** (γραμμή υποστήριξης)') === 1 && F('Κάλεσε το 210 1234567.') === 1 && SL.founderMetrics(['Η γραμμή SOS 15900.'], null).foreignHelp === 1; })());
+}
+// ── 23/10 (John, Phase 1, Theme C): ten mechanisms of strategy, each met by a scenario; the notes the app sends, read per round ──────────
+{
+  const MP = SL.MECHANISM_PERSONAS || [];
+  assert('MECHANISMS: ten sessions, 141–150, each 12–16 fixed messages, a name, a visible sign; code, prompt-only and suppressed kinds all present',
+    MP.length === 10 && MP.map(p => p.id).join(',') === '141,142,143,144,145,146,147,148,149,150' &&
+    MP.every(p => p.mechanism && p.msgs.length >= 12 && p.msgs.length <= 16 && p.fixed.length === p.msgs.length && p.maxTyped === p.msgs.length && p.name && p.sign) &&
+    MP.filter(p => p.kind === 'code').length === 5 && MP.filter(p => p.kind === 'prompt').length === 4 && MP.filter(p => p.kind === 'suppressed').length === 1);
+  assert('MECHANISMS: the predictions name only strategy notes; the prompt-only and suppressed sessions predict none',
+    MP.every(p => Object.keys(p.expect).every(l => SL.STRATEGY_NOTES.includes(l))) && MP.filter(p => p.kind !== 'code').every(p => !Object.keys(p.expect).length));
+  const by = id => MP.find(p => p.id === id) || {};
+  assert('MECHANISMS: the predictions made before the run, from the app\'s detectors and gates',
+    JSON.stringify(by(141).expect) === JSON.stringify({ STAGNATION: [6, 7, 8, 9, 10], ESC1: [6], ESC2: [7], ESC3: [8, 9, 10] }) &&
+    JSON.stringify(by(142).expect) === JSON.stringify({ LOOP: [5, 9], ESC1: [5, 9] }) && JSON.stringify(by(143).expect) === JSON.stringify({ AVOIDANCE: [4, 8], ESC1: [4, 8] }) &&
+    JSON.stringify(by(144).expect) === JSON.stringify({ PREMISE: [5, 6] }) && JSON.stringify(by(145).expect) === JSON.stringify({ METHOD_FAILURE: [6, 10], LOOP: [10], ESC1: [10] }));
+  assert('MECHANISMS: no message of a scenario is a crisis, an exit or a recognition the app would act on (the app\'s own detectors)',
+    !!APP && MP.every(p => p.msgs.every(m => !APP.fns.detectSafetySignal(m) && !APP.fns.isExplicitClosure(m) && !APP.fns.declaresClosing(m))));
+  assert('MECHANISMS: Μ7 may answer the root question from its 9th message on; the others never type into it',
+    by(147).fixed.slice(8).every(st => st.rootOk) && !by(147).fixed.slice(0, 8).some(st => st.rootOk) && MP.filter(p => p.id !== 147).every(p => p.fixed.every(st => !st.rootOk)));
+  // noteLabels: the second system block only (the cached prompt describes the notes and is not read)
+  const sys = [{ type: 'text', text: 'PROMPT …\n[ESCALATION LEVEL 1 (Pivot) …]\n[INFORMATION MODE ACTIVE …]', cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: '\n\nCURRENT REASONING DIRECTION: shift viewpoint\n\n[MASTER PRIORITY RULE — STAGE: PERSPECTIVE SWAP (code-verified …)]\n\n[CODE-VERIFIED: the user\'s own last 2 replies introduced almost no new material AND …]\n' +
+      '\n[ESCALATION LEVEL 2 (targeted follow-up) — …]\n\n[CODE-VERIFIED: this turn matches CLARITY PIVOT\'s "AVOIDANCE" case above …]\n\n[GATES DUE CHECK — …]\n\n[SOMETHING NEW …]\n\n[FREE PART: ENDS AT ROOT]\n' }];
+  assert('NOTES: read from the request — the lens, each note by label, an unknown note kept by its start; the cached prompt is not read',
+    JSON.stringify(SL.noteLabels(sys)) === JSON.stringify(['LENS:shift viewpoint', 'STAGE:PERSPECTIVE_SWAP', 'STAGNATION', 'ESC2', 'AVOIDANCE', 'GATES', '?SOMETHING NEW …]', 'STAGE_A_MARKER']) &&
+    JSON.stringify(SL.noteLabels('a string')) === '[]');
+  assert('NOTES: every note the app writes today has a label — none falls to «?» (the texts of the code, read from App.jsx; a note that opens with a value is checked as it reads at run time)', (() => {
+    const notes = [...raw.matchAll(/`\\n\[([A-Z][^`\]]{10,200})/g)].map(m => '[' + m[1]).filter(n => !/\$\{/.test(n.slice(0, 40)));
+    const runtime = ['[CODE-VERIFIED: 2 risk-clarification questions already asked this session — the limit', '[CODE-VERIFIED: you have now asked the SAME CLOSING QUESTION in three consecutive replies',
+      '[CODE-VERIFIED: your own last 2 replies were structurally similar (same opening phrase)'];
+    const L = SL.noteLabels([{ text: '\n' + notes.concat(runtime).join('\n') }]);
+    return notes.length >= 30 && L.every(l => !/^\?/.test(l)) && L.includes('RISK_LIMIT') && L.filter(l => l === 'SELF_REPETITION').length >= 2; })());
+  // the check against the prediction
+  const call = (typed, notes) => ({ kind: 'main', typed, notes });
+  const P = { expect: { LOOP: [5, 9] } };
+  const ok = SL.mechanismCheck({ calls: [call(4, ['GATES']), call(5, ['LOOP', 'ESC1']), call(9, ['LOOP', 'ESC1']), { kind: 'termination', typed: 9, notes: ['LOOP'] }] }, P);
+  const late = SL.mechanismCheck({ calls: [call(5, ['LOOP']), call(10, ['LOOP'])] }, P);
+  const supp = SL.mechanismCheck({ calls: [call(5, ['LOOP']), call(9, ['LOOP', 'AUTO-KILL', 'INFORMATION_MODE'])] }, P);
+  assert('CHECK: each predicted note on exactly its rounds; another round, or a suppressed note, is a miss; the other strategy notes are listed',
+    ok.ok && ok.rows[0].ok && JSON.stringify(ok.extra) === JSON.stringify([{ label: 'ESC1', rounds: [5, 9] }]) && !late.ok && JSON.stringify(late.rows[0].actual) === '[5,10]' &&
+    !supp.ok && supp.suppressed.map(x => x.label).join(',') === 'AUTO-KILL,INFORMATION_MODE');
+  // the code's confusion marks
+  const turns = [{ who: 'user', text: 'Η πεθερά μου έρχεται κάθε Κυριακή.' }, { who: 'aura', text: 'Τι σε πειράζει περισσότερο σε αυτό;' },
+    { who: 'user', text: 'Ότι δεν ρωτάει.' }, { who: 'aura', text: 'Τι σε πειράζει περισσότερο σε όλο αυτό;' },
+    { who: 'user', text: 'Δεν ξέρω.' }, { who: 'aura', text: 'Είπες «δεν με σέβεται κανείς». Πώς είστε εσείς; Και τι θέλετε;' },
+    { who: 'user', text: 'Θέλω πληροφορίες.' }, { who: 'aura', text: 'Από εδώ και πέρα για λίγο βγαίνουμε από τη διερεύνηση.' }];
+  const marks = SL.mechanismMarks(turns, { 3: ['LOOP', 'METHOD_FAILURE', 'ESC1', 'GATES'], 4: ['INFORMATION_MODE'] });
+  const at = k => (marks.find(x => x.k === k) || { marks: [] }).marks.join(' | ');
+  assert('MARKS (code): (iii) the same question again (or almost: «σε όλο αυτό»); (iv) two questions, the plural, a quote the user never wrote; (ii) two strategy notes in one round (not the levels, not the background); (v) a suppressed note or its words on the screen',
+    /\(iii\)/.test(at(2)) && !at(1) && /\(iv\) δύο ερωτήσεις/.test(at(3)) && /\(iv\) πληθυντικός/.test(at(3)) && /\(iv\) απόσπασμα που δεν έγραψε ο χρήστης: «δεν με σέβεται κανείς»/.test(at(3)) &&
+    /\(ii\) δύο σημειώσεις στρατηγικής μαζί: LOOP \+ METHOD_FAILURE$/m.test(at(3).split(' | ').find(x => /\(ii\)/.test(x)) || '') &&
+    /\(v\) INFORMATION MODE στην οθόνη/.test(at(4)) && /\(v\) σημείωση κατεσταλμένου μηχανισμού: INFORMATION_MODE/.test(at(4)));
+  assert('JUDGE: one call per mechanism session — the sign, where it is due, every round with the strategy notes and what they mean; a schema with the five questions',
+    (() => { const t = SL.mechanismJudgePrompt(by(142), turns, { 3: ['LOOP', 'GATES'] }); return /Its visible sign: Στους γύρους 5 και 9/.test(t) && /\[Γ3\] ΧΡΗΣΤΗΣ: Δεν ξέρω\./.test(t) &&
+      /ΣΗΜΕΙΩΣΕΙΣ ΤΗΣ ΕΦΑΡΜΟΓΗΣ: LOOP \(the user circles/.test(t) && !/GATES/.test(t); })() &&
+    ['k', 'sign_due', 'sign_shown', 'ignores_note', 'conflict', 'interprets', 'why'].every(f => SL.MECH_JUDGE_SCHEMA.properties.rounds.items.required.includes(f)));
+  assert('RUNNER: the notes of every request recorded (labels only); the fake model varies for a mechanism session; an unplanned root question gets «Δεν το βρήκα ακόμα»; the session ends at a confirmed root; check, marks, judge, report',
+    /stage: SL\.masterStage\(sysText\), notes: SL\.noteLabels\(body\.system\) \}\);/.test(RUNNER) && /function stressFakeAura\(persona\) \{/.test(RUNNER) &&
+    /: stressFakeAura\(item\.persona\);/.test(RUNNER) && /\} else if \(p\.mechanism && s\.ask && st && st\.say !== undefined && !st\.rootOk\) \{/.test(RUNNER) &&
+    /if \(p\.mechanism && sess\.rootConfirmed\) \{/.test(RUNNER) && /sess\.mechanismCheck = SL\.mechanismCheck\(sess, p\);/.test(RUNNER) &&
+    /for \(const s of sessions\) await judgeMechanism\(s,/.test(RUNNER) && /L\.push\(\.\.\.mechanismReport\(S\)\);/.test(LIBSRC) && /SL\.MECHANISM_PERSONAS \|\| \[\]\) : SL\.PERSONAS;/.test(RUNNER));
 }
 // 23/10: the checks that run the runner's async functions are awaited before the count
 Promise.all(PENDING).then(() => {

@@ -1585,6 +1585,347 @@ function callTally(sessions) {
   }
   return t;
 }
+// ── ΜΗΧΑΝΙΣΜΟΙ ΣΤΡΑΤΗΓΙΚΗΣ (John, 23/10/2026, Phase 1, Theme C) ─────────────────────────────────────────────────────────────────
+// The per-turn notes the app sent with a request, read from the request itself: the second system block (lens + notes; the cached
+// first block is the fixed prompt, which only describes the notes). Labels only — never the prompt text, never what the user wrote.
+const NOTE_LABELS = [
+  [/^\[ESCALATION LEVEL (\d)/, m => 'ESC' + m[1]], [/^\[AUTO-KILL/, 'AUTO-KILL'],
+  [/^\[CODE-VERIFIED: the user's own last 2 replies introduced almost no new material/, 'STAGNATION'],
+  [/^\[CODE-VERIFIED: this turn matches CLARITY PIVOT's "(LOOP|AVOIDANCE)"/, m => m[1]],
+  [/^\[The user has now used binary-opposition phrasing/, 'PREMISE'], [/^\[CODE-VERIFIED: the user placed an opposition marker/, 'TENSION'],
+  [/^\[CODE-VERIFIED: the user's own words this turn signal the CURRENT APPROACH/, 'METHOD_FAILURE'],
+  [/^\[CODE-VERIFIED: (?:you have now asked the SAME CLOSING QUESTION|your own last 2 replies were structurally similar)/, 'SELF_REPETITION'],
+  [/^\[CODE-VERIFIED: these words of the user have already been said back/, 'NEW_MATERIAL'],
+  [/^\[CODE-VERIFIED: the STOP MOMENT/, 'STOP_LIMIT'], [/^\[CODE-VERIFIED: a sign of heaviness or risk was seen/, 'STOP_GENTLE'],
+  [/^\[CODE-VERIFIED: \d+ risk-clarification questions already asked/, 'RISK_LIMIT'], [/^\[INFORMATION MODE ACTIVE/, 'INFORMATION_MODE'],
+  [/^\[MASTER PRIORITY RULE — STAGE: (SAFETY|GRACEFUL EXIT|OPENING|PERSPECTIVE SWAP)/, m => 'STAGE:' + m[1].replace(' ', '_')],
+  [/^\[GATES DUE CHECK/, 'GATES'], [/^\[CODE-VERIFIED: the user gave a closing signal/, 'CLOSING_DRIFT'], [/^\[STAGE A, FIRST REPLY/, 'STAGE_A_FIRST'],
+  [/^\[FIRST REPLY (?:OF THIS SESSION|FLOOR)/, 'FIRST_REPLY_FLOOR'], [/^\[SILENT PROFILE/, 'PROFILE'], [/^\[FREE PART: ENDS AT ROOT\]/, 'STAGE_A_MARKER'], [/has been the highest-attention signal/, 'LAST_FAMILY'],
+  [/^\[STRUCTURAL EVIDENCE/, 'EVIDENCE'], [/^\[SESSION COVERAGE/, 'COVERAGE'], [/^\[CODE-VERIFIED KNOWLEDGE STATE/, 'GOAL_OBSTACLE_STAKES'],
+  [/^\[ROAD QUESTION/, 'ROAD_QUESTION'], [/map has already been delivered in this session/, 'POST_MAP_CLOSE'],
+  [/^\[The user just confirmed readiness/, 'CORE_READINESS'], [/^\[The user just confirmed they feel something changed/, 'SHIFT_CHECK'],
+  [/^\[The user just answered "yes" to the friend-perspective/, 'FRIEND_PERSPECTIVE'], [/^\[EXPLICIT PAUSE AVAILABLE/, 'EXPLICIT_PAUSE'],
+  [/^\[CODE-VERIFIED: the safety path was activated/, 'SAFETY_PATH'], [/^\[CODE-VERIFIED: this turn matches CLARITY PIVOT's/, 'CLARITY_PIVOT'],
+];
+// The notes that steer the strategy. The others are background: the stage, the marker, counts, the first-reply floor — and, in Stage A,
+// GATES (sent from the 3rd round on while Anchors / Stakes are «due») and LAST_FAMILY (from the 5th: it names the family that came last
+// in the collision list, which is then always gatesCtx). Those two are written down per round, never counted as a clash.
+const STRATEGY_NOTES = ['STAGNATION', 'ESC1', 'ESC2', 'ESC3', 'AUTO-KILL', 'LOOP', 'AVOIDANCE', 'PREMISE', 'TENSION', 'METHOD_FAILURE', 'SELF_REPETITION',
+  'NEW_MATERIAL', 'STOP_LIMIT', 'STOP_GENTLE', 'RISK_LIMIT', 'INFORMATION_MODE', 'ROAD_QUESTION', 'POST_MAP_CLOSE', 'CORE_READINESS', 'SHIFT_CHECK',
+  'FRIEND_PERSPECTIVE', 'CLOSING_DRIFT'];
+// Suppressed in Stage A before the root — never sent in a mechanism session (ADR «19 Οκτωβρίου (δ)», «22 Οκτωβρίου (στ)», step 3.0)
+const SUPPRESSED_NOTES = ['AUTO-KILL', 'INFORMATION_MODE', 'ROAD_QUESTION', 'POST_MAP_CLOSE'];
+function noteLabels(system) {
+  const blocks = Array.isArray(system) ? system : [];
+  const text = blocks.filter(b => b && typeof b.text === 'string' && !b.cache_control).map(b => b.text).join('\n');
+  const out = [];
+  const lens = /CURRENT REASONING DIRECTION: ([^\n]+)/.exec(text);
+  if (lens) out.push('LENS:' + lens[1].trim());
+  for (const seg of text.split(/\n(?=\[)/)) {
+    const s = seg.replace(/^\s+/, '');
+    if (!s.startsWith('[')) continue;
+    const hit = NOTE_LABELS.find(([re]) => re.test(s));
+    if (!hit) { out.push('?' + s.slice(1, 32).split('\n')[0].trim()); continue; }
+    const m = hit[0].exec(s);
+    out.push(typeof hit[1] === 'function' ? hit[1](m) : hit[1]);
+  }
+  return out;
+}
+// The ten sessions. `expect`: the strategy notes the code must send, round by round — the prediction made from the app's own
+// detectors and gates before the run (no other strategy note may appear in the fake-model proof). `sign`: the visible mark of a right
+// reply, for the judge and the reader. Fixed messages: a mechanism must really be met, and the code's notes depend only on them.
+const MECHANISM_PERSONAS = [
+  { id: 141, key: 'mech_stagnation', kind: 'code', name: 'Μ1 · Στασιμότητα και κλιμάκωση 1→2→3 (κώδικας) · AUTO-KILL κατεσταλμένο πριν από τη ρίζα',
+    expect: { STAGNATION: [6, 7, 8, 9, 10], ESC1: [6], ESC2: [7], ESC3: [8, 9, 10] },
+    sign: 'Στους γύρους 6–10: αλλάζει γωνία κάθε φορά (μικρότερη ερώτηση, στο 3ο επίπεδο αλλαγή οπτικής), δεν ξαναρωτά την ίδια ερώτηση· ποτέ αντίο ή πρόταση να σταματήσουμε.',
+    msgs: [
+      'Δουλεύω οκτώ χρόνια λογίστρια σε μια μικρή εταιρεία και τελευταία νιώθω ότι κάθε μέρα μοιάζει με την προηγούμενη.',
+      'Ο διευθυντής μου είναι καλός άνθρωπος, οι συνάδελφοι επίσης, απλώς τα πρωινά ξυπνάω χωρίς καμία διάθεση να πάω.',
+      'Παλιότερα μου άρεσε να λύνω δύσκολα λογιστικά προβλήματα, τώρα κάνω μόνο ρουτίνα και περνάνε οι μήνες.',
+      'Σκέφτομαι μήπως φταίει που δεν έχω κάποιον στόχο, κάτι να περιμένω μέσα στη χρονιά.',
+      'Δεν ξέρω.', 'Δεν ξέρω, ίσως.', 'Δεν έχω ιδέα.', 'Δεν ξέρω τι να πω.', 'Δεν ξέρω.', 'Δεν ξέρω, πραγματικά.',
+      'Θυμήθηκα ότι πριν από δύο χρόνια έκανα ένα σεμινάριο ανάλυσης δεδομένων και ήταν η μόνη φορά που ενθουσιάστηκα με κάτι στη δουλειά.',
+      'Εκεί ένιωθα ότι μαθαίνω, ότι το μυαλό μου δουλεύει σε κάτι καινούργιο και όχι στα ίδια τιμολόγια.',
+      'Μετά το σεμινάριο δεν συνέχισα, γύρισα στα συνηθισμένα και το άφησα να ξεχαστεί.',
+      'Μάλλον μου λείπει αυτή η αίσθηση ότι μαθαίνω κάτι.'] },
+  { id: 142, key: 'mech_loop', kind: 'code', name: 'Μ2 · Κύκλος: το ίδιο παράπονο ξανά και ξανά (κώδικας, CLARITY PIVOT «LOOP»)',
+    expect: { LOOP: [5, 9], ESC1: [5, 9] },
+    sign: 'Στους γύρους 5 και 9: δεν ξαναρωτά το ίδιο· ονομάζει ουδέτερα ότι επανέρχεται το ίδιο ή αλλάζει γωνία, με δικά της λόγια.',
+    msgs: [
+      'Η πεθερά μου έρχεται κάθε Κυριακή χωρίς να ρωτήσει και κάθεται όλη μέρα στο σπίτι μας.',
+      'Ο άντρας μου δεν λέει τίποτα, θεωρεί φυσιολογικό να έρχεται η μητέρα του.',
+      'Η πεθερά μου έρχεται κάθε Κυριακή χωρίς να ρωτήσει, αυτό με πειράζει.',
+      'Η πεθερά μου έρχεται κάθε Κυριακή χωρίς να ρωτήσει και κάθεται όλη μέρα, αυτό σου λέω.',
+      'Η πεθερά μου έρχεται κάθε Κυριακή χωρίς να ρωτήσει, όλη μέρα.',
+      'Κάθε Κυριακή έρχεται χωρίς να ρωτήσει η πεθερά μου.',
+      'Έρχεται κάθε Κυριακή η πεθερά μου χωρίς να ρωτήσει κανέναν.',
+      'Η πεθερά μου, κάθε Κυριακή, χωρίς να ρωτήσει, όλη μέρα σπίτι μας.',
+      'Η πεθερά μου έρχεται κάθε Κυριακή χωρίς να ρωτήσει, όπως σου είπα.',
+      'Τις Κυριακές θα ήθελα να ξεκουράζομαι με τα παιδιά, μόνο εμείς οι τέσσερις.',
+      'Όταν ήμουν μικρή, οι Κυριακές στο πατρικό μου ήταν ήσυχες και δικές μας.',
+      'Δεν έχω πει ποτέ στον άντρα μου ότι μου λείπει μια Κυριακή μόνο για εμάς.',
+      'Φοβάμαι ότι θα το πάρει σαν επίθεση στη μητέρα του.'] },
+  { id: 143, key: 'mech_avoidance', kind: 'code', name: 'Μ3 · Αποφυγή: αλλάζει θέμα όταν η ερώτηση πλησιάζει (κώδικας, CLARITY PIVOT «AVOIDANCE»)',
+    expect: { AVOIDANCE: [4, 8], ESC1: [4, 8] },
+    sign: 'Στους γύρους 4 και 8: ονομάζει ουδέτερα ότι το θέμα άλλαξε και επιστρέφει στην αδερφή και τα χρήματα, χωρίς «αποφεύγεις» και χωρίς κατηγορία.',
+    msgs: [
+      'Η αδερφή μου μου χρωστάει τρεις χιλιάδες ευρώ εδώ και δύο χρόνια και δεν έχουμε μιλήσει ποτέ γι\' αυτό.',
+      'Κάθε φορά που βρισκόμαστε στο τραπέζι της μαμάς κάνουμε σαν να μην υπάρχει τίποτα.',
+      'Τα παιδιά της είναι πολύ γλυκά, τα πάω βόλτα κάθε Σάββατο και περνάμε τέλεια.',
+      'Από την άλλη, η δουλειά μου έχει πολύ φόρτο αυτόν τον μήνα και δεν προλαβαίνω να σκεφτώ.',
+      'Ίσως πρέπει να της το πω κάποια στιγμή, δεν είναι μικρό ποσό για μένα.',
+      'Το καλοκαίρι σκεφτόμαστε να πάμε όλοι μαζί διακοπές στη Νάξο.',
+      'Από την άλλη, ο σύντροφός μου λέει να το ξεχάσω εντελώς.',
+      'Αλλά και η γάτα μας είναι άρρωστη αυτές τις μέρες, τρέχουμε στον κτηνίατρο.',
+      'Αν της το έλεγα, φοβάμαι πώς θα με κοιτάζει μετά στο τραπέζι.',
+      'Τέλος πάντων, έχω και εξετάσεις για το δίπλωμα οδήγησης την άλλη εβδομάδα.',
+      'Βλέπω ότι αποφεύγω να το σκεφτώ, κάθε φορά βρίσκω κάτι άλλο να πω.',
+      'Το θέμα είναι ότι τη χρειάζομαι, είναι η μόνη μου αδερφή.',
+      'Τρεις χιλιάδες είναι πολλά λεφτά για τον μισθό μου.',
+      'Μάλλον φοβάμαι ότι θα χαλάσει η σχέση μας αν της ζητήσω τα λεφτά.'] },
+  { id: 144, key: 'mech_premise', kind: 'code', name: 'Μ4 · Αντιστροφή υπόθεσης: «ή…ή» δύο φορές και απόλυτα «πάντα / ποτέ» (κώδικας, PREMISE INVERSION)',
+    expect: { PREMISE: [5, 6] },
+    sign: 'Στους γύρους 5–6: ρωτά για την κοινή υπόθεση των δύο δρόμων ή το αντίστροφο του απόλυτου («υπήρξε φορά που δεν διάλεξες το σίγουρο;»), χωρίς να ονομάζει ο ίδιος την υπόθεση.',
+    msgs: [
+      'Σκέφτομαι να αφήσω το δημόσιο για να ανοίξω ένα μικρό εργαστήριο κεραμικής.',
+      'Ή μένω στη σιγουριά ή κάνω επιτέλους αυτό που αγαπάω.',
+      'Στο δημόσιο είμαι δώδεκα χρόνια, ο μισθός είναι σταθερός και το ωράριο καλό.',
+      'Η κεραμική είναι το μόνο που με κάνει να ξεχνάω την ώρα.',
+      'Είτε θα ρισκάρω τώρα είτε θα το μετανιώνω για πάντα.',
+      'Πάντα έτσι ήμουν, πάντα διάλεγα το σίγουρο.',
+      'Οι γονείς μου έλεγαν πάντα ότι η τέχνη δεν βγάζει ψωμί.',
+      'Έχω μαζέψει κάποια χρήματα για τον πρώτο χρόνο.',
+      'Κανείς στην οικογένειά μου δεν έχει ανοίξει ποτέ δική του δουλειά.',
+      'Νομίζω πως αν δεν το κάνω τώρα, δεν θα το κάνω ποτέ.',
+      'Η φίλη μου η Δέσποινα άνοιξε ανθοπωλείο πέρυσι και τα πάει καλά.',
+      'Πάντα πίστευα ότι δεν είμαι φτιαγμένη για ρίσκα.',
+      'Ίσως αυτό που με κρατάει είναι η φράση των γονιών μου.'] },
+  { id: 145, key: 'mech_method_failure', kind: 'code', name: 'Μ5 · «Δεν πάμε πουθενά»: αλλαγή στρατηγικής (κώδικας, CONVERSATION STRATEGY SWITCH επίπεδο 1)',
+    expect: { METHOD_FAILURE: [6, 10], LOOP: [10], ESC1: [10] },
+    sign: 'Στους γύρους 6 και 10: άλλη οικογένεια ερωτήσεων, όχι η ίδια ερώτηση με άλλα λόγια· στο 10 φτάνουν μαζί «κύκλος» και «αλλαγή στρατηγικής» — μία καθαρή κίνηση, όχι δύο.',
+    msgs: [
+      'Ο γιος μου είναι δεκαεννιά και θέλει να σταματήσει τη σχολή για να δουλέψει σε ένα μπαρ.',
+      'Του έχω πει ότι κάνει λάθος, δεν με ακούει.',
+      'Πληρώνω το ενοίκιό του εδώ και δύο χρόνια στη Θεσσαλονίκη.',
+      'Ο πατέρας του λέει να τον αφήσουμε να κάνει τα δικά του λάθη.',
+      'Εγώ φοβάμαι ότι αν σταματήσει τώρα, δεν θα γυρίσει ποτέ πίσω.',
+      'Γυρίζουμε γύρω γύρω, δεν πάμε πουθενά με αυτές τις ερωτήσεις.',
+      'Το θέμα είναι ότι εγώ δεν τελείωσα ποτέ τη σχολή μου και το μετάνιωσα.',
+      'Δούλευα από τα δεκαοχτώ σε ένα κατάστημα και μετά ήρθαν τα παιδιά.',
+      'Δεν θέλω να περάσει τα ίδια με μένα.',
+      'Το ίδιο λέμε ξανά και ξανά.',
+      'Ίσως με τρομάζει ότι θα μοιάσει στη δική μου ζωή, όχι στη σχολή.',
+      'Μου λέει ότι το μπαρ τον κάνει χαρούμενο, και τον πιστεύω.',
+      'Είναι ενήλικας πια, και εγώ ακόμα του λέω τι να κάνει.',
+      'Νομίζω ότι μιλάω για μένα όταν μιλάω για εκείνον.'] },
+  { id: 146, key: 'mech_contradiction', kind: 'prompt', name: 'Μ6 · Αντίφαση: Χ στο 2ο μήνυμα, το αντίθετο στο 7ο (μόνο prompt, COGNITIVE TENSION)',
+    expect: {}, signFrom: 7,
+    sign: 'Από τον γύρο 7: παραθέτει αυτολεξεί «δεν με χρειάζεται καθόλου» και «χωρίς εμένα δεν θα τα βγάλει πέρα» και ρωτά πώς ταιριάζουν — χωρίς ερμηνεία, χωρίς «αντιφάσκεις».',
+    msgs: [
+      'Σκέφτομαι να δεχτώ μια μετάθεση στην Κρήτη με την εταιρεία.',
+      'Η οικογένειά μου εδώ δεν με χρειάζεται καθόλου, ο καθένας έχει τη ζωή του.',
+      'Η θέση στην Κρήτη έχει περισσότερη ευθύνη και καλύτερο μισθό.',
+      'Θα μένω κοντά στη θάλασσα, το ήθελα από παιδί.',
+      'Οι συνάδελφοι εκεί φαίνονται συμπαθητικοί από τις βιντεοκλήσεις.',
+      'Το σπίτι εδώ θα το νοικιάσω, δεν είναι πρόβλημα.',
+      'Η μητέρα μου με παίρνει τηλέφωνο κάθε πρωί και χωρίς εμένα δεν θα τα βγάλει πέρα με τα ψώνια και τους γιατρούς.',
+      'Ο αδερφός μου μένει δίπλα της, δουλεύει όμως όλη μέρα.',
+      'Η απάντηση στην εταιρεία πρέπει να δοθεί μέχρι το τέλος του μήνα.',
+      'Δεν έχω πει τίποτα στη μητέρα μου ακόμα.',
+      'Φοβάμαι ότι θα στεναχωρηθεί πολύ αν το μάθει από άλλον.',
+      'Μάλλον περιμένω να μου πει εκείνη να πάω.',
+      'Ποτέ δεν της έχω πει ότι κουράζομαι με τα τηλεφωνήματα.'] },
+  { id: 147, key: 'mech_stop_moment', kind: 'prompt', name: 'Μ7 · STOP MOMENT: συνειδητοποίηση με δικά του λόγια (μόνο prompt· ο κώδικας μόνο για τα όρια)',
+    expect: {}, signFrom: 8, rootOkFrom: 9,
+    sign: 'Στον γύρο 8: σήμα στάσης («Όπα — στάσου εδώ.» / «Για στάσου.» / «Στάσου λίγο εδώ.»), η φράση του αυτολεξεί σε εισαγωγικά, και η ερώτηση «Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει…;» — καμία νέα ερώτηση διερεύνησης.',
+    msgs: [
+      'Ο φίλος μου ο Νίκος μου ζήτησε να γίνω συνέταιρος στο καφέ που ανοίγει.',
+      'Έχω βάλει στην άκρη κάποια χρήματα από τη δουλειά στην τράπεζα.',
+      'Ο Νίκος είναι φίλος από το σχολείο, τον εμπιστεύομαι.',
+      'Στην τράπεζα βαριέμαι, κάθε μέρα τα ίδια χαρτιά.',
+      'Η γυναίκα μου λέει να το σκεφτώ καλά γιατί έχουμε και το δάνειο του σπιτιού.',
+      'Το καφέ θα είναι στην πλατεία της γειτονιάς μας, εκεί που μεγαλώσαμε.',
+      'Φαντάζομαι τον εαυτό μου πίσω από τον πάγκο και χαμογελάω.',
+      'Τώρα που το γράφω, μου ξεκαθάρισε κάτι: δεν θέλω το καφέ, θέλω να φύγω από την τράπεζα.',
+      'Ναι, αυτό είναι που με απασχολεί, όχι ο Νίκος.',
+      'Θέλω να φύγω από την τράπεζα, αλλά δεν έχω τολμήσει να το πω ούτε στον εαυτό μου.',
+      'Το δάνειο με κρατάει, και ο φόβος ότι δεν ξέρω να κάνω τίποτα άλλο.',
+      'Μάλλον το καφέ ήταν μια πόρτα για να μην το πω καθαρά.'] },
+  { id: 148, key: 'mech_choice', kind: 'prompt', name: 'Μ8 · Ερώτηση επιλογής: μακριά, μπερδεμένα μηνύματα χωρίς στίξη (μόνο prompt, CHOICE QUESTION)',
+    expect: {}, signFrom: 1,
+    sign: 'Στους γύρους 1–5: ερώτηση επιλογής «τι βαραίνει πιο πολύ: Α, Β, ή κάτι άλλο;» μόνο με δικά της λόγια — καμία επιλογή με νέο περιεχόμενο ή ψυχολογική ερμηνεία.',
+    msgs: [
+      'λοιπον εχω τη δουλεια που με πιεζει και το σπιτι που θελει επισκευη και την κορη μου που δινει πανελληνιες και δεν βρισκω απο που να πιασω τιποτα ολα μαζι ερχονται και δεν κοιμαμαι καλα',
+      'η δουλεια ειναι σε λογιστικο γραφειο και τωρα ειναι η περιοδος των δηλωσεων και τελειωνω στις εννια το βραδυ και μετα στο σπιτι εχει υγρασια στο μπανιο και ο μαστορας δεν απανταει στα τηλεφωνα',
+      'και η κορη μου ειναι αγχωμενη και θελει να της κανω παρεα στο διαβασμα και εγω δεν προλαβαινω και νιωθω ενοχες και μετα θυμαμαι το μπανιο και τον μαστορα και τους λογαριασμους',
+      'ο αντρας μου δουλευει στα καραβια και λειπει τρεις μηνες οποτε ολα πεφτουν πανω μου και η πεθερα θελει να την επισκεπτομαι καθε κυριακη και η γειτονισσα παραπονιεται για τη μουχλα',
+      'το αφεντικο ζητησε και ενα επιπλεον πελατη αυτη την εβδομαδα και εγω ειπα εντασει γιατι δεν μπορω να πω οχι και τωρα εχω δεκα φακελους στο γραφειο και η κορη μου γραφει διαγωνισμα την πεμπτη',
+      'πιο πολυ με ενοχλει που δεν ειμαι διπλα στην κορη μου τωρα που με χρειαζεται',
+      'γιατι σε δυο μηνες δινει και μετα φευγει για σπουδες και δεν θα την εχω στο σπιτι',
+      'το μπανιο μπορει να περιμενει και ο μαστορας θα απαντησει καποτε',
+      'η δουλεια ομως δεν περιμενει και αν πω οχι στο αφεντικο φοβαμαι οτι θα με θεωρησει αχαριστη',
+      'παντα λεω ναι σε ολους και μετα δεν μενει τιποτα για τους δικους μου ανθρωπους',
+      'μαλλον δεν ειναι τα πολλα πραγματα το θεμα ειναι οτι δεν λεω οχι σε κανεναν',
+      'και φοβαμαι οτι η κορη μου θα θυμαται μια μαμα που ηταν παντα κουρασμενη'] },
+  { id: 149, key: 'mech_root_refocus', kind: 'prompt', name: 'Μ9 · Επιστροφή στη ρίζα: το ουσιώδες στο 2ο μήνυμα, μετά 8 παρεκβάσεις (μόνο prompt, ROOT RE-FOCUS)',
+    expect: {}, signFrom: 3,
+    sign: 'Στους γύρους 3–11: κάποια στιγμή φέρνει πίσω αυτολεξεί το «δεν με βλέπει κανείς» (δικά της λόγια) και ρωτά γι\' αυτό — όχι ερμηνεία, όχι νέο θέμα της AURA.',
+    msgs: [
+      'Είμαι νοσηλεύτρια σε μεγάλο νοσοκομείο εδώ και δεκαπέντε χρόνια.',
+      'Νιώθω ότι στη δουλειά δεν με βλέπει κανείς, σαν να είμαι μέρος του εξοπλισμού.',
+      'Χθες είχε απίστευτη κίνηση στον δρόμο, έκανα μία ώρα να γυρίσω.',
+      'Ο σκύλος μου έφαγε πάλι το παπούτσι του άντρα μου, γελάσαμε πολύ.',
+      'Βλέπω μια σειρά για ένα νοσοκομείο στη Σουηδία, πολύ ωραία φωτογραφία.',
+      'Το Σάββατο φτιάξαμε γεμιστά με τα παιδιά, έγιναν λίγο άνοστα.',
+      'Ο καιρός άλλαξε απότομα, πρέπει να κατεβάσω τα χειμωνιάτικα.',
+      'Η κουμπάρα μου γεννάει τον Δεκέμβριο, θα γίνω νονά.',
+      'Σκέφτομαι να ξαναρχίσω πιλάτες, το είχα σταματήσει πέρσι.',
+      'Έκλεισα εισιτήρια για Θεσσαλονίκη τα Χριστούγεννα, στους γονείς μου.',
+      'Τέλος πάντων, πολλά μαζεμένα.',
+      'Η προϊσταμένη χθες ευχαρίστησε όλη τη βάρδια εκτός από μένα, και εγώ είχα κάνει τις διπλές.',
+      'Δεν το είπα σε κανέναν, το κατάπια.',
+      'Μάλλον με πονάει περισσότερο απ\' όσο λέω.'] },
+  { id: 150, key: 'mech_suppressed_im', kind: 'suppressed', name: 'Μ10 · Κατεσταλμένος: INFORMATION MODE πριν από τη ρίζα (κώδικας· η σημείωση ΔΕΝ πρέπει να σταλεί)',
+    expect: {}, signFrom: 3,
+    sign: 'Στους γύρους 3–4 (ζητά «χωρίς ερωτήσεις, μόνο πληροφορίες»): δεν λέει «Από εδώ και πέρα για λίγο βγαίνουμε από τη διερεύνηση», δεν γίνεται πηγή πληροφοριών· μένει σε μία ερώτηση.',
+    msgs: [
+      'Θέλω να αλλάξω καριέρα και να γίνω προγραμματιστής, είμαι τριάντα οχτώ.',
+      'Δουλεύω σε πωλήσεις δεκαπέντε χρόνια και έχω κουραστεί από τους στόχους.',
+      'Χωρίς ερωτήσεις, δώσε μου μόνο πληροφορίες για το πώς γίνεται κάποιος προγραμματιστής.',
+      'Θέλω απλώς πληροφορίες, όχι κουβέντα.',
+      'Έχω κάνει μόνο λίγο Excel στη δουλειά.',
+      'Ο ξάδερφός μου έγινε προγραμματιστής στα τριάντα και είναι ευχαριστημένος.',
+      'Φοβάμαι ότι στα τριάντα οχτώ είναι αργά για να ξεκινήσω από το μηδέν.',
+      'Η γυναίκα μου με στηρίζει, λέει να το δοκιμάσω.',
+      'Τα βράδια έχω δύο ώρες ελεύθερες, όταν κοιμηθούν τα παιδιά.',
+      'Δεν έχω τελειώσει πανεπιστήμιο, μόνο λύκειο.',
+      'Μου αρέσει να λύνω γρίφους, από παιδί.',
+      'Ίσως με φοβίζει περισσότερο να ξαναγίνω αρχάριος απ\' ό,τι η ηλικία.'] },
+].map(p => Object.assign(p, { runs: 1, mechanism: true, hiddenRoot: '—', maxTyped: p.msgs.length,
+  fixed: p.msgs.map((m, i) => (p.rootOkFrom && i + 1 >= p.rootOkFrom ? { say: m, rootOk: true } : { say: m })) }));
+// The rounds of a mechanism session: the strategy notes the app actually sent with each main request, by the typed message they answer.
+function mechanismRounds(calls) {
+  const out = {};
+  for (const c of calls || []) if (c && c.kind === 'main' && Array.isArray(c.notes)) out[c.typed] = c.notes;
+  return out;
+}
+// The code's side: each expected note on exactly its rounds, no other strategy note, none of the suppressed ones.
+function mechanismCheck(sess, p) {
+  const R = mechanismRounds(sess.calls), rows = [], expect = (p && p.expect) || {};
+  const roundsOf = label => Object.keys(R).map(Number).filter(k => R[k].includes(label)).sort((a, b) => a - b);
+  for (const [label, want] of Object.entries(expect)) {
+    const got = roundsOf(label);
+    rows.push({ label, expected: want, actual: got, ok: JSON.stringify(got) === JSON.stringify(want) });
+  }
+  const extra = STRATEGY_NOTES.filter(l => !(l in expect)).map(l => ({ label: l, rounds: roundsOf(l) })).filter(x => x.rounds.length);
+  const suppressed = extra.filter(x => SUPPRESSED_NOTES.includes(x.label));
+  return { rows, extra, suppressed, ok: rows.every(r => r.ok) && !suppressed.length, rounds: R };
+}
+// Code checks for the confusion marks (iii)–(v) on each reply: the same question again, two questions, the plural, a quote the user
+// never wrote, a suppressed mechanism that showed on the screen («Από εδώ και πέρα…», a road map). (i)–(ii) are the judge's, and (ii)
+// also two or more strategy notes in one round, from the code.
+const SUPPRESSED_ON_SCREEN = [[/βγαίνουμε από τη διερεύνηση/i, 'INFORMATION MODE στην οθόνη'], [/(?:^|\n)\s*ΔΡΟΜΟΣ\s*\d|ΚΕΡΔΙΖΕΙΣ\s*:|ΚΟΣΤΙΖΕΙ\s*:/, 'χάρτης δρόμων στην οθόνη']];
+function mechanismMarks(turns, rounds) {
+  const out = [], users = [];
+  let k = 0, prevQ = '';
+  const lastQ = t => { const q = String(t || '').match(/[^.!;?\n]*[;?]/g); return q ? fold(q[q.length - 1]).replace(/[^α-ωa-z ]/g, ' ').replace(/\s+/g, ' ').trim() : ''; };
+  for (const t of turns || []) {
+    if (t.who === 'user') { k++; users.push(t.text); continue; }
+    if (t.who !== 'aura') continue;
+    const m = [];
+    const f = voiceFindings(t.text);
+    if (f.questions > 1) m.push('(iv) δύο ερωτήσεις');
+    if (f.plural.length) m.push('(iv) πληθυντικός («' + f.plural.join('», «') + '»)');
+    for (const q of quoteFindings(t.text, users)) m.push('(iv) απόσπασμα που δεν έγραψε ο χρήστης: «' + q + '»');
+    const q = lastQ(t.text);
+    if (q && prevQ && (q === prevQ || jaccard(q, prevQ) >= 0.7)) m.push('(iii) η ίδια ερώτηση με τον προηγούμενο γύρο');
+    if (q) prevQ = q;
+    for (const [re, what] of SUPPRESSED_ON_SCREEN) if (re.test(t.text)) m.push('(v) ' + what);
+    const strat = ((rounds || {})[k] || []).filter(l => STRATEGY_NOTES.includes(l) && !/^ESC/.test(l));
+    if (strat.length >= 2) m.push('(ii) δύο σημειώσεις στρατηγικής μαζί: ' + strat.join(' + '));
+    for (const l of ((rounds || {})[k] || [])) if (SUPPRESSED_NOTES.includes(l)) m.push('(v) σημείωση κατεσταλμένου μηχανισμού: ' + l);
+    if (m.length) out.push({ k, text: t.text, marks: m });
+  }
+  return out;
+}
+function jaccard(a, b) { const A = new Set(a.split(' ')), B = new Set(b.split(' ')); const i = [...A].filter(x => B.has(x)).length; return i / Math.max(1, new Set([...A, ...B]).size); }
+// The mechanism judge (cheap model, an aid, never pass/fail): one call per session, every round with the notes the app sent.
+const MECH_JUDGE_SCHEMA = {
+  type: 'object',
+  properties: {
+    rounds: { type: 'array', items: { type: 'object', properties: {
+      k: { type: 'integer', description: 'The round, as marked [Γ1], [Γ2], …' },
+      sign_due: { type: 'boolean', description: 'Is the expected visible sign of the mechanism due in THIS round (by the round range given, or by a strategy note sent with this round)?' },
+      sign_shown: { type: 'boolean', description: 'Does AURA\'s reply show that visible sign?' },
+      ignores_note: { type: 'boolean', description: 'A strategy note was sent with this round and the reply does not do what it says.' },
+      conflict: { type: 'boolean', description: 'The reply mixes two mechanisms that pull apart (e.g. a strategy switch and a loop reply at once, or a step and a root question).' },
+      interprets: { type: 'boolean', description: 'The reply states as fact a feeling, motive, cause or trait the user did not say.' },
+      why: { type: 'string', description: 'One short Greek sentence.' },
+    }, required: ['k', 'sign_due', 'sign_shown', 'ignores_note', 'conflict', 'interprets', 'why'], additionalProperties: false } },
+    followed: { type: 'boolean', description: 'Over the whole session, did the replies show the expected visible sign where it was due?' },
+    followed_why: { type: 'string', description: 'One short Greek sentence.' },
+  },
+  required: ['rounds', 'followed', 'followed_why'],
+  additionalProperties: false,
+};
+const MECH_JUDGE_SYSTEM = 'You review a test conversation of AURA, a Greek-language app that helps a person find, in their own words, what is really ' +
+  'bothering them, one question at a time, with no advice. Each round shows the user\'s message, the notes the app sent to the model with that ' +
+  'round (labels), and AURA\'s reply. You judge one mechanism, whose visible sign is given. Your answer is an aid for a human reader, not a verdict.';
+const NOTE_MEANING = { STAGNATION: 'the user brings no new material — change the approach', ESC1: 'stuck, level 1: pivot', ESC2: 'stuck, level 2: a sharper targeted follow-up, not level 1 again',
+  ESC3: 'stuck, level 3: perspective swap', LOOP: 'the user circles — use the LOOP response, not the same question', AVOIDANCE: 'the user changes the subject — test it gently, name it neutrally',
+  PREMISE: 'two-sided dilemma twice — question the shared premise, as a question', METHOD_FAILURE: 'the user says this is not working — switch to a different family of question',
+  TENSION: 'the user marked a tension themselves — may name it', SELF_REPETITION: 'your last replies were alike — vary', NEW_MATERIAL: 'do not say these words back again',
+  STOP_LIMIT: 'no more stop signals', STOP_GENTLE: 'only the gentle stop form', RISK_LIMIT: 'no more risk questions about the same thing', CORE_READINESS: 'the user is ready to name the root' };
+function mechanismJudgePrompt(p, turns, rounds) {
+  const L = []; let k = 0;
+  for (const t of turns || []) {
+    if (t.who === 'user') { k++; L.push('[Γ' + k + '] ΧΡΗΣΤΗΣ: ' + t.text); const n = ((rounds || {})[k] || []).filter(l => STRATEGY_NOTES.includes(l));
+      L.push('  ΣΗΜΕΙΩΣΕΙΣ ΤΗΣ ΕΦΑΡΜΟΓΗΣ: ' + (n.length ? n.map(l => l + (NOTE_MEANING[l] ? ' (' + NOTE_MEANING[l] + ')' : '')).join('; ') : '—')); continue; }
+    L.push((t.who === 'aura' ? 'AURA: ' : '[οθόνη] ') + t.text);
+  }
+  return 'The mechanism: ' + p.name + '\nIts visible sign: ' + p.sign + (p.signFrom ? '\nDue from round ' + p.signFrom + ' on (once is enough unless notes say otherwise).' : '') +
+    '\n\nThe conversation, round by round:\n' + L.join('\n') + '\n\nFor each round [Γ1]…[Γ' + k + '], one entry. Then followed and followed_why for the whole session.';
+}
+// The report: the 10-row table, then each session round by round — the notes sent, AURA's reply verbatim, the code's marks, the judge.
+function mechanismReport(S) {
+  const M = (S || []).filter(s => s.persona && s.persona.mechanism);
+  if (!M.length) return [];
+  const L = ['## Μηχανισμοί στρατηγικής — 10 συνεδρίες (δεν είναι φρένο· για απόφαση)', '',
+    '| Μηχανισμός | Ενεργοποιήθηκε σωστά (κώδικας) | Το μοντέλο ακολούθησε (κριτής) | Πού μπερδεύτηκε (γύροι) |', '|---|---|---|---|'];
+  for (const s of M) {
+    const c = s.mechanismCheck || { rows: [], extra: [], suppressed: [] };
+    const code = s.persona.kind === 'code' ? (c.rows.every(r => r.ok) ? '✓' : '✗ ' + c.rows.filter(r => !r.ok).map(r => r.label + ' ' + JSON.stringify(r.actual) + ' αντί ' + JSON.stringify(r.expected)).join('; '))
+      : s.persona.kind === 'suppressed' ? (c.suppressed.length ? '✗ στάλθηκε: ' + c.suppressed.map(x => x.label + ' ' + JSON.stringify(x.rounds)).join('; ') : '✓ δεν στάλθηκε')
+      : '— (μόνο prompt)' + (c.extra.length ? ' · άλλες σημειώσεις: ' + c.extra.map(x => x.label + ' ' + JSON.stringify(x.rounds)).join('; ') : '');
+    const j = s.mechanismJudge;
+    const fol = j ? (j.followed ? '✓' : '✗') + ' — ' + j.followed_why : 'δεν κρίθηκε';
+    const where = (s.mechanismMarks || []).map(x => 'Γ' + x.k + ': ' + x.marks.join(', ')).concat((j && j.rounds || []).filter(r => r.ignores_note || r.conflict || r.interprets)
+      .map(r => 'Γ' + r.k + ' (κρ): ' + [r.ignores_note && '(i) αγνοεί σημείωση', r.conflict && '(ii) σύγκρουση', r.interprets && '(iv) ερμηνεία ως γεγονός'].filter(Boolean).join(', ')));
+    L.push('| ' + s.persona.name + ' | ' + code + ' | ' + fol + ' | ' + (where.join(' · ') || '—') + ' |');
+  }
+  L.push('');
+  for (const s of M) {
+    const c = s.mechanismCheck || { rounds: {} };
+    L.push('### ' + s.persona.name, '', 'Ορατό σημάδι: ' + s.persona.sign, '');
+    if (s.persona.kind === 'code') L.push('Πρόβλεψη (πριν από την εκτέλεση): ' + Object.entries(s.persona.expect).map(([l, r]) => l + ' στους γύρους ' + r.join(', ')).join(' · '), '');
+    let k = 0;
+    const jr = {}; for (const r of ((s.mechanismJudge && s.mechanismJudge.rounds) || [])) jr[r.k] = r;
+    const mk = {}; for (const x of (s.mechanismMarks || [])) mk[x.k] = x.marks;
+    for (const t of s.turns || []) {
+      if (t.who === 'user') { k++; const all = c.rounds[k] || [], n = all.filter(l => STRATEGY_NOTES.includes(l));
+        const bg = all.filter(l => !STRATEGY_NOTES.includes(l) && !/^LENS:|^STAGE_A_MARKER$/.test(l));
+        L.push('**Γ' + k + ' · Χρήστης:** ' + t.text, '', 'Σημειώσεις στρατηγικής: ' + (n.join(', ') || '—') + ' · υπόβαθρο: ' + (bg.join(', ') || '—') +
+          (all.some(l => /^LENS:/.test(l)) ? ' · φακός: ' + all.find(l => /^LENS:/.test(l)).slice(5) : ''), ''); continue; }
+      if (t.who === 'aura') {
+        L.push('> ' + String(t.text).split('\n').join('\n> '), '');
+        const r = jr[k];
+        if (r) L.push('Κριτής: σημάδι ' + (r.sign_due ? (r.sign_shown ? '✓' : '✗') : 'δεν οφειλόταν') + (r.ignores_note ? ' · (i) αγνοεί σημείωση' : '') + (r.conflict ? ' · (ii) σύγκρουση' : '') + (r.interprets ? ' · (iv) ερμηνεία ως γεγονός' : '') + ' — ' + r.why, '');
+        if (mk[k]) L.push('ΣΗΜΑΔΙ ΜΠΕΡΔΕΜΑΤΟΣ (κώδικας): ' + mk[k].join(' · '), '');
+      } else L.push('_[οθόνη] ' + t.text + '_', '');
+    }
+  }
+  return L;
+}
 function buildStressReport(sessions, meta) {
   const m = meta || {};
   const S = sessions || [];
@@ -1619,6 +1960,7 @@ function buildStressReport(sessions, meta) {
   L.push(...loopReport(S));
   L.push(...rehearsalReport(S));
   L.push(...finalReport(S, m));
+  L.push(...mechanismReport(S)); // 23/10 (John, Theme C)
   const worst = S.slice().sort((a, b) => sessionScore(b) - sessionScore(a)).slice(0, 5);
   L.push('## Οι 5 χειρότερες συνομιλίες (αυτούσιες)', '');
   for (const s of worst) {
@@ -1636,5 +1978,5 @@ module.exports = {
   ADVICE_VIOLATIONS, violationType, lastSessionEvents, telemetryIssues, estimateCost, CHECKS, sessionScore, buildStressReport, keyShape, KEY_KIND_TEXT,
   VOICE_PERSONAS, VOICE_FORBIDDEN, voiceFindings, voiceReplies, VOICE_JUDGE_SCHEMA, VOICE_JUDGE_SYSTEM, voiceJudgePrompt, voiceReport, isAppStepText,
   REHEARSAL_PERSONAS, REHEARSAL_REAL, TARGETED_PERSONAS, FINAL_PERSONAS, capsDictation, finalBrakeFindings, friendSafetyQuestion, crisisReplies, riskFoundByCode, sessionEstimate, finalReport, FINAL_HELPLINES, inventedNumbers, quoteFindings, genderWords, genderSuspicions, isRefusal, NUMBER_WORDS, rehearsalRow, rehearsalReport,
-  LOOP_PERSONAS, masterStage, loopRounds, stageOrderFindings, LOOP_JUDGE_SCHEMA, LOOP_JUDGE_SYSTEM, loopJudgePrompt, CRISIS_JUDGE_SCHEMA, CRISIS_JUDGE_SYSTEM, crisisJudgePrompt, politePlural, genericWhy, loopReport,
+  LOOP_PERSONAS, MECHANISM_PERSONAS, noteLabels, STRATEGY_NOTES, SUPPRESSED_NOTES, mechanismRounds, mechanismCheck, mechanismMarks, MECH_JUDGE_SCHEMA, MECH_JUDGE_SYSTEM, mechanismJudgePrompt, mechanismReport, masterStage, loopRounds, stageOrderFindings, LOOP_JUDGE_SCHEMA, LOOP_JUDGE_SYSTEM, loopJudgePrompt, CRISIS_JUDGE_SCHEMA, CRISIS_JUDGE_SYSTEM, crisisJudgePrompt, politePlural, genericWhy, loopReport,
 };

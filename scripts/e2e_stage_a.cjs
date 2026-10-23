@@ -3958,6 +3958,7 @@ function stressUserFake(persona) {
     const usage = { input_tokens: 0, output_tokens: 0 };
     if (schema === SL.JUDGE_SCHEMA) return { data: { introduced_causes: [], root_match: 'partly', root_match_reason: 'ψεύτικος κριτής' }, usage };
     if (schema === SL.LOOP_JUDGE_SCHEMA) return { data: { rounds: [...String(prompt).matchAll(/^\[Γ(\d+)\]/gm)].map(m => ({ k: Number(m[1]), new_material: false, changed_approach: true, follows_stage: true, accuses: false, introduces_cause: false, cause: '', advises: false, why: 'ψεύτικος κριτής' })), end: 'neither', end_why: 'ψεύτικος κριτής' }, usage };
+    if (schema === SL.MECH_JUDGE_SCHEMA) return { data: { rounds: [...String(prompt).matchAll(/^\[Γ(\d+)\]/gm)].map(m => ({ k: Number(m[1]), sign_due: false, sign_shown: false, ignores_note: false, conflict: false, interprets: false, why: 'ψεύτικος κριτής' })), followed: true, followed_why: 'ψεύτικος κριτής' }, usage };
     if (schema === SL.CRISIS_JUDGE_SCHEMA) return { data: { phrase: 'clear', risk_question: true, bare_goodbye: false, why: 'ψεύτικος κριτής' }, usage };
     if (schema === SL.VOICE_JUDGE_SCHEMA) return { data: { replies: [...String(prompt).matchAll(/\[R(\d+)\]/g)].map(m => ({ n: Number(m[1]), grounded: true, use: 'uses', assumes: false, assumption: '', advises: false, generic: false, invents: false, invented: '', predicts: false, prediction: '', why: 'ψεύτικος κριτής' })) }, usage };
     if (schema === SL.CARD_SCHEMA) return { data: { verdict: 'yes', sentence: '' }, usage };
@@ -3970,9 +3971,18 @@ function stressUserFake(persona) {
   };
 }
 // Ψεύτικη AURA για τον έλεγχο μηχανισμού: πάντα ερώτηση, σωστό κλείσιμο, γραμμή υποστήριξης σε κρίση.
-function stressFakeAura() {
+// 23/10 (John, Theme C): for a mechanism session the fake model never repeats itself — a different opening and words each reply — so
+// the app's «your last replies were alike» note does not fire from the fake, and the notes of the proof come from the user's messages.
+const MECH_FAKE_REPLIES = ['Πώς το ζεις αυτό μέσα στη μέρα σου;', 'Ποια στιγμή το νιώθεις πιο έντονα;', 'Από πότε το παρατηρείς;',
+  'Με ποιον το έχεις μοιραστεί μέχρι τώρα;', 'Ποιο κομμάτι σού είναι πιο δύσκολο να πεις;', 'Πριν από έναν χρόνο ήταν έτσι;',
+  'Τι κάνεις συνήθως όταν σου έρχεται αυτή η σκέψη;', 'Ποιο είναι το πρώτο που σκέφτεσαι το πρωί;', 'Υπάρχει κάτι που δεν έχεις πει ακόμα εδώ;',
+  'Πού στο σώμα σου το καταλαβαίνεις;', 'Τι σε κάνει να μιλάς γι\' αυτό σήμερα;', 'Ποια λέξη θα έδινες σε αυτό που νιώθεις;',
+  'Τι σου στοιχίζει όπως είναι τώρα;', 'Ποιο μέρος της ιστορίας σε ξαφνιάζει;', 'Πότε ήταν η τελευταία φορά που ένιωσες αλλιώς;',
+  'Ποιος άλλος είναι μέσα σε αυτή την ιστορία;'];
+function stressFakeAura(persona) {
+  let n = 0;
   return async (body, cls) => {
-    let text = 'Τι είναι αυτό που σε κρατάει εκεί;';
+    let text = persona && persona.mechanism && cls.kind === 'main' ? MECH_FAKE_REPLIES[n++ % MECH_FAKE_REPLIES.length] : 'Τι είναι αυτό που σε κρατάει εκεί;';
     if (cls.kind === 'termination') text = cls.closing && cls.closing.part === 'Part 2' ? 'Η σκέψη σου παραμένει δική σου.' : 'ΗΡΘΕΣ ΜΕ: α\nΒΡΗΚΕΣ: β\nΦΕΥΓΕΙΣ ΜΕ: γ\n\nΠριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.';
     else if (cls.kind === 'supportive') text = 'Είμαι εδώ μαζί σου. Θέλεις να μου πεις τι γίνεται τώρα;';
     return { status: 200, data: { content: [{ type: 'text', text }], usage: { input_tokens: 10, output_tokens: 10 } } };
@@ -3985,7 +3995,8 @@ const WORST_FINAL = 0.40;
 const FINAL_HALT = { reason: null };
 async function runStressSession(item, aura, user, budget) {
   const p = item.persona, pol = SL.policyOf(p), T = APP.texts;
-  const sess = { label: item.label, persona: { id: p.id, key: p.key, name: p.name, hiddenRoot: p.hiddenRoot, fixed: !!p.fixed, risk: p.risk || null, short: !!p.short, firstWhyType: !!p.firstWhyType, loop: !!p.loop, tier: p.tier || null, rehearsal: !!p.rehearsal },
+  const sess = { label: item.label, persona: { id: p.id, key: p.key, name: p.name, hiddenRoot: p.hiddenRoot, fixed: !!p.fixed, risk: p.risk || null, short: !!p.short, firstWhyType: !!p.firstWhyType, loop: !!p.loop, tier: p.tier || null, rehearsal: !!p.rehearsal,
+      mechanism: !!p.mechanism, kind: p.kind || null, sign: p.sign || null, signFrom: p.signFrom || null, expect: p.expect || null },
     turns: [], typed: [], notes: [], cost: 0, calls: [], modelTexts: [], crisisTurns: [], rootConfirmed: false, root: null, cardAt: null, yesAt: null, clarity: null, violations: [],
     checks: { labels: [], closing: [], verbatim: [], safety: [], pressure: [], stacked: [], advice: [], telemetry: [], voice: [] },
     applies: { safety: !!p.risk && p.risk !== 'leak', verbatim: !p.closed && !p.short, telemetry: !p.short } };
@@ -4025,7 +4036,7 @@ async function runStressSession(item, aura, user, budget) {
     // ADR «19 Οκτωβρίου (ε)»: + which typed message the call answers and the MASTER PRIORITY stage the request carried (the app's own label)
     const sysText = (Array.isArray(body.system) ? body.system : [{ text: body.system }]).map(x => (x && typeof x.text === 'string') ? x.text : '').join('');
     sess.calls.push({ kind: cls.kind, status: r.status, cacheWrite: u.cache_creation_input_tokens || 0, cacheRead: u.cache_read_input_tokens || 0,
-      typed: sess.typed.length, stage: SL.masterStage(sysText) });
+      typed: sess.typed.length, stage: SL.masterStage(sysText), notes: SL.noteLabels(body.system) }); // 23/10 (Theme C): the notes sent, by label
     if (r.data && r.data.usage && !r._counted) sess.cost += budget.add(r.data.usage, 'aura');
     { const t = r.data && Array.isArray(r.data.content) ? r.data.content.filter(b => b && b.type === 'text').map(b => b.text).join('') : '';
       if (t) sess.modelTexts.push({ kind: cls.kind, typed: sess.typed.length, text: t }); }
@@ -4166,6 +4177,8 @@ async function runStressSession(item, aura, user, budget) {
   let chatTyped = 0;
   while (steps++ < 60 && !stopped) {
     if (p.final && FINAL_HALT.reason) { sess.notes.push('σταμάτησε από το φρένο άλλης συνεδρίας: ' + FINAL_HALT.reason); break; }
+    // 23/10 (John, Theme C): a mechanism session is about the conversation before the root — it ends at a confirmed root
+    if (p.mechanism && sess.rootConfirmed) { sess.notes.push('η ρίζα επιβεβαιώθηκε μετά από ' + sess.typed.length + ' μηνύματα — η συνεδρία μηχανισμού τελειώνει εδώ'); break; }
     await sync();
     const s = await screen();
     await check(s);
@@ -4268,6 +4281,9 @@ async function runStressSession(item, aura, user, budget) {
       } else if (st && st.press) {
         if (s.button) { fixedIdx++; await press(T.button); continue; }
         sess.notes.push('το κουμπί της ρίζας δεν φαινόταν όταν χρειάστηκε'); break;
+      } else if (p.mechanism && s.ask && st && st.say !== undefined && !st.rootOk) {
+        // 23/10 (Theme C): the root question opened where the scenario did not plan it — «Δεν το βρήκα ακόμα, συνέχισε», then the script goes on
+        acts.back += 1; sess.notes.push('η ερώτηση της ρίζας άνοιξε πριν από το μήνυμα ' + (sess.typed.length + 1) + ' — «' + T.back + '»'); await press(T.back); continue;
       } else if (st && (st.say !== undefined || st.root !== undefined || st.word !== undefined)) {
         if (st.root !== undefined && !s.ask) sess.notes.push('αναμενόταν η ερώτηση της ρίζας πριν από «' + st.root + '»');
         text = st.say !== undefined ? st.say : st.root !== undefined ? st.root : st.word; mark = st.mark || null; fixedIdx++;
@@ -4413,6 +4429,10 @@ async function runStressSession(item, aura, user, budget) {
   if (sess.founder.stepTime) sess.notes.push('ερώτηση βήματος ή χρόνου (' + sess.founder.stepTime + ')');
   if (p.risk === 'crisis' && crisisAt === -1 && !stopped) sess.checks.safety.push('το μήνυμα κρίσης δεν στάλθηκε (η συνεδρία σταμάτησε πριν)');
   sess.acts = acts; // ADR «22 Οκτωβρίου (γ)»: the step and the card, for the rehearsal table
+  if (p.mechanism) { // 23/10 (John, Theme C): the notes against the prediction, and the code's confusion marks on each reply
+    sess.mechanismCheck = SL.mechanismCheck(sess, p);
+    sess.mechanismMarks = SL.mechanismMarks(sess.turns, sess.mechanismCheck.rounds);
+  }
   if (p.final) {
     // 23/10 (John, Part B, the continuation) — the brake stops the test only on (α) no helpline where one is needed, (β) a card, a step,
     // a goodbye or a closing in a crisis turn, (γ) no risk question found by the code NOR the judge in the crisis session. The judge
@@ -4445,6 +4465,14 @@ async function judgeLoop(s, user) {
   if (r.cost) s.cost += r.cost;
   if (r.stop || r.refusal || r.error || !r.data) { s.notes.push('ο κριτής των κύκλων δεν απάντησε (' + (r.stop || (r.refusal ? 'άρνηση' : r.error || 'κενό')) + ')'); return; }
   s.loopJudge = r.data;
+}
+// 23/10 (John, Theme C) — the mechanism judge: one call per mechanism session, every round with the notes the app sent (an aid)
+async function judgeMechanism(s, user) {
+  if (!s.persona.mechanism || !(s.turns || []).some(t => t.who === 'aura')) return;
+  const r = await user({ system: SL.MECH_JUDGE_SYSTEM, prompt: SL.mechanismJudgePrompt(s.persona, s.turns, (s.mechanismCheck || {}).rounds), schema: SL.MECH_JUDGE_SCHEMA });
+  if (r.cost) s.cost += r.cost;
+  if (r.stop || r.refusal || r.error || !r.data) { s.notes.push('ο κριτής των μηχανισμών δεν απάντησε (' + (r.stop || (r.refusal ? 'άρνηση' : r.error || 'κενό')) + ')'); return; }
+  s.mechanismJudge = r.data;
 }
 async function judgeCrisis(s, user) {
   if (!s.crisisReply || !s.crisisReply.text || s.crisisReply.judge || s.riskFound) return; // a final crisis session was judged before its brake
@@ -4510,7 +4538,7 @@ async function mainStress() {
   const real = has('--real');
   const only = (opt('--sessions', '') || '').split(',').map(x => x.trim()).filter(Boolean);
   // «επιλογή» (--sessions) can re-run a session of either round; the full test without --sessions stays the 16 users
-  const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17), SL.FOUNDER_PERSONAS || [], SL.VOICE_PERSONAS || [], SL.LOOP_PERSONAS || [], SL.REHEARSAL_PERSONAS || [], SL.TARGETED_PERSONAS || [], SL.FINAL_PERSONAS || []) : SL.PERSONAS;
+  const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17), SL.FOUNDER_PERSONAS || [], SL.VOICE_PERSONAS || [], SL.LOOP_PERSONAS || [], SL.REHEARSAL_PERSONAS || [], SL.TARGETED_PERSONAS || [], SL.FINAL_PERSONAS || [], SL.MECHANISM_PERSONAS || []) : SL.PERSONAS;
   const plan = SL.planRuns(PEOPLE, only.length ? only : null);
   // 22/10 (the last hard test): in waves, the sessions run in the order they were asked for (the crisis ones first)
   if (Number(opt('--parallel', '1')) > 1 && only.length) { const pos = l => { const i = only.indexOf(l); return i < 0 ? 1e9 : i; }; plan.sort((a, b) => pos(a.label) - pos(b.label)); }
@@ -4595,7 +4623,7 @@ async function mainStress() {
       const firstAlone = m => async (...a) => { const r = await m(...a); if (firstBack) { firstBack(); firstBack = null; } return r; };
       const rs = await Promise.all(wave.map(async (item, j) => {
         if (j > 0 && warm) await Promise.race([warm, new Promise(r => setTimeout(r, 120000))]);
-        const m = real ? await realModel('10.20.' + wn + '.' + (j + 1)) : stressFakeAura();
+        const m = real ? await realModel('10.20.' + wn + '.' + (j + 1)) : stressFakeAura(item.persona);
         return runStressSession(item, j === 0 && warm ? firstAlone(m) : m, real ? stressUserReal(budget) : stressUserFake(item.persona), budget);
       }));
       for (const r of rs) {
@@ -4613,7 +4641,7 @@ async function mainStress() {
     else for (const item of plan) {
       if (minutes && Date.now() - t0 > minutes * 60000) { stopped = 'χρονικό όριο (' + minutes + ' λεπτά) — δεν ξεκίνησαν οι συνεδρίες από την ' + item.label; break; }
       console.log('… ' + item.label + ' — ' + item.persona.name);
-      const r = await runStressSession(item, real ? await realModel() : stressFakeAura(), real ? stressUserReal(budget) : stressUserFake(item.persona), budget);
+      const r = await runStressSession(item, real ? await realModel() : stressFakeAura(item.persona), real ? stressUserReal(budget) : stressUserFake(item.persona), budget);
       sessions.push(r.sess);
       const bad = SL.CHECKS.filter(c => (r.sess.checks[c.key] || []).length).map(c => c.key);
       console.log('   ρίζα: ' + (r.sess.rootConfirmed ? '«' + r.sess.root + '»' : '—') + ' | έλεγχοι με ✗: ' + (bad.join(', ') || 'κανένας') + ' | $' + r.sess.cost.toFixed(2) + ' (σύνολο $' + budget.spent().toFixed(2) + ')');
@@ -4630,6 +4658,7 @@ async function mainStress() {
     for (const s of sessions) s.judge = await judgeSession(s, real ? stressUserReal(budget) : stressUserFake(null));
     for (const s of sessions) await judgeVoice(s, real ? stressUserReal(budget) : stressUserFake(null));
     for (const s of sessions) await judgeLoop(s, real ? stressUserReal(budget) : stressUserFake(null));
+    for (const s of sessions) await judgeMechanism(s, real ? stressUserReal(budget) : stressUserFake(null));
     for (const s of sessions) await judgeCrisis(s, real ? stressUserReal(budget) : stressUserFake(null));
   } finally {
     await app.close();
