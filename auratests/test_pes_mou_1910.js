@@ -72,7 +72,8 @@ assert('CRISIS: the app\'s crisis lines themselves are untouched', S(L_A) === L_
   const h = s => crypto.createHash('sha256').update(s || '').digest('hex').slice(0, 16);
   // UPDATED (22/10, ADR «22 Οκτωβρίου»): John's voice edit (the example without a number, the prediction rule) — e1e56e0c… → b5f303cc…;
   // «Πες μου» itself is still display-only and never in the prompt
-  assert('UNCHANGED by «Πες μου»: the prompt (b5f303cc…, John\'s voice edit of 22/10)', h(PROMPT) === 'b5f303cc9405aa21' && !PROMPT.includes('singularTellMe'));
+  // UPDATED (23/10, John, Phase 1, Theme A): the law/money/health edits of 23/10, undone, give b5f303cc… back (prompt_edits_2310.js)
+  assert('UNCHANGED by «Πες μου»: the prompt (b5f303cc…, John\'s voice edit of 22/10; his edits of 23/10 undone)', h(require('./prompt_edits_2310.js').undoPrompt2310(PROMPT)) === 'b5f303cc9405aa21' && !PROMPT.includes('singularTellMe'));
   // UPDATED (22/10, ADR «22 Οκτωβρίου (β)», SAFETY): detectSafetySignal and classifyCrisisTier changed on purpose — Greeklish and spelling by
   // ear, additive; the phrase list, the crisis lines and the numbers are unchanged (pinned in test_crisis_greeklish_2210.js).
   assert('UNCHANGED: buildCrisisLine, detectSafetySignal, classifyCrisisTier, replaceBareGoodbye',

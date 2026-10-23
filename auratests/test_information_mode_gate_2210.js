@@ -96,10 +96,13 @@ assert('3: the held state is set and cleared where it was — after the reply, i
   (raw.match(/informationModeActive\.current = false;/g) || []).length === 1 &&
   (raw.match(/informationModeActive\.current = true/g) || []).length === 2);
 assert('3: … and it still holds the method-failure note back, as before', /if \(!informationModeActive\.current && lastUserMsgForMethodFailure && detectsMethodFailureSignal\(lastUserMsgForMethodFailure\.content\)\) \{/.test(G));
-assert('3: the fixed prompt is a409a47\'s, byte for byte', h(PROMPT) === 'b5f303cc9405aa21');
+// UPDATED (23/10, John, Phase 1, Theme A): the prompt moved only by the law/money/health edits of 23/10 (undone: a409a47's, byte for byte);
+// api/aura.js only by the fingerprint of the core prompt that goes with them (gen_prompt_fingerprints.cjs)
+assert('3: the fixed prompt is a409a47\'s, byte for byte, apart from John\'s edits of 23/10', h(require('./prompt_edits_2310.js').undoPrompt2310(PROMPT)) === 'b5f303cc9405aa21');
 assert('3: the crisis prompt, the closing prompt and the honest-uncertainty rule are unchanged',
   h(lit('SYSTEM_SUPPORTIVE')) === 'c7815b96d83ebae8' && h(lit('SYSTEM_TERMINATION')) === 'd5a77ca926f9490b' && h(lit('HONEST_UNCERTAINTY_RULE')) === '80b2ffd69933aee9');
-assert('3: api/aura.js is a409a47\'s, byte for byte — guard and fingerprints', h(api) === 'b11fad3a5d793717');
+assert('3: api/aura.js is a409a47\'s, byte for byte — guard and fingerprints — apart from the core fingerprint of 23/10',
+  h(api.replace(/  core: \{ length: \d+, sha256: "[0-9a-f]{64}" \},/, '  core: { length: 311822, sha256: "b5f303cc9405aa216e92e481f24507b03f6d878c2475733063c42733074c5b01" },')) === 'b11fad3a5d793717');
 assert('3: the helper is in the file once, outside the prompt, right after perTurnSafety',
   raw.split(HELPER).length === 2 && raw.indexOf(HELPER) > raw.indexOf(fnSrc('perTurnSafety')) && raw.indexOf(HELPER) - (raw.indexOf(fnSrc('perTurnSafety')) + fnSrc('perTurnSafety').length) === 1 &&
   !PROMPT.includes('informationModeNoteDue'));

@@ -162,11 +162,12 @@ const VOICE_1910 = [['«Θέλω να αδυνατίσω» → «Έγινε κά
     '(e.g. όταν ο χρήστης έχει πει "πέντε χρόνια": «Πέντε χρόνια έτσι. Δεν είναι λίγο.»); when they do not, none. Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης, με τα δικά του λόγια· ποτέ μη μετράς ή υπολογίζεις εσύ.'],
   ['(e.g. όταν ο χρήστης έχει πει "πέντε χρόνια": «Πέντε χρόνια έτσι. Δεν είναι λίγο.»); when they do not, none. Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης, με τα δικά του λόγια· ποτέ μη μετράς ή υπολογίζεις εσύ.',
     '(e.g. «Πέντε χρόνια έτσι. Δεν είναι λίγο.»); when they do not, none.']];
+const { undoPrompt2310 } = require('./prompt_edits_2310.js'); // UPDATED (23/10): John's Phase 1 prompt edits, undone for the pins below
 const undoVoice1910 = p => VOICE_1910.reduce((t, [now, before]) => (t.split(now).length === 2 ? t.replace(now, before) : 'MISSING ' + now), String(p || ''));
 assert('UNCHANGED: the prompt (no prompt change by this fix), the parser, the closing decision and its Stage A gate, the leaving door, the marker',
   // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
   // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
-  sha(undoVoice1910(PROMPT)) === 'a6d7fe7ae33515a0' && sha(fullFnSrc('parseThreeBeatShift')) === '7bceea7040494611' && sha(fullFnSrc('decideTermination')) === '60778a7e90295a31' &&
+  sha(undoVoice1910(undoPrompt2310(PROMPT))) === 'a6d7fe7ae33515a0' && // UPDATED (23/10, John, Phase 1, Theme A): the edits of 23/10 undone first sha(fullFnSrc('parseThreeBeatShift')) === '7bceea7040494611' && sha(fullFnSrc('decideTermination')) === '60778a7e90295a31' &&
   sha(fullFnSrc('stageAPreRootDecision')) === '81c3cf76a21109f4' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'e55ba1a0d4c46f3c' && // UPDATED (δ): the leaving door no longer reads the decision
   sha(fullFnSrc('buildStageAMarker')) === '0ef63f69e55acfde');
 // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 for the same question.

@@ -219,9 +219,14 @@ assert('CLOSING: Part 2 is still told not to repeat the summary',
 // CHANGED AGAIN, DELIBERATELY, on 2026-10-22 (e1e56e0c962656b0 → b5f303cc9405aa21). John (ADR «22 Οκτωβρίου»): in ΦΩΝΗ (4) the example
 // has no number at all («Μόνη σου, εδώ και καιρό. Δεν είναι λίγο.»), and after the number rule «Ποτέ πρόβλεψη για το μέλλον του χρήστη
 // ή άλλου ανθρώπου, ούτε γενίκευση που μεγαλώνει τον φόβο του.». +126 characters, one cache write. See test_voice_1710.js.
+// CHANGED AGAIN, DELIBERATELY, on 2026-10-23 (b5f303cc9405aa21 → 28940eecbf90e8fa). John (Phase 1, Theme A): law, money and health only as
+// the kind of expert, in PROACTIVE RESOURCE POINTER, ANSWER BEFORE INTERPRETATION, CRITICAL CORRECTION, PIPELINE PRINCIPLE and SOURCE
+// HANDLING; NO PROMISES; DANGER FROM ANOTHER PERSON. +2030 characters, one cache write. See test_prompt_lmh_2310.js; undone, the
+// edits give b5f303cc… back (prompt_edits_2310.js).
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 b5f303cc9405aa21…)',
-  PROMPT_SHA.slice(0, 16) === 'b5f303cc9405aa21');
+assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 28940eecbf90e8fa…); undone, the edits of 23/10 give b5f303cc9405aa21… back',
+  PROMPT_SHA.slice(0, 16) === '28940eecbf90e8fa' &&
+  require('crypto').createHash('sha256').update(require('./prompt_edits_2310.js').undoPrompt2310(PROMPT), 'utf8').digest('hex').slice(0, 16) === 'b5f303cc9405aa21');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',
