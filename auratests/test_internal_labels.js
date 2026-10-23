@@ -121,8 +121,9 @@ assert('MEASURE: reset with a new session', /labelLeaks\.current = 0;/.test(extr
     // UPDATED (12/10): the two display guards are passed through unchanged here — this run is about the tags and the labels.
     return new Function('rawTextWithTags', 'cleanLabels', 'stripAraDeclarative', 'awaitingEarlyWord', 'declarationLedger', 'issueDeclaration', 'turnCount',
       'guardStopMoment', 'stripRepeatedThreeBeat', 'countStopMoments', 'stopMomentGentleOnly', 'detectsMentalHealthReferral', 'msgs', 'riskSignalKind',
+      'stageAActive', 'dangerFromOther', // UPDATED (23/10, Ο5): the gentle-only check reads the danger latch too (test_danger_from_other_2310.js)
       seg + '\nreturn { modelJudgesEnd, awaiting: awaitingEarlyWord.current, text };')(rawReply, t => S(t).text, t => t, { current: false }, { current: [] }, () => [], { current: 0 },
-      t => t, t => t, () => 0, () => false, () => false, [], { current: 0 });
+      t => t, t => t, () => 0, () => false, () => false, [], { current: 0 }, { current: false }, { current: false });
   } catch (e) { return { error: e.message }; } };
   const r1 = run('Αυτό που περιέγραψες έχει πια όνομα. [[EXIT:yes]]');
   assert('TAGS BEFORE CLEANING (run): «… [[EXIT:yes]]» → the T5 signal is read, the text shown has no tag',

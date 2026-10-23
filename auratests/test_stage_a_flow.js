@@ -36,7 +36,7 @@ function extractBlock(startToken) {
   }
   return null;
 }
-const NAMES = ['detectSafetySignal', 'initialStageAState', 'stageAStep', 'stageAInputHidden', 'stageACaptureAllowed', 'stageATelemetry', 'stripPrematureFarewell', 'buildRootEndLines'];
+const NAMES = ['detectSafetySignal', 'initialStageAState', 'stageAStep', 'stageAInputHidden', 'stageACaptureAllowed', 'stageATelemetry', 'stripPrematureFarewell', 'buildRootEndLines', 'detectsDangerFromOther']; // UPDATED (23/10, Ο5): + detectsDangerFromOther — the capture reads it (danger from another person is never «Τι βρήκες», test_danger_from_other_2310.js)
 const textsSrc = (extractBlock('const STAGE_A_TEXTS = ') || 'const STAGE_A_TEXTS = {}') + ';';
 const F = new Function(textsSrc + '\n' + NAMES.map(n => extractBlock('function ' + n + '(') || `function ${n}(){return undefined}`).join('\n') +
   '\nreturn {' + NAMES.join(',') + '};')();
@@ -174,7 +174,7 @@ const HS = extractBlock('const handleSubmit = useCallback(async () => ') || '';
 assert('SUBMIT: the Stage A intercept runs after the risk latch and before the word path',
   HS.indexOf('mergeRiskKind(') < HS.indexOf('STAGE A — typed answers') && HS.indexOf('STAGE A — typed answers') < HS.indexOf('if (awaitingRememberedWord'));
 assert('SUBMIT: an armed door 2 never captures in tier A, nor once the old closing has started (the word must never become the root)',
-  /const _saArmed = stageARootArmed\.current && !_saPhase && riskSignalKind\.current !== 1 && !reflectionDelivered\.current && !awaitingRememberedWord;/.test(HS));
+  /const _saArmed = stageARootArmed\.current && !_saPhase && !stageASafetyHold\(riskSignalKind\.current, dangerFromOther\.current\) && !reflectionDelivered\.current && !awaitingRememberedWord;/.test(HS)); // UPDATED (23/10, Ο5): + the danger latch — danger from another person (test_danger_from_other_2310.js)
 assert('CLOSING: while door 2 is armed or the card is open, the old «πριν κλείσουμε» card does not open (Stage A only)',
   /if \(stageAActive\.current && \(stageARootArmed\.current \|\| stageARef\.current\.phase\) && \(decision === "confirm" \|\| decision === "terminate"\)\) return;\s*if \(decision === "confirm" \|\| decision === "terminate"\) \{/.test(CODE));
 assert('SUBMIT: only with the switch open', /if \(stageAActive\.current && \(_saPhase === "ask" \|\| _saPhase === "correct" \|\| _saArmed\)\) \{/.test(HS));
@@ -205,7 +205,7 @@ assert('OPEN: the found text must be the user\'s own (verbatim check) before a c
 assert('OPEN: riskKind from the latch; rootCardOpenedOnce set only when a card really opened',
   /riskKind: riskSignalKind\.current/.test(OPENFN) && /if \(stageARef\.current\.phase === "card"\) rootCardOpenedOnce\.current = true;/.test(OPENFN));
 assert('DOOR 2: armed in the readiness latch only when it flips this turn, only with the switch open, no flow/closing, never in tier A',
-  /if \(stageAActive\.current && !_saReadyBefore && coreReadinessConfirmed\.current && !stageARef\.current\.phase && !reflectionDelivered\.current && riskSignalKind\.current !== 1\) \{/.test(CODE));
+  /if \(stageAActive\.current && !_saReadyBefore && coreReadinessConfirmed\.current && !stageARef\.current\.phase && !reflectionDelivered\.current && !stageASafetyHold\(riskSignalKind\.current, dangerFromOther\.current\)\) \{/.test(CODE)); // UPDATED (23/10, Ο5): + the danger latch — danger from another person (test_danger_from_other_2310.js)
 // UPDATED (ADR «7 Οκτωβρίου (γ)»): door 3 opens the card only for a recognising message that passes the crisis check and
 // the root-substance rule; otherwise door 1's question (test_stage_a_door23_substance.js).
 assert('DOOR 2 (spontaneous): the user\'s own recognising message opens the card at once (door 3)',

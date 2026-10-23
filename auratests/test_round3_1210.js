@@ -65,7 +65,7 @@ const has = (head, ...parts) => { const p = para(head); return p.length > 0 && p
   // UPDATED (22/10, ADR «22 Οκτωβρίου (β)», SAFETY): detectSafetySignal and classifyCrisisTier changed on purpose — Greeklish and spelling by
   // ear, additive; the phrase list, the crisis lines and the numbers are unchanged (pinned in test_crisis_greeklish_2210.js).
   const PIN = { detectSafetySignal: 'b8513b1d0d52a148' /* UPDATED (22/10, final stress test A9): the message is also tried made plain, new phrases and a third person; tier B blanked inside — auratests/test_crisis_a9.js */, classifyCrisisTier: 'afa5cf7a370bb0d5', buildCrisisLine: 'd359e22dd7cf9a95',
-    crisisLineAfterFailedCall: 'c87733effcebde7e', mergeRiskKind: 'd3b56f5bad3ae14f', stageACaptureAllowed: 'e45f98e42434f208',
+    crisisLineAfterFailedCall: 'c87733effcebde7e', mergeRiskKind: 'd3b56f5bad3ae14f', stageACaptureAllowed: 'f8a46ebc62fe4ecd', // UPDATED (23/10, Ο5): stageACaptureAllowed changed on purpose — danger from another person (test_danger_from_other_2310.js).
     detectsMentalHealthReferral: 'd03b71d681025b79' };
   for (const [n, h] of Object.entries(PIN)) assert(`UNCHANGED: ${n} is byte for byte the same function`, sha(fullFnSrc(n, raw)) === h);
   assert('UNCHANGED: a negated crisis phrase is still crisis tier A (unsure → the safety path, as today)',

@@ -1463,9 +1463,11 @@ function computeMasterPriorityStage(safetyMode, msgCount, userSignalsClosing) {
 // gates, «run the closing now», the root and the post-map closing, the road question. On the crisis turn itself, also the loop and
 // strategy notes (clarity pivot, self-repetition, stagnation, strategy switch, last fired family, coverage, premise inversion, tension)
 // and the first-reply floor — the crisis prompt answers alone. DISTRESS (3) shows no crisis line: not the safety path.
-function perTurnSafety(currentMode, riskKind) {
+// Ο5 (John, 23/10/2026): danger from another person in Stage A (`dangerFromOther`, passed by the caller only with the switch open) is
+// the safety path too, from the turn it is seen.
+function perTurnSafety(currentMode, riskKind, dangerFromOther) {
   const crisisTurn = currentMode === "SUPPORTIVE";
-  return { crisisTurn, safetyPath: crisisTurn || riskKind === 1 || riskKind === 2 };
+  return { crisisTurn, safetyPath: crisisTurn || riskKind === 1 || riskKind === 2 || dangerFromOther === true };
 }
 // ADR «22 Οκτωβρίου (στ)» (John, a safety exception (α)): the INFORMATION MODE note («concise information … no Socratic questions»)
 // is not sent on the safety path — the crisis turn and every turn after the crisis line, where the crisis reply asks the risk question
@@ -1646,6 +1648,146 @@ function crisisLineAfterFailedCall(mode, msgs, supportLineShown) {
   const list = Array.isArray(msgs) ? msgs : [];
   const last = [...list].reverse().find(m => m && m.role === "user");
   return buildCrisisLine(classifyCrisisTier(last && typeof last.content === "string" ? last.content : ""), "", supportLineShown);
+}
+// DANGER FROM ANOTHER PERSON (Ο5; John, 23/10/2026, a safety fix — real-model run 52, sessions 125 and 125-2: «Με χτυπάει ο άντρας
+// μου. Φοβάμαι να φύγω.» … «Ευχαριστώ, κλείνουμε εδώ.» got the root question: detectSafetySignal reads harm to oneself only). A check
+// of its own: detectSafetySignal, classifyCrisisTier, buildCrisisLine and HELPLINES are untouched. It reads EXPLICIT physical violence
+// by a person, or an explicit threat of it, against the person writing («self») or against a child («child»), sentence by sentence.
+// Indirect phrasings — «φοβάμαι να φύγω», «φοβάμαι να γυρίσω σπίτι», «δεν μπορώ να του πω όχι» — are NOT read: each has everyday
+// meanings. A partner's «θα με σκοτώσει» IS read, like every phrase that reads both ways: a false alarm costs less than a missed signal.
+// The message is read without accents or case, Latin letters as Greek (greeklish), and by sound (ο = ω; ι = η = υ = ει = οι; ε = αι;
+// αυ = αφ; μπ = β; ντ = δ; γκ = γ; a double letter = one), so «ΜΕ ΧΤΥΠΑΕΙ», «με χτυπαει», «me xtypaei» and «με χτιπάει» read the same.
+// A pattern below is written in plain Greek and turned into sounds run by run: a run of letters ends on a consonant or at a word end.
+// Returns null, or { self, child }. See auratests/test_danger_from_other_2310.js.
+function detectsDangerFromOther(text) {
+  if (typeof text !== "string" || !text.trim()) return null;
+  const sound = w => w.replace(/μπ/g, "β").replace(/ντ/g, "δ").replace(/γκ|γγ/g, "γ").replace(/([αε])[υβ]/g, "$1φ").replace(/ει|οι/g, "ι")
+    .replace(/αι/g, "ε").replace(/[ηυ]/g, "ι").replace(/ω/g, "ο").replace(/(.)\1+/g, "$1");
+  const S = src => new RegExp(src.replace(/[α-ω]+/g, sound));
+  const LATIN = { th: "θ", ch: "χ", kh: "χ", ps: "ψ", ks: "ξ", ph: "φ", ou: "ου", 8: "θ", 3: "ξ", a: "α", b: "β", c: "κ", d: "δ", e: "ε", f: "φ",
+    g: "γ", h: "η", i: "ι", j: "τζ", k: "κ", l: "λ", m: "μ", n: "ν", o: "ο", p: "π", q: "κ", r: "ρ", s: "σ", t: "τ", u: "υ", v: "β", w: "ω", x: "χ", y: "υ", z: "ζ" };
+  const ALSO = [{}, { x: "ξ" }, { h: "χ" }, { u: "ου" }, { x: "ξ", h: "χ" }, { x: "ξ", u: "ου" }, { h: "χ", u: "ου" }, { x: "ξ", h: "χ", u: "ου" }];
+  const asGreek = (w, alt) => w.replace(/th|ch|kh|ps|ks|ph|ou|[a-z38]/g, m => alt[m] || LATIN[m] || m);
+  // who: a person (any form these words take after «ο / η / τον / την / τη»); «αυτός» only when it is not «αυτός ο …»
+  const WHO = "(?:αντρασ|αντρα|ανδρασ|ανδρα|συζυγοσ|συζυγο|συντροφοσ|συντροφο|συντροφισσα|φιλοσ|φιλο|φιλη|πρωην|γκομενοσ|γκομενο|γκομενα|" +
+    "αγορι|κοπελα|γυναικα|πατερασ|πατερα|μπαμπασ|μπαμπα|μητερα|μανα|μαμα|πατριοσ|πατριο|μητρια|αδερφοσ|αδερφο|αδελφοσ|αδελφο|αδερφη|" +
+    "αδελφη|θειοσ|θειο|θεια|παππουσ|παππου|γιαγια|γιοσ|γιο|κορη|ξαδερφοσ|ξαδερφο|ξαδερφη|πεθεροσ|πεθερο|πεθερα|κουνιαδοσ|κουνιαδο|" +
+    "γειτονασ|γειτονα|γειτονισσα|προισταμενοσ|προισταμενο|προισταμενη|αφεντικο|συναδελφοσ|συναδελφο|συγκατοικοσ|συγκατοικο|δασκαλοσ|" +
+    "δασκαλο|δασκαλα|καθηγητησ|καθηγητη|προπονητησ|προπονητη|καποιοσ|καποιον|αγνωστοσ|αγνωστο|τυποσ|τυπο|αυτοσ(?! (?:ο|η|το) )|εκεινοσ)";
+  const PARTNER = "(?:αντρασ|αντρα|ανδρασ|ανδρα|συζυγοσ|συζυγο|συντροφοσ|συντροφο|συντροφισσα|πρωην|γκομενοσ|γκομενο|γκομενα|" +
+    "(?:φιλοσ|φιλο|αγορι|κοπελα|γυναικα) μου)";
+  // what only a person does, when no person is named: «όταν πίνει», «όταν θυμώνει», «όταν τσακωνόμαστε» …
+  const ONLY_A_PERSON = "(?:οταν|οποτε|μολισ|σαν) (?:πινει|πιει|μεθαει|μεθυσει|θυμωνει|θυμωσει|νευριαζει|νευριασει|τσακωνομαστε|τσακωθουμε|γυρναει|γυριζει)";
+  const CHILD = "(?:(?:το|τα) (?:παιδι|παιδια|παιδακι|παιδακια|μωρο|μωρα|ανιψι|ανιψακι)|τον (?:γιο|μικρο)|(?:την|τη) (?:κορη|μικρη))";
+  const ME = " (?:θα |να )?με (?:εχει |ειχε |εχουν |ειχαν )?";
+  const R = {
+    notMe: S(" (?:δεν|δε|μη|μην)$"),                                        // «δεν με χτυπάει», «μη με χτυπάς»
+    who: S(" " + WHO + " "), partner: S(" " + PARTNER + " "), onlyPerson: S(" " + ONLY_A_PERSON + " "),
+    // the verb's own subject right after it is a thing: «με χτύπησε η πόρτα», «με χτυπάει ο ήλιος», «με δέρνει ο αέρας»
+    thingAfter: S("^(?:ο|η|οι|ενασ|μια) (?!" + WHO + " )"),
+    // hit / kick / injure: only with a person named in the sentence, or what only a person does; «με χτυπημένο γόνατο» is not a blow
+    hit: S(ME + "(?:χτυπ(?!ημεν|ηματ)|τραυματισ)[^ ]*"), kick: S(ME + "(?:κλωτσ|κλοτσ)[^ ]*"),
+    hitIdiom: S("^(?:[^ ]+ ){0,2}(?:τηλεφων|μηνυμ|νευρ|φιλοτιμ|φιλικ|πλακ|αστει|κουδουν)"),   // «με χτύπησε τηλέφωνο», «στα νεύρα», «φιλικά»
+    asleep: S(" (?:υπνο|υπνοσ|κοιμαται|κοιμομαστε) "),                          // «με κλωτσάει στον ύπνο του», «το μωρό με κλωτσάει» has no person
+    // beat: a person, what only a person does, or no subject at all («Με δέρνει.»); never at a game
+    beat: S(ME + "(?:δερν|εδειρ|δειρ|εδερν|τσακιζ|τσακισ)[^ ]*"),
+    game: S(" (?:ταβλι|σκακι|χαρτια|πρεφα|ποκερ|μπιριμπα|ματσ|μπαλα|ποδοσφαιρο|μπασκετ|τενισ|βολει|παιχνιδι|παιχνιδια|αγωνα|αγωνασ|γκολ|σκορ|τρεξιμο|φιφα|πλαυστατιον|πλειστεισιον) "),
+    subject: S(" (?:ο|η|οι) [^ ]+"),
+    // slap, abuse, rape, force, strangle, push, throw, hair, weapon, blows, beating as «ξύλο»
+    slap: S(ME + "χαστουκ[^ ]*"),
+    abuse: S(ME + "κακοπ(?:οιει|οιεισ|οιουν|οιησε|οιησαν|οιουσε|οιουσαν) "),     // the verb only: «με κακοποίηση» is «with abuse»
+    rape: S(ME + "βιασ(?:ε|ει|αν) (?!να )"),                                     // «με βιάζει / με βίαζε» is mostly «rushes me»: not here
+    force: S(" με (?:αναγκασ|αναγκαζ)[^ ]* να (?:κανουμε σεξ|κανω σεξ|κοιμηθω μαζι|κοιμηθουμε) "),
+    strangle: S(ME + "(?:πνιγ|επνιξ|πνιξ)[^ ]*"), neck: S(" (?:λαιμ[^ ]*|με τα χερια) "),
+    // «με έπιασε από τον λαιμό», «μου έσφιξε τον λαιμό»; not «μου έπιασε τον λαιμό» (a doctor does that)
+    grabNeck: S(" (?:με (?:επιασ|αρπαξ|σφιγγ|εσφιξ|εσφιγγ|κρατ|επιαν)[^ ]*|μου (?:εσφιξε|σφιγγει|σφιγγε|εσφιγγε)) (?:απο )?(?:τον |το )?λαιμ"),
+    push: S(ME + "(?:εσπρωξ|σπρωχν|σπρωξ|εσπρωχν|πεταξ|πεταγ)[^ ]* (?!να )(?:[^ ]+ ){0,2}(?:τοιχο|κατω|σκαλ[^ ]*|πατωμα|κρεβατι|ντουλαπ[^ ]*|επεσα|χτυπησα) "),
+    // «με τράβηξε από τα μαλλιά»; «μου τράβηξε τα μαλλιά» only with a person (a hairdresser does that too)
+    hairBy: S(" με (?:τραβηξ|τραβα|τραβου|εσυρ|σερν)[^ ]* απο τα μαλλια "), hair: S(" μου (?:τραβηξ|τραβα|τραβου)[^ ]* τα μαλλια "),
+    weapon: S(" (?:μου (?:εβγαλε|τραβηξε|εδειξε|εδειχνε) (?:ενα |το )?(?:μαχαιρι|οπλο|πιστολι|καραμπινα)|με (?:μαχαιρωσ|μαχαιρων|πυροβολ)[^ ]*) "),
+    blows: S(" μου (?:εριξε|ριχνει|ριχνε|εριχνε|ριξει|ριχνουν|εριξαν) (?:[^ ]+ )?(?:χαστουκι|χαστουκια|μπουνια|μπουνιεσ|μπατσο|σφαλιαρα|σφαλιαρεσ|κλωτσια|κλωτσιεσ|ξυλο) "),
+    figurative: S(" (?:ζωη|μοιρα|πραγματικοτητα|απορριψη|κριτικη|ειδηση|ειδησεισ) "),
+    wood: S(" (?:τρω|τρωω|τρωμε|τρωει|τρωνε|εφαγα|εφαγε|εφαγαν|φαω|φαει) (?:[^ ]+ ){0,2}ξυλο "), home: S(" στο σπιτι "),
+    // threats: a threat word, then a harm verb in the same sentence; a partner's «θα με σκοτώσει» / «θα με σφάξει»
+    threat: S(" απειλ[^ ]*(?: [^ ]+){0,8}? (?:σκοτωσ|σφαξ|χτυπησ|δειρ|πνιξ|καψ|μαχαιρωσ|σακατεψ|ξεκαν)[^ ]*"),
+    threatArmed: S(" απειλ[^ ]* με (?:μαχαιρι|οπλο|πιστολι|καραμπινα) "),
+    partnerKill: S(" θα με (?:σκοτωσ|σφαξ)[^ ]* "),
+    // a child: the violence verb, then the child; «χτυπάει / κλωτσάει» only with a person before it
+    childHit: S(" (?:χτυπ|κλωτσ|κλοτσ)[^ ]* " + CHILD + " "),
+    childBeat: S(" (?:(?:δερν|εδειρ|δειρ|εδερν|χαστουκ)[^ ]*|κακοπ(?:οιει|οιουν|οιησε|οιουσε)) " + CHILD + " "),
+    harmChild: S(" (?:σκοτωσ|σφαξ|χτυπησ|δειρ|πνιξ|καψ)[^ ]* " + CHILD + " "),
+  };
+  // every occurrence of `re` in `s` that passes `keep(before, after)`
+  const any = (re, s, keep) => {
+    const g = new RegExp(re.source, "g");
+    for (let m; (m = g.exec(s)); g.lastIndex = m.index + 1) if (keep(s.slice(0, m.index), s.slice(m.index + m[0].length).trimStart())) return true;
+    return false;
+  };
+  const read = s => {
+    const person = R.who.test(s), why = person || R.onlyPerson.test(s);
+    const notThing = after => !R.thingAfter.test(after), yes = before => !R.notMe.test(before);
+    const self =
+      any(R.hit, s, (b, a) => yes(b) && why && notThing(a) && !R.hitIdiom.test(a)) ||
+      any(R.kick, s, (b, a) => yes(b) && why && notThing(a) && !R.asleep.test(s)) ||
+      any(R.beat, s, (b, a) => yes(b) && !R.game.test(s) && notThing(a) && (why || !R.subject.test(s))) ||
+      any(R.slap, s, b => yes(b) && !R.figurative.test(s)) ||
+      any(R.abuse, s, yes) || any(R.rape, s, yes) || R.force.test(s) ||
+      any(R.strangle, s, b => yes(b) && R.neck.test(s)) || R.grabNeck.test(s) ||
+      any(R.push, s, b => yes(b) && (why || !R.subject.test(s))) || R.hairBy.test(s) || (R.hair.test(s) && why) || R.weapon.test(s) ||
+      (R.blows.test(s) && !R.figurative.test(s) && !R.game.test(s)) ||
+      (R.wood.test(s) && !R.game.test(s) && (why || R.home.test(s))) ||
+      (R.threat.test(s) && !R.harmChild.test(s)) || R.threatArmed.test(s) ||
+      (R.partnerKill.test(s) && R.partner.test(s));
+    const child = (R.childHit.test(s) && person) || R.childBeat.test(s) || (R.threat.test(s) && R.harmChild.test(s));
+    return { self: !!self, child: !!child };
+  };
+  const plain = String(text).normalize("NFKC").replace(/[\u200b-\u200f\u2060\ufeff\u00ad]/g, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/ς/g, "σ");
+  let self = false, child = false;
+  for (const part of plain.split(/[.!;?\n…]+/)) {
+    const words = part.split(/[^a-zα-ω0-9]+/).filter(Boolean);
+    if (!words.length) continue;
+    const latin = words.some(w => /[a-z]/.test(w));
+    for (const alt of latin ? ALSO.filter(a => Object.keys(a).every(k => part.includes(k))) : [{}]) {
+      const r = read(" " + words.map(w => sound(/[a-z]/.test(w) ? asGreek(w, alt) : w)).join(" ") + " ");
+      self = self || r.self; child = child || r.child;
+    }
+  }
+  return self || child ? { self, child } : null;
+}
+// THE LINE FOR DANGER FROM ANOTHER PERSON (Ο5; John's texts, 23/10/2026), written by the app — each sentence once per session, the
+// names HELPLINES' own, no other number and no promise: «Σε άμεσο κίνδυνο, 112. Για βία στο σπίτι, 15900, γραμμή SOS για τη βία κατά των
+// γυναικών.» for the person writing; «Σε άμεσο κίνδυνο, 112. Για παιδί, 1056, Χαμόγελο του Παιδιού.» for a child; both, with «Σε άμεσο
+// κίνδυνο, 112.» once. That first sentence is left out when this reply already shows 112 (the crisis line A has it) or a danger line
+// was written before. `shown` lists what was written already ("self", "child", "112"); the result gives the new list.
+function buildDangerLine(danger, replyText, shown) {
+  const had = Array.isArray(shown) ? shown : [];
+  const d = danger || {};
+  const want = ["self", "child"].filter(k => d[k] === true && !had.includes(k));
+  if (!want.length) return { line: "", shown: had };
+  const name = n => (HELPLINES.find(h => h.number === n) || {}).name;
+  const parts = [];
+  if (!had.includes("112") && !/(?:^|\D)112(?!\d)/.test(typeof replyText === "string" ? replyText : "")) parts.push("Σε " + name("112") + ", 112.");
+  if (want.includes("self")) parts.push("Για βία στο σπίτι, 15900, " + name("15900") + ".");
+  if (want.includes("child")) parts.push("Για παιδί, 1056, " + name("1056") + ".");
+  return { line: parts.join(" "), shown: [...had, ...want, ...(had.includes("112") ? [] : ["112"])] };
+}
+// Ο5 — what danger from another person this session's user messages told of, all of them (null if none). The line reads every message,
+// not only this turn's: in the old flow a first message gets the app's First-WHY question and the model answers only the next one.
+function dangerInMessages(msgs) {
+  let self = false, child = false;
+  for (const m of Array.isArray(msgs) ? msgs : []) {
+    if (!m || m.role !== "user") continue;
+    const d = detectsDangerFromOther(typeof m.content === "string" ? m.content : "");
+    if (d) { self = self || d.self; child = child || d.child; }
+  }
+  return self || child ? { self, child } : null;
+}
+// Ο5 — Stage A's doors to the root stay shut: crisis A (riskKind 1) as before, or danger from another person seen in this session
+// (`dangerFromOther`, a latch of its own that nothing clears before «Νέα συνεδρία»). Not riskKind 1 itself: that would count as
+// rootSuppressedA in the measure of the 20; not a new riskKind: mergeRiskKind keeps the heaviest, so a later DISTRESS would hide it.
+function stageASafetyHold(riskKind, dangerFromOther) {
+  return riskKind === 1 || dangerFromOther === true;
 }
 
 // AI IDENTITY BACKSTOP (EU AI Act, Art. 50 — founder's instruction after a real test on 2026-10-06:
@@ -1899,7 +2041,7 @@ function buildStepCardText(knew, knewTruncated, found, step, when) {
 // message, drawn by MessageBubble; no prompt and no history ever carries it (the e5af4bc lesson).
 function stageAMethodLineDue(o) {
   const x = o || {};
-  return x.active === true && !x.auraBefore && !x.supportive && x.riskKind === 0 && !x.safetyMode && !detectSafetySignal(x.lastUserText || "");
+  return x.active === true && !x.auraBefore && !x.supportive && x.riskKind === 0 && !x.dangerFromOther && !x.safetyMode && !detectSafetySignal(x.lastUserText || "");
 }
 function buildRootCardLine(riskOffer) {
   return riskOffer ? STAGE_A_TEXTS.cardLineRisk : STAGE_A_TEXTS.cardLine;
@@ -1966,9 +2108,9 @@ function countRiskClarifications(msgs) {
   return (Array.isArray(msgs) ? msgs : []).filter(m => m && m.role === "assistant" && detectsRiskClarification(m.content)).length;
 }
 // «Αν στις πρόσφατες ανταλλαγές υπάρχουν σημάδια βάρους ή κινδύνου»: the session's risk latch, or a risk check among AURA's last
-// three replies. Then only «Ας σταθούμε λίγο εδώ.».
-function stopMomentGentleOnly(msgs, riskKind) {
-  if (typeof riskKind === "number" && riskKind !== 0) return true;
+// three replies. Then only «Ας σταθούμε λίγο εδώ.». Ο5: danger from another person in Stage A counts as a sign of risk too.
+function stopMomentGentleOnly(msgs, riskKind, dangerFromOther) {
+  if (typeof riskKind === "number" && riskKind !== 0 || dangerFromOther === true) return true;
   return (Array.isArray(msgs) ? msgs : []).filter(m => m && m.role === "assistant").slice(-3).some(m => detectsRiskClarification(m.content));
 }
 // The guard on the reply itself: a third stop moment loses its opener; with only the gentle form allowed, a brisk opener becomes
@@ -2044,9 +2186,10 @@ function dropQuoteOnlyLines(text) {
 // ADR «12 Οκτωβρίου (β)» — the last round before the first tester session (John, after his own test). Decision 2 (safety): once
 // the safety path has run — the session's latch holds crisis A or B — the rest of the session is support only. ONE fixed sentence,
 // only on turns that are not SUPPORTIVE (that prompt stays as it is: the e5af4bc lesson). It names no helpline and no number: the
-// app shows those itself (buildCrisisLine). DISTRESS (3) shows no line, so it is not «the safety path».
-function describeSafetyPathCtx(riskKind) {
-  if (riskKind !== 1 && riskKind !== 2) return '';
+// app shows those itself (buildCrisisLine). DISTRESS (3) shows no line, so it is not «the safety path». Ο5: danger from another person
+// in Stage A gets the same sentence, unchanged (the app shows its line itself: buildDangerLine).
+function describeSafetyPathCtx(riskKind, dangerFromOther) {
+  if (riskKind !== 1 && riskKind !== 2 && dangerFromOther !== true) return '';
   return `\n[CODE-VERIFIED: the safety path was activated earlier in this session, so for the rest of it: support only, in proportion to what the user actually said — no root (neither ask toward it nor name it), no question about a step or a time, no push toward closing, never the same question twice, and if they thank you or want to leave, let them go warmly, with no new question.]\n`;
 }
 // ── Looking back without a lookbehind (iPhones before iOS 16.4) ──────────────────────────────────────────────────────────────
@@ -2298,10 +2441,11 @@ function stripRootDeclaration(text) {
   return dropModelSentences(text, (f, p) => !/[;?]\s*["»”']*\s*$/.test(p) && ROOT_DECLARATION.test(f.replace(/«[^»]*»|"[^"]*"|“[^”]*”/g, " ")));
 }
 // §1.5 — door 1, the button: after the first AURA reply; never in tier A, while loading, once the closing
-// has started (two closings must never run), while the ask/card flow is open, or after the session ended.
+// has started (two closings must never run), while the ask/card flow is open, or after the session ended. Ο5: never after danger
+// from another person (stageASafetyHold).
 function stageARootButtonVisible(st) {
   const o = st || {};
-  return o.active === true && o.assistantReplies >= 1 && !o.loading && o.riskKind !== 1 && !o.closingStarted && !o.rootPhase && !o.sessionEnded;
+  return o.active === true && o.assistantReplies >= 1 && !o.loading && !stageASafetyHold(o.riskKind, o.dangerFromOther) && !o.closingStarted && !o.rootPhase && !o.sessionEnded;
 }
 // ADR «22 Οκτωβρίου (ε)» (John; the rehearsal of the 20, session 8): «γεια» opens a conversation as often as it closes one. A bare «γεια»
 // («Γεια», «γεια!», «Γεια.», «γειά») while nothing has been said yet — every EARLIER user message of the session is itself only a greeting —
@@ -2321,12 +2465,12 @@ function isOpeningGreeting(text, earlierUserTexts) {
 // ADR «12 Οκτωβρίου (δ)» (John): the FIRST explicit exit before the root ALWAYS opens it — the user's exit has priority over
 // anything the old closing has pending. Real-model run 27, session 1.1: «… θα πω πως τα χρόνια πήγαν χαμένα» was read as a step,
 // the old closing held for the clarity scale (await_outcome_scale), the door stayed shut and AURA said goodbye before the root.
-// So the old closing's decision (still passed by the callers) is no longer read here.
+// So the old closing's decision (still passed by the callers) is no longer read here. Ο5: never after danger from another person.
 function stageALeavingDoorOpens(st) {
   const o = st || {};
   const u = typeof o.lastUserText === "string" ? o.lastUserText : "";
   return o.active === true && !o.used && !o.rootPhase && !o.armed &&
-    !o.rootConfirmed && !o.closingStarted && o.riskKind !== 1 && !o.safetyMode && !detectSafetySignal(u) && (isExplicitClosure(u) || declaresClosing(u)) &&
+    !o.rootConfirmed && !o.closingStarted && !stageASafetyHold(o.riskKind, o.dangerFromOther) && !o.safetyMode && !detectSafetySignal(u) && (isExplicitClosure(u) || declaresClosing(u)) &&
     !isOpeningGreeting(u, o.earlierUserTexts);
 }
 // ADR «19 Οκτωβρίου (β)» (John, a safety exception (α); real-model run 32, session 34: after the crisis line, «ευχαριστώ» got «Ευχαριστώ
@@ -2335,17 +2479,19 @@ function stageALeavingDoorOpens(st) {
 // message, by the app's own exit test on the whole message AND on each of its sentences («Νιώθω χάλια. Ευχαριστώ.» is still talking:
 // the safety path as today), or (2) the MODEL's reply when it is only a goodbye — for a goodbye the exit test does not know («ευχαριστώ
 // για όλα»). A safety signal in the message, or the switch closed: null. The detectors themselves are unchanged.
+// Ο5 (John, 23/10/2026): the same after the app's line for danger from another person (`dangerLine`: it was shown); a message that
+// itself tells of such danger goes on to the model, which gets the line.
 function stageAAfterCrisisText(st) {
   const o = st || {};
   const u = typeof o.lastUserText === "string" ? o.lastUserText.trim() : "";
-  if (o.active !== true || !u || detectSafetySignal(u)) return null;
+  if (o.active !== true || !u || detectSafetySignal(u) || detectsDangerFromOther(u)) return null;
   const aura = (Array.isArray(o.messages) ? o.messages : []).filter(m => m && m.role === "assistant" && typeof m.content === "string");
-  if (!o.fallbackLine && !aura.some(m => m.msgMode === "SUPPORTIVE")) return null;
+  if (!o.fallbackLine && !o.dangerLine && !aura.some(m => m.msgMode === "SUPPORTIVE")) return null;
   const leaving = (isExplicitClosure(u) || declaresClosing(u)) &&
     u.split(/[.;!?\n…]+/).map(x => x.trim()).filter(Boolean).every(x => isExplicitClosure(x) || declaresClosing(x) || matchesClosingWord(x));
   const modelBye = typeof o.reply === "string" && replaceBareGoodbye(o.reply).includes(BARE_GOODBYE_TEXT);
   if (!leaving && !modelBye) return null;
-  return o.fallbackLine || aura.some(m => /(?:^|\D)(?:1018|10306|112)(?!\d)/.test(m.content)) ? STAGE_A_TEXTS.afterCrisis : STAGE_A_TEXTS.afterCrisisNoNumbers;
+  return o.fallbackLine || o.dangerLine || aura.some(m => /(?:^|\D)(?:1018|10306|112)(?!\d)/.test(m.content)) ? STAGE_A_TEXTS.afterCrisis : STAGE_A_TEXTS.afterCrisisNoNumbers;
 }
 // ADR «11 Οκτωβρίου (β)» — the MODEL's own closing before the root. Found by the stress test with the real model (run 10,
 // sessions 2.1 and 4.1): after «Νιώθεις ότι κάτι άλλαξε…;» → «Ναι, άλλαξε…», the model wrote the old closing summary
@@ -2357,7 +2503,7 @@ function stageAModelClosesBeforeRoot(st) {
   const o = st || {};
   const u = typeof o.lastUserText === "string" ? o.lastUserText : "";
   return o.active === true && !o.rootConfirmed && !o.rootPhase && !o.armed && !o.closingStarted && !o.safetyMode && !o.supportive &&
-    o.riskKind !== 1 && !detectSafetySignal(u) && !((isExplicitClosure(u) || declaresClosing(u)) && !isOpeningGreeting(u, o.earlierUserTexts)) &&
+    !stageASafetyHold(o.riskKind, o.dangerFromOther) && !detectSafetySignal(u) && !((isExplicitClosure(u) || declaresClosing(u)) && !isOpeningGreeting(u, o.earlierUserTexts)) &&
     typeof o.reply === "string" && parseThreeBeatShift(o.reply) !== null;
 }
 // ADR «8 Οκτωβρίου (δ)», 1 — with the switch open and before a confirmed root, the MASTER PRIORITY RULE stage
@@ -2568,7 +2714,7 @@ function stageAStepOpen(phase) {
 // model, so the crisis check runs on it here. ANY crisis tier closes the flow and the message goes through
 // the normal path — tier A for the crisis protocol, tier B so the 10306 support line is never skipped.
 function stageACaptureAllowed(text) {
-  return detectSafetySignal(text) !== "CRISIS";
+  return detectSafetySignal(text) !== "CRISIS" && !detectsDangerFromOther(text); // Ο5: danger from another person is never «Τι βρήκες»
 }
 // session_completed fields for Stage A (§6.1, §6.1α): integers only, so recordTelemetry keeps every one.
 function stageATelemetry(stats, extra) {
@@ -6520,6 +6666,8 @@ export default function AURAv2() {
   const askedActionBeforeRoot = useRef(false); // the user asked for action before the root card ever opened
   const rootCardOpenedOnce    = useRef(false); // set when the root card first opens (step 3.5)
   const riskSignalKind        = useRef(0);
+  const dangerFromOther       = useRef(false); // Ο5: danger from another person seen in this session — never cleared before «Νέα συνεδρία»
+  const dangerLineShown       = useRef([]);    // Ο5: what of the danger line the app already wrote ("self", "child", "112")
   const labelLeaks            = useRef(0);     // ADR «8 Οκτωβρίου (β)»: internal labels removed from model replies (count only)     // §4 latch: 0 none · 1 crisis A · 2 crisis B · 3 DISTRESS (heaviest kept)
   // STAGE A flow (steps 3.3–3.10): the ref is the source of truth, the phase state re-renders it.
   const stageARef             = useRef(initialStageAState());
@@ -6963,7 +7111,7 @@ export default function AURAv2() {
       }
       // U1/U3: Build memory context for current category (injected silently, never shown)
       // ADR «19 Οκτωβρίου (δ)» (John, a safety exception (α)): the notes below read the session's risk latch, set before any branch.
-      const _turnSafety = perTurnSafety(currentMode, riskSignalKind.current);
+      const _turnSafety = perTurnSafety(currentMode, riskSignalKind.current, stageAActive.current && dangerFromOther.current);
       const _crisisTurn = _turnSafety.crisisTurn, _safetyPath = _turnSafety.safetyPath;
       const memCtx = buildMemoryContext(memory, currentDomain);
       if (memCtx) setIllumLevel(prev => Math.min(11, prev + 1));
@@ -7338,10 +7486,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // suffix, and with the gentle-form note the crisis reply opened with «Ας σταθούμε λίγο εδώ.». That path stays as it was.
       const _notSupportive = currentMode !== "SUPPORTIVE";
       const repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs)) : '';
-      const stopMomentCtx = _notSupportive ? describeStopMomentCtx(countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current)) : '';
+      const stopMomentCtx = _notSupportive ? describeStopMomentCtx(countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current, stageAActive.current && dangerFromOther.current)) : '';
       const riskClarificationCtx = _notSupportive ? describeRiskClarificationCtx(countRiskClarifications(msgs), ([...msgs].reverse().find(m => m.role === "user") || {}).content) : '';
       // ADR «12 Οκτωβρίου (β)», decision 2: after the safety path, support only — one fixed sentence, never on a SUPPORTIVE turn.
-      const safetyPathCtx = _notSupportive ? describeSafetyPathCtx(riskSignalKind.current) : '';
+      const safetyPathCtx = _notSupportive ? describeSafetyPathCtx(riskSignalKind.current, stageAActive.current && dangerFromOther.current) : '';
       // ROAD QUESTIONS STAND-DOWN (see gatesCtx above): this block tells the model to switch region
       // or show the map — but the map has already been shown, and a short answer to a road question
       // is an answer, not stagnation.
@@ -7562,7 +7710,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       const rawText = rawTextWithTags.replace(/\s*\[\[EARLY_WORD:yes\]\]\s*/gi, "\n").trim();
       // ADR «12 Οκτωβρίου»: the ΗΡΘΕΣ ΜΕ summary once per session, and the STOP MOMENT's limit and gentle form — on the text that
       // reaches the screen AND the history. A referral in this very reply counts as a sign of heaviness too.
-      const text = guardStopMoment(stripRepeatedThreeBeat(stripAraDeclarative(cleanLabels(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""))), msgs), countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current) || detectsMentalHealthReferral(rawText));
+      const text = guardStopMoment(stripRepeatedThreeBeat(stripAraDeclarative(cleanLabels(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""))), msgs), countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current, stageAActive.current && dangerFromOther.current) || detectsMentalHealthReferral(rawText));
 
       // If explicit pause was used, record it
       if (explicitPauseCtx && /(τρόπο που ψάχνεις|προτιμάς να φτάσουμε|απόφαση ή να καταλάβεις)/i.test(text)) {
@@ -7708,7 +7856,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // ADR «8 Οκτωβρίου (δ)», 2: when the closing card opens on this same reply, no farewell is added — a goodbye, then the
         // card, then the real closing is two goodbyes. The decision is the one the real call below makes (same inputs, run early).
         const _closingCardOpens = userWasClosing && closingCardOpensNow({
-          decision: stageAPreRootDecision(currentMode === "SUPPORTIVE" ? "none" : decideTermination(msgs, text, {
+          decision: stageAPreRootDecision(currentMode === "SUPPORTIVE" || (stageAActive.current && dangerFromOther.current) ? "none" : decideTermination(msgs, text, {
             safetyMode, currentMode, warningIssued: warningIssued.current, compressionCount: compressionCount.current,
             modelJudgesEnd,
             concreteStepStated: concreteStepStated.current, outcomeScaleAsked: outcomeScaleAsked.current, outcomeScaleBlockUsed: outcomeScaleBlockUsed.current,
@@ -7756,18 +7904,26 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       const _saModelClose = stageAModelClosesBeforeRoot({
         active: stageAActive.current, reply: text, lastUserText: lastUserMsg, earlierUserTexts: _earlierUserTexts,
         rootConfirmed: stageARef.current.stats.rootConfirmed === 1, rootPhase: stageARef.current.phase, armed: stageARootArmed.current,
-        closingStarted: reflectionDelivered.current, riskKind: riskSignalKind.current, safetyMode, supportive: currentMode === "SUPPORTIVE",
+        closingStarted: reflectionDelivered.current, riskKind: riskSignalKind.current, dangerFromOther: dangerFromOther.current, safetyMode, supportive: currentMode === "SUPPORTIVE",
       });
       if (_saModelClose) displayText = "";
       // ADR «19 Οκτωβρίου (β)»: after the crisis line, a bare goodbye from the model (or a goodbye of the user's) → John's phrase instead.
-      const _afterCrisis = stageAAfterCrisisText({ active: stageAActive.current, messages: msgs, lastUserText: lastUserMsg, reply: displayText });
+      const _afterCrisis = stageAAfterCrisisText({ active: stageAActive.current, messages: msgs, lastUserText: lastUserMsg, reply: displayText, dangerLine: dangerLineShown.current.length > 0 });
       if (_afterCrisis) displayText = _afterCrisis;
+      // Ο5 (John, 23/10/2026): danger from another person in this session's messages → the app writes its line under the reply, each
+      // sentence once per session (buildDangerLine), in both flows. After every rewrite above, so none of them can drop it.
+      const _danger = dangerInMessages(msgs);
+      if (_danger) {
+        const _dangerLine = buildDangerLine(_danger, displayText, dangerLineShown.current);
+        if (_dangerLine.line) displayText = displayText.trim() ? displayText + "\n\n" + _dangerLine.line : _dangerLine.line;
+        dangerLineShown.current = _dangerLine.shown;
+      }
       // AI IDENTITY BACKSTOP — last step before the reply is written, so no earlier rewrite of displayText
       // can drop it. See buildAiIdentityLine.
       const _aiLine = buildAiIdentityLine(lastUserMsg, displayText);
       if (_aiLine) displayText = displayText + "\n\n" + _aiLine;
       // ADR «17 Οκτωβρίου»: the first reply of a Stage A session carries the app's method line (display only, never on the safety path).
-      const _methodLine = stageAMethodLineDue({ active: stageAActive.current, auraBefore: msgs.some(m => m && m.role === "assistant"), supportive: currentMode === "SUPPORTIVE", riskKind: riskSignalKind.current, safetyMode, lastUserText: lastUserMsg });
+      const _methodLine = stageAMethodLineDue({ active: stageAActive.current, auraBefore: msgs.some(m => m && m.role === "assistant"), supportive: currentMode === "SUPPORTIVE", riskKind: riskSignalKind.current, dangerFromOther: dangerFromOther.current, safetyMode, lastUserText: lastUserMsg });
       if (displayText.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode, ...(_methodLine ? { methodLine: true } : {}) }]);
       // PASSIVE MEASUREMENT ONLY — fires after display, never blocks or alters anything. See
       // detectsPossibleAraPatternViolation's comment for full context (Measurement Before
@@ -7851,7 +8007,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // STAGE A — door 2 (§1.4, §1.5). The readiness latch flipped on THIS turn: if the user recognised the root
       // in their own words, that message opens the card now (door 3); after a «ναι» to the readiness question,
       // the NEXT message they write is captured as «Τι βρήκες» (door 2).
-      if (stageAActive.current && !_saReadyBefore && coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1) {
+      if (stageAActive.current && !_saReadyBefore && coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && !stageASafetyHold(riskSignalKind.current, dangerFromOther.current)) {
         const _saLastUser = [...msgs].reverse().find(m => m.role === "user");
         const _saSpont = !!_saLastUser && detectsSpontaneousCoreRecognition(_saLastUser.content);
         if (_saSpont && !stageACaptureAllowed(_saLastUser.content)) {
@@ -7972,8 +8128,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // ADR «7 Οκτωβρίου (β)», 2: on a supportive (crisis) turn no closing decision opens — no card, warning,
       // «Πριν φύγεις:», T3 or T6. Read from THIS call's mode: safetyMode only updates after this call returns.
       // ADR «10 Οκτωβρίου», 1: switch open, before the root — only an explicit exit (T2) keeps a closing decision.
+      // Ο5: switch open and danger from another person seen — no closing decision at all (the exit gets John's fixed phrase).
       const _saLastText = msgs.length && msgs[msgs.length - 1].role === "user" ? String(msgs[msgs.length - 1].content || "") : "";
-      const decision = stageAPreRootDecision(currentMode === "SUPPORTIVE" ? "none" : decideTermination(msgs, text, {
+      const decision = stageAPreRootDecision(currentMode === "SUPPORTIVE" || (stageAActive.current && dangerFromOther.current) ? "none" : decideTermination(msgs, text, {
         safetyMode,
         currentMode,
         warningIssued: warningIssued.current,
@@ -8040,7 +8197,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         used: stageARef.current.stats.rootDoorFromClosing > 0,
         rootPhase: stageARef.current.phase, armed: stageARootArmed.current,
         rootConfirmed: stageARef.current.stats.rootConfirmed === 1,
-        closingStarted: reflectionDelivered.current, riskKind: riskSignalKind.current, safetyMode,
+        closingStarted: reflectionDelivered.current, riskKind: riskSignalKind.current, dangerFromOther: dangerFromOther.current, safetyMode,
       })) {
         stageADispatch({ type: "leaving" });
         return;
@@ -8072,7 +8229,11 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // SAFETY (ADR «10 Οκτωβρίου (γ)»): a failed crisis turn still shows its crisis line, from code. The once-per-session
       // 10306 is not marked as shown here — the retry's successful reply carries it when it clears this line.
       const _failLine = crisisLineAfterFailedCall(currentMode, msgs, supportLineShown.current);
-      if (_failLine.line) setCrisisFallback(_failLine.line);
+      // Ο5: a failed turn on a message that tells of danger from another person still shows the app's danger line — not marked as
+      // shown, so the retry's reply carries it (as with 10306).
+      const _failDanger = dangerInMessages(msgs);
+      const _failDangerLine = _failDanger ? buildDangerLine(_failDanger, _failLine.line, dangerLineShown.current).line : "";
+      if (_failLine.line || _failDangerLine) setCrisisFallback([_failLine.line, _failDangerLine].filter(Boolean).join("\n\n"));
       // ROLLBACK — see rollbackFailedTurn above for the production evidence. Without this, the
       // failed message stays in history with no reply under it and every later send this session
       // is rejected. msgs is exactly what every caller committed to state before awaiting, so
@@ -8505,16 +8666,20 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     // STAGE A §4 — the session's risk latch sees EVERY submitted message, before any branch below. Updated with the
     // switch closed too (ADR «7 Οκτωβρίου (β)», 3): passive — read only by Stage A and by the 6€ paywall below.
     riskSignalKind.current = mergeRiskKind(riskSignalKind.current, detectSafetySignal(userText), classifyCrisisTier(userText));
+    // Ο5 (John, 23/10/2026): danger from another person — a latch of its own, never cleared before «Νέα συνεδρία» (an «Όχι τώρα» or a
+    // «Δεν ξέρω αν είμαι ασφαλής» after it changes nothing). Set with the switch closed too: only Stage A reads it; the old flow shows the
+    // app's line only (generateResponse).
+    if (detectsDangerFromOther(userText)) dangerFromOther.current = true;
     // STAGE A — typed answers (door 1's question, door 2's capture, «Διόρθωσε»). These are never sent to the
     // model, so the crisis check runs here: ANY crisis closes the flow and the message takes the normal path below.
     const _saPhase = stageARef.current.phase;
-    const _saArmed = stageARootArmed.current && !_saPhase && riskSignalKind.current !== 1 && !reflectionDelivered.current && !awaitingRememberedWord;
+    const _saArmed = stageARootArmed.current && !_saPhase && !stageASafetyHold(riskSignalKind.current, dangerFromOther.current) && !reflectionDelivered.current && !awaitingRememberedWord;
     // ADR «17 Οκτωβρίου (δ)» — the step's typed answers (the step, the smaller piece, «Πότε»): taken like the root phrase, through this
     // box and with no model call, but kept out of `messages` — a UI-only bubble, page memory only, so no request, detector, memory or
     // telemetry ever sees them. (η): the same detector as for any conversation message runs first. If it catches something, the step
     // flow stops here and the message goes on down the normal path, where the existing safety path takes it.
     if (stageAActive.current && (_saPhase === "step" || _saPhase === "smaller" || _saPhase === "when")) {
-      if (detectSafetySignal(userText)) {
+      if (detectSafetySignal(userText) || detectsDangerFromOther(userText)) { // Ο5: danger from another person stops the step too
         stageADispatch({ type: "stepStop" });
       } else {
         addUiBubble(userText, messages.length);
@@ -8559,7 +8724,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     // Word-to-remember: save as a real anchor (code-level, deterministic), then finish closure Part 2
     // RT-fix: still check for safety signals even here — a crisis phrase must never be silently missed
     // just because we were expecting a "word to remember" instead.
-    if (awaitingRememberedWord && !detectSafetySignal(userText)) {
+    // Ο5: nor a message that tells of danger from another person (it goes to the model, which gets the app's line), nor anything in
+    // Stage A once such danger was seen — no normal closing then.
+    if (awaitingRememberedWord && !detectSafetySignal(userText) && !detectsDangerFromOther(userText) && !(stageAActive.current && dangerFromOther.current)) {
       setAwaitingRememberedWord(false);
       setMessages(prev => [...prev, { id: nextMsgId(), role: "user", content: userText }]);
       const priorEchoCount = countPriorWordEchoes(memory, userText);
@@ -8723,8 +8890,14 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         } catch (e) { /* observation must never affect the session */ }
         // AI IDENTITY BACKSTOP on the entry turn too — «Είσαι άνθρωπος;» is a natural FIRST message, and
         // this branch writes its own reply. Every user message of the turn is checked (opening + why-answer).
-        const _firstAiLine = buildAiIdentityLine(initMsgs.filter(m => m && m.role === "user").map(m => String(m.content || "")).join("\n"), text);
-        const _firstWhyShown = _firstAiLine ? text + "\n\n" + _firstAiLine : text;
+        // Ο5 (John, 23/10/2026): the danger line on the entry turn too — this branch writes its own reply. The same rule as the main path:
+        // every user message of the turn (opening + why-answer), each sentence once per session, before the AI-identity line.
+        const _firstDanger = dangerInMessages(initMsgs);
+        const _firstDangerLine = _firstDanger ? buildDangerLine(_firstDanger, text, dangerLineShown.current) : { line: "", shown: dangerLineShown.current };
+        dangerLineShown.current = _firstDangerLine.shown;
+        const _firstText = _firstDangerLine.line ? (String(text || "").trim() ? text + "\n\n" + _firstDangerLine.line : _firstDangerLine.line) : text;
+        const _firstAiLine = buildAiIdentityLine(initMsgs.filter(m => m && m.role === "user").map(m => String(m.content || "")).join("\n"), _firstText);
+        const _firstWhyShown = _firstAiLine ? _firstText + "\n\n" + _firstAiLine : _firstText;
         if (_firstWhyShown.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: _firstWhyShown, msgMode: "ANSWER" }]);
         // U1: Start trajectory for this category
         if (memory.storageEnabled) {
@@ -8732,14 +8905,14 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           setMemory(updated);
           saveMemory(updated);
         }
-      } catch(e) { setError(e.message); }
+      } catch(e) { setError(e.message); const _fd = dangerInMessages(initMsgs); const _fdl = _fd ? buildDangerLine(_fd, "", dangerLineShown.current).line : ""; if (_fdl) setCrisisFallback(_fdl); } // Ο5: not marked as shown (the retry carries it)
       finally { setLoading(false); }
       return;
     }
 
     // ADR «19 Οκτωβρίου (β)» (John, a safety exception (α)): after the crisis line, a goodbye gets the app's fixed phrase, word for word,
     // and nothing else — no model call, no leaving door, no root question. A message with a safety signal took its path above.
-    const _afterCrisis = stageAAfterCrisisText({ active: stageAActive.current, messages, fallbackLine: crisisFallback, lastUserText: userText });
+    const _afterCrisis = stageAAfterCrisisText({ active: stageAActive.current, messages, fallbackLine: crisisFallback, lastUserText: userText, dangerLine: dangerLineShown.current.length > 0 });
     if (_afterCrisis) {
       setMessages(prev => [...prev, { id: nextMsgId(), role: "user", content: userText }, { id: nextMsgId(), role: "assistant", content: _afterCrisis, msgMode: "STAGE_A" }]);
       return;
@@ -8759,7 +8932,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       used: stageARef.current.stats.rootDoorFromClosing > 0,
       rootPhase: stageARef.current.phase, armed: stageARootArmed.current,
       rootConfirmed: stageARef.current.stats.rootConfirmed === 1,
-      closingStarted: reflectionDelivered.current, riskKind: riskSignalKind.current, safetyMode,
+      closingStarted: reflectionDelivered.current, riskKind: riskSignalKind.current, dangerFromOther: dangerFromOther.current, safetyMode,
     })) {
       addUiBubble(userText, messages.length); // ADR «8 Οκτωβρίου (δ)», 5: the user's «Ευχαριστώ» stays on screen (shown, not sent)
       stageADispatch({ type: "leaving" });
@@ -8770,7 +8943,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     // question under it. Crisis and DISTRESS returned above (safety path as today). With substance, door 3 still opens
     // the card after the reply. Switch closed: never true.
     if (stageAActive.current && messages.some(m => m.role === "assistant" && m.msgMode !== "STAGE_A") &&
-        !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1 &&
+        !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && !stageASafetyHold(riskSignalKind.current, dangerFromOther.current) &&
         detectsSpontaneousCoreRecognition(userText) && !rootTextHasSubstance(userText)) {
       addUiBubble(userText, messages.length); // ADR «8 Οκτωβρίου (δ)», 5: shown, not sent
       coreReadinessConfirmed.current = true; // the readiness latch flips exactly as it would have after the reply (door 3)
@@ -8784,7 +8957,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     // anything else, and tier A, go on as before. Switch closed: never true.
     if (stageAActive.current && messages.some(m => m.role === "assistant" && m.msgMode !== "STAGE_A") &&
         messages[messages.length - 1].role === "assistant" && detectsCoreReadinessAsked(messages[messages.length - 1].content) && coreReadinessAsked.current &&
-        !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1 &&
+        !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && !stageASafetyHold(riskSignalKind.current, dangerFromOther.current) &&
         !detectsSpontaneousCoreRecognition(userText) && detectsAffirmativeShort(userText)) {
       coreReadinessConfirmed.current = true; // the readiness latch flips exactly as it would have after the reply (door 2)
       addUiBubble(userText, messages.length); // shown, not sent
@@ -8945,7 +9118,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     coreReadinessAsked.current = false;
     coreReadinessConfirmed.current = false;
     freeActionOffered.current = 0; freeDeferral.current = 0; askedActionBeforeRoot.current = false; rootCardOpenedOnce.current = false;
-    riskSignalKind.current = 0; labelLeaks.current = 0;
+    riskSignalKind.current = 0; labelLeaks.current = 0; dangerFromOther.current = false; dangerLineShown.current = [];
     stageARef.current = initialStageAState(); stageARootArmed.current = false; setStageAPhase(null); lastCardDoor.current = 0;
     setUiBubbles([]);
     abandonMark.current = { started: false, ended: false, done: false };
@@ -10008,6 +10181,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               assistantReplies: messages.filter(m => m.role === "assistant" && m.msgMode !== "STAGE_A").length,
               loading,
               riskKind: riskSignalKind.current,
+              dangerFromOther: dangerFromOther.current,
               closingStarted: reflectionDelivered.current || awaitingRememberedWord || closureConfirmPending || warningPending,
               rootPhase: stageAPhase,
               sessionEnded,

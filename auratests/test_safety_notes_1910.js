@@ -81,7 +81,7 @@ const FIRST_REPLY = '\n[STAGE A, FIRST REPLY — CODE-VERIFIED: in this flow the
   const gs = CODE.indexOf('const generateResponse = useCallback(async'), ge = CODE.indexOf('\n  }, [', gs);
   const G = gs >= 0 && ge > gs ? CODE.slice(gs, ge) : '';
   const at = re => { const m = re.exec(G); return m ? m.index : -1; };
-  const def = at(/const _turnSafety = perTurnSafety\(currentMode, riskSignalKind\.current\);\n\s*const _crisisTurn = _turnSafety\.crisisTurn, _safetyPath = _turnSafety\.safetyPath;/);
+  const def = at(/const _turnSafety = perTurnSafety\(currentMode, riskSignalKind\.current, stageAActive\.current && dangerFromOther\.current\);\n\s*const _crisisTurn = _turnSafety\.crisisTurn, _safetyPath = _turnSafety\.safetyPath;/); // UPDATED (23/10, Ο5): + the danger latch (danger from another person, test_danger_from_other_2310.js)
   assert('1: the safety state is computed from the latch before the first per-turn note is built', def > 0 && def < G.indexOf('const memCtx = ') && def < G.indexOf('const masterPriorityStageCtx'));
   assert('2/3: the MASTER PRIORITY stage reads it — SAFETY on the crisis turn and after the line, crisis A and B',
     /return describeMasterPriorityStageCtx\(_safetyPath \? 'SAFETY' : stage\);/.test(G) && G.indexOf("_safetyPath ? 'SAFETY' : stage") > G.indexOf('const masterPriorityStageCtx'));
@@ -152,7 +152,7 @@ const undoVoice1910 = p => VOICE_1910.reduce((t, [now, before]) => (t.split(now)
     crisisLineAfterFailedCall: 'c87733effcebde7e' };
   for (const [n, v] of Object.entries(PIN)) assert(`UNCHANGED: ${n}`, h(fullFnSrc(n, raw)) === v);
   assert('UNCHANGED: the stage note texts (SAFETY / GRACEFUL EXIT / OPENING / PERSPECTIVE SWAP)', h(fullFnSrc('describeMasterPriorityStageCtx', raw)) === 'b9ec012473adece6');
-  assert('UNCHANGED: the risk latch and the safety-path note', h(fullFnSrc('mergeRiskKind', raw)) === 'd3b56f5bad3ae14f' && h(fullFnSrc('describeSafetyPathCtx', raw)) === 'b0496329b4826a9f');
+  assert('UNCHANGED: the risk latch and the safety-path note', h(fullFnSrc('mergeRiskKind', raw)) === 'd3b56f5bad3ae14f' && h(fullFnSrc('describeSafetyPathCtx', raw)) === 'edb4d97939656976'); // UPDATED (23/10, Ο5): describeSafetyPathCtx changed on purpose — danger from another person (test_danger_from_other_2310.js).
 }
 // ── The browser section that checks the exact text of every request ─────────────────────────────────────────────────────
 {

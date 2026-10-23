@@ -100,7 +100,7 @@ assert('2: the door 1 question and «Δεν το βρήκα ακόμα» are unc
   assert('3: placed after the crisis and DISTRESS branches (safety path first, as today) and before anything is sent',
     pre > dis && dis > 0 && pre > leave && leave > 0 && next > pre);
   assert('3: the same conditions as door 3 after a reply — switch open, a reply already, latch not flipped, no flow, no closing, not tier A',
-    /if \(stageAActive\.current && messages\.some\(m => m\.role === "assistant" && m\.msgMode !== "STAGE_A"\) &&\s*!coreReadinessConfirmed\.current && !stageARef\.current\.phase && !reflectionDelivered\.current && riskSignalKind\.current !== 1 &&\s*detectsSpontaneousCoreRecognition\(userText\) && !rootTextHasSubstance\(userText\)\) \{/.test(blk));
+    /if \(stageAActive\.current && messages\.some\(m => m\.role === "assistant" && m\.msgMode !== "STAGE_A"\) &&\s*!coreReadinessConfirmed\.current && !stageARef\.current\.phase && !reflectionDelivered\.current && !stageASafetyHold\(riskSignalKind\.current, dangerFromOther\.current\) &&\s*detectsSpontaneousCoreRecognition\(userText\) && !rootTextHasSubstance\(userText\)\) \{/.test(blk)); // UPDATED (23/10, Ο5): + the danger latch — danger from another person (test_danger_from_other_2310.js)
   assert('3: the latch flips as it would have after the reply, door 1\'s question opens (door 3 kept), the turn ENDS — nothing sent',
     /coreReadinessConfirmed\.current = true;[^\n]*\n\s*stageADispatch\(\{ type: "reask", door: 3 \}\);\s*return;\s*\}/.test(blk) && !/generateResponse|callAura|setMessages/.test(blk));
   assert('3: door 3 WITH substance still opens the card after the reply, as before (unchanged)',

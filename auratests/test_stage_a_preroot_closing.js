@@ -109,7 +109,7 @@ for (const [name, hist, u, text, o, expect] of CASES) {
 // ── Wiring ───────────────────────────────────────────────────────────────────
 {
   assert('WIRING: the decision after a reply goes through the gate — same call, same options, this message as lastUserText',
-    /const decision = stageAPreRootDecision\(currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{\s*safetyMode,\s*currentMode,/.test(GEN) &&
+    /const decision = stageAPreRootDecision\(currentMode === "SUPPORTIVE" \|\| \(stageAActive\.current && dangerFromOther\.current\) \? "none" : decideTermination\(msgs, text, \{\s*safetyMode,\s*currentMode,/.test(GEN) && // UPDATED (23/10, Ο5): + the danger latch — danger from another person (test_danger_from_other_2310.js)
     // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): + the opening «γεια» (isOpeningGreeting) — the line is otherwise as before
     /\}\), \{ active: stageAActive\.current, rootConfirmed: stageARef\.current\.stats\.rootConfirmed === 1, lastUserText: _saLastText, earlierUserTexts: _earlierUserTexts \}\);/.test(GEN) &&
     /const _saLastText = msgs\.length && msgs\[msgs\.length - 1\]\.role === "user" \? String\(msgs\[msgs\.length - 1\]\.content \|\| ""\) : "";/.test(GEN));
@@ -118,7 +118,7 @@ for (const [name, hist, u, text, o, expect] of CASES) {
   const at = GEN.indexOf('if (isBareEmojiOrAcknowledgment(displayText)) {');
   const blk = at >= 0 ? GEN.slice(at, GEN.indexOf('// EXPLICIT STYLE PREFERENCE', at)) : '';
   assert('WIRING: the empty-reply rule sees the same gated decision (a card that does not open does not count)',
-    /decision: stageAPreRootDecision\(currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{/.test(blk) &&
+    /decision: stageAPreRootDecision\(currentMode === "SUPPORTIVE" \|\| \(stageAActive\.current && dangerFromOther\.current\) \? "none" : decideTermination\(msgs, text, \{/.test(blk) && // UPDATED (23/10, Ο5): + the danger latch — danger from another person (test_danger_from_other_2310.js)
     // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): + the opening «γεια» (isOpeningGreeting) — the line is otherwise as before
     /\}\), \{ active: stageAActive\.current, rootConfirmed: stageARef\.current\.stats\.rootConfirmed === 1, lastUserText: lastUserMsg, earlierUserTexts: _earlierUserTexts \}\),/.test(blk));
   // UPDATED (12/10/2026, ADR «12 Οκτωβρίου (β)», John's approved text): the closing sentence is «Ευχαριστώ που το μοιράστηκες. Να είσαι
@@ -140,7 +140,7 @@ for (const [name, hist, u, text, o, expect] of CASES) {
   assert('UNCHANGED: decideTermination and the leaving-door gate byte for byte (the T1–T8 logic itself is untouched)',
     // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
     // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
-    sha(fullFnSrc('decideTermination')) === '60778a7e90295a31' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'e55ba1a0d4c46f3c'); // UPDATED (δ): the leaving door no longer reads the decision
+    sha(fullFnSrc('decideTermination')) === '60778a7e90295a31' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'a319ffa8afded157'); // UPDATED (δ): the leaving door no longer reads the decision UPDATED (23/10, Ο5): stageALeavingDoorOpens changed on purpose — danger from another person (test_danger_from_other_2310.js).
   assert('UNCHANGED: the first T2 still opens the root question before the model (the door is not touched)',
     CODE.includes('// STAGE A — «Πριν φύγεις:» BEFORE the model') && /stageADispatch\(\{ type: "leaving" \}\);/.test(CODE));
 }

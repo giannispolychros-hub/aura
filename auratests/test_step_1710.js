@@ -65,7 +65,7 @@ const HANDLERS = CODE.slice(CODE.indexOf('const handleStageAPress = useCallback(
   // With the switch open the first message goes on to the main path: generateResponse writes the reply and decides the method line.
   const GR = CODE.slice(CODE.indexOf('const generateResponse = useCallback('), CODE.indexOf('const handleSubmit = useCallback('));
   assert('FIRST-WHY: the model\'s first reply carries the method line by stageAMethodLineDue (never on Supportive / risk / safety mode)',
-    GR.includes('stageAMethodLineDue({ active: stageAActive.current, auraBefore: msgs.some(m => m && m.role === "assistant"), supportive: currentMode === "SUPPORTIVE", riskKind: riskSignalKind.current, safetyMode, lastUserText: lastUserMsg })'));
+    GR.includes('stageAMethodLineDue({ active: stageAActive.current, auraBefore: msgs.some(m => m && m.role === "assistant"), supportive: currentMode === "SUPPORTIVE", riskKind: riskSignalKind.current, dangerFromOther: dangerFromOther.current, safetyMode, lastUserText: lastUserMsg })')); // UPDATED (23/10, Ο5): + danger from another person (test_danger_from_other_2310.js)
 }
 
 // ── 2. The card line ────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -232,8 +232,8 @@ const Y = T('stageAStep', CARD, { type: 'yes', riskKind: 0, step: true });
   const latch = HS.indexOf('riskSignalKind.current = mergeRiskKind(');
   assert('(η): the step\'s typed answers are taken right after the risk latch has seen them, before anything else', st > latch && latch > 0 && cap > st);
   const branch = st > 0 ? HS.slice(st, cap) : '';
-  assert('(η): the SAME detector as for a conversation message, on every typed answer of the step', branch.includes('if (detectSafetySignal(userText)) {') && branch.includes('stageADispatch({ type: "stepStop" });'));
-  const stopPart = branch.slice(branch.indexOf('if (detectSafetySignal(userText)) {'), branch.indexOf('} else {'));
+  assert('(η): the SAME detector as for a conversation message, on every typed answer of the step', branch.includes('if (detectSafetySignal(userText) || detectsDangerFromOther(userText)) {') && branch.includes('stageADispatch({ type: "stepStop" });')); // UPDATED (23/10, Ο5): + danger from another person (test_danger_from_other_2310.js)
+  const stopPart = branch.slice(branch.indexOf('if (detectSafetySignal(userText) || detectsDangerFromOther(userText)) {'), branch.indexOf('} else {')); // UPDATED (23/10, Ο5): + danger from another person (test_danger_from_other_2310.js)
   assert('(η): on a signal the branch does NOT return — the message goes on down the normal path, where the safety path takes it', stopPart && !/return/.test(stopPart));
   assert('(β)/(ια): the typed step is a UI-only bubble — never `messages`, never sent, the branch returns before any model call',
     branch.includes('addUiBubble(userText, messages.length);') && !/setMessages|callAura|generateResponse|saveMemory|localStorage|console\./.test(branch) && /return;\s*\n\s*\}\s*\n\s*\}\s*$/.test(branch.trimEnd() + '\n'));

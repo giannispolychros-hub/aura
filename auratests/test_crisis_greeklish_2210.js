@@ -17,7 +17,7 @@ try {
   detect = new Function(extract('detectSafetySignal') + '\nreturn detectSafetySignal;')();
   tier = new Function('detectSafetySignal', extract('classifyCrisisTier') + '\nreturn classifyCrisisTier;')(detect);
   line = new Function(extract('buildCrisisLine') + '\nreturn buildCrisisLine;')();
-  capture = new Function('detectSafetySignal', extract('stageACaptureAllowed') + '\nreturn stageACaptureAllowed;')(detect);
+  capture = new Function('detectSafetySignal', extract('detectsDangerFromOther') + '\n' + extract('stageACaptureAllowed') + '\nreturn stageACaptureAllowed;')(detect); // UPDATED (23/10, Ο5): + detectsDangerFromOther — Stage A's gates read it now (danger from another person, test_danger_from_other_2310.js)
 } catch (e) { console.log('LOAD ERROR — ' + e.message); }
 let passed = 0, failed = 0;
 function assert(label, cond) { if (cond) { passed++; console.log('PASS — ' + label); } else { failed++; console.log('FAIL — ' + label); } }

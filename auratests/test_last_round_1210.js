@@ -62,7 +62,7 @@ const GEN = CODE.slice(CODE.indexOf('const generateResponse = useCallback('), CO
   // UPDATED (22/10, ADR «22 Οκτωβρίου (β)», SAFETY): detectSafetySignal and classifyCrisisTier changed on purpose — Greeklish and spelling by
   // ear, additive; the phrase list, the crisis lines and the numbers are unchanged (pinned in test_crisis_greeklish_2210.js).
   const PIN = { detectSafetySignal: 'b8513b1d0d52a148' /* UPDATED (22/10, final stress test A9): the message is also tried made plain, new phrases and a third person; tier B blanked inside — auratests/test_crisis_a9.js */, classifyCrisisTier: 'afa5cf7a370bb0d5', buildCrisisLine: 'd359e22dd7cf9a95',
-    crisisLineAfterFailedCall: 'c87733effcebde7e', mergeRiskKind: 'd3b56f5bad3ae14f', stageACaptureAllowed: 'e45f98e42434f208',
+    crisisLineAfterFailedCall: 'c87733effcebde7e', mergeRiskKind: 'd3b56f5bad3ae14f', stageACaptureAllowed: 'f8a46ebc62fe4ecd', // UPDATED (23/10, Ο5): stageACaptureAllowed changed on purpose — danger from another person (test_danger_from_other_2310.js).
     detectsMentalHealthReferral: 'd03b71d681025b79' };
   for (const [n, h] of Object.entries(PIN)) assert(`(α) UNCHANGED: ${n} is byte for byte the same function`, sha(fullFnSrc(n, raw)) === h);
   const NEG = 'όχι όχι δεν θέλω να κάνω κακό στον εαυτό μου απλά δεν βλέπω πώς θα χωρέσει η σχολή με το δάνειο και τα παιδιά';
@@ -138,7 +138,7 @@ assert('AFTER THE SAFETY PATH: support only, in proportion; no root, no step or 
   assert('SAFETY NOTE: it names no helpline, no number, no organization (the e5af4bc lesson: the app shows those itself)',
     !/\d/.test(inner) && !/line|number|call|phone|hotline|γραμμ|τηλ|αριθμ|καλ[εέ]σ|1018|10306|112/i.test(inner));
   assert('WIRING: built from the session\'s risk latch, and never on a SUPPORTIVE turn (that prompt stays as it was)',
-    GEN.includes("const safetyPathCtx = _notSupportive ? describeSafetyPathCtx(riskSignalKind.current) : '';") &&
+    GEN.includes("const safetyPathCtx = _notSupportive ? describeSafetyPathCtx(riskSignalKind.current, stageAActive.current && dangerFromOther.current) : '';") /* UPDATED (23/10, Ο5): + the danger latch (danger from another person, test_danger_from_other_2310.js) */ &&
     GEN.indexOf('const _notSupportive = currentMode !== "SUPPORTIVE";') < GEN.indexOf('const safetyPathCtx = '));
   const SUFFIX = (CODE.match(/const dynamicSuffix = \[([\s\S]*?)\]\.filter\(Boolean\)/) || ['', ''])[1];
   assert('WIRING: in the hard-constraint tier, right before the Stage A marker (which stays last); and in the collision log',

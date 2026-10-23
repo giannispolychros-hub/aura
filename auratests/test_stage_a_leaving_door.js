@@ -51,7 +51,7 @@ function extractBlock(startToken) {
 }
 const NAMES = ['isExplicitClosure', 'declaresClosing', 'matchesClosingWord', 'detectSafetySignal', 'classifyCrisisTier', 'mergeRiskKind',
   'stageALeavingDoorOpens', 'initialStageAState', 'stageAStep', 'stageATelemetry', 'substanceOfSentence', 'splitSentences',
-  'rootTextHasSubstance', 'pickKnewSnippet', 'isOpeningGreeting', 'lookBehind']; // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): the opening «γεια» — and UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex)
+  'rootTextHasSubstance', 'pickKnewSnippet', 'isOpeningGreeting', 'lookBehind', 'stageASafetyHold']; // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): the opening «γεια» — and UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex); UPDATED (23/10, Ο5): + stageASafetyHold — the leaving door reads it (danger from another person, test_danger_from_other_2310.js)
 const srcs = NAMES.map(n => extractBlock('function ' + n + '(') || `function ${n}(){return undefined}`);
 const consts = ['ROOT_MIN_SUBSTANCE_WORDS', 'KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_FILLER_WORDS'].map(n => {
   const a = CODE.indexOf('const ' + n + ' = ');

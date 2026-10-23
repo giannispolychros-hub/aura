@@ -167,7 +167,7 @@ assert('UNCHANGED: the prompt (no prompt change by this fix), the parser, the cl
   // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
   // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
   sha(undoVoice1910(PROMPT)) === 'a6d7fe7ae33515a0' && sha(fullFnSrc('parseThreeBeatShift')) === '7bceea7040494611' && sha(fullFnSrc('decideTermination')) === '60778a7e90295a31' &&
-  sha(fullFnSrc('stageAPreRootDecision')) === '81c3cf76a21109f4' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'e55ba1a0d4c46f3c' && // UPDATED (δ): the leaving door no longer reads the decision
+  sha(fullFnSrc('stageAPreRootDecision')) === '81c3cf76a21109f4' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'a319ffa8afded157' && // UPDATED (δ): the leaving door no longer reads the decision UPDATED (23/10, Ο5): stageALeavingDoorOpens changed on purpose — danger from another person (test_danger_from_other_2310.js).
   sha(fullFnSrc('buildStageAMarker')) === '0ef63f69e55acfde');
 // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 for the same question.
 // UPDATED (17/10, ADR «17 Οκτωβρίου»): without «Πριν φύγεις:».

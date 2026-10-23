@@ -44,7 +44,7 @@ function extractBlock(startToken) {
   return null;
 }
 const NAMES = ['isVerbatimUserText', 'pickKnewSnippet', 'rootTextHasSubstance', 'substanceOfSentence', 'splitSentences', 'sameAsRootText', 'buildRootEndLines', 'buildRootCardLine',
-  'mergeRiskKind', 'stageARootButtonVisible', 'buildRootCopyText', 'normalizeVerbatim'];
+  'mergeRiskKind', 'stageARootButtonVisible', 'buildRootCopyText', 'normalizeVerbatim', 'stageASafetyHold']; // UPDATED (23/10, Ο5): + stageASafetyHold — Stage A's gates read it now (danger from another person, test_danger_from_other_2310.js)
 const srcs = NAMES.map(n => extractBlock('function ' + n + '(') || `function ${n}(){return undefined}`);
 const textsSrc = extractBlock('const STAGE_A_TEXTS = ') || 'const STAGE_A_TEXTS = {};';
 const constsSrc = ['KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_MIN_SUBSTANCE_WORDS', 'ROOT_FILLER_WORDS'].map(n => {

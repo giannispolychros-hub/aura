@@ -44,7 +44,7 @@ const L10306 = 'Υπάρχει η Γραμμή Ψυχοκοινωνικής Υπ
 
 const textsSrc = (() => { const a = CODE.indexOf('const STAGE_A_TEXTS = {'); return a >= 0 ? CODE.slice(a, CODE.indexOf('\n};', a) + 3) : ''; })();
 const constLine = n => (CODE.match(new RegExp('^const ' + n + ' = .*$', 'm')) || [''])[0];
-const NAMES = ['detectSafetySignal', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord', 'buildCrisisLine', 'replaceBareGoodbye', 'stageAAfterCrisisText', 'lookBehind']; // UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex)
+const NAMES = ['detectSafetySignal', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord', 'buildCrisisLine', 'replaceBareGoodbye', 'stageAAfterCrisisText', 'lookBehind', 'detectsDangerFromOther']; // UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex); UPDATED (23/10, Ο5): + detectsDangerFromOther — a message that tells of danger from another person goes to the model, which gets the app's line
 let F = {};
 try {
   F = new Function(textsSrc + '\n' + constLine('BARE_GOODBYE_TEXT') + '\n' + NAMES.map(n => fullFnSrc(n) || `function ${n}(){return 'missing'}`).join('\n') +

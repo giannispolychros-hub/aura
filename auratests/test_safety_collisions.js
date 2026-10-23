@@ -59,9 +59,9 @@ assert('1: the crisis branch cancels the wait for the word BEFORE the supportive
 assert('1: the DISTRESS branch cancels it too, before its reply',
   /setAwaitingRememberedWord\(false\);[\s\S]*await generateResponse\(distressMsgs, mode\);/.test(DISTRESS));
 assert('1: the word path itself is unchanged (a message with a signal never becomes the word)',
-  SUB.includes('if (awaitingRememberedWord && !detectSafetySignal(userText)) {'));
+  SUB.includes('if (awaitingRememberedWord && !detectSafetySignal(userText) && !detectsDangerFromOther(userText) && !(stageAActive.current && dangerFromOther.current)) {') /* UPDATED (23/10, Ο5): + the danger latch (danger from another person, test_danger_from_other_2310.js) */);
 assert('1: the word path still runs BEFORE the safety branches (order unchanged)',
-  SUB.indexOf('if (awaitingRememberedWord && !detectSafetySignal(userText)) {') < SUB.indexOf('const safetySignal = detectSafetySignal(userText);'));
+  SUB.indexOf('if (awaitingRememberedWord && !detectSafetySignal(userText) && !detectsDangerFromOther(userText) && !(stageAActive.current && dangerFromOther.current)) {') /* UPDATED (23/10, Ο5): + the danger latch (danger from another person, test_danger_from_other_2310.js) */ < SUB.indexOf('const safetySignal = detectSafetySignal(userText);'));
 assert('1: the crisis tier and safetyMode rule are untouched (tier A locks, tier B does not)',
   /const _crisisTier = classifyCrisisTier\(userText\);\s*if \(_crisisTier !== "B"\) setSafetyMode\(true\);/.test(CRISIS));
 
@@ -71,7 +71,7 @@ assert('2: generateResponse receives this turn\'s mode as its own argument',
 // UPDATED (2026-10-10, ADR «10 Οκτωβρίου», 1): the decision now passes through stageAPreRootDecision (switch open, before the
 // root: only T2 keeps a closing). The supportive rule is inside it, unchanged — a supportive turn still gives "none".
 assert('2: a supportive turn takes NO closing decision — read from this turn\'s mode, not from safetyMode',
-  /const decision = stageAPreRootDecision\(currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{/.test(GEN));
+  /const decision = stageAPreRootDecision\(currentMode === "SUPPORTIVE" \|\| \(stageAActive\.current && dangerFromOther\.current\) \? "none" : decideTermination\(msgs, text, \{/.test(GEN)); // UPDATED (23/10, Ο5): + Stage A after danger from another person — no closing decision either (test_danger_from_other_2310.js)
 assert('2: the only supportive call is the crisis branch (so «supportive turn» = «crisis turn»)',
   (CODE.match(/generateResponse\([^)]*"SUPPORTIVE"\)/g) || []).length === 1 && CRISIS.includes('generateResponse(safeMsgs, "SUPPORTIVE")'));
 {
@@ -92,7 +92,7 @@ assert('2: the only supportive call is the crisis branch (so «supportive turn»
 {
   const btn = extractBlock('function stageARootButtonVisible(') || '';
   assert('2: the root button the user presses is NOT blocked on a supportive turn (its rule does not read the mode)',
-    btn.length > 0 && !/SUPPORTIVE|currentMode|safetyMode/.test(btn) && /o\.riskKind !== 1/.test(btn));
+    btn.length > 0 && !/SUPPORTIVE|currentMode|safetyMode/.test(btn) && /!stageASafetyHold\(o\.riskKind, o\.dangerFromOther\)/.test(btn)); // UPDATED (23/10, Ο5): tier A or danger from another person, through stageASafetyHold (test_danger_from_other_2310.js)
 }
 
 // ── 3. the latch is always updated; the 6€ paywall only when it is 0 ─────────

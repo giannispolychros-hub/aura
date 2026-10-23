@@ -126,7 +126,7 @@ assert('UNCHANGED: «Δεν το βρήκα ακόμα» — the model is called
 assert('UNCHANGED: the question text and the «Δεν το βρήκα ακόμα» text',
   CODE.includes('ask: "Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;",') && CODE.includes('back: "Δεν το βρήκα ακόμα, συνέχισε",'));
 assert('UNCHANGED: the crisis capture rule and the root rule (byte for byte)',
-  sha(extractBlock('function stageACaptureAllowed(')) === 'e45f98e42434f208' && sha(extractBlock('function rootTextHasSubstance(')) === '11d0cb226862ec80');
+  sha(extractBlock('function stageACaptureAllowed(')) === 'f8a46ebc62fe4ecd' && sha(extractBlock('function rootTextHasSubstance(')) === '11d0cb226862ec80'); // UPDATED (23/10, Ο5): stageACaptureAllowed changed on purpose — danger from another person (test_danger_from_other_2310.js).
 // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
 // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
 assert('UNCHANGED: the closings (decideTermination byte for byte)', sha(fullFnSrc('decideTermination')) === '60778a7e90295a31');

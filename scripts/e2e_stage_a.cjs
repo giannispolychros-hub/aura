@@ -13,7 +13,7 @@
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
-// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only MAIN | ST | W | X | Y | Z | … | R4 | TX | VO | AP | CX | SN | GL (μόνο μία ενότητα· MAIN = A–V)
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only MAIN | ST | W | X | Y | Z | … | R4 | TX | VO | AP | CX | O5 | SN | GL (μόνο μία ενότητα· MAIN = A–V)
 //   --viewport 390x844 | 360x640 (17/10 (δ): όλος ο έλεγχος σε αυτό το μέγεθος κινητού· οι ενότητες με δικά τους μεγέθη τα κρατούν)
 // ΣΤΡΕΣ ΤΕΣΤ (Μέρος Β, 10/10): --stress (ψεύτικα, κόστος 0) · --stress --real --dry (σχέδιο + εκτίμηση) · --stress --real --yes (ΠΡΑΓΜΑΤΙΚΟ,
 //   όριο --budget έως $25, προεπιλογή $25) · --sessions 14,15,1 (μόνο αυτοί) · --minutes 75 (καμία νέα συνεδρία μετά). Τρέχει και από το
@@ -685,6 +685,7 @@ async function runMock() {
   await runMockY();
   await runMockZ();
   await runMockCX();
+  await runMockO5(); // 23/10 (Ο5): danger from another person
   await runMockSN();
   await runMockAR();
   await runMockPM();
@@ -3006,6 +3007,176 @@ async function runMockCX() {
   }
 }
 
+// ── O5: danger from another person (John, 23/10/2026, a safety fix, code only; real-model run 52, sessions 125 and 125-2). With the switch
+// open, once the app's own check sees it: the app writes its line under the reply (each sentence once), the root button is hidden, an
+// «Όχι τώρα» / «Δεν ξέρω αν είμαι ασφαλής» changes nothing, and «Ευχαριστώ, κλείνουμε εδώ.» gets John's phrase from the app — no root
+// question, no card, no step, no normal closing, no model call. The per-turn notes put safety first (the existing safety-path sentence).
+// With crisis A: the 1018 line as today and 112 once; with crisis B: 10306 and the whole danger line. A failed call: the line from code.
+// A danger message typed into the root question is never «Τι βρήκες». No danger (a legal question, «Θέλω λύση»): as today. Old flow
+// (?stageA=0): the line only — the notes and the goodbye as today. The texts are written out here on purpose, so the old code fails.
+// Screenshots O5-1-danger-line, O5-2-goodbye, O5-3-old-flow (-390 / -360). Alone: --only O5.
+async function runMockO5() {
+  const SELF = 'Σε άμεσο κίνδυνο, 112. Για βία στο σπίτι, 15900, γραμμή SOS για τη βία κατά των γυναικών.';
+  const CHILD = 'Σε άμεσο κίνδυνο, 112. Για παιδί, 1056, Χαμόγελο του Παιδιού.';
+  const SELF2 = 'Για βία στο σπίτι, 15900, γραμμή SOS για τη βία κατά των γυναικών.';
+  const PHRASE = 'Είμαι εδώ όταν χρειαστεί να συνεχίσουμε. Κι αν βαρύνει, οι αριθμοί που σου έδωσα είναι εκεί.';
+  const L1018 = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
+  const L10306 = 'Υπάρχει η Γραμμή Ψυχοκοινωνικής Υποστήριξης, 10306 — δωρεάν και ανώνυμη.';
+  const SAFETY_NOTE = '[CODE-VERIFIED: the safety path was activated earlier in this session';
+  const DANGER = 'Με χτυπάει ο άντρας μου. Φοβάμαι να φύγω.';
+  const T = APP.texts;
+  const sess = async (query, replies) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }) });
+    const bodies = [];
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      bodies.push(route.request().postData() || '');
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      if (typeof r === 'number') return route.fulfill({ status: r, contentType: 'application/json', body: JSON.stringify({ type: 'error', error: { type: 'x', message: 'x' } }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await page.waitForTimeout(300);
+    return { browser, page, calls: () => n, bodies };
+  };
+  const auraTexts = async page => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+  const lastAura = async page => (await auraTexts(page)).slice(-1)[0] || '';
+  const body = page => page.locator('body').innerText();
+  const btnCount = (page, name) => page.getByRole('button', { name, exact: true }).count();
+  const count = (hay, needle) => hay.split(needle).length - 1;
+  const shot = async (page, name) => page.screenshot({ path: path.join(OUT, name + '-' + (VP ? VP.width : 390) + '.png'), fullPage: false });
+  const noRootFlow = async page => { const b = await body(page);
+    return !b.includes(T.ask) && !b.includes(T.askLeaving) && await btnCount(page, T.button) === 0 && !b.includes(T.stepQ) && !b.includes(T.whenQ) &&
+      await btnCount(page, T.yes) === 0 && await btnCount(page, 'Δείξε μου') === 0; };
+  {
+    const s = await sess('?stageA=1&rec=1', ['Τώρα αυτή τη στιγμή — είσαι ασφαλής;', 'Υπάρχει κάποιος κοντά σου που ξέρει;', 'Σε ακούω. Τι θα σε βοηθούσε τώρα;', 'Να είσαι καλά.']);
+    await send(s.page, DANGER); await s.page.waitForTimeout(800);
+    const first = await lastAura(s.page);
+    ok('O5-1 (switch open): the danger message → the model\'s reply, then the app\'s line, word for word, once', first.endsWith(SELF) && count(first, SELF) === 1 && first.startsWith('Τώρα αυτή τη στιγμή'));
+    ok('O5-1: no method line on that reply (safety path), and no root button', !(await body(s.page)).includes(T.methodLine) && await btnCount(s.page, T.button) === 0);
+    ok('O5-1: the request of that very turn already puts safety first — the stage is SAFETY and the existing safety-path sentence is there',
+      s.bodies[0].includes('STAGE: SAFETY') && s.bodies[0].includes(SAFETY_NOTE));
+    await shot(s.page, 'O5-1-danger-line');
+    await send(s.page, 'Όχι τώρα. Ο άντρας μου κοιμάται, αλλά ξέρω ότι θα ξυπνήσει.'); await s.page.waitForTimeout(800);
+    ok('O5-1: «Όχι τώρα …» goes to the model as a message (not an exit), the line is not written again, still no root button',
+      s.calls() === 2 && count(await body(s.page), SELF) === 1 && await btnCount(s.page, T.button) === 0 && s.bodies[1].includes(SAFETY_NOTE));
+    await send(s.page, 'Δεν ξέρω αν είμαι ασφαλής.'); await s.page.waitForTimeout(800);
+    ok('O5-1: «Δεν ξέρω αν είμαι ασφαλής» — the same: the latch holds, no root flow', s.calls() === 3 && await noRootFlow(s.page) && s.bodies[2].includes('STAGE: SAFETY'));
+    const before = s.calls();
+    await send(s.page, 'Ευχαριστώ, κλείνουμε εδώ.'); await s.page.waitForTimeout(800);
+    ok('O5-1: «Ευχαριστώ, κλείνουμε εδώ.» → John\'s phrase, word for word, from the app — no model call', await lastAura(s.page) === PHRASE && s.calls() === before);
+    ok('O5-1: … no root question, no root button, no card, no step, no «Πότε;», no closing card', await noRootFlow(s.page) &&
+      !/πριν κλείσουμε/i.test(await body(s.page)) && await s.page.locator('.closure-confirm, [data-closure-confirm]').count() === 0);
+    ok('O5-1: the line is still on screen, once', count(await body(s.page), SELF) === 1);
+    await shot(s.page, 'O5-2-goodbye');
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1', ['Σε ακούω. Τι ακούς ακριβώς;']);
+    await send(s.page, 'Ο γείτονας χτυπάει το παιδί του, ακούω φωνές κάθε βράδυ.'); await s.page.waitForTimeout(800);
+    const a = await lastAura(s.page);
+    ok('O5-2 (a child): the line for a child, word for word, once', a.endsWith(CHILD) && count(a, CHILD) === 1 && !a.includes('15900') && await btnCount(s.page, T.button) === 0);
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1', ['Σε ακούω. Είσαι ασφαλής αυτή τη στιγμή;']);
+    await send(s.page, 'Με χτυπάει ο άντρας μου και θέλω να πεθάνω.'); await s.page.waitForTimeout(800);
+    const a = (await lastAura(s.page)).replace(/\n?ΥΠΟΣΤΗΡΙΞΗ\s*$/, ''); // the crisis bubble's own badge, under the text
+    ok('O5-3 (crisis A + danger): the 1018 line as today, then only the second sentence of the danger line — 112 once',
+      a.includes(L1018) && a.endsWith(SELF2) && count(a, '112') === 1 && !a.includes(SELF));
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1', ['Σε ακούω. Τι γίνεται τώρα;']);
+    await send(s.page, 'Με χτυπάει ο άντρας μου και δεν αντέχω άλλο.'); await s.page.waitForTimeout(800);
+    const a = (await lastAura(s.page)).replace(/\n?ΥΠΟΣΤΗΡΙΞΗ\s*$/, ''); // the crisis bubble's own badge, under the text
+    ok('O5-4 (crisis B + danger): the 10306 line as today, and the whole danger line', a.includes(L10306) && a.endsWith(SELF) && count(a, '112') === 1);
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1', ['Τι σε φοβίζει πιο πολύ σε αυτό;', 'Τι από όλα αυτά σε βαραίνει περισσότερο;']);
+    await send(s.page, 'Χωρίζουμε και ο άντρας μου λέει ότι θα πάρει την επιμέλεια της μικρής. Τι λες να κάνω; Θέλω λύση.'); await s.page.waitForTimeout(800);
+    await send(s.page, 'Θέλω λύση, όχι ερωτήσεις. Τι να κάνω;'); await s.page.waitForTimeout(800);
+    const b = await body(s.page);
+    ok('O5-5 (no danger: a legal question, «Θέλω λύση»): no line, the root button as today, no safety-path note',
+      !b.includes('15900') && !b.includes('1056') && await btnCount(s.page, T.button) === 1 && !s.bodies.some(x => x.includes(SAFETY_NOTE)));
+    await send(s.page, 'Ευχαριστώ, κλείνουμε εδώ.'); await s.page.waitForTimeout(800);
+    ok('O5-5: … and «Ευχαριστώ, κλείνουμε εδώ.» opens the leaving door, as today (never the phrase)', (await body(s.page)).includes(T.askLeaving) && !(await body(s.page)).includes(PHRASE));
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1', [500, 500, 'Είμαι εδώ.']);
+    await send(s.page, DANGER); await s.page.waitForTimeout(1500);
+    const fb = await s.page.locator('.crisis-fallback').count() ? (await s.page.locator('.crisis-fallback').first().innerText()).trim() : '';
+    ok('O5-6 (a failed call on the danger message): the danger line from code is on screen', fb === SELF);
+    const before = s.calls();
+    await send(s.page, 'ευχαριστώ'); await s.page.waitForTimeout(800);
+    ok('O5-6: then «ευχαριστώ» → the phrase, from the app (that line counts as shown), no root question', await lastAura(s.page) === PHRASE && s.calls() === before && await noRootFlow(s.page));
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1', ['Τι σε κρατάει εκεί;', 'Σε ακούω. Είσαι ασφαλής τώρα;']);
+    await send(s.page, 'Δεν ξέρω αν πρέπει να αλλάξω δουλειά, κάθε μέρα είναι ίδια.'); await s.page.waitForTimeout(800);
+    await s.page.getByRole('button', { name: T.button, exact: true }).click({ timeout: 4000 }).catch(() => {});
+    await s.page.waitForTimeout(400);
+    const asked = (await body(s.page)).includes(T.ask);
+    await send(s.page, 'Με χτυπάει ο άντρας μου.'); await s.page.waitForTimeout(800);
+    const b = await body(s.page);
+    ok('O5-7 (typed into the root question): it is never «Τι βρήκες» — no card; it goes to the model, which gets the line, and the button stays hidden',
+      asked && await btnCount(s.page, T.yes) === 0 && await btnCount(s.page, 'Διόρθωσε') === 0 && (await lastAura(s.page)).endsWith(SELF) && await btnCount(s.page, T.button) === 0 && !b.includes(T.foundLabel + ':'));
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=0', ['Γιατί έχει σημασία αυτό για σένα τώρα;', 'Σε ακούω. Είσαι ασφαλής αυτή τη στιγμή;', 'Τι σε κρατάει τώρα;', 'Να είσαι καλά.']);
+    await send(s.page, 'Δεν ξέρω τι να κάνω με το σπίτι.'); await s.page.waitForTimeout(800);
+    if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) { await send(s.page, 'Γιατί κουράστηκα.'); await s.page.waitForTimeout(800); }
+    const n0 = s.calls();
+    await send(s.page, DANGER); await s.page.waitForTimeout(800);
+    const a = await lastAura(s.page);
+    ok('O5-8 (old flow, ?stageA=0): the line under the reply, word for word, once', a.endsWith(SELF) && count(await body(s.page), SELF) === 1 && s.calls() === n0 + 1);
+    ok('O5-8 (old flow): the notes as today — no safety-path sentence, no SAFETY stage from the latch', !s.bodies.some(x => x.includes(SAFETY_NOTE)) && !s.bodies[s.bodies.length - 1].includes('STAGE: SAFETY'));
+    await shot(s.page, 'O5-3-old-flow');
+    const before = s.calls();
+    await send(s.page, 'ευχαριστώ'); await s.page.waitForTimeout(800);
+    ok('O5-8 (old flow): «ευχαριστώ» goes to the model as today — the old flow keeps its own goodbye, never the phrase', s.calls() === before + 1 && !(await body(s.page)).includes(PHRASE));
+    await s.browser.close();
+  }
+  {
+    // a first message that DOES open First-WHY in the old flow (needsFirstWhy: «δεν ξέρω τι …»); the app asks it, the model answers the next one
+    const s = await sess('?stageA=0', ['Σε ακούω. Είσαι ασφαλής αυτή τη στιγμή;', 'Τι σε κρατάει τώρα;']);
+    await send(s.page, 'Ο άντρας μου με χτυπάει και δεν ξέρω τι να κάνω.'); await s.page.waitForTimeout(800);
+    const fw = await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count();
+    const before = s.calls();
+    await send(s.page, 'Γιατί φοβάμαι.'); await s.page.waitForTimeout(800);
+    const a = await lastAura(s.page);
+    ok('O5-9 (old flow, the danger in the FIRST message): First-WHY as today (no model call), then the model\'s reply to the answer carries the line, once',
+      fw === 1 && before === 0 && s.calls() === 1 && a.endsWith(SELF) && count(await body(s.page), SELF) === 1);
+    await s.browser.close();
+  }
+  {
+    // the same, and the call after First-WHY fails: the danger line from code is on screen
+    const s = await sess('?stageA=0', [500, 500, 'Σε ακούω.']);
+    await send(s.page, 'Ο άντρας μου με χτυπάει και δεν ξέρω τι να κάνω.'); await s.page.waitForTimeout(800);
+    const fw = await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count();
+    await send(s.page, 'Γιατί φοβάμαι.'); await s.page.waitForTimeout(1500);
+    const fb = await s.page.locator('.crisis-fallback').count() ? (await s.page.locator('.crisis-fallback').first().innerText()).trim() : '';
+    ok('O5-11 (old flow, First-WHY, then a failed call): the danger line from code is on screen', fw === 1 && fb === SELF);
+    await s.browser.close();
+  }
+  {
+    // the danger and a goodbye in ONE message, after a first reply: no root question before the model, the reply carries the line, no door after it
+    const s = await sess('?stageA=1&rec=1', ['Τι σε κρατάει εκεί;', 'Σε ακούω. Είσαι ασφαλής αυτή τη στιγμή;']);
+    await send(s.page, 'Δεν ξέρω αν πρέπει να αλλάξω δουλειά, κάθε μέρα είναι ίδια.'); await s.page.waitForTimeout(800);
+    await send(s.page, 'Με χτυπάει ο άντρας μου. Ευχαριστώ, κλείνουμε εδώ.'); await s.page.waitForTimeout(800);
+    ok('O5-10 (danger + «κλείνουμε» in one message): it goes to the model, the reply carries the line, and no root question, button or card follows',
+      s.calls() === 2 && (await lastAura(s.page)).endsWith(SELF) && await noRootFlow(s.page));
+    await s.browser.close();
+  }
+}
+
 // ── SN: ADR «19 Οκτωβρίου (δ)» (John, a safety exception (α)): the per-turn notes put safety first. The EXACT text of every request
 // is recorded (the part after the fixed prompt) — not the screen only. (Α) the crisis turn, (Β) the turns after it, (Γ) crisis B,
 // (Δ) crisis with «ευχαριστώ» / «αντίο» / «κλείνουμε», (Ε) crisis after repetitions or stagnation, (ΣΤ) crisis once the escalation is
@@ -4494,7 +4665,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

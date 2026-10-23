@@ -75,12 +75,12 @@ assert('2: informationModeCtx is built through informationModeNoteDue, with _saf
 assert('2: … and its «before the root» is the same one the escalation cap uses (one definition, not a new one)',
   G.includes('stageAActive.current && stageARef.current.stats.rootConfirmed !== 1 ? 3 : 4'));
 assert('2: _safetyPath is perTurnSafety\'s, set before the note is built (the crisis turn and every turn after the crisis line)', (() => {
-  const d = G.indexOf('const _turnSafety = perTurnSafety(currentMode, riskSignalKind.current);');
+  const d = G.indexOf('const _turnSafety = perTurnSafety(currentMode, riskSignalKind.current, stageAActive.current && dangerFromOther.current);') /* UPDATED (23/10, Ο5): + the danger latch (danger from another person, test_danger_from_other_2310.js) */;
   const s = G.indexOf('const _crisisTurn = _turnSafety.crisisTurn, _safetyPath = _turnSafety.safetyPath;');
   const n = G.indexOf('const informationModeCtx = ');
   return d > 0 && s > d && n > s;
 })());
-assert('2: perTurnSafety is unchanged', h(fnSrc('perTurnSafety')) === '5fb162dd8166d99f');
+assert('2: perTurnSafety is unchanged', h(fnSrc('perTurnSafety')) === '42c868d331e2229a'); // UPDATED (23/10, Ο5): perTurnSafety changed on purpose — danger from another person (test_danger_from_other_2310.js).
 assert('2: the note is still in the per-turn list and in the collision log — held, not deleted', (() => {
   const arr = (G.match(/const dynamicSuffix = \[([\s\S]*?)\]\.filter\(Boolean\)/) || ['', ''])[1];
   return /demoCtx, informationModeCtx, explicitPauseCtx,/.test(arr) && /goalObstacleStakesCtx, demoCtx, informationModeCtx, explicitPauseCtx,\n/.test(G);

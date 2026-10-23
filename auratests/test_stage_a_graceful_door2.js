@@ -137,7 +137,7 @@ const SHORT = JOHN.slice(0, 4); // two user messages so far
   assert('DOOR 2: the answer is the existing «Ναι» detector, and not a spontaneous recognition (that is door 3, in the order the latch always had)',
     /detectsAffirmativeShort\(userText\)/.test(blk) && /!detectsSpontaneousCoreRecognition\(userText\)/.test(blk));
   assert('DOOR 2: latch not flipped, no flow open, no closing started, not tier A — the same conditions as the latch itself',
-    /!coreReadinessConfirmed\.current/.test(blk) && /!stageARef\.current\.phase/.test(blk) && /!reflectionDelivered\.current/.test(blk) && /riskSignalKind\.current !== 1/.test(blk));
+    /!coreReadinessConfirmed\.current/.test(blk) && /!stageARef\.current\.phase/.test(blk) && /!reflectionDelivered\.current/.test(blk) && /!stageASafetyHold\(riskSignalKind\.current, dangerFromOther\.current\)/.test(blk)); // UPDATED (23/10, Ο5): + the danger latch — danger from another person (test_danger_from_other_2310.js)
   assert('DOOR 2: the latch flips exactly as it would have after the reply, the «Ναι» is shown (not sent), door 1\'s question opens, the turn ENDS — nothing sent',
     /coreReadinessConfirmed\.current = true;[^\n]*\n\s*addUiBubble\(userText, messages\.length\);[^\n]*\n\s*stageADispatch\(\{ type: "ready" \}\);\s*return;\s*\}/.test(blk) && !/generateResponse|callAura|setMessages/.test(blk));
   assert('DOOR 2: the old arming path after a reply stays for the «Ναι» that this block does not catch (unchanged)', /else stageARootArmed\.current = true;/.test(GEN) &&
@@ -172,21 +172,21 @@ const SHORT = JOHN.slice(0, 4); // two user messages so far
     blk.includes('const addition = userWasClosing ? "Ευχαριστώ που το μοιράστηκες. Να είσαι καλά." : "Τι σκέφτεσαι τώρα;";'));
   assert('2: wiring — only when the user was closing, the same decision as the real call (this reply, the model signal), supportive → none',
     // UPDATED (10/10, ADR «10 Οκτωβρίου», 1): the same decision now passes through the pre-root gate.
-    /const _closingCardOpens = userWasClosing && closingCardOpensNow\(\{/.test(blk) && /decision: stageAPreRootDecision\(currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{/.test(blk) &&
+    /const _closingCardOpens = userWasClosing && closingCardOpensNow\(\{/.test(blk) && /decision: stageAPreRootDecision\(currentMode === "SUPPORTIVE" \|\| \(stageAActive\.current && dangerFromOther\.current\) \? "none" : decideTermination\(msgs, text, \{/.test(blk) && // UPDATED (23/10, Ο5): + the danger latch — danger from another person (test_danger_from_other_2310.js)
     /modelJudgesEnd,/.test(blk) && /duringOnboarding: showDemo, duringDeclineCooldown: closureDeclineCooldown\.current > 0/.test(blk) &&
     /active: stageAActive\.current, armed: stageARootArmed\.current, rootPhase: stageARef\.current\.phase/.test(blk));
   assert('2: wiring — no farewell is added when the card opens; otherwise the text is added exactly as before',
     // UPDATED (10/10, ADR «10 Οκτωβρίου», 1): before the root (switch open) a closing word that opens no closing gets the existing question
     /if \(!_closingCardOpens\) displayText = \(displayText\.trim\(\) \? displayText\.trim\(\) \+ " " : ""\) \+ \(_saNoGoodbye \? "Τι σκέφτεσαι τώρα;" : addition\);/.test(blk));
   assert('2: the real decision after the reply is untouched (same call, same options)',
-    /const decision = stageAPreRootDecision\(currentMode === "SUPPORTIVE" \? "none" : decideTermination\(msgs, text, \{\s*safetyMode,\s*currentMode,/.test(GEN)); // UPDATED 10/10: the pre-root gate wraps it
+    /const decision = stageAPreRootDecision\(currentMode === "SUPPORTIVE" \|\| \(stageAActive\.current && dangerFromOther\.current\) \? "none" : decideTermination\(msgs, text, \{\s*safetyMode,\s*currentMode,/.test(GEN)); // UPDATED 10/10: the pre-root gate wraps it // UPDATED (23/10, Ο5): + the danger latch — danger from another person (test_danger_from_other_2310.js)
 }
 
 // ── Not touched ──────────────────────────────────────────────────────────────
 assert('UNCHANGED: the closings and the leaving door (byte for byte)',
   // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
   // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
-  sha(fullFnSrc('decideTermination')) === '60778a7e90295a31' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'e55ba1a0d4c46f3c'); // UPDATED (δ): the leaving door no longer reads the decision
+  sha(fullFnSrc('decideTermination')) === '60778a7e90295a31' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'a319ffa8afded157'); // UPDATED (δ): the leaving door no longer reads the decision UPDATED (23/10, Ο5): stageALeavingDoorOpens changed on purpose — danger from another person (test_danger_from_other_2310.js).
 assert('UNCHANGED: the first-closing door and door 3 before the model are still there',
   SUB.includes('// STAGE A — «Πριν φύγεις:» BEFORE the model') && SUB.includes('// STAGE A — door 3 without substance BEFORE the model'));
 

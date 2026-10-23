@@ -130,7 +130,7 @@ const fw = CODE.indexOf(FW_WRITE);
 assert('WIRING: First-WHY path writes the checked text', fw > 0);
 const beforeFw = fw > 0 ? CODE.slice(fw - 900, fw) : '';
 assert('WIRING: First-WHY path checks every user message of that turn',
-  /buildAiIdentityLine\(initMsgs\.filter\(m => m && m\.role === "user"\)\.map\(m => String\(m\.content \|\| ""\)\)\.join\("\\n"\), text\)/.test(beforeFw));
+  /buildAiIdentityLine\(initMsgs\.filter\(m => m && m\.role === "user"\)\.map\(m => String\(m\.content \|\| ""\)\)\.join\("\\n"\), _firstText\)/.test(beforeFw)); // UPDATED (23/10, Ο5): the text it checks now carries the danger line when there is one (test_danger_from_other_2310.js)
 assert('WIRING: no reply path still writes the unchecked First-WHY text',
   !CODE.includes('setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "ANSWER" }]);'));
 

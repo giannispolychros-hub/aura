@@ -73,7 +73,7 @@ assert('METHOD: never when the first message itself carries a crisis or distress
 {
   const GR = CODE.slice(CODE.indexOf('const generateResponse = useCallback('), CODE.indexOf('const handleSubmit = useCallback('));
   assert('METHOD (model\'s first reply): the reply carries a display flag, decided by stageAMethodLineDue with the turn\'s own mode and the risk latch',
-    /stageAMethodLineDue\(\{ active: stageAActive\.current, auraBefore: msgs\.some\(m => m && m\.role === "assistant"\), supportive: currentMode === "SUPPORTIVE", riskKind: riskSignalKind\.current, safetyMode, lastUserText: lastUserMsg \}\)/.test(GR) &&
+    /stageAMethodLineDue\(\{ active: stageAActive\.current, auraBefore: msgs\.some\(m => m && m\.role === "assistant"\), supportive: currentMode === "SUPPORTIVE", riskKind: riskSignalKind\.current, dangerFromOther: dangerFromOther\.current, safetyMode, lastUserText: lastUserMsg \}\)/.test(GR) && // UPDATED (23/10, Ο5): + danger from another person (test_danger_from_other_2310.js)
     GR.includes('{ id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode, ...(_methodLine ? { methodLine: true } : {}) }'));
   const HS = CODE.slice(CODE.indexOf('const handleSubmit = useCallback('), CODE.indexOf('const handleStageAPress = useCallback('));
   // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): First-WHY no longer fires with the switch open, and the line lives only there — so the

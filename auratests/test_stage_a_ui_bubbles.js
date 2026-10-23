@@ -71,7 +71,7 @@ assert('SITE 5 — door 2, the capture without substance: the bubble, then «rea
 // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): a sixth — the step's typed answer (the step, the smaller piece, «Πότε»), John's decision.
 assert('SITE 6 — exactly these six calls exist (door 3 and door 2 «Ναι» share none): a new one is a decision, not a drift',
   count(SUB, 'addUiBubble(userText, messages.length);') === 6 &&
-  /if \(detectSafetySignal\(userText\)\) \{\s*stageADispatch\(\{ type: "stepStop" \}\);\s*\} else \{\s*addUiBubble\(userText, messages\.length\);/.test(SUB));
+  /if \(detectSafetySignal\(userText\) \|\| detectsDangerFromOther\(userText\)\) \{ \/\/ Ο5: danger from another person stops the step too\s*stageADispatch\(\{ type: "stepStop" \}\);\s*\} else \{\s*addUiBubble\(userText, messages\.length\);/.test(SUB)); // UPDATED (23/10, Ο5): + danger from another person stops the step too (test_danger_from_other_2310.js)
 assert('NOT A BUBBLE: a correction or an answer that becomes the card is NOT shown as a bubble (it is shown on the card / added to the conversation)',
   !/addUiBubble\(userText, messages\.length\);[^\n]*\n\s*stageADispatch\(\{ type: "correctDone"/.test(SUB) && !/addUiBubble\(userText, messages\.length\);[^\n]*\n\s*const _saDoor/.test(SUB));
 {

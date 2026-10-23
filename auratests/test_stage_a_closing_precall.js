@@ -103,7 +103,7 @@ assert('A: tier A earlier in the session / safety mode → no door', G('Ευχα
     /duringDeclineCooldown: closureDeclineCooldown\.current > 0/.test(blk) && /safetyMode, currentMode: mode/.test(blk));
   assert('A: wiring — once per session, never with the flow open, door 2 armed, a confirmed root or a closing started',
     /used: stageARef\.current\.stats\.rootDoorFromClosing > 0/.test(blk) && /rootPhase: stageARef\.current\.phase, armed: stageARootArmed\.current/.test(blk) &&
-    /rootConfirmed: stageARef\.current\.stats\.rootConfirmed === 1/.test(blk) && /closingStarted: reflectionDelivered\.current, riskKind: riskSignalKind\.current, safetyMode/.test(blk));
+    /rootConfirmed: stageARef\.current\.stats\.rootConfirmed === 1/.test(blk) && /closingStarted: reflectionDelivered\.current, riskKind: riskSignalKind\.current, dangerFromOther: dangerFromOther\.current, safetyMode/.test(blk)); // UPDATED (23/10, Ο5): + the danger latch — danger from another person (test_danger_from_other_2310.js)
   assert('A: wiring — the door opens and the turn ENDS: no model call, nothing sent',
     /stageADispatch\(\{ type: "leaving" \}\);\s*return;\s*\}/.test(blk) && !/generateResponse|callAura|setMessages/.test(blk));
 }
@@ -116,7 +116,7 @@ assert('A: the old closing itself is unchanged (decideTermination, the T1/T2 det
   sha(extractBlock('function declaresClosing(')) === '53de60c064a4125d' && sha(extractBlock('function matchesClosingWord(')) === 'c3d044cc974bb7ac'); // UPDATED (12/10, ADR «12 Οκτωβρίου»): «μπάι» only as a word (run 24); again (ADR «12 Οκτωβρίου (β)»): «αντίο», «τα λέμε» too; (γ): not right after a negation; UPDATED (22/10, old iPhones, Γ3): declaresClosing's tier-A lookbehinds written as lookBehind notAfter — same result on every input (test_regex_compat.js)
 // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
 // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
-assert('A: the gate function itself is unchanged', sha(extractBlock('function stageALeavingDoorOpens(')) === 'e55ba1a0d4c46f3c' && // UPDATED (8/10): + !detectSafetySignal(u), ADR «8 Οκτωβρίου (β)», 4; (δ): the leaving door no longer reads the decision
+assert('A: the gate function itself is unchanged', sha(extractBlock('function stageALeavingDoorOpens(')) === 'a319ffa8afded157' && // UPDATED (8/10): + !detectSafetySignal(u), ADR «8 Οκτωβρίου (β)», 4; (δ): the leaving door no longer reads the decision UPDATED (23/10, Ο5): stageALeavingDoorOpens changed on purpose — danger from another person (test_danger_from_other_2310.js).
   
   // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)»): + the opening «γεια» (isOpeningGreeting) — the line is otherwise as before
   /\(isExplicitClosure\(u\) \|\| declaresClosing\(u\)\) &&\s*!isOpeningGreeting\(u, o\.earlierUserTexts\);/.test(extractBlock('function stageALeavingDoorOpens(') || ''));

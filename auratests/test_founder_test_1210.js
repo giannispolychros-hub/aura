@@ -48,7 +48,8 @@ function fullFnSrc(name, src) {
 const NAMES = ['stopOpenerKind', 'countStopMoments', 'detectsRiskClarification', 'countRiskClarifications', 'stopMomentGentleOnly',
   'guardStopMoment', 'describeStopMomentCtx', 'describeRiskClarificationCtx', 'repeatedUserElements', 'describeRepeatedElementsCtx',
   'stripRepeatedThreeBeat', 'dropQuoteOnlyLines', 'parseThreeBeatShift', 'detectSafetySignal', 'classifyCrisisTier', 'buildCrisisLine',
-  'mergeRiskKind', 'stageACaptureAllowed', 'stageARootButtonVisible', 'rootTextHasSubstance', 'detectsCoreReadinessAsked', 'lookBehind']; // UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex)
+  'mergeRiskKind', 'stageACaptureAllowed', 'stageARootButtonVisible', 'rootTextHasSubstance', 'detectsCoreReadinessAsked', 'lookBehind',
+  'stageASafetyHold', 'detectsDangerFromOther']; // UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex); UPDATED (23/10, Ο5): + stageASafetyHold, detectsDangerFromOther — the root button and the capture read them
 let F = {};
 try {
   const consts = ['STOP_OPENER', 'STOP_GENTLE'].map(n => { const a = CODE.indexOf('const ' + n + ' = '); return a >= 0 ? CODE.slice(a, CODE.indexOf(';\n', a) + 1) : ''; }).join('\n');
@@ -64,7 +65,7 @@ const sha = s => crypto.createHash('sha256').update(String(s)).digest('hex').sli
   // UPDATED (22/10, ADR «22 Οκτωβρίου (β)», SAFETY): detectSafetySignal and classifyCrisisTier changed on purpose — Greeklish and spelling by
   // ear, additive; the phrase list, the crisis lines and the numbers are unchanged (pinned in test_crisis_greeklish_2210.js).
   const PIN = { detectSafetySignal: 'b8513b1d0d52a148' /* UPDATED (22/10, final stress test A9): the message is also tried made plain, new phrases and a third person; tier B blanked inside — auratests/test_crisis_a9.js */, classifyCrisisTier: 'afa5cf7a370bb0d5', buildCrisisLine: 'd359e22dd7cf9a95',
-    crisisLineAfterFailedCall: 'c87733effcebde7e', mergeRiskKind: 'd3b56f5bad3ae14f', stageACaptureAllowed: 'e45f98e42434f208',
+    crisisLineAfterFailedCall: 'c87733effcebde7e', mergeRiskKind: 'd3b56f5bad3ae14f', stageACaptureAllowed: 'f8a46ebc62fe4ecd', // UPDATED (23/10, Ο5): stageACaptureAllowed changed on purpose — danger from another person (test_danger_from_other_2310.js).
     detectsMentalHealthReferral: 'd03b71d681025b79' };
   for (const [n, h] of Object.entries(PIN)) assert(`UNCHANGED: ${n} is byte for byte the same function`, sha(fullFnSrc(n, raw)) === h);
 }
@@ -227,9 +228,9 @@ assert('QUOTE-ONLY: a message of only «"» becomes empty (not shown); not a str
 {
   const GEN = CODE.slice(CODE.indexOf('const generateResponse = useCallback('), CODE.indexOf('const handleSubmit = useCallback('));
   assert('WIRING: every main reply passes the two guards, on the text that goes to the screen AND the history',
-    GEN.includes('const text = guardStopMoment(stripRepeatedThreeBeat(stripAraDeclarative(cleanLabels(rawText.replace(/\\s*\\[\\[EXIT:(yes|no)\\]\\]\\s*$/i, ""))), msgs), countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current) || detectsMentalHealthReferral(rawText));'));
+    GEN.includes('const text = guardStopMoment(stripRepeatedThreeBeat(stripAraDeclarative(cleanLabels(rawText.replace(/\\s*\\[\\[EXIT:(yes|no)\\]\\]\\s*$/i, ""))), msgs), countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current, stageAActive.current && dangerFromOther.current) || detectsMentalHealthReferral(rawText));') /* UPDATED (23/10, Ο5): + the danger latch (danger from another person, test_danger_from_other_2310.js) */);
   assert('WIRING: the three notes are built from the conversation so far and sent with the turn (situational tier, before the hard constraints)',
-    GEN.includes('const stopMomentCtx = _notSupportive ? describeStopMomentCtx(countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current)) : \'\';') &&
+    GEN.includes('const stopMomentCtx = _notSupportive ? describeStopMomentCtx(countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current, stageAActive.current && dangerFromOther.current)) : \'\';') /* UPDATED (23/10, Ο5): + the danger latch (danger from another person, test_danger_from_other_2310.js) */ &&
     GEN.includes('const riskClarificationCtx = _notSupportive ? describeRiskClarificationCtx(countRiskClarifications(msgs), ([...msgs].reverse().find(m => m.role === "user") || {}).content) : \'\';') &&
     GEN.includes('const repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs)) : \'\';') &&
     /selfRepetitionCtx, repeatedElementsCtx, stopMomentCtx, riskClarificationCtx, methodFailureCtx/.test(GEN));

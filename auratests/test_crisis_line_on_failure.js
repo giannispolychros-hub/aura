@@ -82,10 +82,10 @@ assert('FIXTURES: the two sentences are crisis A and crisis B by the app\'s own 
     /const _failLine = crisisLineAfterFailedCall\(currentMode, msgs, supportLineShown\.current\);/.test(cat));
   // the once-per-session flag is NOT set here: the retry's successful reply must still carry the 10306 when it clears this line
   assert('WIRING: … shows it on screen and still rolls the message back for a retry; the 10306 stays «not yet shown» for the reply',
-    /if \(_failLine\.line\) setCrisisFallback\(_failLine\.line\);/.test(cat) && !/supportLineShown\.current = true/.test(cat) &&
+    /if \(_failLine\.line \|\| _failDangerLine\) setCrisisFallback\(\[_failLine\.line, _failDangerLine\]\.filter\(Boolean\)\.join\("\\n\\n"\)\);/.test(cat) && !/supportLineShown\.current = true/.test(cat) && !/dangerLineShown\.current = /.test(cat) /* UPDATED (23/10, Ο5): the danger line (test_danger_from_other_2310.js) joins it — not marked as shown either */ &&
     cat.indexOf('_failLine') < cat.indexOf('rollbackFailedTurn(msgs)') && /setError\(e\.message\);/.test(cat));
   assert('WIRING: a successful reply clears it (the reply carries its own line); a new session clears it',
-    /let displayText = text;\s*setCrisisFallback\(null\);/.test(GEN) && /setCrisisFallback\(null\);/.test(fullFnSrc('resetSession') || CODE.slice(CODE.indexOf('const resetSession = () =>'), CODE.indexOf('const resetSession = () =>') + 4000)));
+    /let displayText = text;\s*setCrisisFallback\(null\);/.test(GEN) && /setCrisisFallback\(null\);/.test(fullFnSrc('resetSession') || CODE.slice(CODE.indexOf('const resetSession = () =>'), CODE.indexOf('\n  };', CODE.indexOf('const resetSession = () =>')) + 4) /* UPDATED (23/10, Ο5): resetSession has one line more (the danger latch) — read to its end, not 4000 characters */));
   assert('STATE: one string or null', /const \[crisisFallback, setCrisisFallback\] = useState\(null\);/.test(CODE));
   assert('SCREEN: drawn as its own readable line (role alert), not inside the 10px error text, right above the error',
     /\{crisisFallback && <div role="alert" className="crisis-fallback"[^>]*>\{crisisFallback\}<\/div>\}\s*\{error && <div className="err">Σφάλμα: \{error\}<\/div>\}/.test(CODE) &&
