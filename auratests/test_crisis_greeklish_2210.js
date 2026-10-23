@@ -96,10 +96,15 @@ for (const t of WHOLE) assert('NOTHING: «' + t + '»', D(t) === null);
 {
   const h = s => crypto.createHash('sha256').update(s || '').digest('hex').slice(0, 16);
   const f = extract('detectSafetySignal'), b = f.indexOf('  const crisis = ['), e = f.indexOf('\n  ];\n', b) + 5, d = f.indexOf('  const distress = ['), de = f.indexOf('\n  ];\n', d) + 5;
-  assert('UNCHANGED: the crisis phrase list, byte for byte (ea16fa93…)', b > 0 && h(f.slice(b, e)) === 'ea16fa93aae344f6');
+  // UPDATED (22/10, final stress test A9, auratests/test_crisis_a9.js): the new phrases are a list of their own at the end of `crisis`;
+  // without them the list is the one of before, byte for byte
+  const added = f.indexOf('    // FINAL STRESS TEST BEFORE THE 20 (A9');
+  assert('UNCHANGED: the crisis phrase list, byte for byte (ea16fa93…), apart from the phrases of A9 at its end',
+    b > 0 && added > b && added < e && h(f.slice(b, added) + f.slice(f.indexOf('\n  ];\n', b) + 1, e)) === 'ea16fa93aae344f6');
   assert('UNCHANGED: the distress list, byte for byte (64fbf2a9…)', d > 0 && h(f.slice(d, de)) === '64fbf2a953170f24');
-  const exact = '  if (crisis.some(p => new RegExp(fold(p.source), "i").test(folded))) return "CRISIS";\n';
-  assert('ORDER: the exact check comes first, unchanged; the by-sound check comes after it and before DISTRESS',
+  // UPDATED (22/10, A9 (α)): the same exact check, on the message as written and made plain («views»)
+  const exact = '  if (views.some(v => crisis.some(p => new RegExp(fold(p.source), "i").test(fold(v))))) return "CRISIS";\n';
+  assert('ORDER: the exact check comes first; the by-sound check comes after it and before DISTRESS',
     f.includes(exact) && f.indexOf(exact) < f.indexOf('const byEar') && f.indexOf('const byEar') < f.indexOf('if (distress.some(p => p.test(text))) return "DISTRESS";'));
   assert('SELF-CONTAINED: the by-sound check lives inside detectSafetySignal (the tests and the e2e load each function on its own)',
     !/\nfunction (sound|asGreek)\(/.test(CODE) && /const sound = w =>/.test(f));
@@ -109,11 +114,13 @@ for (const t of WHOLE) assert('NOTHING: «' + t + '»', D(t) === null);
   assert('NOT A STRING: as before', D('') === null && T(null) === null && T(undefined) === null);
   // the tier: the same phrases, the same lookahead — classifyCrisisTier only names its regex and hands it on
   const ct = extract('classifyCrisisTier');
-  assert('TIER: classifyCrisisTier removes the same tier-B phrases from the text and hands the same regex to the by-sound check',
-    ct.includes('  const tierB = /(?:δεν αντεχω αλλο|δεν βλεπω νοημα|δεν αξιζει (?:πια|πλεον)|τι νοημα εχει πια|κουραστηκα να (?:προσπαθω|αγωνιζομαι))(?! να (?:ζω|ζησω|συνεχ|υπαρχ|ειμαι))/g;') &&
-    ct.includes('  const rest = folded.replace(tierB, " ");') && ct.includes('  return detectSafetySignal(rest, tierB) === "CRISIS" ? "A" : "B";'));
+  // UPDATED (22/10, A9 (α)): the tier-B phrases (plus «τα παρατάω όλα, δεν αξίζει», (β)) are blanked inside detectSafetySignal, in the
+  // message as written and made plain, and the same regex goes on to the by-sound check
+  assert('TIER: classifyCrisisTier names the same tier-B phrases (and A9\'s one) and asks detectSafetySignal with them; it blanks them in each form',
+    ct.includes('  const tierB = /(?:δεν αντεχω αλλο|δεν βλεπω νοημα|δεν αξιζει (?:πια|πλεον)|τι νοημα εχει πια|κουραστηκα να (?:προσπαθω|αγωνιζομαι)|τα παραταω ολα') &&
+    ct.includes('  return detectSafetySignal(text, tierB) === "CRISIS" ? "A" : "B";') && f.includes('(tierB ? fold(v).toLowerCase().replace(tierB, " ") : v)'));
   assert('TIER: every other caller calls detectSafetySignal with the text only (a second argument: the definition and the tier, nothing else)',
-    (CODE.match(/detectSafetySignal\([^()]*,/g) || []).join(' | ') === 'detectSafetySignal(text, | detectSafetySignal(rest,');
+    (CODE.match(/detectSafetySignal\([^()]*,/g) || []).join(' | ') === 'detectSafetySignal(text, | detectSafetySignal(text,'); // UPDATED (22/10, A9)
 }
 
 // ── 5. The whole path: the line on the screen, and the step box (check 14) ──────────────────────────────────────────────────

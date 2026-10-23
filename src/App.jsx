@@ -1535,6 +1535,13 @@ function detectSafetySignal(text, tierB) {
     // alarm costs less than a missed real signal. KNOWN GAP, not fixed: the list is accent-sensitive,
     // so «θελω να πεθανω» typed without accents is not caught (pinned in the test).
     /(αυτοκτον|αυτοτραυματ|δεν θέλω να ζω|θέλω να πεθάν|θέλω να χαθώ|ήθελα να χαθώ|να χαθώ (από προσώπου|για πάντα|από τον κόσμο)|να τελειώσω (τα πάντα|με όλα|με τα πάντα|τη ζωή μου|με τη ζωή μου)|να τελειώσω όλα(?! (μου )?(τα|τις|τους|αυτά))|να τα τελειώσω όλα|δεν αντέχω άλλο|δεν βλέπω νόημα|δεν υπάρχει λόγος να συνεχίσω|δεν βλέπω λόγο να συνεχίσω|ίσως (ούτε )?η ζωή μου|δεν αξίζει (πια|πλέον)|τι νόημα έχει πια|κουράστηκα να (προσπαθώ|υπάρχω|αγωνίζομαι|συνεχίζω|ζω)|δώσω τέλος|να δώσω ένα τέλος|βάλω (ένα )?τέλος|να μην ξυπνήσω|να μην είμαι εδώ|δεν θέλω να είμαι (πια |πλέον )?εδώ|δεν έχει νόημα να (συνεχίζω|συνεχίσω|ζω)|να εξαφανιστώ|καλύτερα νεκρ|θα ήταν καλύτερα χωρίς εμένα|κακό στον εαυτό μου|βλάψω τον εαυτό μου|να φύγω από τη ζωή|δεν έχω λόγο να ζω|τελειώνω με όλα)/i,
+    // FINAL STRESS TEST BEFORE THE 20 (A9; run 48, Κ2, Κ3, Κ4; John, 22/10/2026): what people type and what was missing — a means or a
+    // plan («όλα τα χάπια», «από το μπαλκόνι»), «καλύτερα για όλους χωρίς εμένα», «δεν θέλω να υπάρχω», the English «wanna die» and
+    // «kms» (never after a number: «5 kms» is a distance), and someone else at risk («ο φίλος μου … θέλει να τελειώσει τη ζωή του»).
+    // High precision: «τα χάπια μου», «πολλά χάπια», «θα πέσω ξερός», «δεν αξίζει τον κόπο» are not here. Tier A, except «τα παρατάω
+    // όλα, δεν αξίζει» — tier B, like «δεν αξίζει πια» (classifyCrisisTier). See auratests/test_crisis_a9.js.
+    /(?:θα ήταν|θα είναι) (?:πιο )?καλύτερα(?: [^\s.,;!?]+){0,4} χωρίς εμένα|καλύτερα να μην (?:υπήρχα|είχα γεννηθεί)|δεν? θέλω (?:πια |πλέον )?να υπάρχω|δεν αξίζει να (?:ζω|ζήσω|συνεχίσω)|(?:πάρω|πήρα|παίρνω|πιω|ήπια|καταπιώ|κατάπια) (?:όλα τα|ένα κουτί|όλο το κουτί) χάπια|(?:να|θα) (?:πηδήξω|πέσω|πεταχτώ|ριχτώ) (?:από|απ') (?:το μπαλκόνι|την ταράτσα|τη γέφυρα|το παράθυρο|τον γκρεμό)|(?:να|θα) πέσω στο κενό|(?:να|θα) κρεμαστώ|(?:κόβω|έκοψα|κόψω) τον εαυτό μου|τα παρατάω όλα[,.…—–-]*\s*(?:γιατί |αφού )?δεν αξίζει(?=\s*(?:$|[.!;?…,]|πια|πλέον|τίποτα|άλλο))|θέλει να πεθάνει|να τελειώσει τη ζωή (?:του|της)|δεν θέλει (?:πια |πλέον )?να ζει|να βλάψει τον εαυτό (?:του|της)|βάλει τέλος στη ζωή (?:του|της)/i,
+    /\b(?:wanna die|wanna kill myself|wanna end it all|(?:want to|going to|gonna) end it all)\b|(?:^|[^\d\s])\s*\bkms\b/i,
   ];
   const distress = [
     /\b(grief|bereaved|bereavement|trauma|traumatic|abuse|abused|assault|crisis|breakdown|panic attack)\b/i,
@@ -1551,8 +1558,20 @@ function detectSafetySignal(text, tierB) {
   // ONLY the CRISIS list is folded: DISTRESS below is matched exactly as before.
   // See auratests/test_crisis_vocabulary.js §4.
   const fold = s => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const folded = fold(text);
-  if (crisis.some(p => new RegExp(fold(p.source), "i").test(folded))) return "CRISIS";
+  // THE MESSAGE MADE PLAIN, the one place before any phrase is tried (final stress test before the 20, A9): «θέλω  να   πεθάνω»,
+  // «θ έ λ ω  ν α  π ε θ ά ν ω», «θ.έ.λ.ω. ν.α. …», «θέλω 😞 να πεθάνω», «θέλω-να-πεθάνω» and letters in full-width or other
+  // compatibility forms matched nothing. Made plain: compatibility forms become the plain letters (NFKC), a zero-width space is a space, other invisible characters go, an
+  // emoji becomes a space, a run of single letters split by one space or dot becomes the word, punctuation glued between two letters
+  // becomes a space, a run of spaces becomes one. It ADDS NO PHRASE: the message is tried as written AND made plain, and either may
+  // match — whatever matched before still matches, and a false alarm still needs one of the phrases above. For the CRISIS
+  // phrases only: DISTRESS below is matched as written, as before.
+  const plain = s => s.normalize("NFKC").replace(/\u200b/g, " ").replace(/[\u00ad\u200c-\u200f\u2060\ufeff]/g, "")
+    .replace(/[\u{1f000}-\u{1faff}\u{2600}-\u{27bf}\u{2300}-\u{23ff}\u{2b00}-\u{2bff}]|\ufe0f|\u20e3/gu, " ")
+    .replace(/(^|\s)(\p{L}(?:[ .]\p{L})+)\.?(?=\s|$)/gu, (m, b, w) => b + w.replace(/[ .]/g, ""))
+    .replace(/(\p{L})[^\p{L}\p{M}\p{N}\s'’]+(?=\p{L})/gu, "$1 ").replace(/[^\S\n]+/g, " ");
+  // `tierB` comes only from classifyCrisisTier: its phrases are blanked in each form first, so what is left tells tier A from tier B.
+  const views = [...new Set([String(text), plain(String(text))])].map(v => (tierB ? fold(v).toLowerCase().replace(tierB, " ") : v));
+  if (views.some(v => crisis.some(p => new RegExp(fold(p.source), "i").test(fold(v))))) return "CRISIS";
   // GREEKLISH AND SPELLING BY EAR (2026-10-22, ADR «22 Οκτωβρίου (β)», a safety fix John approved in advance): «thelo na pethano»,
   // «den antexo allo na zw» or «δεν θελο να ζο» matched nothing, because the phrases above are Greek, spelled right. ADDITIVE ONLY:
   // no phrase is changed, and everything that matched above still matches. Latin letters are read as Greek; then every word is
@@ -1574,14 +1593,14 @@ function detectSafetySignal(text, tierB) {
     for (const w of s.match(/[α-ω]+/g)) heard.add(sound(w));
     for (const m of s.matchAll(/([α-ω]+)(?=[|)])/g)) if (/[^αεηιουωσ]$/.test(m[1])) stems.push(sound(m[1]));
   }
-  const byEar = fold(text).toLowerCase().replace(/ς/g, "σ").replace(/[a-z0-9α-ω]+/g, w => {
+  const byEar = v => fold(v).toLowerCase().replace(/ς/g, "σ").replace(/[a-z0-9α-ω]+/g, w => {
     for (const f of /[a-z]/.test(w) ? ALSO.filter(alt => Object.keys(alt).every(k => w.includes(k))).map(alt => asGreek(w, alt)) : [w]) {
       const k = sound(f);
       if (heard.has(k) || stems.some(s => k.startsWith(s))) return k;
     }
     return "#";
   }).replace(tierPhrases ? new RegExp(tierPhrases.replace(/[α-ω]+/g, sound), "g") : /$^/, " ");
-  if (greekPhrases.some(s => new RegExp(s.replace(/[α-ω]+/g, sound)).test(byEar))) return "CRISIS";
+  if (views.some(v => greekPhrases.some(s => new RegExp(s.replace(/[α-ω]+/g, sound)).test(byEar(v))))) return "CRISIS";
   if (distress.some(p => p.test(text))) return "DISTRESS";
   return null;
 }
@@ -1595,10 +1614,9 @@ function detectSafetySignal(text, tierB) {
 // trauma, panic, «κρίση») is not CRISIS and gets null: no number from code, as before.
 function classifyCrisisTier(text) {
   if (typeof text !== "string" || detectSafetySignal(text) !== "CRISIS") return null;
-  const folded = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const tierB = /(?:δεν αντεχω αλλο|δεν βλεπω νοημα|δεν αξιζει (?:πια|πλεον)|τι νοημα εχει πια|κουραστηκα να (?:προσπαθω|αγωνιζομαι))(?! να (?:ζω|ζησω|συνεχ|υπαρχ|ειμαι))/g;
-  const rest = folded.replace(tierB, " ");
-  return detectSafetySignal(rest, tierB) === "CRISIS" ? "A" : "B";
+  // the tier-B phrases, folded (no accents, lower case); detectSafetySignal blanks them in the message, as written and made plain
+  const tierB = /(?:δεν αντεχω αλλο|δεν βλεπω νοημα|δεν αξιζει (?:πια|πλεον)|τι νοημα εχει πια|κουραστηκα να (?:προσπαθω|αγωνιζομαι)|τα παραταω ολα[,.…—–-]*\s*(?:γιατι |αφου )?δεν αξιζει(?=\s*(?:$|[.!;?…,]|πια|πλεον|τιποτα|αλλο)))(?! να (?:ζω|ζησω|συνεχ|υπαρχ|ειμαι))/g;
+  return detectSafetySignal(text, tierB) === "CRISIS" ? "A" : "B";
 }
 // THE LINE APPENDED TO A CRISIS REPLY — pure, so it is testable. Tier A: the 1018 + 112 line on EVERY tier-A message,
 // unless the model's own text already contains "1018". Tier B: the 10306 line ONCE per session (`supportLineShown`), and
@@ -1930,11 +1948,14 @@ function countStopMoments(msgs) {
 // RISK CHECKS — AURA's own question that checks for harm (Level 3's canonical question and its usual variants). Only sentences
 // that ARE questions count; counted per reply. Read by the limit note (2 per session for ambiguous phrases) and by the gentle form.
 // ADR «12 Οκτωβρίου (β)»: also John's form, the everyday meaning first — «…, ή κάτι βαρύτερο;» (only as the alternative «ή κάτι…»).
-function detectsRiskClarification(text) {
+// `selfHarmOnly` (final stress test, the second line of defence): only a question about suicide or self-harm — «…να βλάψεις τον
+// εαυτό σου;», «…να τελειώσεις τη ζωή σου;», «…σκέψεις αυτοκτονίας;» — not «ασφαλής», «κινδυνεύεις», «σκοτεινό», «ή κάτι βαρύτερο».
+function detectsRiskClarification(text, selfHarmOnly) {
   if (typeof text !== "string" || !text.trim()) return false;
   const f = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  return (f.match(/[^.!;?\n]*[;?]/g) || []).some(q =>
-    /βλα(?:ψ|π)[α-ω]* τον εαυτο σου|κακο στον εαυτο σου|αυτοκτον|να (?:πεθανεις|μη(?:ν)? ζεις)|(?:βαλεις|δωσεις) (?:ενα )?τελος|σκοτειν|ασφαλη[σς]|κινδυνευ|(?:^|[\s,—–-])η κατι (?:πιο )?βαρ(?:υτερο|υ)(?![α-ω])/.test(q));
+  const selfHarm = /βλα(?:ψ|π)[α-ω]* τον εαυτο σου|κακο στον εαυτο σου|αυτοκτον|να (?:πεθανεις|μη(?:ν)? ζεις)|(?:βαλεις|δωσεις) (?:ενα )?τελος|τελειωσεις (?:με )?τη ζωη σου/;
+  const other = /σκοτειν|ασφαλη[σς]|κινδυνευ|(?:^|[\s,—–-])η κατι (?:πιο )?βαρ(?:υτερο|υ)(?![α-ω])/;
+  return (f.match(/[^.!;?\n]*[;?]/g) || []).some(q => selfHarm.test(q) || (!selfHarmOnly && other.test(q)));
 }
 function countRiskClarifications(msgs) {
   return (Array.isArray(msgs) ? msgs : []).filter(m => m && m.role === "assistant" && detectsRiskClarification(m.content)).length;
@@ -7544,6 +7565,12 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         const _crisisLine = buildCrisisLine(classifyCrisisTier(lastUserMsg), text, supportLineShown.current);
         if (_crisisLine.line) displayText = text + "\n\n" + _crisisLine.line;
         if (_crisisLine.supportShown) supportLineShown.current = true;
+      } else if (detectsRiskClarification(text, true)) {
+        // THE SECOND LINE OF DEFENCE (final stress test before the 20): the check on the person's words found nothing, but AURA's
+        // own reply asks about suicide or self-harm — the app adds the line it writes for tier A (1018, 112). Only the line: the
+        // mode, the flow and the once-per-session 10306 flag do not change.
+        const _selfHarmLine = buildCrisisLine("A", text, supportLineShown.current);
+        if (_selfHarmLine.line) displayText = text + "\n\n" + _selfHarmLine.line;
       }
       // SAFETY (ADR «11 Οκτωβρίου (ε)»): AURA's own reply referred the user to mental-health help → the session counts as one with
       // a risk signal (DISTRESS): the root card stays, no €6 offer, no paywall. Only ever raises the latch (heavier signals stay).
