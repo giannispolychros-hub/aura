@@ -933,8 +933,14 @@ async function runMockFT() {
       r4.startsWith('Ας σταθούμε λίγο εδώ.') && !/Όπα/.test(r4) && r4.includes('ή κάτι άλλο;'));
     ok('FT1: a line of only «"» is not shown (no lone quotation mark anywhere on screen)',
       shown.every(t => t.split('\n').every(l => !/^\s*["«»“”]+\s*$/.test(l))) && r4.includes('ουδέτερα'));
-    ok('FT1: the app\'s crisis detector saw none of these messages — no crisis line, the root button still there',
-      !/1018|10306/.test(await s.page.locator('body').innerText()) && await s.btn(T.button).count() === 1);
+    // UPDATED (23/10, final stress test, the second line of defence): AURA's own «σκέφτεσαι να βλάψεις τον εαυτό σου;» now carries the
+    // tier-A line from code — under that one reply only; «Είσαι ασφαλής;» does not. The detector still saw none of the messages: no
+    // 10306, no crisis mode, the root button still there.
+    const body1 = await s.page.locator('body').innerText();
+    const withLine = shown.filter(t => t.includes('Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.'));
+    ok('FT1: the app\'s crisis detector saw none of these messages — no 10306, the root button still there; the one 1018 line is under AURA\'s own self-harm question',
+      !/10306/.test(body1) && (body1.match(/1018/g) || []).length === 1 && withLine.length === 1 && withLine[0].includes('σκέφτεσαι να βλάψεις τον εαυτό σου;') &&
+      await s.btn(T.button).count() === 1);
     for (const m of V.slice(5)) { await send(s.page, m); await s.page.waitForTimeout(300); }
     const shown2 = await s.aura();
     const stopShown = shown2.find(t => t.includes('Μόλις είπες: "είναι σωστή επιλογή')) || '';
