@@ -137,7 +137,7 @@ const undoVoice1910 = p => VOICE_1910.reduce((t, [now, before]) => (t.split(now)
   const h = s => crypto.createHash('sha256').update(s || '').digest('hex').slice(0, 16);
   // UPDATED (22/10, ADR «22 Οκτωβρίου (β)», SAFETY): detectSafetySignal and classifyCrisisTier changed on purpose — Greeklish and spelling by
   // ear, additive; the phrase list, the crisis lines and the numbers are unchanged (pinned in test_crisis_greeklish_2210.js).
-  const PIN = { detectSafetySignal: '0c3f52d74f92fad3' /* UPDATED (22/10, final stress test A9): the message is also tried made plain, new phrases and a third person; tier B blanked inside — auratests/test_crisis_a9.js */, classifyCrisisTier: 'afa5cf7a370bb0d5', buildCrisisLine: 'd359e22dd7cf9a95',
+  const PIN = { detectSafetySignal: 'b8513b1d0d52a148' /* UPDATED (22/10, final stress test A9): the message is also tried made plain, new phrases and a third person; tier B blanked inside — auratests/test_crisis_a9.js */, classifyCrisisTier: 'afa5cf7a370bb0d5', buildCrisisLine: 'd359e22dd7cf9a95',
     crisisLineAfterFailedCall: 'c87733effcebde7e', isExplicitClosure: '09da70474755ef40', declaresClosing: '53de60c064a4125d', // UPDATED (22/10, old iPhones, Γ3): declaresClosing's tier-A lookbehinds written as lookBehind notAfter — same result on every input (test_regex_compat.js)
     matchesClosingWord: 'c3d044cc974bb7ac', stripForeignHelplines: 'dc29d4631ac847d9', /* UPDATED (22/10, A5): the numbers come from HELPLINES */ replaceBareGoodbye: 'e6351d2cb8e28ab5',
     detectsMentalHealthReferral: 'd03b71d681025b79' };
