@@ -4541,8 +4541,12 @@ async function mainStress() {
   const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17), SL.FOUNDER_PERSONAS || [], SL.VOICE_PERSONAS || [], SL.LOOP_PERSONAS || [], SL.REHEARSAL_PERSONAS || [], SL.TARGETED_PERSONAS || [], SL.FINAL_PERSONAS || [], SL.MECHANISM_PERSONAS || []) : SL.PERSONAS;
   const plan = SL.planRuns(PEOPLE, only.length ? only : null);
   // 22/10 (the last hard test): in waves, the sessions run in the order they were asked for (the crisis ones first)
-  if (Number(opt('--parallel', '1')) > 1 && only.length) { const pos = l => { const i = only.indexOf(l); return i < 0 ? 1e9 : i; }; plan.sort((a, b) => pos(a.label) - pos(b.label)); }
+  // 23/10 (John, Phase 2): a session asked twice runs the second time where it was asked the second time (SL.askedOrder)
+  if (Number(opt('--parallel', '1')) > 1 && only.length) { const pos = SL.askedOrder(only); plan.sort((a, b) => pos(a.label) - pos(b.label)); }
   const want = Number(opt('--budget', String(SL.BUDGET_CAP)));
+  // 23/10 (John, Phase 2): --optional 151,152,41,42,43 — these start only if their estimate fits in what is left (the rest start as before;
+  // the hard cap still stops the test before a call that would pass it). Asked last, they are the ones left out, in their order.
+  const OPTIONAL = new Set(String(opt('--optional', '')).split(',').map(x => x.trim()).filter(Boolean));
   if (!(want > 0) || want > SL.BUDGET_CAP) { console.error('Το όριο δαπάνης πρέπει να είναι από 0 ως $' + SL.BUDGET_CAP + '.'); process.exit(2); }
   if (real && has('--dry')) {
     const e = SL.estimateCost(plan, APP.consts.core.length);
@@ -4607,7 +4611,10 @@ async function mainStress() {
       const wave = [];
       { let held = 0;
         for (const item of plan.slice(w, w + PAR)) {
-          if (!item.persona.final) { wave.push(item); continue; }
+          // 23/10 (John, Phase 2): with --optional, only the sessions it names may be left out; the others always start, and their
+          // estimates count in what an optional session of the same wave must fit in. Without it, as before (the last hard test's).
+          const mayWait = OPTIONAL.size ? OPTIONAL.has(String(item.persona.id)) : !!item.persona.final;
+          if (!mayWait) { wave.push(item); if (OPTIONAL.size) held += SL.sessionEstimate(item.persona); continue; }
           const est = SL.sessionEstimate(item.persona, { cold: budget.spent() === 0 && !wave.length }), left = budget.cap - budget.spent() - held;
           if (est > left) { skipped.push({ label: item.label, est, left }); console.log('   ' + item.label + ' δεν ξεκινά: εκτίμηση $' + est.toFixed(2) + ', μένουν $' + left.toFixed(2)); continue; }
           wave.push(item); held += est;

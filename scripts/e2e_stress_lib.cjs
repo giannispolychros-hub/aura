@@ -883,6 +883,17 @@ const MAX_TYPED = 12, EXIT_AFTER = 10, EXIT_TEXT = 'Ευχαριστώ, κλεί
 // «1.1» = μόνο η πρώτη. Οι συνεδρίες ασφαλείας (σταθερά μηνύματα) τρέχουν ΠΡΩΤΕΣ: αν το όριο δαπάνης ή χρόνου σταματήσει τη
 // δοκιμή νωρίς, η ασφάλεια έχει ήδη ελεγχθεί.
 // Η ίδια συνεδρία πολλές φορές (ADR «12 Οκτωβρίου (δ)», «η 1.1 τρεις φορές»): «1.1,1.1,1.1» → 1.1, 1.1-2, 1.1-3.
+// The order a plan runs in, as asked (23/10, John, Phase 2): a session asked twice runs twice, the second time where it was asked the
+// second time («102-2» at the second «102» of the list), not at the end. A label asked once keeps its place, as before; one not asked
+// goes last.
+function askedOrder(only) {
+  const list = (only || []).map(x => String(x).trim());
+  return label => {
+    const m = /^(.+)-(\d+)$/.exec(label), base = m ? m[1] : label, k = m ? Number(m[2]) : 1;
+    for (let i = 0, seen = 0; i < list.length; i++) if (list[i] === base && ++seen === k) return i;
+    return 1e9;
+  };
+}
 function planRuns(personas, only) {
   const list = [];
   const want = Array.isArray(only) && only.length ? new Set(only.map(x => String(x).trim())) : null;
@@ -1801,6 +1812,37 @@ const MECHANISM_PERSONAS = [
       'Δεν έχω τελειώσει πανεπιστήμιο, μόνο λύκειο.',
       'Μου αρέσει να λύνω γρίφους, από παιδί.',
       'Ίσως με φοβίζει περισσότερο να ξαναγίνω αρχάριος απ\' ό,τι η ηλικία.'] },
+  // 23/10 (John, before Phase 2, Β4): two more, 10–12 messages, the prediction written before the run like the ten above
+  { id: 151, key: 'mech_self_tension', kind: 'code', name: 'Μ11 · Ένταση που σημειώνει ο ίδιος: «αλλά / όμως», με «εγώ» και στις δύο μεριές (κώδικας, TENSION)',
+    expect: { TENSION: [4, 8] },
+    sign: 'Στους γύρους 4 και 8: βάζει τις δύο μεριές με τα δικά του λόγια («θέλω πολύ να δοκιμάσω τη ζωή έξω» / «φοβάμαι ότι θα νιώθω μόνη»· «θα το μετανιώνω χρόνια» / «η μητέρα μου με χρειάζεται») και ρωτά πώς στέκονται μαζί — χωρίς να διαλέξει, χωρίς ερμηνεία.',
+    msgs: [
+      'Μου πρότειναν μια θέση σε εταιρεία στο Άμστερνταμ και πρέπει να απαντήσω μέσα στον μήνα.',
+      'Δουλεύω εδώ πέντε χρόνια ως μηχανικός λογισμικού, σε μια ομάδα που μου αρέσει.',
+      'Ο μισθός εκεί είναι σχεδόν διπλάσιος και η δουλειά πιο ενδιαφέρουσα.',
+      'Θέλω πολύ να δοκιμάσω τη ζωή έξω, αλλά φοβάμαι ότι θα νιώθω μόνη εκεί πέρα.',
+      'Η μητέρα μου μένει μόνη της στη Θεσσαλονίκη και τη βλέπω κάθε Κυριακή.',
+      'Οι φίλοι μου λένε να φύγω χωρίς δεύτερη σκέψη, όπως έκαναν οι περισσότεροι.',
+      'Έχω ήδη κοιτάξει διαμερίσματα εκεί, απλώς από περιέργεια, τα βράδια.',
+      'Νιώθω ότι αν μείνω θα το μετανιώνω χρόνια, όμως πιστεύω ότι η μητέρα μου με χρειάζεται κοντά της.',
+      'Δεν της το έχω πει ακόμα, ούτε ότι πήγα στη συνέντευξη.',
+      'Ίσως με βαραίνει περισσότερο που δεν της έχω μιλήσει καθόλου γι\' αυτό.',
+      'Θα ήθελα να της το πω πριν απαντήσω στην εταιρεία.'] },
+  { id: 152, key: 'mech_cost_collision', kind: 'prompt', name: 'Μ12 · Δύο κόστη με τα δικά του λόγια (μόνο prompt, VERBATIM COST COLLISION)',
+    expect: {}, signFrom: 5,
+    sign: 'Από τον γύρο 5: βάζει δίπλα αυτολεξεί «χάνω τη σιγουριά του μισθού» και «άλλα είκοσι χρόνια σε ένα γραφείο που με βαραίνει» και ρωτά ποιο θα διάλεγε να αντέξει — χωρίς τρίτο κόστος, χωρίς ερμηνεία, χωρίς συμβουλή.',
+    msgs: [
+      'Σκέφτομαι να αφήσω τη δουλειά μου στην τράπεζα για να ανοίξω ένα μικρό αρτοποιείο.',
+      'Έχω μαζέψει κάποια χρήματα και έχω βρει ένα μαγαζί που νοικιάζεται στη γειτονιά μου.',
+      'Η γυναίκα μου λέει να το κάνω, αν το θέλω πραγματικά.',
+      'Αν φύγω από την τράπεζα, χάνω τη σιγουριά του μισθού κάθε μήνα.',
+      'Αν μείνω, θα περάσω άλλα είκοσι χρόνια σε ένα γραφείο που με βαραίνει.',
+      'Δεν μπορώ να καταλάβω ποιο από τα δύο φοβάμαι περισσότερο.',
+      'Ο πατέρας μου δούλεψε σε τράπεζα όλη του τη ζωή και ήταν περήφανος γι\' αυτό.',
+      'Κάθε πρωί περνάω έξω από εκείνο το μαγαζί πριν πάω στη δουλειά.',
+      'Έχω κάνει και λογαριασμό με τη γυναίκα μου για δώδεκα μήνες χωρίς τον μισθό μου.',
+      'Νομίζω με φοβίζει περισσότερο να γίνω σαν τον πατέρα μου χωρίς να το έχω διαλέξει.',
+      'Ίσως το θέμα είναι ότι δεν έχω διαλέξει τίποτα μόνος μου ως τώρα.'] },
 ].map(p => Object.assign(p, { runs: 1, mechanism: true, hiddenRoot: '—', maxTyped: p.msgs.length,
   fixed: p.msgs.map((m, i) => (p.rootOkFrom && i + 1 >= p.rootOkFrom ? { say: m, rootOk: true } : { say: m })) }));
 // The rounds of a mechanism session: the strategy notes the app actually sent with each main request, by the typed message they answer.
@@ -1890,7 +1932,7 @@ function mechanismJudgePrompt(p, turns, rounds) {
 function mechanismReport(S) {
   const M = (S || []).filter(s => s.persona && s.persona.mechanism);
   if (!M.length) return [];
-  const L = ['## Μηχανισμοί στρατηγικής — 10 συνεδρίες (δεν είναι φρένο· για απόφαση)', '',
+  const L = ['## Μηχανισμοί στρατηγικής — ' + M.length + ' συνεδρίες (δεν είναι φρένο· για απόφαση)', '',
     '| Μηχανισμός | Ενεργοποιήθηκε σωστά (κώδικας) | Το μοντέλο ακολούθησε (κριτής) | Πού μπερδεύτηκε (γύροι) |', '|---|---|---|---|'];
   for (const s of M) {
     const c = s.mechanismCheck || { rows: [], extra: [], suppressed: [] };
@@ -1972,7 +2014,7 @@ function buildStressReport(sessions, meta) {
 
 module.exports = {
   callTally,
-  USER_MODEL, PRICES, BUDGET_CAP, WORST_CALL, costOf, makeStressBudget, PERSONAS, HARD_PERSONAS, FOUNDER_PERSONAS, founderMetrics, BASE_POLICY, policyOf, planRuns, MAX_TYPED, EXIT_AFTER, EXIT_TEXT,
+  USER_MODEL, PRICES, BUDGET_CAP, WORST_CALL, costOf, makeStressBudget, PERSONAS, HARD_PERSONAS, FOUNDER_PERSONAS, founderMetrics, BASE_POLICY, policyOf, planRuns, askedOrder, MAX_TYPED, EXIT_AFTER, EXIT_TEXT,
   USER_SCHEMA, CARD_SCHEMA, CLARITY_SCHEMA, personaSystem, personaPrompt, transcriptText, parseJsonReply, cleanUserText, JUDGE_SCHEMA, JUDGE_SYSTEM, judgePrompt,
   fold, findLabels, FAREWELLS, findFarewells, AFTER_CRISIS, AFTER_CRISIS_FIRST, crisisLineAt, afterCrisisFindings, isLeaving, pressureFindings, apiErrorLabel, edTechniqueFindings, aiIdentityFindings, promptTexts, normCorpus, promptLeakFindings, preRootClosingChecked, normalizeVerbatim, rootIsUserWords, rootQuestionUnderModelQuestion,
   ADVICE_VIOLATIONS, violationType, lastSessionEvents, telemetryIssues, estimateCost, CHECKS, sessionScore, buildStressReport, keyShape, KEY_KIND_TEXT,

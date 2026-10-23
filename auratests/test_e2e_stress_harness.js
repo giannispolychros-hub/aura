@@ -286,7 +286,8 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   assert('ΕΠΙΛΟΓΗ: only the sessions and the budget of the form, through env, checked (digits, dots, commas; a number) before use',
     /- επιλογή/.test(ST) && /SESSIONS: \$\{\{ inputs\.sessions \}\}/.test(ST) && /BUDGET: \$\{\{ inputs\.budget \}\}/.test(ST) &&
     // UPDATED (22/10, the last hard test — work branch only): … and «parallel», 1–5, checked the same way
-    /\[\[ "\$SESSIONS" =~ \^\[0-9\]\[0-9\.,\]\*\$ \]\]/.test(ST) && /--sessions "\$SESSIONS" --budget "\$BUDGET" --parallel "\$\{PARALLEL:-1\}" --minutes 75/.test(ST) &&
+    // UPDATED (23/10, John, Phase 2 — work branch only): … and «optional», empty or the same characters, passed only when given
+    /\[\[ "\$SESSIONS" =~ \^\[0-9\]\[0-9\.,\]\*\$ \]\]/.test(ST) && /--sessions "\$SESSIONS" --budget "\$BUDGET" --parallel "\$\{PARALLEL:-1\}" \$\{OPTIONAL:\+--optional "\$OPTIONAL"\} --minutes 75/.test(ST) &&
     /PARALLEL: \$\{\{ inputs\.parallel \}\}/.test(ST) && /\[\[ "\$\{PARALLEL:-1\}" =~ \^\[1-5\]\$ \]\]/.test(ST));
   assert('TESTS: on every push to main, all suites through the one loop in test.yml, then the build — no secret at all',
     /push:\s*\n\s+branches: \[main\]/.test(TS) && /uses: \.\/\.github\/workflows\/test\.yml/.test(TS) && /npm run build/.test(TS) && !/secrets/.test(TS) && /permissions:\s*\n\s+contents: read/.test(TS));
@@ -1018,6 +1019,20 @@ const PENDING = [];
     /const est = SL\.sessionEstimate\(item\.persona, \{ cold: budget\.spent\(\) === 0 && !wave\.length \}\), left = budget\.cap - budget\.spent\(\) - held;/.test(RUNNER) &&
     /if \(est > left\) \{ skipped\.push\(\{ label: item\.label, est, left \}\);/.test(RUNNER) && /by: budget\.by\(\), stopped, skipped \};/.test(RUNNER) &&
     Math.abs(SL.sessionEstimate({ maxTyped: 8 }) - 0.45) < 1e-9 && Math.abs(SL.sessionEstimate({ maxTyped: 35 }) - 1.8) < 1e-9 && Math.abs(SL.sessionEstimate({ maxTyped: 8 }, { cold: true }) - 0.8) < 1e-9);
+  // 23/10 (John, Phase 2): a session asked twice runs the second time where it was asked the second time; and only the sessions
+  // named --optional (151–152, 41–43) start only if their estimate fits — the others start as before (the hard cap still holds)
+  assert('PHASE 2, the order: «102» asked twice → «102-2» runs at the second «102» of the list, not at the end; a single label as before',
+    typeof SL.askedOrder === 'function' && (() => { const pos = SL.askedOrder(['101', '102', '127', '102', '83', '1.1']);
+      return pos('101') === 0 && pos('102') === 1 && pos('102-2') === 3 && pos('83') === 4 && pos('1.1') === 5 && pos('999') === 1e9 && pos('102-3') === 1e9; })() &&
+    /\{ const pos = SL\.askedOrder\(only\); plan\.sort\(\(a, b\) => pos\(a\.label\) - pos\(b\.label\)\); \}/.test(RUNNER) && !/only\.indexOf\(l\)/.test(RUNNER));
+  assert('PHASE 2, the optional sessions: with --optional only they may be left out (the others always start, their estimates held for the wave); without it, as before',
+    /const OPTIONAL = new Set\(String\(opt\('--optional', ''\)\)\.split\(','\)\.map\(x => x\.trim\(\)\)\.filter\(Boolean\)\);/.test(RUNNER) &&
+    /const mayWait = OPTIONAL\.size \? OPTIONAL\.has\(String\(item\.persona\.id\)\) : !!item\.persona\.final;/.test(RUNNER) &&
+    /if \(!mayWait\) \{ wave\.push\(item\); if \(OPTIONAL\.size\) held \+= SL\.sessionEstimate\(item\.persona\); continue; \}/.test(RUNNER));
+  assert('PHASE 2, the workflow: «optional» through env, empty or digits / dots / commas, passed as --optional only when given',
+    (() => { const W2 = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'stress.yml'), 'utf8');
+      return /OPTIONAL: \$\{\{ inputs\.optional \}\}/.test(W2) && /\[\[ -z "\$OPTIONAL" \|\| "\$OPTIONAL" =~ \^\[0-9\]\[0-9\.,\]\*\$ \]\]/.test(W2) &&
+        /\$\{OPTIONAL:\+--optional "\$OPTIONAL"\}/.test(W2) && /optional:\s*\n\s+description: 'Μόνο για «επιλογή»/.test(W2); })());
   assert('CONTINUATION, the report: who found the risk question in each crisis session, the stuck errors, the sessions that did not start',
     (() => { const L = SL.finalReport([
       { label: 'Κ4', persona: { final: true, risk: 'crisis' }, calls: [], crisisTurns: [{ k: 5 }], crisisReply: { judge: { risk_question: true, why: 'ρωτά' } }, riskFound: { code: [], judge: [{ k: 5, text: 'ή κάτι πιο μεγάλο;' }], asked: 1, failed: 0, stopped: 0 } },
@@ -1033,17 +1048,25 @@ const PENDING = [];
 // ── 23/10 (John, Phase 1, Theme C): ten mechanisms of strategy, each met by a scenario; the notes the app sends, read per round ──────────
 {
   const MP = SL.MECHANISM_PERSONAS || [];
-  assert('MECHANISMS: ten sessions, 141–150, each 12–16 fixed messages, a name, a visible sign; code, prompt-only and suppressed kinds all present',
-    MP.length === 10 && MP.map(p => p.id).join(',') === '141,142,143,144,145,146,147,148,149,150' &&
-    MP.every(p => p.mechanism && p.msgs.length >= 12 && p.msgs.length <= 16 && p.fixed.length === p.msgs.length && p.maxTyped === p.msgs.length && p.name && p.sign) &&
-    MP.filter(p => p.kind === 'code').length === 5 && MP.filter(p => p.kind === 'prompt').length === 4 && MP.filter(p => p.kind === 'suppressed').length === 1);
+  // UPDATED (23/10, John, before Phase 2, Β4 — work branch only): + 151 (self-marked tension, code) and 152 (verbatim cost collision,
+  // prompt only), 10–12 messages each
+  assert('MECHANISMS: twelve sessions, 141–152 — 141–150 with 12–16 fixed messages, 151–152 with 10–12 — a name, a visible sign; code, prompt-only and suppressed kinds all present',
+    MP.length === 12 && MP.map(p => p.id).join(',') === '141,142,143,144,145,146,147,148,149,150,151,152' &&
+    MP.every(p => p.mechanism && p.msgs.length >= (p.id > 150 ? 10 : 12) && p.msgs.length <= (p.id > 150 ? 12 : 16) && p.fixed.length === p.msgs.length && p.maxTyped === p.msgs.length && p.name && p.sign) &&
+    MP.filter(p => p.kind === 'code').length === 6 && MP.filter(p => p.kind === 'prompt').length === 5 && MP.filter(p => p.kind === 'suppressed').length === 1);
   assert('MECHANISMS: the predictions name only strategy notes; the prompt-only and suppressed sessions predict none',
     MP.every(p => Object.keys(p.expect).every(l => SL.STRATEGY_NOTES.includes(l))) && MP.filter(p => p.kind !== 'code').every(p => !Object.keys(p.expect).length));
   const by = id => MP.find(p => p.id === id) || {};
   assert('MECHANISMS: the predictions made before the run, from the app\'s detectors and gates',
     JSON.stringify(by(141).expect) === JSON.stringify({ STAGNATION: [6, 7, 8, 9, 10], ESC1: [6], ESC2: [7], ESC3: [8, 9, 10] }) &&
     JSON.stringify(by(142).expect) === JSON.stringify({ LOOP: [5, 9], ESC1: [5, 9] }) && JSON.stringify(by(143).expect) === JSON.stringify({ AVOIDANCE: [4, 8], ESC1: [4, 8] }) &&
-    JSON.stringify(by(144).expect) === JSON.stringify({ PREMISE: [5, 6] }) && JSON.stringify(by(145).expect) === JSON.stringify({ METHOD_FAILURE: [6, 10], LOOP: [10], ESC1: [10] }));
+    JSON.stringify(by(144).expect) === JSON.stringify({ PREMISE: [5, 6] }) && JSON.stringify(by(145).expect) === JSON.stringify({ METHOD_FAILURE: [6, 10], LOOP: [10], ESC1: [10] }) &&
+    // UPDATED (23/10, Β4): 151 — TENSION on its 4th and 8th message only; 152 — none (the cost collision has no note of the code)
+    JSON.stringify(by(151).expect) === JSON.stringify({ TENSION: [4, 8] }) && JSON.stringify(by(152).expect) === '{}' &&
+    // … and the tension messages are the ones the app's own detector reads as tension, no other
+    (() => { const a = raw.indexOf('\nfunction detectSelfMarkedTension('); if (a < 0) return false;
+      const tension = new Function(raw.slice(a + 1, raw.indexOf('\n}', a + 1) + 2) + '\nreturn detectSelfMarkedTension;')();
+      return by(151).msgs.map((m, i) => (tension(m) ? i + 1 : 0)).filter(Boolean).join(',') === '4,8'; })());
   assert('MECHANISMS: no message of a scenario is a crisis, an exit or a recognition the app would act on (the app\'s own detectors)',
     !!APP && MP.every(p => p.msgs.every(m => !APP.fns.detectSafetySignal(m) && !APP.fns.isExplicitClosure(m) && !APP.fns.declaresClosing(m))));
   assert('MECHANISMS: Μ7 may answer the root question from its 9th message on; the others never type into it',
