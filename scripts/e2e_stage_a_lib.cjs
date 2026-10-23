@@ -108,7 +108,9 @@ function loadApp(src) {
   const unsignedCtx = Object.keys(catalog).filter(n => catalog[n].length === 0);
   const lens = { SIMPLIFY: literal('SYSTEM_LENS_SIMPLIFY'), CHALLENGE: literal('SYSTEM_LENS_CHALLENGE'),
     PERSPECTIVE: literal('SYSTEM_LENS_PERSPECTIVE'), EXPLORE: literal('SYSTEM_LENS_EXPLORE'), COMPRESSION: literal('SYSTEM_COMPRESSION') };
-  return { consts: { core, marker, lens, termination: literal('SYSTEM_TERMINATION'), supportive: literal('SYSTEM_SUPPORTIVE') },
+  // the app's table of help numbers (HELPLINES, final stress test A5), for the stress tool's brake (β)
+  const helplines = (() => { const m = code.match(/\nconst HELPLINES = \[([\s\S]*?)\n\];/); return m ? [...m[1].matchAll(/number: "(\d+)"/g)].map(x => x[1]) : null; })();
+  return { helplines, consts: { core, marker, lens, termination: literal('SYSTEM_TERMINATION'), supportive: literal('SYSTEM_SUPPORTIVE') },
     catalog, unsignedCtx, fns, texts };
 }
 

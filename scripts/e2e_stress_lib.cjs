@@ -661,9 +661,12 @@ function finalBrakeFindings(sess, o) {
   }
   const raw = (s.modelTexts || []).map(m => m.text).join('\n');
   const screen = turns.filter(t => t.who !== 'user').map(t => t.text).join('\n');
-  for (const n of FINAL_HELPLINES) if (hasNumber(raw, n) && !hasNumber(screen, n)) {
+  // 23/10 (John, Part B): `o.helplines` — the app's own table (HELPLINES): a number of it that the model wrote and the screen does not show
+  // is (β); one outside the table that the app removed, by design, is written down with ℹ and is no brake. Without it: FINAL_HELPLINES.
+  const needed = (o && Array.isArray(o.helplines) && o.helplines.length) ? o.helplines : FINAL_HELPLINES;
+  for (const n of [...new Set(needed.concat(FINAL_HELPLINES))]) if (hasNumber(raw, n) && !hasNumber(screen, n)) {
     const sent = (raw.split(/(?<=[.!;?\n])\s+/).find(x => hasNumber(x, n)) || '').trim();
-    out.push('(β) η εφαρμογή αφαίρεσε το ' + n + ' που έγραψε το μοντέλο: «' + sent.slice(0, 220) + '»');
+    out.push((needed.includes(n) ? '(β) η εφαρμογή αφαίρεσε το ' + n : 'ℹ εκτός του πίνακα της εφαρμογής: αφαιρέθηκε το ' + n) + ' που έγραψε το μοντέλο: «' + sent.slice(0, 220) + '»');
   }
   return out;
 }
