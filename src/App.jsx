@@ -2157,8 +2157,11 @@ const HELP_WORDS = /τηλεφων|τηλ\.|καλεσ(?:ε|εισ|ετε|τε)(
 // AND gives a dose — an amount in mg / ml / μg / mcg / γρ. / γραμμάρια, «φορές την ημέρα», «κάθε N ώρες», «ημερησίως», or a pill
 // word (χάπι, δισκίο, κάψουλα; not in a question) — is replaced by DOSE_LINE, once per reply. Not read: the user's own words in
 // quotation marks («πήρα 500mg» said back), a medicine named without a dose (the prompt's rule), and — for safety — a sentence with a
-// number of HELPLINES («Αν πήρες χάπια Xanax, κάλεσε τώρα το 166.»). The names are a list: a medicine not on it is not caught. Known
-// limit: «1 γρ. παρακεταμόλης» is two sentences for dropModelSentences (a dot, a space, a letter), so neither half is a dose.
+// number of HELPLINES («Αν πήρες χάπια Xanax, κάλεσε τώρα το 166.»). The names are a list: a medicine not on it is not caught.
+// The dot after a unit (John, 23/10, before Phase 2): «1 γρ. παρακεταμόλης», «500 mg. Depon», «5 ml. σιρόπι» are one sentence for this
+// filter — the dot is an abbreviation when what follows goes on with the dose (a small letter, a medicine, an amount, a pill word). It
+// still ends the sentence before a capital that starts something else («500 mg. Τι σε απασχολεί;») and before a sentence with a
+// number of HELPLINES, which is never replaced. dropModelSentences itself is not changed: the dot is held aside while it reads.
 const DOSE_LINE = "Για φάρμακα και δόσεις, μόνο γιατρός ή φαρμακοποιός.";
 // Greek names by their stem (any ending follows: «παρακεταμόλη», «παρακεταμόλης»), Latin and brand names as whole words.
 const DOSE_MEDICINE = new RegExp("(?:^|[^a-zα-ω])(?:" + [
@@ -2172,6 +2175,10 @@ const DOSE_MEDICINE = new RegExp("(?:^|[^a-zα-ω])(?:" + [
   "φουροσεμιδ", "βαρφαριν", "ασενοκουμαρολ", "ηπαριν", "σαλβουταμολ", "μοντελουκαστ", "δομπεριδον", "λοπεραμιδ", "ορλιστατ", "σεμαγλουτιδ",
   "λιραγλουτιδ", "τιρζεπατιδ", "μεθυλφαινιδατ", "ναλτρεξον", "βουπρενορφιν", "μεθαδον", "ισοτρετινοιν", "ντεπον", "παναντολ", "νουροφεν",
   "αλγκοφρεν", "ζαναξ", "λεξοτανιλ", "ταβορ", "ριβοτριλ", "στιλνοξ", "βιαγκρα", "οζεμπικ", "βολταρεν",
+  // Β2 (23/10, before Phase 2): brands of the 25 checked names, as they are written in Greek letters, and one generic («Λύρικα» is not
+  // here: in Greek letters it is the word «λυρικά»)
+  "μπρουφεν", "ζολοφτ", "προζακ", "πονσταν", "βαλιουμ", "ιμοβαν", "σεροξατ", "σιπραλεξ", "λαντοζ", "τραμαλ", "ογκμεντιν", "αουγκμεντιν",
+  "μεσουλιντ", "ζοπικλον",
 ].join("|") + ")|(?:^|[^a-z])(?:" + [
   "paracetamol", "acetaminophen", "ibuprofen", "aspirin", "diclofenac", "naproxen", "codeine", "tramadol", "morphine", "oxycodone", "amoxicillin",
   "azithromycin", "ciprofloxacin", "omeprazole", "esomeprazole", "pantoprazole", "loratadine", "cetirizine", "prednisolone", "prednisone",
@@ -2186,6 +2193,7 @@ const DOSE_MEDICINE = new RegExp("(?:^|[^a-zα-ω])(?:" + [
   "lyrica", "neurontin", "viagra", "cialis", "lipitor", "crestor", "augmentin", "zithromax", "ciproxin", "losec", "nexium", "zyrtec", "claritine",
   "aerius", "ozempic", "wegovy", "saxenda", "mounjaro", "xenical", "ritalin", "concerta", "imodium", "motilium", "euthyrox", "glucophage", "lasix",
   "sintrom", "ventolin", "singulair", "medrol", "roaccutane",
+  "valium", "imovane", "zopiclone", "ladose", "tramal", "mesulid", "nimesulide", // Β2 (23/10): five of the 25 checked names, two generics
 ].join("|") + ")(?![a-z])");
 const DOSE_QUANTITY = /\d(?:[.,]?\d)*(?:\s*(?:[-–—]|εωσ|ωσ|to)\s*\d(?:[.,]?\d)*)?\s*(?:mg|ml|mcg|μg|µg|g|γρ\.?|γραμμαρι[α-ω]*)(?![a-zα-ω])/;
 const DOSE_AMOUNT = new RegExp(DOSE_QUANTITY.source + "|φορ(?:εσ|α) (?:την |τη )?(?:ημερα|μερα)|καθε \\d+ ωρ|ημερησιωσ");
@@ -2193,7 +2201,17 @@ const DOSE_PILL = /(?:^|[^α-ω])(?:χαπι|δισκι|καψουλ)/;
 function stripForeignHelplines(text) {
   const listed = n => HELPLINES.some(h => h.number === n);
   let doseSaid = typeof text === "string" && text.includes(DOSE_LINE);
-  return dropModelSentences(text, f => {
+  // the dot after a unit, held aside (U+E000) where the dose goes on after it, and given back after the reading
+  const HOLD = "\uE000";
+  const helpIn = f => HELPLINES.some(h => new RegExp("(?:^|\\D)" + h.number + "(?!\\d)").test(f));
+  const held = typeof text === "string" && !text.includes(HOLD) ? text.replace(/(\d\s*(?:mg|ml|mcg|μg|µg|g|γρ|γραμμ[άα]ρι[α-ωά-ώ]*))\.([ \t]+)/gi,
+    (m, unit, space, at, all) => {
+      const next = all.slice(at + m.length).split("\n")[0].split(/[.!;?…](?=[ \t]+[^\s\d]|$)/)[0];
+      const f = next.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ");
+      const c = next.charAt(0), small = c !== c.toUpperCase() && c === c.toLowerCase();
+      return (small || DOSE_MEDICINE.test(f) || DOSE_AMOUNT.test(f) || DOSE_PILL.test(f)) && !helpIn(f) ? unit + HOLD + space : m;
+    }) : text;
+  const out = dropModelSentences(held, f => {
     if (HELP_ORGS.test(f)) return true;
     // a number of the table written in groups («116 111») is that number
     f = f.replace(/\d+(?: \d+)+/g, m => (listed(m.replace(/ /g, "")) ? m.replace(/ /g, "") : m));
@@ -2212,6 +2230,7 @@ function stripForeignHelplines(text) {
     const nums = [...f.matchAll(/(?:^|[^\d.,])(\d{3,})(?![\d.,]?\d)(?!\s*(?:€|ευρω|euro|χρον|μην|μερ|εβδομαδ|ωρ|λεπτ|%|χιλ|km))/g)].map(m => m[1]);
     return nums.some(n => !listed(n) && !/^(?:19|20)\d\d$/.test(n)) || /κλιμακ/.test(f);
   });
+  return held === text ? out : out.split(HOLD).join(".");
 }
 // §3a (decision 2: «σε κάθε ροή η AURA δεν λέει ποτέ "αυτό είναι η ρίζα"»): the root is the user's phrase and only they confirm
 // it. A model sentence that DECLARES a root («Αυτό είναι η ρίζα.», «Εδώ είναι η ρίζα:», «… είναι η ρίζα που ψάχναμε.», «Η ρίζα
