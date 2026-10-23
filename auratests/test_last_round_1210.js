@@ -50,7 +50,7 @@ const NAMES = ['stopOpenerKind', 'detectsRiskClarification', 'guardStopMoment', 
   'detectSafetySignal', 'classifyCrisisTier', 'buildCrisisLine', 'stripInternalLabels', 'matchesClosingWord', 'lookBehind']; // UPDATED (22/10, old iPhones, Γ3): + lookBehind — the functions here look back through it (no lookbehind regex)
 let F = {};
 try {
-  const consts = ['STOP_OPENER', 'STOP_GENTLE', 'HELPLINES', 'HELP_ORGS', 'HELP_WORDS', 'ROOT_DECLARATION', 'INTERNAL_LABEL_HEADS'].map(constSrc).join('\n'); // UPDATED (22/10, A5): + HELPLINES, the one table of help numbers
+  const consts = ['STOP_OPENER', 'STOP_GENTLE', 'HELPLINES', 'HELP_ORGS', 'HELP_WORDS', 'ROOT_DECLARATION', 'INTERNAL_LABEL_HEADS', 'DOSE_LINE', 'DOSE_MEDICINE', 'DOSE_QUANTITY', 'DOSE_AMOUNT', 'DOSE_PILL'].map(constSrc).join('\n'); // UPDATED (22/10, A5): + HELPLINES, the one table of help numbers; UPDATED (23/10, Theme B): + the dose constants
   F = new Function(consts + '\n' + NAMES.map(n => fullFnSrc(n) || `function ${n}(){return 'missing'}`).join('\n') + '\nreturn {' + NAMES.join(',') + '};')();
 } catch (e) { console.log('LOAD ERROR — ' + e.message); }
 const T = (f, ...a) => { try { return F[f](...a); } catch (e) { return 'threw:' + e.message; } };
