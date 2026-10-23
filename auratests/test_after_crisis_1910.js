@@ -145,7 +145,26 @@ const undoVoice1910 = p => VOICE_1910.reduce((t, [now, before]) => (t.split(now)
   assert('UNCHANGED: the help organisations and phone words of the helpline filter', h(constLine('HELP_ORGS')) === '0a7e408fff4b45a3' /* UPDATED (22/10, A5): ΕΚΑΒ and Χαμόγελο του Παιδιού moved to HELPLINES, beside their numbers */ && h(constLine('HELP_WORDS')) === '72ccdbaf7c453351');
   assert('UNCHANGED: the approved goodbye of the normal case', h(constLine('BARE_GOODBYE_TEXT')) === 'acc0d288e40d9606');
   // UPDATED (19/10, ADR «19 Οκτωβρίου (ε)»): the prompt moved only by John's two voice edits
-  assert('UNCHANGED: the prompt, apart from John\'s voice edits of 19/10 (ε) and (ζ)', h(undoVoice1910(raw.slice(_s, _e))) === 'a6d7fe7ae33515a0' && h(raw.slice(_s, _e)) !== 'a6d7fe7ae33515a0');
+// UPDATED (23/10, Π3, branch p3-prompt — John): the precedence clauses in lines 35, 37, 39, 40, 41, 42, the organisation names out of
+// those lines, and the examples 35β / 37β. Undone first — each piece must be there exactly as many times as it was put in — so what is
+// left must be the prompt before Π3 byte for byte.
+const P3_LONG = 'PRECEDENCE (this rule yields; nothing is added to it): SAFETY (MASTER PRIORITY RULE, step 1) comes first; then the content limit — no facts about law, money or health, and no technique for health, mental health, sleep or food (what a law, a court, a tax, a loan, a treatment or a dose does is not said; saying plainly that this is a question for a lawyer, an accountant or a doctor IS allowed; an organisation is named only if the user wrote its name; a help line only from the app\'s own table, never another number or name); then, while [FREE PART: ENDS AT ROOT] is present, STAGE A rule (2) below. Where any of these conflicts with this rule, it wins and this rule does not apply. ';
+const P3_SHORT = 'PRECEDENCE (as in PROACTIVE RESOURCE POINTER above — this rule yields): SAFETY, then the content limit (no facts about law, money or health; the kind of professional may be named; an organisation only if the user wrote its name; a help line only from the app\'s own table), then, while [FREE PART: ENDS AT ROOT] is present, STAGE A rule (2) below. ';
+const P3_TEXT = [
+  ['before AURA mentioned that free smoking-cessation clinics exist;', 'before AURA mentioned that free ΕΣΥ smoking-cessation clinics exist;'],
+  ["a founder didn't know one-time-payment platforms existed as a category", "a founder didn't know one-time-payment platforms like Gumroad existed as a category"],
+  ['(e.g. "δωρεάν ιατρεία διακοπής καπνίσματος")', '(e.g. "σταδιακή μείωση, απότομη διακοπή, υποκατάστατα, ιατρεία διακοπής, φαρμακευτική υποστήριξη" or "δωρεάν ιατρεία διακοπής καπνίσματος στο ΕΣΥ")'],
+  ['Example: "Πόσο κρατάει συνήθως ένα μεταπτυχιακό;" → answer it.', 'Example: "Πόσο κοστίζει περίπου ένα ταξίδι στην Ιαπωνία;" → answer it.'],
+  ['naming the kind of professional who knows this, categorically, is not deciding anything', 'naming that ΕΣΠΑ and ΔΥΠΑ exist, categorically, is not deciding anything'],
+  ['after being told two organisations exist): Name the kind of professional who knows it (e.g. "δικηγόρος", "λογιστής", "γιατρός"); an organisation only if the user wrote its name.',
+    'after being told ΕΣΠΑ/ΔΥΠΑ exist): naming the specific OFFICIAL ORGANIZATION (e.g. "ΔΥΠΑ", "δες dypa.gov.gr") is safe and sufficient — organization names don\'t go stale.'],
+  ['When a source is asked for or genuinely essential, name the kind of professional plainly,', 'When a source is asked for or genuinely essential, name the organization plainly,']];
+const undoP3 = p => {
+  const t = String(p || '');
+  if (t.split(P3_LONG).length !== 2 || t.split(P3_SHORT).length !== 6) return 'MISSING a Π3 precedence clause';
+  return P3_TEXT.reduce((x, [now, before]) => (x.split(now).length === 2 ? x.replace(now, before) : 'MISSING ' + now), t.replace(P3_LONG, '').split(P3_SHORT).join(''));
+};
+  assert('UNCHANGED: the prompt, apart from John\'s voice edits of 19/10 (ε) and (ζ) and Π3 (23/10)', h(undoVoice1910(undoP3(raw.slice(_s, _e)))) === 'a6d7fe7ae33515a0' && h(raw.slice(_s, _e)) !== 'a6d7fe7ae33515a0');
 }
 
 // ── 5. The stress script: the check that caught session 34 now looks for the phrase ─────────────────────────────────────

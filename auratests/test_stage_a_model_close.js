@@ -163,10 +163,29 @@ const VOICE_1910 = [['«Θέλω να αδυνατίσω» → «Έγινε κά
   ['(e.g. όταν ο χρήστης έχει πει "πέντε χρόνια": «Πέντε χρόνια έτσι. Δεν είναι λίγο.»); when they do not, none. Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης, με τα δικά του λόγια· ποτέ μη μετράς ή υπολογίζεις εσύ.',
     '(e.g. «Πέντε χρόνια έτσι. Δεν είναι λίγο.»); when they do not, none.']];
 const undoVoice1910 = p => VOICE_1910.reduce((t, [now, before]) => (t.split(now).length === 2 ? t.replace(now, before) : 'MISSING ' + now), String(p || ''));
+// UPDATED (23/10, Π3, branch p3-prompt — John): the precedence clauses in lines 35, 37, 39, 40, 41, 42, the organisation names out of
+// those lines, and the examples 35β / 37β. Undone first — each piece must be there exactly as many times as it was put in — so what is
+// left must be the prompt before Π3 byte for byte.
+const P3_LONG = 'PRECEDENCE (this rule yields; nothing is added to it): SAFETY (MASTER PRIORITY RULE, step 1) comes first; then the content limit — no facts about law, money or health, and no technique for health, mental health, sleep or food (what a law, a court, a tax, a loan, a treatment or a dose does is not said; saying plainly that this is a question for a lawyer, an accountant or a doctor IS allowed; an organisation is named only if the user wrote its name; a help line only from the app\'s own table, never another number or name); then, while [FREE PART: ENDS AT ROOT] is present, STAGE A rule (2) below. Where any of these conflicts with this rule, it wins and this rule does not apply. ';
+const P3_SHORT = 'PRECEDENCE (as in PROACTIVE RESOURCE POINTER above — this rule yields): SAFETY, then the content limit (no facts about law, money or health; the kind of professional may be named; an organisation only if the user wrote its name; a help line only from the app\'s own table), then, while [FREE PART: ENDS AT ROOT] is present, STAGE A rule (2) below. ';
+const P3_TEXT = [
+  ['before AURA mentioned that free smoking-cessation clinics exist;', 'before AURA mentioned that free ΕΣΥ smoking-cessation clinics exist;'],
+  ["a founder didn't know one-time-payment platforms existed as a category", "a founder didn't know one-time-payment platforms like Gumroad existed as a category"],
+  ['(e.g. "δωρεάν ιατρεία διακοπής καπνίσματος")', '(e.g. "σταδιακή μείωση, απότομη διακοπή, υποκατάστατα, ιατρεία διακοπής, φαρμακευτική υποστήριξη" or "δωρεάν ιατρεία διακοπής καπνίσματος στο ΕΣΥ")'],
+  ['Example: "Πόσο κρατάει συνήθως ένα μεταπτυχιακό;" → answer it.', 'Example: "Πόσο κοστίζει περίπου ένα ταξίδι στην Ιαπωνία;" → answer it.'],
+  ['naming the kind of professional who knows this, categorically, is not deciding anything', 'naming that ΕΣΠΑ and ΔΥΠΑ exist, categorically, is not deciding anything'],
+  ['after being told two organisations exist): Name the kind of professional who knows it (e.g. "δικηγόρος", "λογιστής", "γιατρός"); an organisation only if the user wrote its name.',
+    'after being told ΕΣΠΑ/ΔΥΠΑ exist): naming the specific OFFICIAL ORGANIZATION (e.g. "ΔΥΠΑ", "δες dypa.gov.gr") is safe and sufficient — organization names don\'t go stale.'],
+  ['When a source is asked for or genuinely essential, name the kind of professional plainly,', 'When a source is asked for or genuinely essential, name the organization plainly,']];
+const undoP3 = p => {
+  const t = String(p || '');
+  if (t.split(P3_LONG).length !== 2 || t.split(P3_SHORT).length !== 6) return 'MISSING a Π3 precedence clause';
+  return P3_TEXT.reduce((x, [now, before]) => (x.split(now).length === 2 ? x.replace(now, before) : 'MISSING ' + now), t.replace(P3_LONG, '').split(P3_SHORT).join(''));
+};
 assert('UNCHANGED: the prompt (no prompt change by this fix), the parser, the closing decision and its Stage A gate, the leaving door, the marker',
   // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
   // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
-  sha(undoVoice1910(PROMPT)) === 'a6d7fe7ae33515a0' && sha(fullFnSrc('parseThreeBeatShift')) === '7bceea7040494611' && sha(fullFnSrc('decideTermination')) === '60778a7e90295a31' &&
+  sha(undoVoice1910(undoP3(PROMPT))) === 'a6d7fe7ae33515a0' && /* UPDATED (23/10, Π3): Π3 undone first */ sha(fullFnSrc('parseThreeBeatShift')) === '7bceea7040494611' && sha(fullFnSrc('decideTermination')) === '60778a7e90295a31' &&
   sha(fullFnSrc('stageAPreRootDecision')) === '81c3cf76a21109f4' && sha(fullFnSrc('stageALeavingDoorOpens')) === 'a319ffa8afded157' && // UPDATED (δ): the leaving door no longer reads the decision UPDATED (23/10, Ο5): stageALeavingDoorOpens changed on purpose — danger from another person (test_danger_from_other_2310.js).
   sha(fullFnSrc('buildStageAMarker')) === '0ef63f69e55acfde');
 // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's text of 16/10 for the same question.
