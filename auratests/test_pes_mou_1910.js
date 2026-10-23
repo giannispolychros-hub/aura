@@ -73,7 +73,7 @@ assert('CRISIS: the app\'s crisis lines themselves are untouched', S(L_A) === L_
   // UPDATED (22/10, ADR «22 Οκτωβρίου»): John's voice edit (the example without a number, the prediction rule) — e1e56e0c… → b5f303cc…;
   // «Πες μου» itself is still display-only and never in the prompt
 // UPDATED (23/10, Π3, branch p3-prompt — John): the precedence clauses in lines 35, 37, 39, 40, 41, 42, the organisation names out of
-// those lines, and the examples 35β / 37β. Undone first — each piece must be there exactly as many times as it was put in — so what is
+// those lines, the examples 35β / 37β, and (β) the ΦΩΝΗ (4) example in a form with no gender. Undone first — each piece must be there exactly as many times as it was put in — so what is
 // left must be the prompt before Π3 byte for byte.
 const P3_LONG = 'PRECEDENCE (this rule yields; nothing is added to it): SAFETY (MASTER PRIORITY RULE, step 1) comes first; then the content limit — no facts about law, money or health, and no technique for health, mental health, sleep or food (what a law, a court, a tax, a loan, a treatment or a dose does is not said; saying plainly that this is a question for a lawyer, an accountant or a doctor IS allowed; an organisation is named only if the user wrote its name; a help line only from the app\'s own table, never another number or name); then, while [FREE PART: ENDS AT ROOT] is present, STAGE A rule (2) below. Where any of these conflicts with this rule, it wins and this rule does not apply. ';
 const P3_SHORT = 'PRECEDENCE (as in PROACTIVE RESOURCE POINTER above — this rule yields): SAFETY, then the content limit (no facts about law, money or health; the kind of professional may be named; an organisation only if the user wrote its name; a help line only from the app\'s own table), then, while [FREE PART: ENDS AT ROOT] is present, STAGE A rule (2) below. ';
@@ -85,7 +85,8 @@ const P3_TEXT = [
   ['naming the kind of professional who knows this, categorically, is not deciding anything', 'naming that ΕΣΠΑ and ΔΥΠΑ exist, categorically, is not deciding anything'],
   ['after being told two organisations exist): Name the kind of professional who knows it (e.g. "δικηγόρος", "λογιστής", "γιατρός"); an organisation only if the user wrote its name.',
     'after being told ΕΣΠΑ/ΔΥΠΑ exist): naming the specific OFFICIAL ORGANIZATION (e.g. "ΔΥΠΑ", "δες dypa.gov.gr") is safe and sufficient — organization names don\'t go stale.'],
-  ['When a source is asked for or genuinely essential, name the kind of professional plainly,', 'When a source is asked for or genuinely essential, name the organization plainly,']];
+  ['When a source is asked for or genuinely essential, name the kind of professional plainly,', 'When a source is asked for or genuinely essential, name the organization plainly,'],
+  ['(e.g. όταν ο χρήστης γράφει "τα κουβαλάω όλα εγώ εδώ και καιρό": «Όλα σε σένα, εδώ και καιρό. Δεν είναι λίγο.»)', '(e.g. όταν ο χρήστης γράφει "τα κουβαλάω μόνη μου εδώ και καιρό": «Μόνη σου, εδώ και καιρό. Δεν είναι λίγο.»)']];
 const undoP3 = p => {
   const t = String(p || '');
   if (t.split(P3_LONG).length !== 2 || t.split(P3_SHORT).length !== 6) return 'MISSING a Π3 precedence clause';

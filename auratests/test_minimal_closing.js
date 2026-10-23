@@ -222,9 +222,11 @@ assert('CLOSING: Part 2 is still told not to repeat the summary',
 // CHANGED AGAIN, DELIBERATELY, on 2026-10-23, branch p3-prompt only (b5f303cc9405aa21 → 64ee749b7b17dbe3). John (Π3): a precedence clause
 // in lines 35, 37, 39, 40, 41, 42 (safety, then no facts about law, money or health and no organisation the user did not name, then Stage A
 // rule (2)), the organisation names out of those lines, the examples 35β and 37β. +2,321 characters, one cache write.
+// CHANGED AGAIN, DELIBERATELY, on 2026-10-23, branch p3-prompt only (64ee749b7b17dbe3 → 4dfe0d45e271f1e2). John (Π3 (β)): the ΦΩΝΗ (4)
+// example with no gender — «τα κουβαλάω όλα εγώ εδώ και καιρό» / «Όλα σε σένα, εδώ και καιρό.». +2 characters, one cache write.
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 64ee749b7b17dbe3…)',
-  PROMPT_SHA.slice(0, 16) === '64ee749b7b17dbe3');
+assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 4dfe0d45e271f1e2…)',
+  PROMPT_SHA.slice(0, 16) === '4dfe0d45e271f1e2');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',
