@@ -19,7 +19,8 @@ const fnSrc = n => { const a = raw.indexOf('\nfunction ' + n + '('); return a < 
 const constSrc = n => { const a = raw.indexOf('\nconst ' + n + ' = '); if (a < 0) return ''; const l = raw.slice(a + 1).split('\n'); const o = [l[0]]; for (let i = 1; i < l.length && /^[ \t\]}]/.test(l[i]); i++) o.push(l[i]); return o.join('\n'); };
 let F = {};
 try {
-  F = new Function(['HELPLINES', 'HELP_ORGS', 'HELP_WORDS'].map(constSrc).join('\n') + '\n' +
+  // UPDATED (23/10, John, Phase 1, Theme B): + the dose constants — the same filter now also replaces a medicine's dose
+  F = new Function(['HELPLINES', 'HELP_ORGS', 'HELP_WORDS', 'DOSE_LINE', 'DOSE_MEDICINE', 'DOSE_QUANTITY', 'DOSE_AMOUNT', 'DOSE_PILL'].map(constSrc).join('\n') + '\n' +
     ['lookBehind', 'dropModelSentences', 'stripForeignHelplines', 'buildCrisisLine'].map(fnSrc).join('\n') +
     '\nreturn { stripForeignHelplines, buildCrisisLine, HELPLINES: typeof HELPLINES === "undefined" ? null : HELPLINES };')();
 } catch (e) { console.log('LOAD ERROR — ' + e.message); }

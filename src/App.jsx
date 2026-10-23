@@ -2109,15 +2109,20 @@ function lookBehind(...alternatives) {
 }
 // Removes the sentences of a MODEL reply that `test` (given the sentence folded: no accents, lower case, ς → σ) flags, and leaves
 // everything else byte for byte. A sentence ends at . ! ; ? … followed by a space and something that is not a digit (so «τηλ. 210…»
-// stays one sentence); a line is never joined to another. Nothing flagged → the very same string back.
+// stays one sentence); a line is never joined to another. Nothing flagged → the very same string back. A `test` that returns a
+// string puts that string in the sentence's place (23/10, the dose sentence of stripForeignHelplines).
 function dropModelSentences(text, test) {
   if (typeof text !== "string" || !text) return "";
   const fold = x => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ");
   let hit = false;
   const lines = text.split("\n").map(line => {
     const parts = lookBehind({ after: /[.!;?…]/, match: /[ \t]+(?=[^\s\d])/ }).split(line);
-    const kept = parts.filter(p => !(p.trim() && test(fold(p), p)));
-    if (kept.length === parts.length) return line;
+    const kept = [];
+    for (const p of parts) {
+      const r = p.trim() ? test(fold(p), p) : false;
+      if (!r) kept.push(p); else if (typeof r === "string") kept.push(r);
+    }
+    if (kept.length === parts.length && kept.every((k, i) => k === parts[i])) return line;
     hit = true;
     return kept.join(" ").trim() ? kept.join(" ") : null;
   });
@@ -2147,12 +2152,59 @@ const HELPLINES = [
 ];
 const HELP_ORGS = /(?:^|[^α-ω])(?:κεθεα|οκανα|επιψυ|ψυχαργ)|σαμαρειτ|samaritan|befrienders|lifeline|childline/;
 const HELP_WORDS = /τηλεφων|τηλ\.|καλεσ(?:ε|εισ|ετε|τε)(?![α-ω])|καλεστε|(?:^|[^α-ω])γραμμ(?:η|ησ|εσ|ων)(?![α-ω])|helpline|hotline|(?:^|[^a-z])sos(?![a-z])|κυπρ|cyprus/;
+// DOSES (John, 23/10/2026; run 50, Π2: «Παρακεταμόλη 500mg–1000mg, μέχρι 3 φορές την ημέρα…» reached the screen). The same filter
+// reads them, with its own logic: a number counts only beside what makes it the thing looked for. A sentence that names a medicine
+// AND gives a dose — an amount in mg / ml / μg / mcg / γρ. / γραμμάρια, «φορές την ημέρα», «κάθε N ώρες», «ημερησίως», or a pill
+// word (χάπι, δισκίο, κάψουλα; not in a question) — is replaced by DOSE_LINE, once per reply. Not read: the user's own words in
+// quotation marks («πήρα 500mg» said back), a medicine named without a dose (the prompt's rule), and — for safety — a sentence with a
+// number of HELPLINES («Αν πήρες χάπια Xanax, κάλεσε τώρα το 166.»). The names are a list: a medicine not on it is not caught. Known
+// limit: «1 γρ. παρακεταμόλης» is two sentences for dropModelSentences (a dot, a space, a letter), so neither half is a dose.
+const DOSE_LINE = "Για φάρμακα και δόσεις, μόνο γιατρός ή φαρμακοποιός.";
+// Greek names by their stem (any ending follows: «παρακεταμόλη», «παρακεταμόλης»), Latin and brand names as whole words.
+const DOSE_MEDICINE = new RegExp("(?:^|[^a-zα-ω])(?:" + [
+  "παρακεταμολ", "ακεταμινοφαιν", "ιβουπροφαιν", "ασπιριν", "ακετυλοσαλικυλικ", "δικλοφαιν", "ναπροξαιν", "μεφαιναμικ", "νιμεσουλιδ", "κωδειν",
+  "τραμαδολ", "μορφιν", "οξυκωδον", "αμοξικιλλιν", "κλαβουλανικ", "αζιθρομυκιν", "κλαριθρομυκιν", "σιπροφλοξασιν", "δοξυκυκλιν", "ομεπραζολ",
+  "εσομεπραζολ", "παντοπραζολ", "λανσοπραζολ", "λοραταδιν", "δεσλοραταδιν", "σετιριζιν", "κορτιζον", "πρεδνιζολον", "δεξαμεθαζον", "ινσουλιν",
+  "μετφορμιν", "λεβοθυροξιν", "αλπραζολαμ", "λοραζεπαμ", "διαζεπαμ", "βρωμαζεπαμ", "κλοναζεπαμ", "ζολπιδεμ", "μελατονιν", "σερτραλιν",
+  "παροξετιν", "εσιταλοπραμ", "σιταλοπραμ", "φλουοξετιν", "βενλαφαξιν", "ντουλοξετιν", "μιρταζαπιν", "τραζοδον", "κουετιαπιν", "ολανζαπιν",
+  "αριπιπραζολ", "ρισπεριδον", "λαμοτριγιν", "βαλπροικ", "καρβαμαζεπιν", "πρεγκαμπαλιν", "γκαμπαπεντιν", "σιλδεναφιλ", "ταδαλαφιλ",
+  "ατορβαστατιν", "σιμβαστατιν", "ροσουβαστατιν", "αμλοδιπιν", "ραμιπριλ", "λοσαρταν", "βισοπρολολ", "μετοπρολολ", "προπρανολολ",
+  "φουροσεμιδ", "βαρφαριν", "ασενοκουμαρολ", "ηπαριν", "σαλβουταμολ", "μοντελουκαστ", "δομπεριδον", "λοπεραμιδ", "ορλιστατ", "σεμαγλουτιδ",
+  "λιραγλουτιδ", "τιρζεπατιδ", "μεθυλφαινιδατ", "ναλτρεξον", "βουπρενορφιν", "μεθαδον", "ισοτρετινοιν", "ντεπον", "παναντολ", "νουροφεν",
+  "αλγκοφρεν", "ζαναξ", "λεξοτανιλ", "ταβορ", "ριβοτριλ", "στιλνοξ", "βιαγκρα", "οζεμπικ", "βολταρεν",
+].join("|") + ")|(?:^|[^a-z])(?:" + [
+  "paracetamol", "acetaminophen", "ibuprofen", "aspirin", "diclofenac", "naproxen", "codeine", "tramadol", "morphine", "oxycodone", "amoxicillin",
+  "azithromycin", "ciprofloxacin", "omeprazole", "esomeprazole", "pantoprazole", "loratadine", "cetirizine", "prednisolone", "prednisone",
+  "cortisone", "dexamethasone", "insulin", "metformin", "levothyroxine", "alprazolam", "lorazepam", "diazepam", "bromazepam", "clonazepam",
+  "zolpidem", "melatonin", "sertraline", "paroxetine", "escitalopram", "citalopram", "fluoxetine", "venlafaxine", "duloxetine", "mirtazapine",
+  "trazodone", "quetiapine", "olanzapine", "aripiprazole", "risperidone", "lithium", "lamotrigine", "valproate", "carbamazepine", "pregabalin",
+  "gabapentin", "sildenafil", "tadalafil", "atorvastatin", "simvastatin", "rosuvastatin", "amlodipine", "ramipril", "losartan", "bisoprolol",
+  "metoprolol", "propranolol", "furosemide", "warfarin", "heparin", "salbutamol", "montelukast", "domperidone", "loperamide", "orlistat",
+  "semaglutide", "liraglutide", "tirzepatide", "methylphenidate", "naltrexone", "buprenorphine", "methadone", "isotretinoin", "depon", "panadol",
+  "tylenol", "nurofen", "algofren", "advil", "brufen", "ponstan", "aulin", "voltaren", "aspirine", "xanax", "lexotanil", "stedon", "tavor",
+  "rivotril", "stilnox", "zoloft", "seroxat", "cipralex", "prozac", "efexor", "cymbalta", "remeron", "seroquel", "zyprexa", "abilify", "risperdal",
+  "lyrica", "neurontin", "viagra", "cialis", "lipitor", "crestor", "augmentin", "zithromax", "ciproxin", "losec", "nexium", "zyrtec", "claritine",
+  "aerius", "ozempic", "wegovy", "saxenda", "mounjaro", "xenical", "ritalin", "concerta", "imodium", "motilium", "euthyrox", "glucophage", "lasix",
+  "sintrom", "ventolin", "singulair", "medrol", "roaccutane",
+].join("|") + ")(?![a-z])");
+const DOSE_QUANTITY = /\d(?:[.,]?\d)*(?:\s*(?:[-–—]|εωσ|ωσ|to)\s*\d(?:[.,]?\d)*)?\s*(?:mg|ml|mcg|μg|µg|g|γρ\.?|γραμμαρι[α-ω]*)(?![a-zα-ω])/;
+const DOSE_AMOUNT = new RegExp(DOSE_QUANTITY.source + "|φορ(?:εσ|α) (?:την |τη )?(?:ημερα|μερα)|καθε \\d+ ωρ|ημερησιωσ");
+const DOSE_PILL = /(?:^|[^α-ω])(?:χαπι|δισκι|καψουλ)/;
 function stripForeignHelplines(text) {
   const listed = n => HELPLINES.some(h => h.number === n);
+  let doseSaid = typeof text === "string" && text.includes(DOSE_LINE);
   return dropModelSentences(text, f => {
     if (HELP_ORGS.test(f)) return true;
     // a number of the table written in groups («116 111») is that number
     f = f.replace(/\d+(?: \d+)+/g, m => (listed(m.replace(/ /g, "")) ? m.replace(/ /g, "") : m));
+    const own = f.replace(/«[^»]*»|"[^"]*"|“[^”]*”/g, " ");
+    if (DOSE_MEDICINE.test(own) && (DOSE_AMOUNT.test(own) || (DOSE_PILL.test(own) && !/[;?]\s*$/.test(own))) &&
+      // a help number is a help number only when it is not the amount of a dose («Ασπιρίνη 100 μg» is not the 100)
+      !HELPLINES.some(h => new RegExp("(?:^|\\D)" + h.number + "(?!\\d)").test(own.replace(new RegExp(DOSE_QUANTITY.source, "g"), " ")))) {
+      if (doseSaid) return true;
+      doseSaid = true;
+      return DOSE_LINE;
+    }
     if (HELPLINES.some(h => h.org && h.org.test(f) && !new RegExp("(?:^|\\D)" + h.number + "(?!\\d)").test(f))) return true;
     if (/(?:^|[^\d.,])\+?\d(?:[ \t-]?\d){7,}(?![\d.,]?\d)(?!\s*(?:€|ευρω|euro))/.test(f)) return true;
     if (!HELP_WORDS.test(f)) return false;
