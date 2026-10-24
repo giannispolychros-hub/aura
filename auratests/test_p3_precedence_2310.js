@@ -34,6 +34,8 @@ for (const [head, clause] of Object.entries(RULES)) {
 // UPDATED (24/10, Π3, tests only): later Π3 commits add a clause of their own, each in its own slot below, and count it there — so each
 // commit can be reverted on its own and a clause nobody counted still fails.
 let MORE_SHORT = 0, MORE_CLAUSES = 0;
+// Π3 (ζ):
+// Π3 (η):
 // Π3 (γ):
 MORE_CLAUSES += 1; // (γ) line 315 — at the end of the line, so not counted as SHORT (which ends in a space)
 { const F = lines.filter(l => l.startsWith('FACT: '));
@@ -100,6 +102,7 @@ const SHA_BEFORE = { 'PROACTIVE RESOURCE POINTER': '50d31f82baaa3747', 'ANSWER B
   'EXTERNAL CONSTRAINT RECOGNITION': 'eb785604836b1876', 'PIPELINE PRINCIPLE': '364209d0f349a676', 'SOURCE HANDLING': '9e815860c2ffb495' };
 // UPDATED (24/10, Π3, tests only): a later Π3 commit that edits one of the six lines puts its own pair in its slot (unshift: the newest
 // edit is taken back first).
+// Π3 (η) back:
 // Π3 (δ) back:
 TEXT_BACK.unshift(['Neither is stated as a fact here (the content limit in PROACTIVE RESOURCE POINTER above), and the latter is genuinely EXTERNAL CONSTRAINT territory below, not this one)', 'The former can be stated factually and accurately, with the same care Claude already applies to health topics generally — the latter cannot, and that is genuinely EXTERNAL CONSTRAINT territory below, not this one)']); // (δ) line 39
 TEXT_BACK.unshift(['Apply ANSWER BEFORE INTERPRETATION normally to general factual questions that are not about law, money or health;', 'Apply ANSWER BEFORE INTERPRETATION normally to general factual/statistical questions, health-related or not;']); // (δ) line 39
