@@ -35,6 +35,12 @@ for (const [head, clause] of Object.entries(RULES)) {
 // commit can be reverted on its own and a clause nobody counted still fails.
 let MORE_SHORT = 0, MORE_CLAUSES = 0;
 // Π3 (γ):
+MORE_CLAUSES += 1; // (γ) line 315 — at the end of the line, so not counted as SHORT (which ends in a space)
+{ const F = lines.filter(l => l.startsWith('FACT: '));
+  assert('(γ) FACT: the short clause right after «answer immediately.», once — the classification yields to the content limit',
+    F.length === 1 && F[0] === 'FACT: direct knowledge → answer immediately. ' + SHORT.trimEnd());
+  assert('(γ) SCOPE LIMIT ON FACT ANSWERS (321) is unchanged — it only narrows «answer immediately», it grants nothing',
+    h(lines.find(l => l.startsWith('SCOPE LIMIT ON FACT ANSWERS (')) || '') === '42713032f7bd93fa'); }
 // Π3 (δ):
 // Π3 (ε):
 // Π3 (στ):
