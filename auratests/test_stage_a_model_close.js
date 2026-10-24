@@ -186,6 +186,7 @@ const P3_CLAUSES = [['it should not take user frustration to say this): ', P3_LO
 // Each later Π3 commit puts its own undo pairs in its own slot below (unshift: the newest edit is undone first), so that each commit
 // can be reverted on its own.
 // Π3 (ζ):
+P3_TEXT.unshift(['ANALYSIS: no first-person, no personal decision → answer directly. ' + P3_SHORT.trimEnd(), 'ANALYSIS: no first-person, no personal decision → answer directly.']); // (ζ) line 314
 // Π3 (η):
 // Π3 (γ):
 P3_TEXT.unshift(['FACT: direct knowledge → answer immediately. ' + P3_SHORT.trimEnd(), 'FACT: direct knowledge → answer immediately.']); // (γ) line 315

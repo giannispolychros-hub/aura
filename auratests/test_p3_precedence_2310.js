@@ -35,6 +35,10 @@ for (const [head, clause] of Object.entries(RULES)) {
 // commit can be reverted on its own and a clause nobody counted still fails.
 let MORE_SHORT = 0, MORE_CLAUSES = 0;
 // Π3 (ζ):
+MORE_CLAUSES += 1; // (ζ) line 314 — at the end of the line, like (γ)
+{ const A = lines.filter(l => l.startsWith('ANALYSIS: no first-person'));
+  assert('(ζ) ANALYSIS (314): the short clause right after «answer directly.», once — an analysis of the economy or of health yields to the content limit',
+    A.length === 1 && A[0] === 'ANALYSIS: no first-person, no personal decision → answer directly. ' + SHORT.trimEnd()); }
 // Π3 (η):
 // Π3 (γ):
 MORE_CLAUSES += 1; // (γ) line 315 — at the end of the line, so not counted as SHORT (which ends in a space)
