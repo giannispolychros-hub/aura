@@ -42,6 +42,11 @@ MORE_CLAUSES += 1; // (γ) line 315 — at the end of the line, so not counted a
   assert('(γ) SCOPE LIMIT ON FACT ANSWERS (321) is unchanged — it only narrows «answer immediately», it grants nothing',
     h(lines.find(l => l.startsWith('SCOPE LIMIT ON FACT ANSWERS (')) || '') === '42713032f7bd93fa'); }
 // Π3 (δ):
+{ const C = lineOf('CRITICAL CORRECTION on what counts as answerable')[0] || '';
+  assert('(δ) CRITICAL CORRECTION (39): no permission for health statistics — «can be stated factually» and «health-related or not» are gone',
+    !C.includes('can be stated factually') && !C.includes('health-related or not') && !C.includes('factual/statistical'));
+  assert('(δ) CRITICAL CORRECTION (39): the two new sentences, word for word', C.includes('Neither is stated as a fact here (the content limit in PROACTIVE RESOURCE POINTER above), and the latter is genuinely EXTERNAL CONSTRAINT territory below, not this one)') &&
+    C.includes('Apply ANSWER BEFORE INTERPRETATION normally to general factual questions that are not about law, money or health;')); }
 // Π3 (ε):
 // Π3 (στ):
 assert('CLAUSE: the long one once and the short one five times, nowhere else in the prompt — apart from the clauses the later Π3 commits count above',
@@ -85,6 +90,8 @@ const SHA_BEFORE = { 'PROACTIVE RESOURCE POINTER': '50d31f82baaa3747', 'ANSWER B
 // UPDATED (24/10, Π3, tests only): a later Π3 commit that edits one of the six lines puts its own pair in its slot (unshift: the newest
 // edit is taken back first).
 // Π3 (δ) back:
+TEXT_BACK.unshift(['Neither is stated as a fact here (the content limit in PROACTIVE RESOURCE POINTER above), and the latter is genuinely EXTERNAL CONSTRAINT territory below, not this one)', 'The former can be stated factually and accurately, with the same care Claude already applies to health topics generally — the latter cannot, and that is genuinely EXTERNAL CONSTRAINT territory below, not this one)']); // (δ) line 39
+TEXT_BACK.unshift(['Apply ANSWER BEFORE INTERPRETATION normally to general factual questions that are not about law, money or health;', 'Apply ANSWER BEFORE INTERPRETATION normally to general factual/statistical questions, health-related or not;']); // (δ) line 39
 // Π3 (ε) back:
 for (const head of Object.keys(RULES)) assert(`UNCHANGED otherwise: ${head} is the line before Π3, byte for byte`, h(back(lineOf(head)[0] || '')) === SHA_BEFORE[head]);
 
