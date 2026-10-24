@@ -40,6 +40,12 @@ MORE_CLAUSES += 1; // (ζ) line 314 — at the end of the line, like (γ)
   assert('(ζ) ANALYSIS (314): the short clause right after «answer directly.», once — an analysis of the economy or of health yields to the content limit',
     A.length === 1 && A[0] === 'ANALYSIS: no first-person, no personal decision → answer directly. ' + SHORT.trimEnd()); }
 // Π3 (η):
+{ const P35 = lineOf('PROACTIVE RESOURCE POINTER')[0] || '';
+  assert('(η) 35: the clinics are no longer what AURA should say sooner — the kind of professional is; the long clause\'s anchor is kept',
+    P35.includes('before AURA pointed to where help could come from (in that session by naming free smoking-cessation clinics; here only the kind of professional is named, e.g. a doctor — the content limit that follows); it should not take user frustration to say this): ') && !P35.includes('before AURA mentioned that free smoking-cessation clinics exist'));
+  assert('(η) 35: no health example for the landscape of approaches', !P35.includes('smoking cessation approaches') && P35.includes('the landscape of a familiar problem type and asked for it'));
+  assert('(η) 35: Level 2 names no platform the user did not name and gives no price (pricing is a money fact)',
+    !P35.includes('platforms/mechanics/pricing') && P35.includes('Only give the mechanics (Level 2) if the user indicates they want to continue into it, and even then no platform the user did not name and no price or fee (the content limit at the start of this rule) — do not front-load full detail just because you have it.')); }
 // Π3 (γ):
 MORE_CLAUSES += 1; // (γ) line 315 — at the end of the line, so not counted as SHORT (which ends in a space)
 { const F = lines.filter(l => l.startsWith('FACT: '));
@@ -107,6 +113,9 @@ const SHA_BEFORE = { 'PROACTIVE RESOURCE POINTER': '50d31f82baaa3747', 'ANSWER B
 // UPDATED (24/10, Π3, tests only): a later Π3 commit that edits one of the six lines puts its own pair in its slot (unshift: the newest
 // edit is taken back first).
 // Π3 (η) back:
+TEXT_BACK.unshift(['before AURA pointed to where help could come from (in that session by naming free smoking-cessation clinics; here only the kind of professional is named, e.g. a doctor — the content limit that follows);', 'before AURA mentioned that free smoking-cessation clinics exist;']); // (η) line 35
+TEXT_BACK.unshift(['the landscape of a familiar problem type and asked for it', 'the landscape of a familiar problem type (e.g. smoking cessation approaches) and asked for it']); // (η) line 35
+TEXT_BACK.unshift(['Only give the mechanics (Level 2) if the user indicates they want to continue into it, and even then no platform the user did not name and no price or fee (the content limit at the start of this rule) — do not front-load full detail just because you have it.', 'Only give specific platforms/mechanics/pricing (Level 2) if the user indicates they want to continue into it — do not front-load full detail just because you have it.']); // (η) line 35
 // Π3 (δ) back:
 TEXT_BACK.unshift(['Neither is stated as a fact here (the content limit in PROACTIVE RESOURCE POINTER above), and the latter is genuinely EXTERNAL CONSTRAINT territory below, not this one)', 'The former can be stated factually and accurately, with the same care Claude already applies to health topics generally — the latter cannot, and that is genuinely EXTERNAL CONSTRAINT territory below, not this one)']); // (δ) line 39
 TEXT_BACK.unshift(['Apply ANSWER BEFORE INTERPRETATION normally to general factual questions that are not about law, money or health;', 'Apply ANSWER BEFORE INTERPRETATION normally to general factual/statistical questions, health-related or not;']); // (δ) line 39

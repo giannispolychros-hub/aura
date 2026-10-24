@@ -188,6 +188,9 @@ const P3_CLAUSES = [['it should not take user frustration to say this): ', P3_LO
 // Π3 (ζ):
 P3_TEXT.unshift(['ANALYSIS: no first-person, no personal decision → answer directly. ' + P3_SHORT.trimEnd(), 'ANALYSIS: no first-person, no personal decision → answer directly.']); // (ζ) line 314
 // Π3 (η):
+P3_TEXT.unshift(['before AURA pointed to where help could come from (in that session by naming free smoking-cessation clinics; here only the kind of professional is named, e.g. a doctor — the content limit that follows);', 'before AURA mentioned that free smoking-cessation clinics exist;']); // (η) line 35
+P3_TEXT.unshift(['the landscape of a familiar problem type and asked for it', 'the landscape of a familiar problem type (e.g. smoking cessation approaches) and asked for it']); // (η) line 35
+P3_TEXT.unshift(['Only give the mechanics (Level 2) if the user indicates they want to continue into it, and even then no platform the user did not name and no price or fee (the content limit at the start of this rule) — do not front-load full detail just because you have it.', 'Only give specific platforms/mechanics/pricing (Level 2) if the user indicates they want to continue into it — do not front-load full detail just because you have it.']); // (η) line 35
 // Π3 (γ):
 P3_TEXT.unshift(['FACT: direct knowledge → answer immediately. ' + P3_SHORT.trimEnd(), 'FACT: direct knowledge → answer immediately.']); // (γ) line 315
 // Π3 (δ):
