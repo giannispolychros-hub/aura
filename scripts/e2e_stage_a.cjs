@@ -4096,6 +4096,9 @@ const ORGF_SRC = fs.readFileSync(path.join(REPO, 'src', 'App.jsx'), 'utf8');
 const ORGF_FILTERS = (() => { try { return ORGF.loadFilters(ORGF_SRC); } catch (e) { return null; } })();
 const ORGF_HELPLINES = ORGF.loadHelplines(ORGF_SRC);
 const afterFilters = t => { if (!ORGF_FILTERS) return null; try { return ORGF_FILTERS.afterFilters(t); } catch (e) { return null; } };
+// 24/10 (Π3 step 3): the app's own detector of danger from another person (Ο5, on main since 23/10), lifted out of the same App.jsx — on
+// that path the app sends SAFETY on every request, as on the crisis path, so the MASTER PRIORITY check reads it as the safety path too
+const DANGER_FROM_OTHER = (() => { try { return ORGF.lift(ORGF_SRC, ['detectsDangerFromOther']).detectsDangerFromOther; } catch (e) { return null; } })();
 const STRESS = has('--stress');
 const FIRST_WHY_Q = 'Γιατί έχει σημασία αυτό για σένα τώρα;';
 
@@ -4569,7 +4572,7 @@ async function runStressSession(item, aura, user, budget) {
   // than SAFETY (or SAFETY with no crisis signal) is a safety finding (★); OPENING / GRACEFUL EXIT out of place is a note.
   const _closingTest = t => isExit(t) || !!(APP.fns.matchesClosingWord && APP.fns.matchesClosingWord(t));
   sess.rounds = SL.loopRounds(sess.turns, sess.calls, { methodLine: T.methodLine });
-  { const o = SL.stageOrderFindings(sess.rounds, { crisis: t => !!APP.fns.detectSafetySignal && APP.fns.detectSafetySignal(t) === 'CRISIS', closing: _closingTest });
+  { const o = SL.stageOrderFindings(sess.rounds, { crisis: t => (!!APP.fns.detectSafetySignal && APP.fns.detectSafetySignal(t) === 'CRISIS') || !!(DANGER_FROM_OTHER && DANGER_FROM_OTHER(t)), closing: _closingTest });
     for (const f of o.safety) sess.checks.safety.push('σειρά MASTER PRIORITY: ' + f);
     if (o.safety.length) sess.applies.safety = true;
     for (const f of o.other) sess.notes.push('σειρά MASTER PRIORITY: ' + f); }
@@ -4619,6 +4622,8 @@ async function runStressSession(item, aura, user, budget) {
     if (p.risk === 'crisis' && sess.crisisTurns.length) await crisisRiskSources(sess, user, riskQ);
     for (const f of SL.finalBrakeFindings(sess, { riskQ, helplines: APP.helplines })) {
       if (/^ℹ/.test(f)) { if (!sess.notes.includes(f)) sess.notes.push(f); } else if (!sess.brake.includes(f)) sess.brake.push(f); }
+    // 24/10 (John, Π3 step 3): in a Π3 session, a sign of the failure criteria that code can see in the RAW text stops the run too
+    for (const f of SL.p3BrakeFindings(sess)) if (!sess.brake.includes(f)) sess.brake.push(f);
     if (sess.brake.length && !FINAL_HALT.reason && has('--real')) FINAL_HALT.reason = sess.label + ': ' + sess.brake[0]; // a mechanism check runs to the end
   }
   await page.screenshot({ path: path.join(OUT, 'stress-' + item.label + '-end.png'), fullPage: true }).catch(() => {});
@@ -4716,7 +4721,7 @@ async function mainStress() {
   const real = has('--real');
   const only = (opt('--sessions', '') || '').split(',').map(x => x.trim()).filter(Boolean);
   // «επιλογή» (--sessions) can re-run a session of either round; the full test without --sessions stays the 16 users
-  const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17), SL.FOUNDER_PERSONAS || [], SL.VOICE_PERSONAS || [], SL.LOOP_PERSONAS || [], SL.REHEARSAL_PERSONAS || [], SL.TARGETED_PERSONAS || [], SL.FINAL_PERSONAS || [], SL.MECHANISM_PERSONAS || []) : SL.PERSONAS;
+  const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17), SL.FOUNDER_PERSONAS || [], SL.VOICE_PERSONAS || [], SL.LOOP_PERSONAS || [], SL.REHEARSAL_PERSONAS || [], SL.TARGETED_PERSONAS || [], SL.FINAL_PERSONAS || [], SL.MECHANISM_PERSONAS || [], SL.P3_PERSONAS || []) : SL.PERSONAS;
   const plan = SL.planRuns(PEOPLE, only.length ? only : null);
   // 22/10 (the last hard test): in waves, the sessions run in the order they were asked for (the crisis ones first)
   // 23/10 (John, Phase 2): a session asked twice runs the second time where it was asked the second time (SL.askedOrder)

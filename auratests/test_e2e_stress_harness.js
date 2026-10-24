@@ -412,7 +412,8 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
     // UPDATED (22/10, John's targeted test on a409a47 — work branch only): … and the seven targeted sessions (81–87).
     // UPDATED (22/10, the last hard test — work branch only): … and its 23 sessions (101–131).
     // UPDATED (23/10, John's Phase 1, Theme C — work branch only): … and the ten mechanism sessions (141–150).
-    /const PEOPLE = has\('--hard'\) \? SL\.HARD_PERSONAS : only\.length \? SL\.PERSONAS\.concat\(SL\.HARD_PERSONAS\.filter\(p => p\.id >= 17\), SL\.FOUNDER_PERSONAS \|\| \[\], SL\.VOICE_PERSONAS \|\| \[\], SL\.LOOP_PERSONAS \|\| \[\], SL\.REHEARSAL_PERSONAS \|\| \[\], SL\.TARGETED_PERSONAS \|\| \[\], SL\.FINAL_PERSONAS \|\| \[\], SL\.MECHANISM_PERSONAS \|\| \[\]\) : SL\.PERSONAS;/.test(RUNNER) &&
+    // UPDATED (24/10, Π3 step 3 — branch p3-prompt): … and the three new Π3 sessions (161–163), last.
+    /const PEOPLE = has\('--hard'\) \? SL\.HARD_PERSONAS : only\.length \? SL\.PERSONAS\.concat\(SL\.HARD_PERSONAS\.filter\(p => p\.id >= 17\), SL\.FOUNDER_PERSONAS \|\| \[\], SL\.VOICE_PERSONAS \|\| \[\], SL\.LOOP_PERSONAS \|\| \[\], SL\.REHEARSAL_PERSONAS \|\| \[\], SL\.TARGETED_PERSONAS \|\| \[\], SL\.FINAL_PERSONAS \|\| \[\], SL\.MECHANISM_PERSONAS \|\| \[\], SL\.P3_PERSONAS \|\| \[\]\) : SL\.PERSONAS;/.test(RUNNER) &&
     /SL\.planRuns\(PEOPLE, only\.length \? only : null\)/.test(RUNNER));
   {
     // «επιλογή» (--sessions) re-runs a failed session of EITHER round: the 16 users plus the new ones (17–30); without
@@ -1113,7 +1114,9 @@ const PENDING = [];
     /stage: SL\.masterStage\(sysText\), notes: SL\.noteLabels\(body\.system\) \}\);/.test(RUNNER) && /function stressFakeAura\(persona\) \{/.test(RUNNER) &&
     /: stressFakeAura\(item\.persona\);/.test(RUNNER) && /\} else if \(p\.mechanism && s\.ask && st && st\.say !== undefined && !st\.rootOk\) \{/.test(RUNNER) &&
     /if \(p\.mechanism && sess\.rootConfirmed\) \{/.test(RUNNER) && /sess\.mechanismCheck = SL\.mechanismCheck\(sess, p\);/.test(RUNNER) &&
-    /for \(const s of sessions\) await judgeMechanism\(s,/.test(RUNNER) && /L\.push\(\.\.\.mechanismReport\(S\)\);/.test(LIBSRC) && /SL\.MECHANISM_PERSONAS \|\| \[\]\) : SL\.PERSONAS;/.test(RUNNER));
+    /for \(const s of sessions\) await judgeMechanism\(s,/.test(RUNNER) && /L\.push\(\.\.\.mechanismReport\(S\)\);/.test(LIBSRC) &&
+    // UPDATED (24/10, Π3 step 3 — branch p3-prompt): the mechanism sessions are still in the pool, now followed by the Π3 sessions (161–163)
+    /SL\.MECHANISM_PERSONAS \|\| \[\], SL\.P3_PERSONAS \|\| \[\]\) : SL\.PERSONAS;/.test(RUNNER));
 }
 // 23/10: the checks that run the runner's async functions are awaited before the count
 Promise.all(PENDING).then(() => {

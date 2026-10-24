@@ -16,7 +16,9 @@ const path = require('path');
 // the session's state: stripRepeatedThreeBeat, guardStopMoment, and the lines the app adds itself (crisis line, danger line, AI line)
 // — those are in SCREEN. So AFTER FILTERS is a reconstruction from the app's code, not the app's own variable.
 const FILTER_CHAIN = ['stripInternalLabels', 'stripForeignHelplines', 'stripRootDeclaration', 'stripPressurePhrases', 'stripAraDeclarative'];
-function loadFilters(src) {
+// top-level functions of App.jsx, lifted out with every top-level function and const they use (the prompt left out), as an object
+function lift(src, wanted) { return liftWithNames(src, wanted).lib; }
+function liftWithNames(src, wanted) {
   const ci = src.indexOf('const AURA_CORE_PERSONALITY'), ce = src.indexOf('`;', src.indexOf('`', ci) + 1) + 2;
   const code = src.slice(0, ci) + src.slice(ce);
   const starts = [...code.matchAll(/^(?:function ([A-Za-z_]\w*)\(|const ([A-Za-z_]\w*) = )/gm)].map(m => ({ name: m[1] || m[2], at: m.index }));
@@ -29,15 +31,19 @@ function loadFilters(src) {
     if (/^function /.test(text)) text = text.slice(0, text.indexOf('\n}') + 2);
     chunk[s.name] = { text, at: s.at };
   }
-  const need = new Set(), todo = [...FILTER_CHAIN];
+  const need = new Set(), todo = [...wanted];
   while (todo.length) {
     const n = todo.pop(); if (need.has(n) || !chunk[n]) continue; need.add(n);
     for (const id of new Set(chunk[n].text.match(/[A-Za-z_]\w*/g) || [])) if (id !== n && chunk[id] && !need.has(id)) todo.push(id);
   }
   const ordered = [...need].sort((a, b) => chunk[a].at - chunk[b].at);
-  const lib = new Function(ordered.map(n => chunk[n].text).join('\n') + '\nreturn { ' + FILTER_CHAIN.join(', ') + ' };')();
+  const lib = new Function(ordered.map(n => chunk[n].text).join('\n') + '\nreturn { ' + wanted.join(', ') + ' };')();
+  return { names: ordered, lib };
+}
+function loadFilters(src) {
+  const { names, lib } = liftWithNames(src, FILTER_CHAIN);
   return {
-    names: ordered,
+    names,
     afterFilters: raw => {
       let t = String(raw || '').replace(/\s*\[\[EARLY_WORD:yes\]\]\s*/gi, '\n').trim().replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, '');
       const r = lib.stripInternalLabels(t); t = r && typeof r === 'object' ? r.text : r;
@@ -155,7 +161,7 @@ function reportRun(runJson, appSrc) {
   const filters = loadFilters(appSrc), helplines = loadHelplines(appSrc);
   return (runJson.sessions || []).map(s => ({ label: s.label, rows: flagsForSession(s, filters, helplines) })).filter(x => x.rows.length);
 }
-module.exports = { loadFilters, loadHelplines, orgFlags, flagsForSession, filterChanges, filterChangesForSession, reportRun, FILTER_CHAIN };
+module.exports = { lift, loadFilters, loadHelplines, orgFlags, flagsForSession, filterChanges, filterChangesForSession, reportRun, FILTER_CHAIN };
 
 if (require.main === module) {
   // node scripts/org_flags.cjs <stress-report.json> [App.jsx] — prints the flag list, for reading
