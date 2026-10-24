@@ -32,6 +32,14 @@ on:
         description: 'Μόνο για «επιλογή»: όριο σε δολάρια (το πολύ 25)'
         type: string
         default: '5'
+      parallel:
+        description: 'Μόνο για «επιλογή»: πόσες συνεδρίες μαζί, σε κύματα (1–5)'
+        type: string
+        default: '1'
+      optional:
+        description: 'Μόνο για «επιλογή»: συνεδρίες που ξεκινούν μόνο αν χωράει η εκτίμησή τους, π.χ. 151,152 (κενό = καμία)'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -42,7 +50,7 @@ concurrency:
 
 jobs:
   stress:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - name: Υπάρχει το κλειδί; (ελέγχεται χωρίς να διαβαστεί)
@@ -83,6 +91,8 @@ jobs:
           MODE: ${{ inputs.mode }}
           SESSIONS: ${{ inputs.sessions }}
           BUDGET: ${{ inputs.budget }}
+          PARALLEL: ${{ inputs.parallel }}
+          OPTIONAL: ${{ inputs.optional }}
         run: |
           OUT="$(node -p "require('os').tmpdir()")/aura_stress"
           echo "AURA_STRESS_OUT=$OUT" >> "$GITHUB_ENV"
@@ -92,10 +102,10 @@ jobs:
             πλήρες) node scripts/e2e_stage_a.cjs --stress --real --yes --budget 25 --minutes 75 --out "$OUT" ;;
             επιλογή)
               # only digits, dots and commas; a number for the budget (the script refuses anything above $25)
-              if ! [[ "$SESSIONS" =~ ^[0-9][0-9.,]*$ ]] || ! [[ "$BUDGET" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+              if ! [[ "$SESSIONS" =~ ^[0-9][0-9.,]*$ ]] || ! [[ "$BUDGET" =~ ^[0-9]+(\.[0-9]+)?$ ]] || ! [[ "${PARALLEL:-1}" =~ ^[1-5]$ ]] || ! [[ -z "$OPTIONAL" || "$OPTIONAL" =~ ^[0-9][0-9.,]*$ ]]; then
                 echo "::error::Για «επιλογή» χρειάζονται συνεδρίες (π.χ. 15,1.1) και όριο σε δολάρια."; exit 2
               fi
-              node scripts/e2e_stage_a.cjs --stress --real --yes --sessions "$SESSIONS" --budget "$BUDGET" --minutes 75 --out "$OUT" ;;
+              node scripts/e2e_stage_a.cjs --stress --real --yes --sessions "$SESSIONS" --budget "$BUDGET" --parallel "${PARALLEL:-1}" ${OPTIONAL:+--optional "$OPTIONAL"} --minutes 75 --out "$OUT" ;;
             σκληρό) node scripts/e2e_stage_a.cjs --stress --real --yes --hard --budget 10 --minutes 75 --out "$OUT" ;;
             *)      echo "::error::Άγνωστη επιλογή"; exit 2 ;;
           esac

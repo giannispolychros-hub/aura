@@ -399,13 +399,25 @@ assert('(Κ) UNCHANGED: the Stage A texts (no new text: the goodbye is the exist
   const seen = new Set();
   // the browser script's own O5 section (runMockO5) is the one place meant to hold danger messages — left out; everything else is read
   const withoutO5 = t => { const a = t.indexOf('async function runMockO5('); return a < 0 ? t : t.slice(0, a) + t.slice(t.indexOf('\n}\n', a) + 3); };
-  for (const f of files) for (const m of withoutO5(fs.readFileSync(f, 'utf8')).matchAll(STR)) {
+  // UPDATED (24/10, Π3 step 2, the stress tool brought onto this branch): the stress tool's two danger-from-another sessions — 125
+  // (risk: 'violence') and 126 (risk: 'child') — are meant to hold danger messages too, like runMockO5: left out, and checked below to
+  // be CAUGHT; no other persona is left out
+  const DANGER_PERSONA = /^  finalP\(\{ id: (\d+), [^\n]*risk: '(?:violence|child)'[\s\S]*?(?=^  finalP\(\{|^\];)/gm;
+  const dangerOut = [];
+  const withoutDanger = t => t.replace(DANGER_PERSONA, (b, id) => { dangerOut.push({ id: +id, block: b }); return ''; });
+  for (const f of files) for (const m of withoutDanger(withoutO5(fs.readFileSync(f, 'utf8'))).matchAll(STR)) {
     const s = (m[1] || m[2] || m[3]).replace(/\\n/g, '\n').replace(/\\(.)/g, '$1');
     if ((s.match(/\p{L}/gu) || []).length >= 2) seen.add(s);
   }
   const hits = [...seen].filter(s => D(s));
   assert(`(Λ) none of the ${seen.size} strings of the other tests and the browser scripts is caught — no existing flow moves` + (hits.length ? ' — ' + hits.slice(0, 3).join(' | ') : ''),
     seen.size > 10000 && hits.length === 0);
+  const ids = dangerOut.map(x => x.id).sort((a, b) => a - b).join(',');
+  assert('(Λ) …the only personas left out are the two danger-from-another sessions of the stress tool (125, 126), or none where the tool is absent',
+    ids === '125,126' || (ids === '' && !fs.readFileSync(path.join(ROOT, 'scripts', 'e2e_stress_lib.cjs'), 'utf8').includes("risk: 'violence'")));
+  const firsts = dangerOut.map(x => (x.block.match(/forced: \{ 1: '([^']+)'/) || [])[1]).filter(Boolean);
+  assert('(Λ) …and their first messages ARE caught (they test this path): ' + firsts.map(x => '«' + x + '»').join(', '),
+    firsts.length === dangerOut.length && firsts.every(x => D(x)));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
