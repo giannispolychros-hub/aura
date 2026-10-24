@@ -214,13 +214,16 @@ const P = S.P3_PERSONAS || [], by = id => P.find(p => p.id === id) || {};
     S.auraCallHold({ system: [{ text: 'α'.repeat(171008), cache_control: {} }], messages: [{ role: 'user', content: 'λ'.repeat(4000) }] }, 171008));
   assert('HOLD (AURA): a block marked for the cache that is not the core is held at one token per byte', Math.abs(S.auraCallHold({ system: [{ text: 'x'.repeat(10000), cache_control: {} }], messages: [] }, 5) -
     (10000 * 3.75 + 100 * 3 + 1000 * 15) / 1e6) < 1e-12);
-  assert('HOLD (Haiku): every byte a token at the cache-write price, and 4,000 out', S.userCallHold && Math.abs(S.userCallHold({ system: 'ab', prompt: 'λλ', schema: {} }) - ((2 + 4 + 2 + 200) * 0.125 + 4000 * 0.5) / 1e6) < 1e-15);
+  // UPDATED (25/10, second message): 2,000 tokens, not 200, for what the API adds (section 9)
+  assert('HOLD (Haiku): every byte a token at the cache-write price, and 4,000 out', S.userCallHold && Math.abs(S.userCallHold({ system: 'ab', prompt: 'λλ', schema: {} }) - ((2 + 4 + 2 + 2000) * 0.125 + 4000 * 0.5) / 1e6) < 1e-15);
   assert('HOLD: the run holds for EVERY session (no «if (p.final)» around it, no canSpend left in the session) and for every Haiku call',
-    /const hold = Math\.max\(WORST_FINAL, SL\.auraCallHold\(body, APP\.consts\.core\.length\)\);/.test(RUNNER) &&
+    /\n\s*hold = Math\.max\(WORST_FINAL, SL\.auraCallHold\(body, APP\.consts\.core\.length\)\);/.test(RUNNER) && /let r, hold = 0, callCost = 0, charged = false;/.test(RUNNER) &&
     !/budget\.canSpend\('aura'\)/.test(RUNNER.slice(RUNNER.indexOf('async function runStressSession('), RUNNER.indexOf('// ADR «17 Οκτωβρίου» — the second judge'))) &&
     /const hold = SL\.userCallHold\(\{ system, prompt, schema \}\);\n\s*while \(!budget\.reserve\(hold\)\)/.test(RUNNER) && !/budget\.canSpend\('user'\)/.test(RUNNER));
-  assert('HOLD: released on every path — after the cost is counted, and on an SDK error', /budget\.release\(hold\);\n\s*return \{ error: e instanceof Anthropic\.APIError/.test(RUNNER) &&
-    /const cost = budget\.add\(r\.usage, 'user'\);\n\s*budget\.release\(hold\);/.test(RUNNER) && /r\._counted = true; if \(c > hold\) HOLD_EXCEEDED\.push/.test(RUNNER));
+  // UPDATED (25/10, second message): on an SDK error the hold is now charged before it is released (section 9)
+  assert('HOLD: released on every path — after the cost is counted, and on an SDK error', /budget\.release\(hold\);\n\s*USER_CALLS\.push\(\{ cost: charged, hold, charged: true \}\);\n\s*return \{ error: e instanceof Anthropic\.APIError/.test(RUNNER) &&
+    /const cost = budget\.add\(r\.usage, 'user'\);\n\s*budget\.release\(hold\);/.test(RUNNER) && /r\._counted = true; if \(c > hold\) HOLD_EXCEEDED\.push/.test(RUNNER) &&
+    /charged = true; r\._counted = true; \}\n\s*budget\.release\(hold\);/.test(RUNNER));
   assert('HOLD: a call that cost more than it held is written in the report (none expected)', /meta\.holdExceeded = HOLD_EXCEEDED;/.test(RUNNER) && /Κλήσεις που κόστισαν περισσότερο από τη θέση που κράτησαν: /.test(LIBSRC));
   // two sessions at once, each call costing at most what it holds: the total never passes the cap, whatever the order
   let worst = 0;
@@ -234,6 +237,56 @@ const P = S.P3_PERSONAS || [], by = id => P.find(p => p.id === id) || {};
     }
   }
   assert('CAP: 200 random runs of two sessions at once, each call within its hold — the spend never passes $4.20 (most: $' + worst.toFixed(3) + ')', worst <= 4.2 + 1e-9 && worst > 3.5);
+}
+
+// ── 9. John, 25/10 (second message): the hold is an upper bound, failed calls, no hidden retries, every call on the record ──────────
+{
+  assert('PRICES: Sonnet 4.6 as on the official page — $3 in, $3.75 written to the 5-minute cache, $0.30 read, $15 out',
+    S.PRICES.aura.input === 3 && S.PRICES.aura.cacheWrite === 3.75 && S.PRICES.aura.cacheRead === 0.30 && S.PRICES.aura.output === 15);
+  assert('PRICES: Haiku 5.5 — $0.10 / $0.125 / $0.50 up to 100,000 prompt tokens, five times that above (counted so)',
+    S.PRICES.user.input === 0.10 && S.PRICES.user.cacheWrite === 0.125 && S.PRICES.user.output === 0.50 && S.PRICES_USER_LONG.input === 0.50 && S.PRICES_USER_LONG.output === 2.50 &&
+    Math.abs(S.costOf({ input_tokens: 100000 }, 'user') - 0.01) < 1e-12 && Math.abs(S.costOf({ input_tokens: 100001 }, 'user') - 0.0500005) < 1e-12);
+  assert('PRICES: the api pins claude-sonnet-4-6, caps the reply at 1,000 tokens and makes ONE call, no retry; the app asks the 5-minute cache only',
+    /const ALLOWED_MODEL = "claude-sonnet-4-6";/.test(fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8')) &&
+    /max_tokens: Math\.min\(body\.max_tokens \|\| 1000, 1000\),/.test(fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8')) &&
+    (fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8').match(/await fetch\(/g) || []).length === 1 &&
+    !/ttl/.test(fs.readFileSync(path.join(ROOT, 'src', 'App.jsx'), 'utf8').slice(0, 1).concat((fs.readFileSync(path.join(ROOT, 'src', 'App.jsx'), 'utf8').match(/cache_control: \{[^}]*\}/g) || []).join(' '))));
+  assert('HOLD (Haiku): 2,000 tokens for what the API adds, and the long-prompt prices past 100,000', Math.abs(S.userCallHold({ system: '', prompt: 'a', schema: {} }) - ((1 + 2 + 2000) * 0.125 + 4000 * 0.5) / 1e6) < 1e-15 &&
+    Math.abs(S.userCallHold({ system: 'a'.repeat(100000), prompt: '', schema: {} }) - ((100000 + 2 + 2000) * 0.625 + 4000 * 2.5) / 1e6) < 1e-12);
+  assert('FAILED CALLS: only the api\'s own refusal BEFORE Anthropic (400/403/405/413/429, a plain string) counts as surely unbilled',
+    S.unbilledForSure({ status: 403, data: { error: 'Forbidden' } }) && S.unbilledForSure({ status: 429, data: { error: 'Too many requests' } }) &&
+    !S.unbilledForSure({ status: 400, data: { type: 'error', error: { type: 'invalid_request_error' } } }) && !S.unbilledForSure({ status: 502, data: { error: 'Upstream error' } }) &&
+    !S.unbilledForSure({ status: 529, data: { type: 'error' } }) && !S.unbilledForSure({ status: 200, data: null }));
+  assert('FAILED CALLS: a call with no usage that may have been billed counts its WHOLE hold as spent (AURA and Haiku)',
+    /else if \(!SL\.unbilledForSure\(r\)\) \{ const c = budget\.add\(\{ output_tokens: Math\.ceil\(hold \* 1e6 \/ PRICES_FOR_CHARGE\.aura\) \}, 'aura'\);/.test(RUNNER) &&
+    /const charged = budget\.add\(\{ output_tokens: Math\.ceil\(hold \* 1e6 \/ PRICES_FOR_CHARGE\.user\) \}, 'user'\);\n\s*budget\.release\(hold\);/.test(RUNNER) &&
+    /const PRICES_FOR_CHARGE = \{ aura: SL\.PRICES\.aura\.output, user: SL\.PRICES\.user\.output \};/.test(RUNNER) &&
+    Math.abs(S.costOf({ output_tokens: Math.ceil(0.4419 * 1e6 / 15) }, 'aura') - 0.4419) < 1e-4 && Math.abs(S.costOf({ output_tokens: Math.ceil(0.05 * 1e6 / 0.5) }, 'user') - 0.05) < 1e-9);
+  assert('RETRIES: none inside the SDK for Haiku (a retried attempt could be billed and never counted)', /new Anthropic\(\{ apiKey: KEY, maxRetries: 0 \}\)/.test(RUNNER) && !/maxRetries: 2/.test(RUNNER));
+  assert('RECORD: every AURA call keeps its cost, its hold and whether it was charged; every Haiku call too (numbers only)',
+    /notes: SL\.noteLabels\(body\.system\), cost: callCost, hold, charged \}\);/.test(RUNNER) && /USER_CALLS\.push\(\{ cost, hold, charged: false \}\);/.test(RUNNER) &&
+    /USER_CALLS\.push\(\{ cost: charged, hold, charged: true \}\);/.test(RUNNER) && /meta\.userCalls = USER_CALLS;/.test(RUNNER));
+  const rep = S.planReport([{ label: '1', calls: [{ hold: 0.4, cost: 0.03 }, { hold: 0.41, cost: 0.41, charged: true }] }], { plan: [{ n: 1, label: '1', id: 1, name: 'x', wave: 1 }], userCalls: [{ hold: 0.003, cost: 0.001 }], holdExceeded: [] }).join('\n');
+  assert('RECORD: the report says, from the run itself, how many calls cost ≤ their hold, and how many were charged', /AURA 2 από 2 κόστισαν ≤ τη θέση τους · Haiku 1 από 1 · κλήσεις χωρίς καταγραφή χρήσης, χρεωμένες με όλη τη θέση τους: 1/.test(rep));
+  // the check on a stored run: an upper bound of each call's real cost against the lower bound of its hold
+  const run = { sessions: [{ label: 'a', cost: 0.40, calls: [{ status: 200, cacheWrite: 84607, cacheRead: 0 }, { status: 200, cacheWrite: 0, cacheRead: 84607 }, { status: 400 }] }] };
+  const hc = S.holdCheckOnRun(run, 340320, 0.40);
+  assert('RUN CHECK: a cold write plus the rest of its session is within the hold; a 400 is not a billed call', hc.calls === 2 && hc.violations.length === 0 && hc.coreTokenBound === Math.ceil(340320 * 0.2486 * 1.1));
+  const hc2 = S.holdCheckOnRun({ sessions: [{ label: 'b', cost: 0.70, calls: [{ status: 200, cacheWrite: 84607, cacheRead: 0 }] }] }, 340320, 0.40);
+  const hc3 = S.holdCheckOnRun({ sessions: [{ label: 'c', cost: 0.03, calls: [{ status: 200, cacheWrite: 0, cacheRead: 99999 }] }] }, 340320, 0.40);
+  assert('RUN CHECK: a call that may have cost more than its hold is flagged, and so is a core larger than its token bound', hc2.violations.length === 1 && hc3.violations.length === 1);
+  // two sessions at once, some calls failing and charged their whole hold: the spend still never passes the cap
+  let worst = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    let x = seed * 7 + 3; const rnd = () => (x = (x * 16807) % 2147483647) / 2147483647;
+    const b = S.makeStressBudget(4.2); const flight = [];
+    for (let step = 0; step < 400; step++) {
+      if (flight.length < 2 && rnd() < 0.6) { const h = 0.38 + rnd() * 0.06; if (b.reserve(h)) flight.push({ h, c: rnd() < 0.15 ? h : h * rnd() }); }
+      else if (flight.length) { const f = flight.splice(Math.floor(rnd() * flight.length), 1)[0]; b.add({ output_tokens: Math.ceil(f.c * 1e6 / 15) }, 'aura'); b.release(f.h); }
+      worst = Math.max(worst, b.spent());
+    }
+  }
+  assert('CAP: with failed calls charged their whole hold, 200 random runs of two at once never pass $4.20 + rounding (most: $' + worst.toFixed(4) + ')', worst <= 4.2 + 0.001);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

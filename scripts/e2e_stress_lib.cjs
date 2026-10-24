@@ -31,6 +31,11 @@ const WORST_CALL = {
 // and 100 a request for the format; and the most the api lets out (1,000 tokens). Haiku: every byte of system, prompt and schema at most one
 // token at the cache-write price (the higher one costOf may charge), 200 for the format, and its max_tokens (4,000) out.
 const CORE_TOKENS_PER_BYTE = 0.2486 * 1.10;
+// 25/10 (John): what the api/aura.js answers itself, BEFORE any call to Anthropic (its guard: 400/403/405/413, its own rate limit 429) —
+// a plain string error. Anything else without usage (an Anthropic error, a lost connection, a stream) may have been billed: the run
+// then counts the call's whole hold as spent.
+const GUARD_STATUSES = [400, 403, 405, 413, 429];
+function unbilledForSure(r) { return !!(r && GUARD_STATUSES.includes(r.status) && r.data && typeof r.data.error === 'string'); }
 const bytesOf = t => Buffer.byteLength(String(t == null ? '' : t), 'utf8');
 function auraCallHold(body, coreLength) {
   const b = body || {}, sys = Array.isArray(b.system) ? b.system : [{ text: b.system }];
@@ -44,15 +49,45 @@ function auraCallHold(body, coreLength) {
   const written = Math.ceil(core * CORE_TOKENS_PER_BYTE) + otherCached, input = plain + 30 * msgs.length + 100;
   return (written * PRICES.aura.cacheWrite + input * PRICES.aura.input + 1000 * PRICES.aura.output) / 1e6;
 }
+// 25/10 (John): the check on a stored run (one that kept, per AURA call, its cache tokens — not its full cost). For every call that came
+// back 200: an UPPER bound of what it really cost — its own cache tokens at their prices plus everything the whole session spent beyond
+// the cache (every other call's input and output, and the session's Haiku calls) — against the LOWER bound of what the run now holds for
+// it: never less than `floor` (WORST_FINAL), nor than the core alone at its bound. It passes when upper ≤ lower. The core's cache tokens
+// are checked against their own bound as well.
+function holdCheckOnRun(run, coreBytes, floor) {
+  const coreTokenBound = Math.ceil(coreBytes * CORE_TOKENS_PER_BYTE);
+  const holdLower = Math.max(floor || 0, (coreTokenBound * PRICES.aura.cacheWrite + 100 * PRICES.aura.input + 1000 * PRICES.aura.output) / 1e6);
+  const out = { calls: 0, violations: [], maxUpper: 0, holdLower, coreTokenBound, maxCoreTokens: 0 };
+  for (const s of (run && run.sessions) || []) {
+    const cache = (s.calls || []).map(c => ((c.cacheWrite || 0) * PRICES.aura.cacheWrite + (c.cacheRead || 0) * PRICES.aura.cacheRead) / 1e6);
+    const rest = Math.max(0, (s.cost || 0) - cache.reduce((a, b) => a + b, 0));
+    (s.calls || []).forEach((c, i) => {
+      if (c.status !== 200) return;
+      out.calls++;
+      const upper = cache[i] + rest, tok = (c.cacheWrite || 0) + (c.cacheRead || 0);
+      out.maxUpper = Math.max(out.maxUpper, upper);
+      if (tok > 50000) out.maxCoreTokens = Math.max(out.maxCoreTokens, tok);
+      if (upper > holdLower || (tok > 50000 && tok > coreTokenBound)) out.violations.push(s.label + ' #' + (i + 1) + ': upper $' + upper.toFixed(4) + ', cache tokens ' + tok);
+    });
+  }
+  return out;
+}
 function userCallHold(o) {
   const x = o || {};
-  const n = bytesOf(x.system) + bytesOf(x.prompt) + bytesOf(JSON.stringify(x.schema || {})) + 200;
-  return (n * PRICES.user.cacheWrite + 4000 * PRICES.user.output) / 1e6;
+  // 25/10 (John): 2,000 tokens, not 200, for what the API adds itself (the format and the structured output's schema); the long-prompt
+  // prices when the bound passes 100,000 tokens
+  const n = bytesOf(x.system) + bytesOf(x.prompt) + bytesOf(JSON.stringify(x.schema || {})) + 2000;
+  const p = n > 100000 ? PRICES_USER_LONG : PRICES.user;
+  return (n * p.cacheWrite + 4000 * p.output) / 1e6;
 }
 
+// 25/10 (John): Haiku 5.5 is priced by prompt length (the official price page): over 100,000 input tokens (cache reads and writes
+// included) every price of the request is five times higher — counted so, never the lower one
+const PRICES_USER_LONG = { input: 0.50, output: 2.50, cacheWrite: 0.625, cacheRead: 0.50 };
 function costOf(u, who) {
-  const p = PRICES[who === 'user' ? 'user' : 'aura'];
   const x = u || {};
+  const promptTokens = (x.input_tokens || 0) + (x.cache_creation_input_tokens || 0) + (x.cache_read_input_tokens || 0);
+  const p = who === 'user' ? (promptTokens > 100000 ? PRICES_USER_LONG : PRICES.user) : PRICES.aura;
   return ((x.input_tokens || 0) * p.input + (x.output_tokens || 0) * p.output +
     (x.cache_creation_input_tokens || 0) * p.cacheWrite + (x.cache_read_input_tokens || 0) * p.cacheRead) / 1e6;
 }
@@ -762,6 +797,13 @@ function planReport(S, meta) {
     L.push('| ' + [r.n, r.label, r.id, cell(r.name, 90), r.wave, s ? 'ναι' : 'όχι', s ? (s.typed || []).length : '—', s ? (bad.join(', ') || '—') : '—',
       s && (s.brake || []).length ? cell(s.brake[0], 120) : '—'].join(' | ') + ' |');
   }
+  // 25/10 (John): every call against its own hold, from the run's own record (AURA in the sessions' calls, Haiku in meta.userCalls)
+  const A = [].concat(...(S || []).map(x => (x.calls || []).filter(c => typeof c.hold === 'number' && c.hold > 0)));
+  const U = (meta && meta.userCalls) || [];
+  const okA = A.filter(c => (c.cost || 0) <= c.hold + 1e-12).length, okU = U.filter(c => (c.cost || 0) <= c.hold + 1e-12).length;
+  L.push('', 'Κάθε κλήση με τη θέση της: AURA ' + okA + ' από ' + A.length + ' κόστισαν ≤ τη θέση τους · Haiku ' + okU + ' από ' + U.length +
+    ' · κλήσεις χωρίς καταγραφή χρήσης, χρεωμένες με όλη τη θέση τους: ' + (A.filter(c => c.charged).length + U.filter(c => c.charged).length) +
+    ' · η μεγαλύτερη θέση AURA: $' + (A.length ? Math.max(...A.map(c => c.hold)) : 0).toFixed(4) + ' · το μεγαλύτερο κόστος κλήσης AURA: $' + (A.length ? Math.max(...A.map(c => c.cost || 0)) : 0).toFixed(4) + '.');
   const over = (meta && meta.holdExceeded) || [];
   L.push('', 'Κλήσεις που κόστισαν περισσότερο από τη θέση που κράτησαν: ' + (over.length ? over.length + ' — ' + over.map(x => x.label + ' (' + x.who + ', $' + x.cost.toFixed(4) + ' > $' + x.hold.toFixed(4) + ')').join(' · ') : '0'), '');
   return L;
@@ -2199,7 +2241,7 @@ function buildStressReport(sessions, meta) {
 
 module.exports = {
   callTally,
-  USER_MODEL, PRICES, BUDGET_CAP, WORST_CALL, CORE_TOKENS_PER_BYTE, auraCallHold, userCallHold, planRows, shortNameMap, planReport, costOf, makeStressBudget, PERSONAS, HARD_PERSONAS, FOUNDER_PERSONAS, founderMetrics, BASE_POLICY, policyOf, planRuns, askedOrder, MAX_TYPED, EXIT_AFTER, EXIT_TEXT,
+  USER_MODEL, PRICES, BUDGET_CAP, WORST_CALL, CORE_TOKENS_PER_BYTE, PRICES_USER_LONG, GUARD_STATUSES, unbilledForSure, holdCheckOnRun, auraCallHold, userCallHold, planRows, shortNameMap, planReport, costOf, makeStressBudget, PERSONAS, HARD_PERSONAS, FOUNDER_PERSONAS, founderMetrics, BASE_POLICY, policyOf, planRuns, askedOrder, MAX_TYPED, EXIT_AFTER, EXIT_TEXT,
   USER_SCHEMA, CARD_SCHEMA, CLARITY_SCHEMA, personaSystem, personaPrompt, transcriptText, parseJsonReply, cleanUserText, JUDGE_SCHEMA, JUDGE_SYSTEM, judgePrompt,
   fold, findLabels, FAREWELLS, findFarewells, AFTER_CRISIS, AFTER_CRISIS_FIRST, crisisLineAt, afterCrisisFindings, isLeaving, pressureFindings, apiErrorLabel, edTechniqueFindings, aiIdentityFindings, promptTexts, normCorpus, promptLeakFindings, preRootClosingChecked, normalizeVerbatim, rootIsUserWords, rootQuestionUnderModelQuestion,
   orgFlagReport, ADVICE_VIOLATIONS, violationType, lastSessionEvents, telemetryIssues, estimateCost, CHECKS, sessionScore, buildStressReport, keyShape, KEY_KIND_TEXT,

@@ -4112,7 +4112,8 @@ function loadAnthropic() {
 // Ποτέ δεν γράφεται μήνυμα σφάλματος του SDK σε έξοδο: μόνο ο κωδικός HTTP.
 function stressUserReal(budget) {
   const Anthropic = loadAnthropic();
-  const client = new Anthropic({ apiKey: KEY, maxRetries: 2 });
+  // 25/10 (John): no retries inside the SDK — a retried attempt could be billed and never counted; one attempt, counted or charged
+  const client = new Anthropic({ apiKey: KEY, maxRetries: 0 });
   return async ({ system, prompt, schema }) => {
     // 25/10 (John, Π3 round 3): the call holds the most it may cost (SL.userCallHold) before it starts, like every AURA call — no
     // room → wait while others are in flight, stop when none is
@@ -4126,11 +4127,15 @@ function stressUserReal(budget) {
         output_config: { effort: 'low', format: { type: 'json_schema', schema } },
       });
     } catch (e) {
+      // 25/10 (John): no usage came back — the attempt may still have been billed, so its whole hold counts as spent
+      const charged = budget.add({ output_tokens: Math.ceil(hold * 1e6 / PRICES_FOR_CHARGE.user) }, 'user');
       budget.release(hold);
+      USER_CALLS.push({ cost: charged, hold, charged: true });
       return { error: e instanceof Anthropic.APIError ? SL.apiErrorLabel(e.status, e.message) : 'σφάλμα σύνδεσης' };
     }
     const cost = budget.add(r.usage, 'user');
     budget.release(hold);
+    USER_CALLS.push({ cost, hold, charged: false });
     if (cost > hold) HOLD_EXCEEDED.push({ label: 'Haiku', who: 'user', cost, hold });
     if (r.stop_reason === 'refusal') return { refusal: true, cost };
     const text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
@@ -4181,6 +4186,8 @@ function stressFakeAura(persona) {
 const WORST_FINAL = 0.40;
 const FINAL_HALT = { reason: null };
 const HOLD_EXCEEDED = []; // 25/10: a call that cost more than it held (none expected) — written in the report
+const USER_CALLS = []; // 25/10: every Haiku call's cost and hold (numbers only), so the report can show that each cost ≤ its hold
+const PRICES_FOR_CHARGE = { aura: SL.PRICES.aura.output, user: SL.PRICES.user.output }; // a charged hold is written as output tokens (one price, no long-prompt tier)
 async function runStressSession(item, aura, user, budget) {
   const p = item.persona, pol = SL.policyOf(p), T = APP.texts;
   const sess = { label: item.label, persona: { id: p.id, key: p.key, name: p.name, hiddenRoot: p.hiddenRoot, fixed: !!p.fixed, risk: p.risk || null, short: !!p.short, firstWhyType: !!p.firstWhyType, loop: !!p.loop, tier: p.tier || null, rehearsal: !!p.rehearsal,
@@ -4203,12 +4210,12 @@ async function runStressSession(item, aura, user, budget) {
     let body = {};
     try { body = JSON.parse(route.request().postData() || '{}'); } catch (e) { body = {}; }
     const cls = LIB.classifyRequest(body, APP);
-    let r;
+    let r, hold = 0, callCost = 0, charged = false;
     {
       // 22/10 (the last hard test): parallel sessions — wait while others hold the room; stop only when nothing is in flight.
       // 25/10 (John, Π3 round 3): EVERY session's call holds (not only the «final» ones: 83 runs beside 102), and it holds the larger
       // of WORST_FINAL and the most this very request may cost (SL.auraCallHold) — so the run's total cannot pass the cap
-      const hold = Math.max(WORST_FINAL, SL.auraCallHold(body, APP.consts.core.length));
+      hold = Math.max(WORST_FINAL, SL.auraCallHold(body, APP.consts.core.length));
       while (!budget.reserve(hold)) {
         if (!budget.inflight()) { stopped = stopped || 'όριο δαπάνης'; return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"budget"}' }); }
         await new Promise(res => setTimeout(res, 400));
@@ -4216,7 +4223,9 @@ async function runStressSession(item, aura, user, budget) {
       try { r = await aura(body, cls, { risk: 'stress' }); }
       catch (e) { r = { status: 502, data: { error: 'handler error' } }; }
       const u0 = (r.data && r.data.usage) || null;
-      if (u0) { const c = budget.add(u0, 'aura'); sess.cost += c; r._counted = true; if (c > hold) HOLD_EXCEEDED.push({ label: sess.label, who: 'aura', cost: c, hold }); }
+      if (u0) { const c = budget.add(u0, 'aura'); sess.cost += c; callCost = c; r._counted = true; if (c > hold) HOLD_EXCEEDED.push({ label: sess.label, who: 'aura', cost: c, hold }); }
+      // 25/10 (John): no usage and not the api's own refusal before Anthropic — it may have been billed: the whole hold counts as spent
+      else if (!SL.unbilledForSure(r)) { const c = budget.add({ output_tokens: Math.ceil(hold * 1e6 / PRICES_FOR_CHARGE.aura) }, 'aura'); sess.cost += c; callCost = c; charged = true; r._counted = true; }
       budget.release(hold);
     }
     // ADR «19 Οκτωβρίου» (John): the HTTP code of every call and the cache it wrote / read — numbers only, for the report
@@ -4224,7 +4233,7 @@ async function runStressSession(item, aura, user, budget) {
     // ADR «19 Οκτωβρίου (ε)»: + which typed message the call answers and the MASTER PRIORITY stage the request carried (the app's own label)
     const sysText = (Array.isArray(body.system) ? body.system : [{ text: body.system }]).map(x => (x && typeof x.text === 'string') ? x.text : '').join('');
     sess.calls.push({ kind: cls.kind, status: r.status, cacheWrite: u.cache_creation_input_tokens || 0, cacheRead: u.cache_read_input_tokens || 0,
-      typed: sess.typed.length, stage: SL.masterStage(sysText), notes: SL.noteLabels(body.system) }); // 23/10 (Theme C): the notes sent, by label
+      typed: sess.typed.length, stage: SL.masterStage(sysText), notes: SL.noteLabels(body.system), cost: callCost, hold, charged }); // 23/10 (Theme C): the notes sent, by label; 25/10: the call's cost and hold
     if (r.data && r.data.usage && !r._counted) sess.cost += budget.add(r.data.usage, 'aura');
     { const t = r.data && Array.isArray(r.data.content) ? r.data.content.filter(b => b && b.type === 'text').map(b => b.text).join('') : '';
       if (t) sess.modelTexts.push({ kind: cls.kind, typed: sess.typed.length, text: t, filtered: afterFilters(t) }); }
@@ -4868,7 +4877,7 @@ async function mainStress() {
   const meta = { mode: real ? 'πραγματικό μοντέλο' : 'ψεύτικο μοντέλο (έλεγχος μηχανισμού)', budget: want, spent: budget.spent(), by: budget.by(), stopped, skipped };
   if (waves.length) meta.waves = waves;
   meta.filters = !!ORGF_FILTERS; // 24/10: whether the AFTER FILTERS layer could be written
-  meta.plan = PLAN_ROWS; meta.shortNames = SL.shortNameMap(plan); meta.holdExceeded = HOLD_EXCEEDED; // 25/10
+  meta.plan = PLAN_ROWS; meta.shortNames = SL.shortNameMap(plan); meta.holdExceeded = HOLD_EXCEEDED; meta.userCalls = USER_CALLS; // 25/10
   for (const s of sessions) { s.orgFlags = ORGF.flagsForSession(s, ORGF_FILTERS, ORGF_HELPLINES); s.filterChanges = ORGF.filterChangesForSession(s, ORGF_FILTERS); }
   writeOut('stress-report.md', SL.buildStressReport(sessions, meta));
   writeSummary(SL.buildStressReport(sessions, meta));

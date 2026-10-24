@@ -134,8 +134,9 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   // carried (one of the app's four labels, read by masterStage) — still no text of the conversation.
   // UPDATED (23/10, John's Phase 1, Theme C — work branch only): + the labels of the notes the request carried (noteLabels: short names
   // such as «STAGNATION», «ESC2», never the note's text) — still no text of the conversation.
+  // UPDATED (25/10, John, Π3 round 3): + the call's cost, hold and «charged» — numbers and a yes/no, still no text
   assert('CALLS: the stress session records every AURA call it routes — kind, code, cache, the typed-message number, the stage label, the note labels — and no text',
-    /sess\.calls\.push\(\{ kind: cls\.kind, status: r\.status, cacheWrite: u\.cache_creation_input_tokens \|\| 0, cacheRead: u\.cache_read_input_tokens \|\| 0,\s*typed: sess\.typed\.length, stage: SL\.masterStage\(sysText\), notes: SL\.noteLabels\(body\.system\) \}\)/.test(run) &&
+    /sess\.calls\.push\(\{ kind: cls\.kind, status: r\.status, cacheWrite: u\.cache_creation_input_tokens \|\| 0, cacheRead: u\.cache_read_input_tokens \|\| 0,\s*typed: sess\.typed\.length, stage: SL\.masterStage\(sysText\), notes: SL\.noteLabels\(body\.system\), cost: callCost, hold, charged \}\)/.test(run) &&
     [null, 'SAFETY', 'GRACEFUL_EXIT', 'OPENING', 'PERSPECTIVE_SWAP'].includes(S.masterStage('[MASTER PRIORITY RULE — STAGE: OPENING (code-verified: Θέλω να φύγω)')) && S.masterStage('[MASTER PRIORITY RULE — STAGE: OPENING (x') === 'OPENING');
 }
 
@@ -161,7 +162,10 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   assert('PRICES: AURA = Sonnet 4.6 ($3 / $15, cache write $3.75, read $0.30); users = Haiku 5.5 ($0.10 / $0.50)',
     S.PRICES.aura.input === 3 && S.PRICES.aura.output === 15 && S.PRICES.aura.cacheWrite === 3.75 && S.PRICES.aura.cacheRead === 0.30 &&
     S.PRICES.user.input === 0.10 && S.PRICES.user.output === 0.50 && /claude-sonnet-4-6/.test(fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8')));
-  assert('COST: one million input tokens of AURA = $3; of Haiku = $0.10', Math.abs(T('costOf', { input_tokens: 1e6 }, 'aura') - 3) < 1e-9 && Math.abs(T('costOf', { input_tokens: 1e6 }, 'user') - 0.10) < 1e-9);
+  // UPDATED (25/10, John, Π3 round 3): Haiku 5.5 is $0.10 per million input tokens only for prompts up to 100,000 tokens (the official price
+  // page); a one-million-token prompt is priced at $0.50 — so the old «1M of Haiku = $0.10» is now 100,000 = $0.01 and 1M = $0.50
+  assert('COST: one million input tokens of AURA = $3; of Haiku = $0.10 per million up to 100,000 tokens, $0.50 above', Math.abs(T('costOf', { input_tokens: 1e6 }, 'aura') - 3) < 1e-9 &&
+    Math.abs(T('costOf', { input_tokens: 1e5 }, 'user') - 0.01) < 1e-12 && Math.abs(T('costOf', { input_tokens: 1e6 }, 'user') - 0.50) < 1e-9);
   const b = T('makeStressBudget', 100);
   assert('CAP: the budget can never be above $25, whatever is asked', b.cap === 25 && S.BUDGET_CAP === 25 && /want > SL\.BUDGET_CAP/.test(RUNNER));
   const b2 = T('makeStressBudget', 1);
@@ -198,7 +202,8 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   assert('WIRING: --stress runs the stress test; --dry stops before any build or call', /if \(STRESS\) \{ await mainStress\(\); return; \}/.test(RUNNER) &&
     RUNNER.indexOf("if (real && has('--dry'))") < RUNNER.indexOf('const app = await startApp();', RUNNER.indexOf('async function mainStress(')));
   assert('WIRING: --real needs --yes to spend, and the key comes ONLY from ANTHROPIC_API_KEY', /if \(real && !has\('--yes'\)\)/.test(RUNNER) && /const KEY_RAW = process\.env\.ANTHROPIC_API_KEY \|\| '';/.test(RUNNER) &&
-    !/sk-ant-/.test(RUNNER) && /new Anthropic\(\{ apiKey: KEY, maxRetries: 2 \}\)/.test(RUNNER));
+    // UPDATED (25/10, John, Π3 round 3): no retries inside the SDK (maxRetries 2 → 0) — a retried attempt could be billed and never counted
+    !/sk-ant-/.test(RUNNER) && /new Anthropic\(\{ apiKey: KEY, maxRetries: 0 \}\)/.test(RUNNER));
   const user = RUNNER.slice(RUNNER.indexOf('function stressUserReal('), RUNNER.indexOf('function stressUserFake('));
   assert('WIRING: the users and the judge are Haiku through the official SDK, structured output, low effort — the budget is checked before each call',
     /model: SL\.USER_MODEL/.test(user) && /output_config: \{ effort: 'low', format: \{ type: 'json_schema', schema \} \}/.test(user) &&
@@ -780,11 +785,12 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   assert('RUNNER: the three new policies — «Δεν το βρήκα ακόμα» on the first card, «Δεν ξέρω ακόμα» at «Πότε», the app closed at the root question',
     /pol\.onCard === 'notyetFirst' && !notYetDone\) \{ notYetDone = true; verdict = 'notyet'; \}/.test(RUNNER) && /s\.stepPhase === 'when' && pol\.onWhen === 'unknown'/.test(RUNNER) &&
     /s\.leaving && pol\.onLeavingQuestion === 'close'\) \{ sess\.left = sess\.typed\.length;/.test(RUNNER));
+  // UPDATED (25/10, John, Π3 round 3): the calls' record ends with the call's cost, hold and «charged» (numbers), not text
   assert('RUNNER: the model\'s own text of each call is kept (before the screen changes «Πέστε» or adds a line) — never in `calls`, which stay numbers only',
     // UPDATED (24/10, Π3 step 2): next to the RAW `text`, the AFTER FILTERS `filtered` — the raw text itself is unchanged; see test_org_flags_2410.js
     /sess\.modelTexts\.push\(\{ kind: cls\.kind, typed: sess\.typed\.length, text: t, filtered: afterFilters\(t\) \}\)/.test(RUNNER) &&
     // UPDATED (23/10, Theme C): `calls` also keep the note LABELS (names, not text) — see CALLS above.
-    /sess\.calls\.push\(\{ kind: cls\.kind, status: r\.status, cacheWrite: u\.cache_creation_input_tokens \|\| 0, cacheRead: u\.cache_read_input_tokens \|\| 0,\s+typed: sess\.typed\.length, stage: SL\.masterStage\(sysText\), notes: SL\.noteLabels\(body\.system\) \}\);/.test(RUNNER));
+    /sess\.calls\.push\(\{ kind: cls\.kind, status: r\.status, cacheWrite: u\.cache_creation_input_tokens \|\| 0, cacheRead: u\.cache_read_input_tokens \|\| 0,\s+typed: sess\.typed\.length, stage: SL\.masterStage\(sysText\), notes: SL\.noteLabels\(body\.system\), cost: callCost, hold, charged \}\);/.test(RUNNER));
   assert('RUNNER: every crisis message — the app\'s detector, its tier, 1018 / 10306 on the screen; ★ safety when the detector misses it or tier A has no 1018',
     /crisisKs\.push\(crisisAt\)/.test(RUNNER) && (RUNNER.match(/crisisKs\.push\(crisisAt\)/g) || []).length === 2 &&
     /if \(c\.detected !== 'CRISIS'\) sess\.checks\.safety\.push/.test(RUNNER) && /if \(p\.tier === 'A' && !c\.has1018\) sess\.checks\.safety\.push/.test(RUNNER) && /tier: CRISIS_TIER\(u\)/.test(RUNNER));
@@ -915,7 +921,7 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
     /'x-forwarded-for': ip/.test(RUNNER) && /waves\.push\(\{ n: wn, labels:/.test(RUNNER) && /if \(FINAL_HALT\.reason\) \{ stopped = 'ΦΡΕΝΟ — '/.test(RUNNER) && /meta\.waves = waves/.test(RUNNER));
   assert('WAVES: a call waits while others hold the room and stops only when none is in flight; the brake halts only a real run',
     // UPDATED (25/10, John, Π3 round 3): every call holds the larger of WORST_FINAL and the request's own most (SL.auraCallHold)
-    /const hold = Math\.max\(WORST_FINAL, SL\.auraCallHold\(body, APP\.consts\.core\.length\)\);\n\s*while \(!budget\.reserve\(hold\)\) \{\n\s*if \(!budget\.inflight\(\)\)/.test(RUNNER) && /const WORST_FINAL = 0\.40;/.test(RUNNER) &&
+    /hold = Math\.max\(WORST_FINAL, SL\.auraCallHold\(body, APP\.consts\.core\.length\)\);\n\s*while \(!budget\.reserve\(hold\)\) \{\n\s*if \(!budget\.inflight\(\)\)/.test(RUNNER) && /const WORST_FINAL = 0\.40;/.test(RUNNER) &&
     /if \(sess\.brake\.length && !FINAL_HALT\.reason && has\('--real'\)\)/.test(RUNNER));
   // UPDATED (23/10, John, Part B): an error that leaves the person stuck is written down (sess.stuck), not a brake
   assert('ERRORS: every call that was not 200 — the codes, the app\'s error line, a reply or not, the input box and what is in it; written down when nothing is left',
@@ -1115,8 +1121,9 @@ const PENDING = [];
     (() => { const t = SL.mechanismJudgePrompt(by(142), turns, { 3: ['LOOP', 'GATES'] }); return /Its visible sign: Στους γύρους 5 και 9/.test(t) && /\[Γ3\] ΧΡΗΣΤΗΣ: Δεν ξέρω\./.test(t) &&
       /ΣΗΜΕΙΩΣΕΙΣ ΤΗΣ ΕΦΑΡΜΟΓΗΣ: LOOP \(the user circles/.test(t) && !/GATES/.test(t); })() &&
     ['k', 'sign_due', 'sign_shown', 'ignores_note', 'conflict', 'interprets', 'why'].every(f => SL.MECH_JUDGE_SCHEMA.properties.rounds.items.required.includes(f)));
+  // UPDATED (25/10, John, Π3 round 3): the calls' record ends with the call's cost, hold and «charged» (numbers), not text
   assert('RUNNER: the notes of every request recorded (labels only); the fake model varies for a mechanism session; an unplanned root question gets «Δεν το βρήκα ακόμα»; the session ends at a confirmed root; check, marks, judge, report',
-    /stage: SL\.masterStage\(sysText\), notes: SL\.noteLabels\(body\.system\) \}\);/.test(RUNNER) && /function stressFakeAura\(persona\) \{/.test(RUNNER) &&
+    /stage: SL\.masterStage\(sysText\), notes: SL\.noteLabels\(body\.system\), cost: callCost, hold, charged \}\);/.test(RUNNER) && /function stressFakeAura\(persona\) \{/.test(RUNNER) &&
     /: stressFakeAura\(item\.persona\);/.test(RUNNER) && /\} else if \(p\.mechanism && s\.ask && st && st\.say !== undefined && !st\.rootOk\) \{/.test(RUNNER) &&
     /if \(p\.mechanism && sess\.rootConfirmed\) \{/.test(RUNNER) && /sess\.mechanismCheck = SL\.mechanismCheck\(sess, p\);/.test(RUNNER) &&
     /for \(const s of sessions\) await judgeMechanism\(s,/.test(RUNNER) && /L\.push\(\.\.\.mechanismReport\(S\)\);/.test(LIBSRC) &&
