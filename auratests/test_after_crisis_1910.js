@@ -160,11 +160,19 @@ const P3_TEXT = [
     'after being told ΕΣΠΑ/ΔΥΠΑ exist): naming the specific OFFICIAL ORGANIZATION (e.g. "ΔΥΠΑ", "δες dypa.gov.gr") is safe and sufficient — organization names don\'t go stale.'],
   ['When a source is asked for or genuinely essential, name the kind of professional plainly,', 'When a source is asked for or genuinely essential, name the organization plainly,'],
   ['(e.g. όταν ο χρήστης γράφει "τα κουβαλάω όλα εγώ εδώ και καιρό": «Όλα σε σένα, εδώ και καιρό. Δεν είναι λίγο.»)', '(e.g. όταν ο χρήστης γράφει "τα κουβαλάω μόνη μου εδώ και καιρό": «Μόνη σου, εδώ και καιρό. Δεν είναι λίγο.»)']];
-const undoP3 = p => {
-  const t = String(p || '');
-  if (t.split(P3_LONG).length !== 2 || t.split(P3_SHORT).length !== 6) return 'MISSING a Π3 precedence clause';
-  return P3_TEXT.reduce((x, [now, before]) => (x.split(now).length === 2 ? x.replace(now, before) : 'MISSING ' + now), t.replace(P3_LONG, '').split(P3_SHORT).join(''));
-};
+// UPDATED (24/10, Π3, tests only): the six clauses of (α) are taken out by their place, each exactly once, not by a count over the whole
+// prompt — so a later Π3 edit can add a clause of its own. A clause left anywhere else still fails the comparison below.
+const P3_CLAUSES = [['it should not take user frustration to say this): ', P3_LONG], ['a real mistake caught and corrected here): ', P3_SHORT],
+  ['territory below, not this one): ', P3_SHORT], ['a shift in conversation priority): ', P3_SHORT], ['however revealing): ', P3_SHORT],
+  ['two organisations exist): ', P3_SHORT]];
+// Each later Π3 commit puts its own undo pairs in its own slot below (unshift: the newest edit is undone first), so that each commit
+// can be reverted on its own.
+// Π3 (γ):
+// Π3 (δ):
+// Π3 (ε):
+// Π3 (στ):
+const undoP3 = p => P3_TEXT.reduce((x, [now, before]) => (x.split(now).length === 2 ? x.replace(now, before) : 'MISSING ' + now),
+  P3_CLAUSES.reduce((x, [at, cl]) => (x.split(at + cl).length === 2 ? x.replace(at + cl, at) : 'MISSING the clause after ' + at), String(p || '')));
   assert('UNCHANGED: the prompt, apart from John\'s voice edits of 19/10 (ε) and (ζ) and Π3 (23/10)', h(undoVoice1910(undoP3(raw.slice(_s, _e)))) === 'a6d7fe7ae33515a0' && h(raw.slice(_s, _e)) !== 'a6d7fe7ae33515a0');
 }
 

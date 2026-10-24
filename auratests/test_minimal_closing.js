@@ -224,9 +224,39 @@ assert('CLOSING: Part 2 is still told not to repeat the summary',
 // rule (2)), the organisation names out of those lines, the examples 35β and 37β. +2,321 characters, one cache write.
 // CHANGED AGAIN, DELIBERATELY, on 2026-10-23, branch p3-prompt only (64ee749b7b17dbe3 → 4dfe0d45e271f1e2). John (Π3 (β)): the ΦΩΝΗ (4)
 // example with no gender — «τα κουβαλάω όλα εγώ εδώ και καιρό» / «Όλα σε σένα, εδώ και καιρό.». +2 characters, one cache write.
+// UPDATED (24/10, Π3, tests only): the recorded digest is main's (b5f303cc…) once the Π3 edits listed below are undone — so each Π3
+// commit can be reverted on its own; any edit nobody listed is still a cache write this check catches.
+// UPDATED (23/10, Π3, branch p3-prompt — John): the precedence clauses in lines 35, 37, 39, 40, 41, 42, the organisation names out of
+// those lines, the examples 35β / 37β, and (β) the ΦΩΝΗ (4) example in a form with no gender. Undone first — each piece must be there exactly as many times as it was put in — so what is
+// left must be the prompt before Π3 byte for byte.
+const P3_LONG = 'PRECEDENCE (this rule yields; nothing is added to it): SAFETY (MASTER PRIORITY RULE, step 1) comes first; then the content limit — no facts about law, money or health, and no technique for health, mental health, sleep or food (what a law, a court, a tax, a loan, a treatment or a dose does is not said; saying plainly that this is a question for a lawyer, an accountant or a doctor IS allowed; an organisation is named only if the user wrote its name; a help line only from the app\'s own table, never another number or name); then, while [FREE PART: ENDS AT ROOT] is present, STAGE A rule (2) below. Where any of these conflicts with this rule, it wins and this rule does not apply. ';
+const P3_SHORT = 'PRECEDENCE (as in PROACTIVE RESOURCE POINTER above — this rule yields): SAFETY, then the content limit (no facts about law, money or health; the kind of professional may be named; an organisation only if the user wrote its name; a help line only from the app\'s own table), then, while [FREE PART: ENDS AT ROOT] is present, STAGE A rule (2) below. ';
+const P3_TEXT = [
+  ['before AURA mentioned that free smoking-cessation clinics exist;', 'before AURA mentioned that free ΕΣΥ smoking-cessation clinics exist;'],
+  ["a founder didn't know one-time-payment platforms existed as a category", "a founder didn't know one-time-payment platforms like Gumroad existed as a category"],
+  ['(e.g. "δωρεάν ιατρεία διακοπής καπνίσματος")', '(e.g. "σταδιακή μείωση, απότομη διακοπή, υποκατάστατα, ιατρεία διακοπής, φαρμακευτική υποστήριξη" or "δωρεάν ιατρεία διακοπής καπνίσματος στο ΕΣΥ")'],
+  ['Example: "Πόσο κρατάει συνήθως ένα μεταπτυχιακό;" → answer it.', 'Example: "Πόσο κοστίζει περίπου ένα ταξίδι στην Ιαπωνία;" → answer it.'],
+  ['naming the kind of professional who knows this, categorically, is not deciding anything', 'naming that ΕΣΠΑ and ΔΥΠΑ exist, categorically, is not deciding anything'],
+  ['after being told two organisations exist): Name the kind of professional who knows it (e.g. "δικηγόρος", "λογιστής", "γιατρός"); an organisation only if the user wrote its name.',
+    'after being told ΕΣΠΑ/ΔΥΠΑ exist): naming the specific OFFICIAL ORGANIZATION (e.g. "ΔΥΠΑ", "δες dypa.gov.gr") is safe and sufficient — organization names don\'t go stale.'],
+  ['When a source is asked for or genuinely essential, name the kind of professional plainly,', 'When a source is asked for or genuinely essential, name the organization plainly,'],
+  ['(e.g. όταν ο χρήστης γράφει "τα κουβαλάω όλα εγώ εδώ και καιρό": «Όλα σε σένα, εδώ και καιρό. Δεν είναι λίγο.»)', '(e.g. όταν ο χρήστης γράφει "τα κουβαλάω μόνη μου εδώ και καιρό": «Μόνη σου, εδώ και καιρό. Δεν είναι λίγο.»)']];
+// UPDATED (24/10, Π3, tests only): the six clauses of (α) are taken out by their place, each exactly once, not by a count over the whole
+// prompt — so a later Π3 edit can add a clause of its own. A clause left anywhere else still fails the comparison below.
+const P3_CLAUSES = [['it should not take user frustration to say this): ', P3_LONG], ['a real mistake caught and corrected here): ', P3_SHORT],
+  ['territory below, not this one): ', P3_SHORT], ['a shift in conversation priority): ', P3_SHORT], ['however revealing): ', P3_SHORT],
+  ['two organisations exist): ', P3_SHORT]];
+// Each later Π3 commit puts its own undo pairs in its own slot below (unshift: the newest edit is undone first), so that each commit
+// can be reverted on its own.
+// Π3 (γ):
+// Π3 (δ):
+// Π3 (ε):
+// Π3 (στ):
+const undoP3 = p => P3_TEXT.reduce((x, [now, before]) => (x.split(now).length === 2 ? x.replace(now, before) : 'MISSING ' + now),
+  P3_CLAUSES.reduce((x, [at, cl]) => (x.split(at + cl).length === 2 ? x.replace(at + cl, at) : 'MISSING the clause after ' + at), String(p || '')));
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 4dfe0d45e271f1e2…)',
-  PROMPT_SHA.slice(0, 16) === '4dfe0d45e271f1e2');
+assert('CACHE: AURA_CORE_PERSONALITY matches main\'s recorded digest (sha256 b5f303cc9405aa21…) once the listed Π3 edits are undone',
+  require('crypto').createHash('sha256').update(undoP3(PROMPT), 'utf8').digest('hex').slice(0, 16) === 'b5f303cc9405aa21' && PROMPT_SHA.slice(0, 16) !== 'b5f303cc9405aa21');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',

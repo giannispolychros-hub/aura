@@ -31,7 +31,15 @@ for (const [head, clause] of Object.entries(RULES)) {
   const i = L.length === 1 ? L[0].indexOf('): ') : -1;
   assert(`CLAUSE: ${head} — one line, the clause right after its opening note, once`, L.length === 1 && i > 0 && L[0].slice(i + 3).startsWith(clause) && count(L[0], 'PRECEDENCE (') === 1);
 }
-assert('CLAUSE: the long one once and the short one five times, nowhere else in the prompt', count(PROMPT, LONG) === 1 && count(PROMPT, SHORT) === 5 && count(PROMPT, 'PRECEDENCE (') === 6);
+// UPDATED (24/10, Π3, tests only): later Π3 commits add a clause of their own, each in its own slot below, and count it there — so each
+// commit can be reverted on its own and a clause nobody counted still fails.
+let MORE_SHORT = 0, MORE_CLAUSES = 0;
+// Π3 (γ):
+// Π3 (δ):
+// Π3 (ε):
+// Π3 (στ):
+assert('CLAUSE: the long one once and the short one five times, nowhere else in the prompt — apart from the clauses the later Π3 commits count above',
+  count(PROMPT, LONG) === 1 && count(PROMPT, SHORT) === 5 + MORE_SHORT && count(PROMPT, 'PRECEDENCE (') === 6 + MORE_CLAUSES);
 assert('CLAUSE: every rule it names is in the prompt — MASTER PRIORITY RULE, the Stage A marker, STAGE A rule (2) — and Stage A is below the six',
   PROMPT.includes('MASTER PRIORITY RULE — sequence for every session') && PROMPT.includes('[FREE PART: ENDS AT ROOT]') &&
   PROMPT.includes('(2) Never propose roads, steps, ways, methods or techniques') &&
@@ -68,6 +76,10 @@ const back = l => TEXT_BACK.reduce((x, [now, before]) => (x.includes(now) ? x.re
 // sha256 of each line before Π3 (main ede7ce7)
 const SHA_BEFORE = { 'PROACTIVE RESOURCE POINTER': '50d31f82baaa3747', 'ANSWER BEFORE INTERPRETATION': '0fd0d886977cf51d', 'CRITICAL CORRECTION on what counts as answerable': '1169a0362f5da0e2',
   'EXTERNAL CONSTRAINT RECOGNITION': 'eb785604836b1876', 'PIPELINE PRINCIPLE': '364209d0f349a676', 'SOURCE HANDLING': '9e815860c2ffb495' };
+// UPDATED (24/10, Π3, tests only): a later Π3 commit that edits one of the six lines puts its own pair in its slot (unshift: the newest
+// edit is taken back first).
+// Π3 (δ) back:
+// Π3 (ε) back:
 for (const head of Object.keys(RULES)) assert(`UNCHANGED otherwise: ${head} is the line before Π3, byte for byte`, h(back(lineOf(head)[0] || '')) === SHA_BEFORE[head]);
 
 console.log(`\n${passed} passed, ${failed} failed`);
