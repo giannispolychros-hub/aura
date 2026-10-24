@@ -69,8 +69,10 @@ assert('ORGANISATIONS: PIPELINE PRINCIPLE names the kind of professional, not Ε
 
 // ── 3. John's two examples ───────────────────────────────────────────────────────────────────────────────────────────────
 const P = lineOf('PROACTIVE RESOURCE POINTER')[0], A = lineOf('ANSWER BEFORE INTERPRETATION')[0];
-assert('35β: the example is «δωρεάν ιατρεία διακοπής καπνίσματος» only — no techniques, no «στο ΕΣΥ»',
-  P.includes('(e.g. "δωρεάν ιατρεία διακοπής καπνίσματος")') && !P.includes('σταδιακή μείωση') && !P.includes('φαρμακευτική υποστήριξη'));
+// UPDATED (24/10, Π3 (ε), John): 35β has no example at all now — the smoking-cessation clinics are a health example
+assert('35β: no example — no smoking-cessation clinics, no techniques, no «στο ΕΣΥ»',
+  P.includes('factually and without personalizing, then return the question') && !P.includes('ιατρεία διακοπής καπνίσματος') &&
+  !P.includes('σταδιακή μείωση') && !P.includes('φαρμακευτική υποστήριξη'));
 assert('37β: the example is the master\'s question, not the cost of a trip', A.includes('Example: "Πόσο κρατάει συνήθως ένα μεταπτυχιακό;" → answer it.') && !PROMPT.includes('Ιαπωνία'));
 
 // ── 4. Nothing else in the six rules moved: the clause and the edits taken out, each line is the one before Π3 ─────────────
@@ -93,6 +95,7 @@ const SHA_BEFORE = { 'PROACTIVE RESOURCE POINTER': '50d31f82baaa3747', 'ANSWER B
 TEXT_BACK.unshift(['Neither is stated as a fact here (the content limit in PROACTIVE RESOURCE POINTER above), and the latter is genuinely EXTERNAL CONSTRAINT territory below, not this one)', 'The former can be stated factually and accurately, with the same care Claude already applies to health topics generally — the latter cannot, and that is genuinely EXTERNAL CONSTRAINT territory below, not this one)']); // (δ) line 39
 TEXT_BACK.unshift(['Apply ANSWER BEFORE INTERPRETATION normally to general factual questions that are not about law, money or health;', 'Apply ANSWER BEFORE INTERPRETATION normally to general factual/statistical questions, health-related or not;']); // (δ) line 39
 // Π3 (ε) back:
+TEXT_BACK.unshift(['factually and without personalizing, then return the question', 'factually and without personalizing (e.g. "δωρεάν ιατρεία διακοπής καπνίσματος"), then return the question']); // (ε) line 35
 for (const head of Object.keys(RULES)) assert(`UNCHANGED otherwise: ${head} is the line before Π3, byte for byte`, h(back(lineOf(head)[0] || '')) === SHA_BEFORE[head]);
 
 console.log(`\n${passed} passed, ${failed} failed`);
