@@ -4089,6 +4089,13 @@ const CRISIS_TIER = (() => {
 })();
 // σκληρός γύρος: τα κείμενα που στέλνονται στο μοντέλο, για τον έλεγχο διαρροής του prompt
 const PROMPT_CORPUS = SL.normCorpus(SL.promptTexts(fs.readFileSync(path.join(REPO, 'src', 'App.jsx'), 'utf8')));
+// 24/10 (John, Π3 step 2): the three layers of every reply, kept apart — RAW (`modelTexts[].text`), AFTER FILTERS (`modelTexts[].filtered`:
+// the app's own text filters, lifted out of this App.jsx by scripts/org_flags.cjs) and SCREEN (`turns`, from the page); and the flag list
+const ORGF = require('./org_flags.cjs');
+const ORGF_SRC = fs.readFileSync(path.join(REPO, 'src', 'App.jsx'), 'utf8');
+const ORGF_FILTERS = (() => { try { return ORGF.loadFilters(ORGF_SRC); } catch (e) { return null; } })();
+const ORGF_HELPLINES = ORGF.loadHelplines(ORGF_SRC);
+const afterFilters = t => { if (!ORGF_FILTERS) return null; try { return ORGF_FILTERS.afterFilters(t); } catch (e) { return null; } };
 const STRESS = has('--stress');
 const FIRST_WHY_Q = 'Γιατί έχει σημασία αυτό για σένα τώρα;';
 
@@ -4210,7 +4217,7 @@ async function runStressSession(item, aura, user, budget) {
       typed: sess.typed.length, stage: SL.masterStage(sysText), notes: SL.noteLabels(body.system) }); // 23/10 (Theme C): the notes sent, by label
     if (r.data && r.data.usage && !r._counted) sess.cost += budget.add(r.data.usage, 'aura');
     { const t = r.data && Array.isArray(r.data.content) ? r.data.content.filter(b => b && b.type === 'text').map(b => b.text).join('') : '';
-      if (t) sess.modelTexts.push({ kind: cls.kind, typed: sess.typed.length, text: t }); }
+      if (t) sess.modelTexts.push({ kind: cls.kind, typed: sess.typed.length, text: t, filtered: afterFilters(t) }); }
     return route.fulfill({ status: r.status, contentType: 'application/json', body: JSON.stringify(r.data || {}) });
   });
   await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
@@ -4843,6 +4850,8 @@ async function mainStress() {
   }
   const meta = { mode: real ? 'πραγματικό μοντέλο' : 'ψεύτικο μοντέλο (έλεγχος μηχανισμού)', budget: want, spent: budget.spent(), by: budget.by(), stopped, skipped };
   if (waves.length) meta.waves = waves;
+  meta.filters = !!ORGF_FILTERS; // 24/10: whether the AFTER FILTERS layer could be written
+  for (const s of sessions) { s.orgFlags = ORGF.flagsForSession(s, ORGF_FILTERS, ORGF_HELPLINES); s.filterChanges = ORGF.filterChangesForSession(s, ORGF_FILTERS); }
   writeOut('stress-report.md', SL.buildStressReport(sessions, meta));
   writeSummary(SL.buildStressReport(sessions, meta));
   writeOut('stress-report.json', JSON.stringify({ meta, sessions }, null, 2));

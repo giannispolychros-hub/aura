@@ -1968,6 +1968,45 @@ function mechanismReport(S) {
   }
   return L;
 }
+// 24/10 (John, Π3 step 2): names of organisations, acronyms, web addresses and help numbers in the model's RAW text that the user did
+// not write and that are not in the app's table (rows from scripts/org_flags.cjs, put on each session by the stress run), and what the
+// app's text filters changed — a FLAG LIST for a person to read, never a pass/fail check, never presented as a complete detector.
+function orgFlagReport(S, meta) {
+  const withTexts = (S || []).filter(s => (s.modelTexts || []).length);
+  if (!withTexts.length) return [];
+  const L = ['## Φορείς, ακρωνύμια, διευθύνσεις και αριθμοί που δεν έγραψε ο χρήστης — λίστα για ανάγνωση', '',
+    'Επισημάνσεις για **ανθρώπινη ανάγνωση**, στο **ακατέργαστο** κείμενο του μοντέλου. **Δεν** είναι αυτόματη αποτυχία και **δεν** είναι πλήρης ' +
+    'ανιχνευτής φορέων: δεν βλέπει ονόματα με μικρά γράμματα χωρίς λέξη φορέα («ο δήμος», «το νοσοκομείο», «η πολεοδομία»), ονόματα μόνο με ' +
+    'τον ρόλο («η αρμόδια υπηρεσία»), ελληνικά κύρια ονόματα χωρίς λέξη φορέα που δεν είναι στη σύντομη λίστα, ορθογραφικά λάθη, αριθμούς ' +
+    'γραμμένους με λέξεις· και επισημαίνει και κοινές λατινικές λέξεις με κεφαλαίο. Επιτρέπονται τα ονόματα και οι αριθμοί του πίνακα της ' +
+    'εφαρμογής (π.χ. «ΕΚΑΒ, 166»). Ο έλεγχος ονομάτων **δεν** αποδεικνύει ότι δεν υπήρξαν γεγονότα για νόμο, στατιστικά υγείας, ' +
+    'ποσοστά ή σχέδια· αυτά κρίνονται χωριστά, διαβάζοντας το ακατέργαστο κείμενο.',
+    'Τρία επίπεδα, χωριστά στο stress-report.json: **ακατέργαστο** (`modelTexts[].text`), **μετά τα φίλτρα** (`modelTexts[].filtered` — τα ' +
+    'φίλτρα κειμένου της εφαρμογής, βγαλμένα από το ίδιο App.jsx· όχι όσα διαβάζουν την κατάσταση της συνεδρίας ούτε οι γραμμές που προσθέτει η ' +
+    'εφαρμογή) και **οθόνη** (`turns`, από τη σελίδα).' + (meta && meta.filters === false ? ' **Τα φίλτρα δεν φορτώθηκαν σε αυτή την εκτέλεση: το επίπεδο «μετά τα φίλτρα» λείπει.**' : ''), ''];
+  const rows = [];
+  for (const s of withTexts) for (const r of (s.orgFlags || [])) for (const f of r.flags)
+    rows.push('| ' + [s.label, r.typed + ' (' + r.kind + ')', '«' + cell(f.token, 60) + '»', cell(f.reason, 80),
+      f.inFiltered === null ? '—' : f.inFiltered ? 'μένει' : 'βγήκε', f.inScreen === null ? '—' : f.inScreen ? 'φάνηκε' : 'δεν φάνηκε',
+      cell(f.excerpt, 240)].join(' | ') + ' |');
+  if (rows.length) L.push('| Συνεδρία | Απάντηση μετά το μήνυμα | Επισήμανση | Γιατί | Μετά τα φίλτρα | Οθόνη | Απόσπασμα (ακατέργαστο) |', '|---|---|---|---|---|---|---|', ...rows, '');
+  else L.push('Καμία επισήμανση. (Δεν σημαίνει ότι δεν υπήρξε όνομα φορέα — βλ. τι δεν βλέπει η λίστα.)', '');
+  L.push('### Τι άλλαξαν τα φίλτρα της εφαρμογής (ακατέργαστο → μετά τα φίλτρα)', '');
+  let any = false;
+  for (const s of withTexts) {
+    const ch = s.filterChanges || [];
+    L.push('- ' + s.label + ': ' + (s.modelTexts || []).length + ' απαντήσεις του μοντέλου, ' + ch.length + ' άλλαξαν από τα φίλτρα.');
+    for (const c of ch) {
+      any = true;
+      for (const x of c.removed) L.push('  - μετά το μήνυμα ' + c.typed + ' (' + c.kind + '), βγήκε: «' + cell(x, 240) + '»');
+      for (const x of c.added) L.push('  - μετά το μήνυμα ' + c.typed + ' (' + c.kind + '), μπήκε: «' + cell(x, 240) + '»');
+    }
+  }
+  if (any && withTexts.some(s => (s.filterChanges || []).some(c => c.filteredFrom === 'today'))) L.push('', '(Σε παλιές εκτελέσεις χωρίς αποθηκευμένο επίπεδο, τα φίλτρα είναι τα σημερινά, όχι της εκτέλεσης.)');
+  L.push('');
+  return L;
+}
+
 function buildStressReport(sessions, meta) {
   const m = meta || {};
   const S = sessions || [];
@@ -2003,6 +2042,7 @@ function buildStressReport(sessions, meta) {
   L.push(...rehearsalReport(S));
   L.push(...finalReport(S, m));
   L.push(...mechanismReport(S)); // 23/10 (John, Theme C)
+  L.push(...orgFlagReport(S, m)); // 24/10 (John, Π3 step 2): for reading, not a check
   const worst = S.slice().sort((a, b) => sessionScore(b) - sessionScore(a)).slice(0, 5);
   L.push('## Οι 5 χειρότερες συνομιλίες (αυτούσιες)', '');
   for (const s of worst) {
@@ -2017,7 +2057,7 @@ module.exports = {
   USER_MODEL, PRICES, BUDGET_CAP, WORST_CALL, costOf, makeStressBudget, PERSONAS, HARD_PERSONAS, FOUNDER_PERSONAS, founderMetrics, BASE_POLICY, policyOf, planRuns, askedOrder, MAX_TYPED, EXIT_AFTER, EXIT_TEXT,
   USER_SCHEMA, CARD_SCHEMA, CLARITY_SCHEMA, personaSystem, personaPrompt, transcriptText, parseJsonReply, cleanUserText, JUDGE_SCHEMA, JUDGE_SYSTEM, judgePrompt,
   fold, findLabels, FAREWELLS, findFarewells, AFTER_CRISIS, AFTER_CRISIS_FIRST, crisisLineAt, afterCrisisFindings, isLeaving, pressureFindings, apiErrorLabel, edTechniqueFindings, aiIdentityFindings, promptTexts, normCorpus, promptLeakFindings, preRootClosingChecked, normalizeVerbatim, rootIsUserWords, rootQuestionUnderModelQuestion,
-  ADVICE_VIOLATIONS, violationType, lastSessionEvents, telemetryIssues, estimateCost, CHECKS, sessionScore, buildStressReport, keyShape, KEY_KIND_TEXT,
+  orgFlagReport, ADVICE_VIOLATIONS, violationType, lastSessionEvents, telemetryIssues, estimateCost, CHECKS, sessionScore, buildStressReport, keyShape, KEY_KIND_TEXT,
   VOICE_PERSONAS, VOICE_FORBIDDEN, voiceFindings, voiceReplies, VOICE_JUDGE_SCHEMA, VOICE_JUDGE_SYSTEM, voiceJudgePrompt, voiceReport, isAppStepText,
   REHEARSAL_PERSONAS, REHEARSAL_REAL, TARGETED_PERSONAS, FINAL_PERSONAS, capsDictation, finalBrakeFindings, friendSafetyQuestion, crisisReplies, riskFoundByCode, sessionEstimate, finalReport, FINAL_HELPLINES, inventedNumbers, quoteFindings, genderWords, genderSuspicions, isRefusal, NUMBER_WORDS, rehearsalRow, rehearsalReport,
   LOOP_PERSONAS, MECHANISM_PERSONAS, noteLabels, STRATEGY_NOTES, SUPPRESSED_NOTES, mechanismRounds, mechanismCheck, mechanismMarks, MECH_JUDGE_SCHEMA, MECH_JUDGE_SYSTEM, mechanismJudgePrompt, mechanismReport, masterStage, loopRounds, stageOrderFindings, LOOP_JUDGE_SCHEMA, LOOP_JUDGE_SYSTEM, loopJudgePrompt, CRISIS_JUDGE_SCHEMA, CRISIS_JUDGE_SYSTEM, crisisJudgePrompt, politePlural, genericWhy, loopReport,

@@ -776,7 +776,8 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
     /pol\.onCard === 'notyetFirst' && !notYetDone\) \{ notYetDone = true; verdict = 'notyet'; \}/.test(RUNNER) && /s\.stepPhase === 'when' && pol\.onWhen === 'unknown'/.test(RUNNER) &&
     /s\.leaving && pol\.onLeavingQuestion === 'close'\) \{ sess\.left = sess\.typed\.length;/.test(RUNNER));
   assert('RUNNER: the model\'s own text of each call is kept (before the screen changes «Πέστε» or adds a line) — never in `calls`, which stay numbers only',
-    /sess\.modelTexts\.push\(\{ kind: cls\.kind, typed: sess\.typed\.length, text: t \}\)/.test(RUNNER) &&
+    // UPDATED (24/10, Π3 step 2): next to the RAW `text`, the AFTER FILTERS `filtered` — the raw text itself is unchanged; see test_org_flags_2410.js
+    /sess\.modelTexts\.push\(\{ kind: cls\.kind, typed: sess\.typed\.length, text: t, filtered: afterFilters\(t\) \}\)/.test(RUNNER) &&
     // UPDATED (23/10, Theme C): `calls` also keep the note LABELS (names, not text) — see CALLS above.
     /sess\.calls\.push\(\{ kind: cls\.kind, status: r\.status, cacheWrite: u\.cache_creation_input_tokens \|\| 0, cacheRead: u\.cache_read_input_tokens \|\| 0,\s+typed: sess\.typed\.length, stage: SL\.masterStage\(sysText\), notes: SL\.noteLabels\(body\.system\) \}\);/.test(RUNNER));
   assert('RUNNER: every crisis message — the app\'s detector, its tier, 1018 / 10306 on the screen; ★ safety when the detector misses it or tier A has no 1018',
