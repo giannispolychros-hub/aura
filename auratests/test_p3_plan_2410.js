@@ -166,5 +166,75 @@ const P = S.P3_PERSONAS || [], by = id => P.find(p => p.id === id) || {};
   assert('Ο5: the phrase with NO line before is still a finding', S.afterCrisisFindings([us('γεια'), au('Είμαι εδώ όταν χρειαστεί να συνεχίσουμε.')], {}).some(f => /χωρίς γραμμή κρίσης πριν/.test(f)));
 }
 
+// ── 7. John, 25/10: the session selection — ids, names and order, «103» and «103-2» as two sessions, Κ1–Κ6 = 111–116 ─────────────
+{
+  const POOL = (S.PERSONAS || []).concat((S.HARD_PERSONAS || []).filter(p => p.id >= 17), S.FOUNDER_PERSONAS || [], S.VOICE_PERSONAS || [], S.LOOP_PERSONAS || [],
+    S.REHEARSAL_PERSONAS || [], S.TARGETED_PERSONAS || [], S.FINAL_PERSONAS || [], S.MECHANISM_PERSONAS || [], S.P3_PERSONAS || []);
+  const CMD = '111,112,113,114,115,116,103,103,161,162,163,101,102,83,125';
+  const only = CMD.split(',');
+  const plan = S.planRuns ? S.planRuns(POOL, only) : [], pos = S.askedOrder ? S.askedOrder(only) : () => 0;
+  plan.sort((a, b) => pos(a.label) - pos(b.label));
+  const rows = S.planRows ? S.planRows(plan, '2') : [];
+  assert('SELECTION: the command gives 15 rows, numbered 1–15, in the asked order, with their ids',
+    rows.length === 15 && rows.every((r, i) => r.n === i + 1) && rows.map(r => r.label + '/' + r.id).join(',') ===
+    '111/111,112/112,113/113,114/114,115/115,116/116,103/103,103-2/103,161/161,162/162,163/163,101/101,102/102,83/83,125/125');
+  assert('SELECTION: waves of 2 — 1,1,2,2,…,7,7 and 125 alone in wave 8', rows.map(r => r.wave).join(',') === '1,1,2,2,3,3,4,4,5,5,6,6,7,7,8');
+  const map = S.shortNameMap ? S.shortNameMap(plan) : '';
+  assert('SELECTION: Κ1=111, Κ2=112, Κ3=113, Κ4=114, Κ5=115, Κ6=116 — read from the sessions\' own names', map.startsWith('Κ1=111, Κ2=112, Κ3=113, Κ4=114, Κ5=115, Κ6=116, ') &&
+    rows.slice(0, 6).every((r, i) => r.name.startsWith('Κ' + (i + 1) + ' · ')));
+  assert('SELECTION: the names of the rest, as the report will print them', /Π3=103, Π3=103-2, Π3·γρ\. 315=161, Π3·γρ\. 39=162, Π3·γρ\. 353–360=163, Π1=101, Π2=102, Στοχευμένη 3=83, Ο5=125$/.test(map));
+  const i103 = plan.findIndex(x => x.label === '103'), i1032 = plan.findIndex(x => x.label === '103-2');
+  assert('SELECTION: «103» and «103-2» are TWO plan items (the same session asked twice), in places 7 and 8', i103 === 6 && i1032 === 7 && plan[i103] !== plan[i1032] && plan[i103].persona.id === 103 && plan[i1032].persona.id === 103);
+  const RS = RUNNER.slice(RUNNER.indexOf('async function runStressSession('));
+  assert('SELECTION: each plan item gets a session of its own — its own label, turns, checks and model texts — pushed on its own',
+    /const sess = \{ label: item\.label, persona: \{ id: p\.id,/.test(RS) && /turns: \[\], typed: \[\], notes: \[\], cost: 0, calls: \[\], modelTexts: \[\]/.test(RS) &&
+    /for \(const r of rs\) \{\n\s*sessions\.push\(r\.sess\);/.test(RUNNER));
+  assert('SELECTION: the run prints the plan (place, label, id, wave, name) and the short names BEFORE the first wave',
+    RUNNER.indexOf("console.log('Σειρά εκτέλεσης — ' + plan.length + ' συνεδρίες:');") > 0 &&
+    RUNNER.indexOf("console.log('Σειρά εκτέλεσης — ' + plan.length + ' συνεδρίες:');") < RUNNER.indexOf("console.log('… κύμα ' + wn + ': '") &&
+    /console\.log\('  ' \+ r\.n \+ '\. ' \+ r\.label \+ ' \(id ' \+ r\.id \+ '\) · κύμα ' \+ r\.wave \+ ' · ' \+ r\.name\);/.test(RUNNER) && /console\.log\('Αντιστοίχιση: ' \+ SL\.shortNameMap\(plan\)\);/.test(RUNNER));
+  const md = S.planReport ? S.planReport([{ label: '103', typed: [1, 2], checks: {}, brake: [] }, { label: '103-2', typed: [1], checks: { closing: ['x'] }, brake: ['(Π3) «η λύση» …'] }],
+    { plan: rows, shortNames: map, holdExceeded: [] }).join('\n') : '';
+  assert('SELECTION: the report has the plan, a row each for 103 and 103-2 with their own results, and the sessions that did not run', /\| 7 \| 103 \| 103 \|[^\n]*\| 4 \| ναι \| 2 \| — \| — \|/.test(md) &&
+    /\| 8 \| 103-2 \| 103 \|[^\n]*\| 4 \| ναι \| 1 \| closing \| \(Π3\) «η λύση» … \|/.test(md) && /\| 15 \| 125 \| 125 \|[^\n]*\| 8 \| όχι \| — \| — \| — \|/.test(md) &&
+    md.includes('Αντιστοίχιση: Κ1=111, Κ2=112'));
+}
+
+// ── 8. John, 25/10: the most a run may cost — every call holds its own most before it starts ─────────────────────────────────
+{
+  const core = 'x'.repeat(300000) + 'Α'.repeat(15000); // 330,000 bytes, of the core's length
+  const body = n => ({ system: [{ type: 'text', text: core, cache_control: { type: 'ephemeral' } }, { type: 'text', text: 'ν'.repeat(3000) }],
+    messages: Array.from({ length: n }, (_, k) => ({ role: k % 2 ? 'assistant' : 'user', content: 'λ'.repeat(500) })) });
+  const hold = n => S.auraCallHold(body(n), core.length);
+  const bytesCore = Buffer.byteLength(core), bytesPlain = n => 6000 + n * 1000;
+  // what the call would cost if every token the bound allows were real: the core written at the measured ratio +10%, every other byte a token
+  const worstUsage = n => ({ cache_creation_input_tokens: Math.ceil(bytesCore * 0.2486 * 1.10), input_tokens: bytesPlain(n) + 30 * n + 100, output_tokens: 1000 });
+  assert('HOLD (AURA): the hold is exactly the cost of that worst usage, for a short and a long request', S.auraCallHold && [1, 8, 16].every(n => Math.abs(hold(n) - S.costOf(worstUsage(n), 'aura')) < 1e-9));
+  assert('HOLD (AURA): a cold write of the measured core (84,607 tokens for 340,320 bytes) costs less than its hold', S.costOf({ cache_creation_input_tokens: Math.ceil(342015 * 0.2486), input_tokens: 8000, output_tokens: 1000 }, 'aura') <
+    S.auraCallHold({ system: [{ text: 'α'.repeat(171008), cache_control: {} }], messages: [{ role: 'user', content: 'λ'.repeat(4000) }] }, 171008));
+  assert('HOLD (AURA): a block marked for the cache that is not the core is held at one token per byte', Math.abs(S.auraCallHold({ system: [{ text: 'x'.repeat(10000), cache_control: {} }], messages: [] }, 5) -
+    (10000 * 3.75 + 100 * 3 + 1000 * 15) / 1e6) < 1e-12);
+  assert('HOLD (Haiku): every byte a token at the cache-write price, and 4,000 out', S.userCallHold && Math.abs(S.userCallHold({ system: 'ab', prompt: 'λλ', schema: {} }) - ((2 + 4 + 2 + 200) * 0.125 + 4000 * 0.5) / 1e6) < 1e-15);
+  assert('HOLD: the run holds for EVERY session (no «if (p.final)» around it, no canSpend left in the session) and for every Haiku call',
+    /const hold = Math\.max\(WORST_FINAL, SL\.auraCallHold\(body, APP\.consts\.core\.length\)\);/.test(RUNNER) &&
+    !/budget\.canSpend\('aura'\)/.test(RUNNER.slice(RUNNER.indexOf('async function runStressSession('), RUNNER.indexOf('// ADR «17 Οκτωβρίου» — the second judge'))) &&
+    /const hold = SL\.userCallHold\(\{ system, prompt, schema \}\);\n\s*while \(!budget\.reserve\(hold\)\)/.test(RUNNER) && !/budget\.canSpend\('user'\)/.test(RUNNER));
+  assert('HOLD: released on every path — after the cost is counted, and on an SDK error', /budget\.release\(hold\);\n\s*return \{ error: e instanceof Anthropic\.APIError/.test(RUNNER) &&
+    /const cost = budget\.add\(r\.usage, 'user'\);\n\s*budget\.release\(hold\);/.test(RUNNER) && /r\._counted = true; if \(c > hold\) HOLD_EXCEEDED\.push/.test(RUNNER));
+  assert('HOLD: a call that cost more than it held is written in the report (none expected)', /meta\.holdExceeded = HOLD_EXCEEDED;/.test(RUNNER) && /Κλήσεις που κόστισαν περισσότερο από τη θέση που κράτησαν: /.test(LIBSRC));
+  // two sessions at once, each call costing at most what it holds: the total never passes the cap, whatever the order
+  let worst = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    let x = seed; const rnd = () => (x = (x * 16807) % 2147483647) / 2147483647;
+    const b = S.makeStressBudget(4.2); const flight = [];
+    for (let step = 0; step < 400; step++) {
+      if (flight.length < 2 && rnd() < 0.6) { const h = 0.38 + rnd() * 0.06; if (b.reserve(h)) flight.push({ h, c: h * rnd() }); }
+      else if (flight.length) { const f = flight.splice(Math.floor(rnd() * flight.length), 1)[0]; b.add({ input_tokens: Math.round(f.c * 1e6 / 3) }, 'aura'); b.release(f.h); }
+      worst = Math.max(worst, b.spent());
+    }
+  }
+  assert('CAP: 200 random runs of two sessions at once, each call within its hold — the spend never passes $4.20 (most: $' + worst.toFixed(3) + ')', worst <= 4.2 + 1e-9 && worst > 3.5);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

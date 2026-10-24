@@ -202,14 +202,18 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
   const user = RUNNER.slice(RUNNER.indexOf('function stressUserReal('), RUNNER.indexOf('function stressUserFake('));
   assert('WIRING: the users and the judge are Haiku through the official SDK, structured output, low effort — the budget is checked before each call',
     /model: SL\.USER_MODEL/.test(user) && /output_config: \{ effort: 'low', format: \{ type: 'json_schema', schema \} \}/.test(user) &&
-    user.indexOf("if (!budget.canSpend('user')) return { stop:") >= 0 && user.indexOf("budget.canSpend('user')") < user.indexOf('client.messages.create'));
+    // UPDATED (25/10, John, Π3 round 3): the budget is still checked before each call — now by holding the call's most (SL.userCallHold)
+    user.indexOf("while (!budget.reserve(hold)) { if (!budget.inflight()) return { stop: 'όριο δαπάνης' };") >= 0 &&
+    user.indexOf('budget.reserve(hold)') < user.indexOf('client.messages.create'));
   // UPDATED (12/10, run 28): the message is passed to apiErrorLabel, which derives ONE fact from it (out of credit) and never returns it.
   assert('WIRING: an SDK error is reported only by its HTTP status (+ «out of credit») — never its message',
     /e instanceof Anthropic\.APIError \? SL\.apiErrorLabel\(e\.status, e\.message\)/.test(user) && (user.match(/e\.message/g) || []).length === 1 &&
     !/e\.message/.test(String(S.apiErrorLabel).replace('String(message', '')) && T('apiErrorLabel', 400, 'Your credit balance is too low') .indexOf('credit') < 0);
   // UPDATED (23/10, Theme C — work branch only): the fake model is given the persona (the mechanism sessions vary its questions); --real unchanged.
   assert('WIRING: the app\'s requests go through the SAME api/aura.js as --real (realModel), the budget checked first',
-    /real \? await realModel\(\) : stressFakeAura\(item\.persona\)/.test(RUNNER) && /if \(!budget\.canSpend\('aura'\)\)/.test(RUNNER));
+    // UPDATED (25/10, John, Π3 round 3): «the budget checked first» is now a hold taken before the call (budget.reserve), for every session
+    /real \? await realModel\(\) : stressFakeAura\(item\.persona\)/.test(RUNNER) &&
+    (s => s.indexOf('while (!budget.reserve(hold))') > 0 && s.indexOf('while (!budget.reserve(hold))') < s.indexOf("try { r = await aura(body, cls, { risk: 'stress' }); }"))(RUNNER.slice(RUNNER.indexOf('async function runStressSession('))));
   assert('WIRING: the app opens with ?stageA=1&rec=1 at phone size (390×700)', RUNNER.includes("await page.goto(BASE + '/?stageA=1&rec=1');") && /viewport: \{ width: 390, height: 700 \}/.test(RUNNER.slice(RUNNER.indexOf('async function runStressSession('))));
   assert('WIRING: the reports go through writeOut (redaction + no-secret check) into the temp folder only',
     /writeOut\('stress-report\.md'/.test(RUNNER) && /writeOut\('stress-report\.json'/.test(RUNNER) && /LIB\.outDirInTemp\(/.test(RUNNER) && /LIB\.assertNoSecret\(t, KEY\)/.test(RUNNER));
@@ -910,7 +914,8 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
     /const PAR = Math\.max\(1, Math\.min\(5, Number\(opt\('--parallel', '1'\)\) \|\| 1\)\);/.test(RUNNER) && /realModel\('10\.20\.' \+ wn \+ '\.' \+ \(j \+ 1\)\)/.test(RUNNER) &&
     /'x-forwarded-for': ip/.test(RUNNER) && /waves\.push\(\{ n: wn, labels:/.test(RUNNER) && /if \(FINAL_HALT\.reason\) \{ stopped = 'ΦΡΕΝΟ — '/.test(RUNNER) && /meta\.waves = waves/.test(RUNNER));
   assert('WAVES: a call waits while others hold the room and stops only when none is in flight; the brake halts only a real run',
-    /while \(!budget\.reserve\(WORST_FINAL\)\) \{\n\s*if \(!budget\.inflight\(\)\)/.test(RUNNER) && /const WORST_FINAL = 0\.40;/.test(RUNNER) &&
+    // UPDATED (25/10, John, Π3 round 3): every call holds the larger of WORST_FINAL and the request's own most (SL.auraCallHold)
+    /const hold = Math\.max\(WORST_FINAL, SL\.auraCallHold\(body, APP\.consts\.core\.length\)\);\n\s*while \(!budget\.reserve\(hold\)\) \{\n\s*if \(!budget\.inflight\(\)\)/.test(RUNNER) && /const WORST_FINAL = 0\.40;/.test(RUNNER) &&
     /if \(sess\.brake\.length && !FINAL_HALT\.reason && has\('--real'\)\)/.test(RUNNER));
   // UPDATED (23/10, John, Part B): an error that leaves the person stuck is written down (sess.stuck), not a brake
   assert('ERRORS: every call that was not 200 — the codes, the app\'s error line, a reply or not, the input box and what is in it; written down when nothing is left',

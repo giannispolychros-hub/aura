@@ -4114,7 +4114,10 @@ function stressUserReal(budget) {
   const Anthropic = loadAnthropic();
   const client = new Anthropic({ apiKey: KEY, maxRetries: 2 });
   return async ({ system, prompt, schema }) => {
-    if (!budget.canSpend('user')) return { stop: 'όριο δαπάνης' };
+    // 25/10 (John, Π3 round 3): the call holds the most it may cost (SL.userCallHold) before it starts, like every AURA call — no
+    // room → wait while others are in flight, stop when none is
+    const hold = SL.userCallHold({ system, prompt, schema });
+    while (!budget.reserve(hold)) { if (!budget.inflight()) return { stop: 'όριο δαπάνης' }; await new Promise(res => setTimeout(res, 400)); }
     let r;
     try {
       r = await client.messages.create({
@@ -4123,9 +4126,12 @@ function stressUserReal(budget) {
         output_config: { effort: 'low', format: { type: 'json_schema', schema } },
       });
     } catch (e) {
+      budget.release(hold);
       return { error: e instanceof Anthropic.APIError ? SL.apiErrorLabel(e.status, e.message) : 'σφάλμα σύνδεσης' };
     }
     const cost = budget.add(r.usage, 'user');
+    budget.release(hold);
+    if (cost > hold) HOLD_EXCEEDED.push({ label: 'Haiku', who: 'user', cost, hold });
     if (r.stop_reason === 'refusal') return { refusal: true, cost };
     const text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
     const data = SL.parseJsonReply(text);
@@ -4174,6 +4180,7 @@ function stressFakeAura(persona) {
 // history, 1,000 tokens out ≈ $0.39), held per call in flight; and the brake that stops every running session and every later wave.
 const WORST_FINAL = 0.40;
 const FINAL_HALT = { reason: null };
+const HOLD_EXCEEDED = []; // 25/10: a call that cost more than it held (none expected) — written in the report
 async function runStressSession(item, aura, user, budget) {
   const p = item.persona, pol = SL.policyOf(p), T = APP.texts;
   const sess = { label: item.label, persona: { id: p.id, key: p.key, name: p.name, hiddenRoot: p.hiddenRoot, fixed: !!p.fixed, risk: p.risk || null, short: !!p.short, firstWhyType: !!p.firstWhyType, loop: !!p.loop, tier: p.tier || null, rehearsal: !!p.rehearsal,
@@ -4197,20 +4204,20 @@ async function runStressSession(item, aura, user, budget) {
     try { body = JSON.parse(route.request().postData() || '{}'); } catch (e) { body = {}; }
     const cls = LIB.classifyRequest(body, APP);
     let r;
-    if (p.final) {
-      // 22/10 (the last hard test): parallel sessions — wait while others hold the room; stop only when nothing is in flight
-      while (!budget.reserve(WORST_FINAL)) {
+    {
+      // 22/10 (the last hard test): parallel sessions — wait while others hold the room; stop only when nothing is in flight.
+      // 25/10 (John, Π3 round 3): EVERY session's call holds (not only the «final» ones: 83 runs beside 102), and it holds the larger
+      // of WORST_FINAL and the most this very request may cost (SL.auraCallHold) — so the run's total cannot pass the cap
+      const hold = Math.max(WORST_FINAL, SL.auraCallHold(body, APP.consts.core.length));
+      while (!budget.reserve(hold)) {
         if (!budget.inflight()) { stopped = stopped || 'όριο δαπάνης'; return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"budget"}' }); }
         await new Promise(res => setTimeout(res, 400));
       }
       try { r = await aura(body, cls, { risk: 'stress' }); }
       catch (e) { r = { status: 502, data: { error: 'handler error' } }; }
       const u0 = (r.data && r.data.usage) || null;
-      if (u0) { sess.cost += budget.add(u0, 'aura'); r._counted = true; }
-      budget.release(WORST_FINAL);
-    } else {
-    if (!budget.canSpend('aura')) { stopped = stopped || 'όριο δαπάνης'; return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"budget"}' }); }
-    r = await aura(body, cls, { risk: 'stress' });
+      if (u0) { const c = budget.add(u0, 'aura'); sess.cost += c; r._counted = true; if (c > hold) HOLD_EXCEEDED.push({ label: sess.label, who: 'aura', cost: c, hold }); }
+      budget.release(hold);
     }
     // ADR «19 Οκτωβρίου» (John): the HTTP code of every call and the cache it wrote / read — numbers only, for the report
     const u = (r.data && r.data.usage) || {};
@@ -4726,6 +4733,11 @@ async function mainStress() {
   // 22/10 (the last hard test): in waves, the sessions run in the order they were asked for (the crisis ones first)
   // 23/10 (John, Phase 2): a session asked twice runs the second time where it was asked the second time (SL.askedOrder)
   if (Number(opt('--parallel', '1')) > 1 && only.length) { const pos = SL.askedOrder(only); plan.sort((a, b) => pos(a.label) - pos(b.label)); }
+  // 25/10 (John, Π3 round 3): the plan before anything runs — place, label, id, wave (as planned) and name — and the short names
+  const PLAN_ROWS = SL.planRows(plan, opt('--parallel', '1'));
+  console.log('Σειρά εκτέλεσης — ' + plan.length + ' συνεδρίες:');
+  for (const r of PLAN_ROWS) console.log('  ' + r.n + '. ' + r.label + ' (id ' + r.id + ') · κύμα ' + r.wave + ' · ' + r.name);
+  console.log('Αντιστοίχιση: ' + SL.shortNameMap(plan));
   const want = Number(opt('--budget', String(SL.BUDGET_CAP)));
   // 23/10 (John, Phase 2): --optional 151,152,41,42,43 — these start only if their estimate fits in what is left (the rest start as before;
   // the hard cap still stops the test before a call that would pass it). Asked last, they are the ones left out, in their order.
@@ -4856,6 +4868,7 @@ async function mainStress() {
   const meta = { mode: real ? 'πραγματικό μοντέλο' : 'ψεύτικο μοντέλο (έλεγχος μηχανισμού)', budget: want, spent: budget.spent(), by: budget.by(), stopped, skipped };
   if (waves.length) meta.waves = waves;
   meta.filters = !!ORGF_FILTERS; // 24/10: whether the AFTER FILTERS layer could be written
+  meta.plan = PLAN_ROWS; meta.shortNames = SL.shortNameMap(plan); meta.holdExceeded = HOLD_EXCEEDED; // 25/10
   for (const s of sessions) { s.orgFlags = ORGF.flagsForSession(s, ORGF_FILTERS, ORGF_HELPLINES); s.filterChanges = ORGF.filterChangesForSession(s, ORGF_FILTERS); }
   writeOut('stress-report.md', SL.buildStressReport(sessions, meta));
   writeSummary(SL.buildStressReport(sessions, meta));

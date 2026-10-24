@@ -23,6 +23,33 @@ const WORST_CALL = {
   user: (30000 * PRICES.user.input + 4000 * PRICES.user.output) / 1e6,
 };
 
+// 25/10 (John, Π3 round 3): the most ONE call may cost, read from the request itself, held BEFORE the call starts — for every call of the
+// stress run (AURA and Haiku, every session), so that what runs at the same time can never take the run past its cap. AURA: the app's
+// core prompt (the block marked for the cache whose length is the core's) at the cache-WRITE price, at most CORE_TOKENS_PER_BYTE tokens per
+// byte (measured: run 52 read 84,607 tokens of the 340,320-byte core, 0.2486 — taken +10%); any other block marked for the cache at the
+// write price and at most one token per byte; every other byte of the request at most one token at the input price; 30 tokens a message
+// and 100 a request for the format; and the most the api lets out (1,000 tokens). Haiku: every byte of system, prompt and schema at most one
+// token at the cache-write price (the higher one costOf may charge), 200 for the format, and its max_tokens (4,000) out.
+const CORE_TOKENS_PER_BYTE = 0.2486 * 1.10;
+const bytesOf = t => Buffer.byteLength(String(t == null ? '' : t), 'utf8');
+function auraCallHold(body, coreLength) {
+  const b = body || {}, sys = Array.isArray(b.system) ? b.system : [{ text: b.system }];
+  let core = 0, otherCached = 0, plain = 0;
+  for (const x of sys) {
+    const t = x && typeof x.text === 'string' ? x.text : '', n = bytesOf(t);
+    if (x && x.cache_control && coreLength && t.length === coreLength) core += n; else if (x && x.cache_control) otherCached += n; else plain += n;
+  }
+  const msgs = Array.isArray(b.messages) ? b.messages : [];
+  for (const m of msgs) plain += bytesOf(m && typeof m.content === 'string' ? m.content : JSON.stringify((m && m.content) || ''));
+  const written = Math.ceil(core * CORE_TOKENS_PER_BYTE) + otherCached, input = plain + 30 * msgs.length + 100;
+  return (written * PRICES.aura.cacheWrite + input * PRICES.aura.input + 1000 * PRICES.aura.output) / 1e6;
+}
+function userCallHold(o) {
+  const x = o || {};
+  const n = bytesOf(x.system) + bytesOf(x.prompt) + bytesOf(JSON.stringify(x.schema || {})) + 200;
+  return (n * PRICES.user.cacheWrite + 4000 * PRICES.user.output) / 1e6;
+}
+
 function costOf(u, who) {
   const p = PRICES[who === 'user' ? 'user' : 'aura'];
   const x = u || {};
@@ -712,6 +739,31 @@ function dangerReport(S) {
     }
     L.push('Προτάσεις που μπορεί να υπόσχονται ασφάλεια ή ανωνυμία (για ανάγνωση): ' + (pr.length ? pr.length : 'καμία που να βλέπει ο κώδικας — αυτό δεν σημαίνει ότι δεν υπάρχει'), ...pr, '');
   }
+  return L;
+}
+// 25/10 (John, Π3 round 3): the plan as it will run — its place in the order, the label (a session asked twice runs as «103» and
+// «103-2», two sessions with results of their own), the id, the name and the wave it is planned in; and the short names (Κ1 = 111 …)
+function planRows(plan, parallel) {
+  const par = Math.max(1, Math.min(5, Number(parallel) || 1));
+  return (plan || []).map((it, i) => ({ n: i + 1, label: it.label, id: it.persona.id, name: it.persona.name, wave: Math.floor(i / par) + 1 }));
+}
+function shortNameMap(plan) {
+  return (plan || []).map(it => String(it.persona.name || '').split(' · ')[0].trim() + '=' + it.label).join(', ');
+}
+function planReport(S, meta) {
+  const rows = (meta && meta.plan) || [];
+  if (!rows.length) return [];
+  const by = new Map((S || []).map(s => [s.label, s]));
+  const L = ['## Σειρά εκτέλεσης — το σχέδιο και τι έτρεξε', '', 'Αντιστοίχιση: ' + ((meta && meta.shortNames) || ''), '',
+    '| # | Συνεδρία | id | Όνομα | Κύμα (σχέδιο) | Έτρεξε | Μηνύματα | Έλεγχοι με ✗ | Φρένο |', '|---|---|---|---|---|---|---|---|---|'];
+  for (const r of rows) {
+    const s = by.get(r.label);
+    const bad = s ? CHECKS.filter(c => ((s.checks && s.checks[c.key]) || []).length).map(c => c.key) : [];
+    L.push('| ' + [r.n, r.label, r.id, cell(r.name, 90), r.wave, s ? 'ναι' : 'όχι', s ? (s.typed || []).length : '—', s ? (bad.join(', ') || '—') : '—',
+      s && (s.brake || []).length ? cell(s.brake[0], 120) : '—'].join(' | ') + ' |');
+  }
+  const over = (meta && meta.holdExceeded) || [];
+  L.push('', 'Κλήσεις που κόστισαν περισσότερο από τη θέση που κράτησαν: ' + (over.length ? over.length + ' — ' + over.map(x => x.label + ' (' + x.who + ', $' + x.cost.toFixed(4) + ' > $' + x.hold.toFixed(4) + ')').join(' · ') : '0'), '');
   return L;
 }
 // Κ6: what voice dictation types — capitals, no accents, no punctuation.
@@ -2135,6 +2187,7 @@ function buildStressReport(sessions, meta) {
   L.push(...mechanismReport(S)); // 23/10 (John, Theme C)
   L.push(...orgFlagReport(S, m)); // 24/10 (John, Π3 step 2): for reading, not a check
   L.push(...dangerReport(S)); // 24/10 (John, Π3 step 3): 125 reported separately, for reading
+  L.push(...planReport(S, m)); // 25/10 (John, Π3 round 3): the plan, what ran, and calls above their hold
   const worst = S.slice().sort((a, b) => sessionScore(b) - sessionScore(a)).slice(0, 5);
   L.push('## Οι 5 χειρότερες συνομιλίες (αυτούσιες)', '');
   for (const s of worst) {
@@ -2146,7 +2199,7 @@ function buildStressReport(sessions, meta) {
 
 module.exports = {
   callTally,
-  USER_MODEL, PRICES, BUDGET_CAP, WORST_CALL, costOf, makeStressBudget, PERSONAS, HARD_PERSONAS, FOUNDER_PERSONAS, founderMetrics, BASE_POLICY, policyOf, planRuns, askedOrder, MAX_TYPED, EXIT_AFTER, EXIT_TEXT,
+  USER_MODEL, PRICES, BUDGET_CAP, WORST_CALL, CORE_TOKENS_PER_BYTE, auraCallHold, userCallHold, planRows, shortNameMap, planReport, costOf, makeStressBudget, PERSONAS, HARD_PERSONAS, FOUNDER_PERSONAS, founderMetrics, BASE_POLICY, policyOf, planRuns, askedOrder, MAX_TYPED, EXIT_AFTER, EXIT_TEXT,
   USER_SCHEMA, CARD_SCHEMA, CLARITY_SCHEMA, personaSystem, personaPrompt, transcriptText, parseJsonReply, cleanUserText, JUDGE_SCHEMA, JUDGE_SYSTEM, judgePrompt,
   fold, findLabels, FAREWELLS, findFarewells, AFTER_CRISIS, AFTER_CRISIS_FIRST, crisisLineAt, afterCrisisFindings, isLeaving, pressureFindings, apiErrorLabel, edTechniqueFindings, aiIdentityFindings, promptTexts, normCorpus, promptLeakFindings, preRootClosingChecked, normalizeVerbatim, rootIsUserWords, rootQuestionUnderModelQuestion,
   orgFlagReport, ADVICE_VIOLATIONS, violationType, lastSessionEvents, telemetryIssues, estimateCost, CHECKS, sessionScore, buildStressReport, keyShape, KEY_KIND_TEXT,
