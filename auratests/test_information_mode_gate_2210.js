@@ -126,6 +126,9 @@ P3_TEXT.unshift(['Apply ANSWER BEFORE INTERPRETATION normally to general factual
 // Π3 (ε):
 P3_TEXT.unshift(['factually and without personalizing, then return the question', 'factually and without personalizing (e.g. "δωρεάν ιατρεία διακοπής καπνίσματος"), then return the question']); // (ε) line 35, 35β without an example
 // Π3 (στ):
+P3_TEXT.unshift(['a practical gap not previously covered): ' + P3_SHORT, 'a practical gap not previously covered): ']); // (στ) line 38
+P3_TEXT.unshift(['ANALYSIS WITH POTENTIAL PERSONAL IMPACT: ' + P3_SHORT.trimEnd(), 'ANALYSIS WITH POTENTIAL PERSONAL IMPACT:']); // (στ) line 353
+P3_TEXT.unshift(["not AURA's internal rules): " + P3_SHORT, "not AURA's internal rules): "]); // (στ) line 613
 const undoP3 = p => P3_TEXT.reduce((x, [now, before]) => (x.split(now).length === 2 ? x.replace(now, before) : 'MISSING ' + now),
   P3_CLAUSES.reduce((x, [at, cl]) => (x.split(at + cl).length === 2 ? x.replace(at + cl, at) : 'MISSING the clause after ' + at), String(p || '')));
 assert('3: the fixed prompt is a409a47\'s, byte for byte, apart from Π3', h(undoP3(PROMPT)) === 'b5f303cc9405aa21');

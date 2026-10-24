@@ -49,6 +49,15 @@ MORE_CLAUSES += 1; // (γ) line 315 — at the end of the line, so not counted a
     C.includes('Apply ANSWER BEFORE INTERPRETATION normally to general factual questions that are not about law, money or health;')); }
 // Π3 (ε):
 // Π3 (στ):
+MORE_SHORT += 2; MORE_CLAUSES += 3; // (στ) lines 38 and 613 (inside the line), 353 (at its end)
+{ const one = (start, after, clause) => { const L = lines.filter(l => l.startsWith(start)); return L.length === 1 && L[0].split(after + clause).length === 2; };
+  assert('(στ) REAL-TIME DATA LIMIT (38): the short clause right after its opening note — «general, stable knowledge» yields to the content limit',
+    one('REAL-TIME DATA LIMIT (', 'a practical gap not previously covered): ', SHORT));
+  assert('(στ) ANALYSIS WITH POTENTIAL PERSONAL IMPACT (353–360): the short clause on its heading, so the «γενικά τα δεδομένα» branch yields',
+    lines.filter(l => l === 'ANALYSIS WITH POTENTIAL PERSONAL IMPACT: ' + SHORT.trimEnd()).length === 1);
+  assert('(στ) OPTIONAL RESEARCH OFFER (613): the short clause right after its opening note', one('OPTIONAL RESEARCH OFFER (', "not AURA's internal rules): ", SHORT));
+  assert('(στ) NOT changed, on purpose: FACT/ANALYSIS-ONLY CLOSURE (362) and CONDITIONAL LEAN (367) — before the root Stage A (912 (2), (3), (6)) already stops them',
+    h(lines.find(l => l.startsWith('FACT/ANALYSIS-ONLY CLOSURE (')) || '') === 'ccd9eb8dda91e756' && h(lines.find(l => l.startsWith('CONDITIONAL LEAN, NOT REFUSAL (')) || '') === 'babb070e2c07cf4c'); }
 assert('CLAUSE: the long one once and the short one five times, nowhere else in the prompt — apart from the clauses the later Π3 commits count above',
   count(PROMPT, LONG) === 1 && count(PROMPT, SHORT) === 5 + MORE_SHORT && count(PROMPT, 'PRECEDENCE (') === 6 + MORE_CLAUSES);
 assert('CLAUSE: every rule it names is in the prompt — MASTER PRIORITY RULE, the Stage A marker, STAGE A rule (2) — and Stage A is below the six',
