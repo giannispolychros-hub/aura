@@ -1549,6 +1549,11 @@ function detectSafetySignal(text, tierB) {
     // όλα, δεν αξίζει» and «δεν θέλω να υπάρχω πια» only at the start of a sentence or after a comma; in English «end it all» only with I.
     /(?:(?:θα ήταν (?:πιο )?καλύτερα(?: [^\s.,;!?]+){0,4}|θα είναι (?:πιο )?καλύτερα για(?: [^\s.,;!?]+){1,4}) χωρίς εμένα|καλύτερα να μην (?:υπήρχα|είχα γεννηθεί)|δεν? θέλω (?:πια |πλέον )?να υπάρχω|δεν αξίζει να (?:ζω|ζήσω|συνεχίσω)|(?:πάρω|πήρα|παίρνω|πιω|ήπια|καταπιώ|κατάπια) (?:όλα τα|ένα κουτί|όλο το κουτί) χάπια(?: μου)?|(?:να|θα) (?:πηδήξω|πέσω|πεταχτώ|ριχτώ) (?:από|απ') (?:το μπαλκόνι|την ταράτσα|τη γέφυρα|το παράθυρο|τον γκρεμό)|(?:να|θα) πέσω στο κενό|(?:να|θα) κρεμαστώ|(?:κόβω|έκοψα|κόψω) τον εαυτό μου|θέλει να πεθάνει|να τελειώσει τη ζωή (?:του|της)|δεν θέλει (?:πια |πλέον )?να ζει(?: πια| πλέον)?|βάλει τέλος στη ζωή (?:του|της))(?=\s*(?:$|[.!;?…,·»"”')]|—|–|και |γιατί |αλλά ))|(?:^|[.!;?…,—–-]\s*)(?:δεν? θέλω να υπάρχω (?:πια|πλέον)(?=\s*(?:$|[.!;?…,·»"”')]|—|–|και |γιατί |αλλά ))|τα παρατάω όλα[,.…—–-]*\s*(?:γιατί |αφού )?δεν αξίζει(?=\s*(?:$|[.!;?…,»"”')]|πια|πλέον|τίποτα|άλλο)))|να βλάψει τον εαυτό (?:του|της)/i,
     /(?:\bwanna die|\bi(?:'m| am|m)?(?: just| really)? (?:want to|wanna|going to|gonna|need to) end it all|(?:^|[^\d\s])\s*\bkms)(?=\s*(?:$|[.!?;,…»"”')]|lol\b|lmao\b|fr\b|rn\b|tbh\b))/i,
+    // PASSIVE IDEATION (John, 24/10/2026, a safety fix (α); found reading the code after real-model run 54): «θα ήταν καλύτερα να μην ζω»,
+    // «καλύτερα να μην ζούσα», «θα ήταν καλύτερα να είχα πεθάνει», «μακάρι να μην ξυπνούσα» matched nothing. Tier A. Like the phrases
+    // above, each must END ITS CLAUSE (or go on with «πια», «ποτέ», «άλλο» …), so «καλύτερα να μη ζω με τους γονείς μου» and «μακάρι να μην
+    // ξυπνούσα τόσο νωρίς» do not alarm. Known gaps and known false alarms: auratests/test_passive_ideation_2410.js.
+    /(?:καλύτερα(?: [^\s.,;!?]+){0,3} να (?:μην? (?:ζω|ζούσα)|είχα πεθάνει)|μακάρι να μην? ξυπνούσα)(?: (?:ποτέ(?: ξανά| πια)?|πια|πλέον|ξανά|άλλο))?(?=\s*(?:$|[.!;?…,·»"”')]|—|–|και |γιατί |αλλά ))/i,
   ];
   const distress = [
     /\b(grief|bereaved|bereavement|trauma|traumatic|abuse|abused|assault|crisis|breakdown|panic attack)\b/i,
@@ -1782,6 +1787,26 @@ function dangerInMessages(msgs) {
     if (d) { self = self || d.self; child = child || d.child; }
   }
   return self || child ? { self, child } : null;
+}
+// Ο5 — NO PROMISES UNDER DANGER (John, 24/10/2026, a safety fix (α); real-model run 54, session 125: «Η κλήση στο 15900 είναι
+// εμπιστευτική — … δεν μαθαίνει κανείς», «… πώς να φτάσεις εκεί με ασφάλεια»). Only while danger from another person is in this session's
+// messages (`danger`, from dangerInMessages — the same check that writes the app's line). A model sentence that promises secrecy or tells
+// what a help line is (DANGER_SECRET, a question too), or promises a safe outcome (DANGER_SAFE, statements only), is not shown: the first
+// becomes DANGER_PROMISE_LINE, the others go. It reads the model's text only, before the app adds its own lines; what is inside quotation
+// marks is the user's words said back and is not read. No danger → the very same string. See auratests/test_danger_promises_2410.js.
+const DANGER_PROMISE_LINE = "Δεν μπορώ να σου υποσχεθώ τι θα γίνει. Για το πώς κρατιέται κάτι κρυφό, ρώτα απευθείας τη γραμμή. Οι αριθμοί που σου έδωσα είναι εκεί.";
+const DANGER_SECRET = /ανωνυμ|εμπιστευτικ|(?:^|[^α-ω])(?:δεν|δε) (?:θα )?καταγραφ|κανεισ (?:δεν|δε) (?:θα )?(?:μαθ|ξερ|καταλαβ|δει|βρ)|(?:^|[^α-ω])(?:δεν|δε) (?:θα )?(?:μαθ|ξερ)[^ ]* κανεισ|χωρισ να (?:φανει|μαθ|αναφερθ|δωσεισ (?:το )?ονομα)|(?:^|[^α-ω])(?:δεν|δε) (?:χρειαζεται|ειναι αναγκη) να (?:δωσεισ|πεισ) (?:το )?ονομα|(?:^|[^α-ω])(?:δεν|δε) (?:θα )?μπορει να (?:ξερει|μαθει|βρει)|σιωπηλ|(?:^|[^α-ω])(?:δεν|δε) (?:ανακοινων|δημοσιευ|λενε)[^ ]* (?:τη |την )?διευθυνσ|κρυφ[^ ]* διευθυνσ|δωρεαν|24 ωρ|24ωρ|ολο το 24/;
+const DANGER_SAFE = /με ασφαλεια|(?:^|[^α-ω])να μην? (?:σε|σασ|τισ|μασ) βρ|(?:^|[^α-ω])(?:δεν|δε) θα (?:σε|σασ) βρ|θα (?:εισαι|ειστε|ειναι) ασφαλ|εγγυ/;
+function stripDangerPromises(text, danger) {
+  if (!danger || typeof text !== "string" || !text) return text;
+  let said = text.includes(DANGER_PROMISE_LINE);
+  return dropModelSentences(text, (f, p) => {
+    const own = f.replace(/«[^»]*»|"[^"]*"|“[^”]*”/g, " ");
+    if (!DANGER_SECRET.test(own) && !(DANGER_SAFE.test(own) && !/[;?]\s*["»”']*\s*$/.test(p))) return false;
+    if (said) return true;
+    said = true;
+    return DANGER_PROMISE_LINE;
+  });
 }
 // Ο5 — Stage A's doors to the root stay shut: crisis A (riskKind 1) as before, or danger from another person seen in this session
 // (`dangerFromOther`, a latch of its own that nothing clears before «Νέα συνεδρία»). Not riskKind 1 itself: that would count as
@@ -7709,8 +7734,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       }
       const rawText = rawTextWithTags.replace(/\s*\[\[EARLY_WORD:yes\]\]\s*/gi, "\n").trim();
       // ADR «12 Οκτωβρίου»: the ΗΡΘΕΣ ΜΕ summary once per session, and the STOP MOMENT's limit and gentle form — on the text that
-      // reaches the screen AND the history. A referral in this very reply counts as a sign of heaviness too.
-      const text = guardStopMoment(stripRepeatedThreeBeat(stripAraDeclarative(cleanLabels(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""))), msgs), countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current, stageAActive.current && dangerFromOther.current) || detectsMentalHealthReferral(rawText));
+      // reaches the screen AND the history. A referral in this very reply counts as a sign of heaviness too. Ο5 (24/10): under danger from
+      // another person, no promise (stripDangerPromises), before the app's own lines are added below.
+      const text = guardStopMoment(stripRepeatedThreeBeat(stripAraDeclarative(cleanLabels(stripDangerPromises(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""), dangerInMessages(msgs)))), msgs), countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current, stageAActive.current && dangerFromOther.current) || detectsMentalHealthReferral(rawText));
 
       // If explicit pause was used, record it
       if (explicitPauseCtx && /(τρόπο που ψάχνεις|προτιμάς να φτάσουμε|απόφαση ή να καταλάβεις)/i.test(text)) {
@@ -8865,7 +8891,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         const profileCtx = getProfileSummary(memory);
         const profileWithRules = profileCtx ? profileCtx + HONEST_UNCERTAINTY_RULE : '';
         const prompt = [getLensPrompt(inferred), memCtx, profileWithRules, buildFirstWhyFloor(), buildStageAMarker(stageAActive.current)].filter(Boolean).join('\n');
-        const text = stripAraDeclarative(cleanLabels(await callAura(initMsgs, prompt)));
+        const text = stripAraDeclarative(cleanLabels(stripDangerPromises(await callAura(initMsgs, prompt), dangerInMessages(initMsgs)))); // Ο5 (24/10): no promise under danger
         // THE NO-ADVICE FLOOR ON THE ENTRY TURN. Neither observer saw this reply before: an opening
         // that offered the user options went uncounted, and the guard built for exactly that failure
         // was blind precisely here. Observation only, identical in kind to the main path — a count
