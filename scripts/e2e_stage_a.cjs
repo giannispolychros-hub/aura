@@ -687,6 +687,7 @@ async function runMock() {
   await runMockCX();
   await runMockO5(); // 23/10 (Ο5): danger from another person
   await runMockPI(); // 24/10 (Ε1): passive ideation
+  await runMockLC(); // 25/10 (Ε2 v2): no claim about a line on the safety path
   await runMockSN();
   await runMockAR();
   await runMockPM();
@@ -1037,8 +1038,10 @@ async function runMockLR() {
     const body = await s.page.locator('body').innerText();
     ok(`LR1 (${tag}): «δεν θέλω να κάνω κακό στον εαυτό μου» → the safety path: the crisis prompt and the app's line 1018 + 112 (detector unchanged)`,
       LIB.classifyRequest(s.bodies[iNeg], APP).kind === 'supportive' && /1018/.test(body) && /112/.test(body));
-    ok(`LR1 (${tag}): the model's «ΚΕΘΕΑ» and «Κύπρος: 1480» are NOT on screen; its own referral wording and question are`,
-      !/ΚΕΘΕΑ|1480|Κύπρος/.test(body) && body.includes('Μια γραμμή κρίσης μπορεί να βοηθήσει με τρόπους που εγώ δεν μπορώ.') && body.includes('Είσαι τώρα σε ασφαλές μέρος;'));
+    // UPDATED (25/10, Ε2 v2, John): on the crisis path a model statement about a line is not shown — «Μια γραμμή κρίσης μπορεί να βοηθήσει
+    // με τρόπους που εγώ δεν μπορώ.» goes; its 10306 stays as the table's name and number (auratests/test_line_claims_2510.js)
+    ok(`LR1 (${tag}): the model's «ΚΕΘΕΑ» and «Κύπρος: 1480» are NOT on screen; its 10306 is, as the table's name and number; its question is`,
+      !/ΚΕΘΕΑ|1480|Κύπρος/.test(body) && !body.includes('Μια γραμμή κρίσης μπορεί να βοηθήσει') && body.includes('Γραμμή Ψυχοκοινωνικής Υποστήριξης, 10306.') && body.includes('Είσαι τώρα σε ασφαλές μέρος;'));
     ok(`LR1 (${tag}): the crisis turn itself carries no safety sentence (SUPPORTIVE stays as it was); before the crisis, none either`,
       !s.dyn(iNeg).includes(SAFETY) && s.bodies.slice(0, iNeg).every((b, i) => !s.dyn(i).includes(SAFETY)));
     await send(s.page, 'εντάξει'); await s.page.waitForTimeout(300);
@@ -3185,8 +3188,10 @@ async function runMockO5() {
     const s = await sess('?stageA=1&rec=1', [PROMISE, 'Ξέρουν πώς να φύγεις με το παιδί, με ασφάλεια. Μπορείς να καλέσεις τώρα;', 'Σε ακούω.']);
     await send(s.page, DANGER); await s.page.waitForTimeout(800);
     const a = await lastAura(s.page);
-    ok('O5-12 (Ε2, switch open): «… εμπιστευτική — … δεν μαθαίνει κανείς» → John\'s sentence, once; the rest of the reply and the app\'s line stay',
-      a.includes(JOHN) && count(a, JOHN) === 1 && !/εμπιστευτικ|μαθαίνει κανείς/.test(a) && a.startsWith('Μπροστά στο παιδί.') && a.includes('Είσαι ασφαλής αυτή τη στιγμή;') && a.endsWith(SELF));
+    // UPDATED (25/10, Ε2 v2, John): a statement WITH a number of the table gives the table's name and number (the number is never lost),
+    // not John's sentence — John's sentence stays for a statement without a number (the next turn, below)
+    ok('O5-12 (Ε2 v2, switch open): «Η κλήση στο 15900 είναι εμπιστευτική — … δεν μαθαίνει κανείς» → «Γραμμή SOS για τη βία κατά των γυναικών, 15900.»; the rest of the reply and the app\'s line stay',
+      a.includes('Γραμμή SOS για τη βία κατά των γυναικών, 15900.') && !a.includes(JOHN) && !/εμπιστευτικ|μαθαίνει κανείς/.test(a) && a.startsWith('Μπροστά στο παιδί.') && a.includes('Είσαι ασφαλής αυτή τη στιγμή;') && a.endsWith(SELF));
     await shot(s.page, 'O5-12-no-promise');
     await send(s.page, 'Δεν ξέρω αν είμαι ασφαλής.'); await s.page.waitForTimeout(800);
     const b = await lastAura(s.page);
@@ -3215,8 +3220,9 @@ async function runMockO5() {
     const s = await sess('?stageA=1&rec=1', ['Σε ακούω. Η 10306 είναι δωρεάν και ανώνυμη. Τι γίνεται τώρα;']);
     await send(s.page, 'Με χτυπάει ο άντρας μου και δεν αντέχω άλλο.'); await s.page.waitForTimeout(800);
     const a = (await lastAura(s.page)).replace(/\n?ΥΠΟΣΤΗΡΙΞΗ\s*$/, ''); // the crisis bubble's own badge, under the text
-    ok('O5-15 (Ε2, crisis B + danger): the model\'s 10306 sentence → John\'s sentence; the app writes its own 10306 line, then the danger line',
-      a.includes(JOHN) && a.includes(L10306) && count(a, '10306') === 1 && a.endsWith(SELF));
+    // UPDATED (25/10, Ε2 v2): the model's 10306 statement → the table's name and number; the app sees 10306 and does not write its line again
+    ok('O5-15 (Ε2 v2, crisis B + danger): «Η 10306 είναι δωρεάν και ανώνυμη.» → «Γραμμή Ψυχοκοινωνικής Υποστήριξης, 10306.», 10306 once, no property, then the danger line',
+      a.includes('Γραμμή Ψυχοκοινωνικής Υποστήριξης, 10306.') && !a.includes(L10306) && !/δωρεάν|ανώνυμη/.test(a) && count(a, '10306') === 1 && a.endsWith(SELF));
     await s.browser.close();
   }
   {
@@ -3225,8 +3231,9 @@ async function runMockO5() {
     const fw = await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count();
     await send(s.page, 'Γιατί φοβάμαι.'); await s.page.waitForTimeout(800);
     const a = await lastAura(s.page);
-    ok('O5-16 (Ε2, old flow, the First-WHY reply): the promise → John\'s sentence, the line after it, once',
-      fw === 1 && s.calls() === 1 && a.includes(JOHN) && !/εμπιστευτικ|μαθαίνει κανείς/.test(a) && a.endsWith(SELF) && count(await body(s.page), SELF) === 1);
+    // UPDATED (25/10, Ε2 v2): as O5-12 — the statement with 15900 → the table's name and number
+    ok('O5-16 (Ε2 v2, old flow, the First-WHY reply): the promise with 15900 → «Γραμμή SOS για τη βία κατά των γυναικών, 15900.», the line after it, once',
+      fw === 1 && s.calls() === 1 && a.includes('Γραμμή SOS για τη βία κατά των γυναικών, 15900.') && !/εμπιστευτικ|μαθαίνει κανείς/.test(a) && a.endsWith(SELF) && count(await body(s.page), SELF) === 1);
     await s.browser.close();
   }
 }
@@ -3298,6 +3305,62 @@ async function runMockPI() {
     await send(s.page, 'Εύχομαι να μην ξυπνούσα τόσο νωρίς κάθε πρωί.'); await s.page.waitForTimeout(800);
     ok('PI-6 (the new words, the clause goes on): «Εύχομαι να μην ξυπνούσα τόσο νωρίς κάθε πρωί.» → no line, no SAFETY stage',
       !(await lastAura(s.page)).includes('1018') && !s.bodies[0].includes('STAGE: SAFETY'));
+    await s.browser.close();
+  }
+}
+
+// ── LC: Ε2 v2 (John, 25/10/2026, a safety fix (α); real-model run 55): on the safety path — crisis A or B, the turns after it, danger
+// from another person — a model statement about a line or a service is not shown; a call keeps its words up to the number (and «τώρα»
+// right after it); a statement with a number gives the table's name and number only. Questions stay. Off the path: as written. On the
+// screen AND in the history. The texts are written out here on purpose, so the old code fails. Screenshot LC-1-call (-390 / -360).
+// Alone: --only LC.
+async function runMockLC() {
+  const sess = async (query, replies) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }) });
+    const bodies = [];
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      bodies.push(route.request().postData() || '');
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await page.waitForTimeout(300);
+    return { browser, page, bodies };
+  };
+  const lastAura = async page => ((await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim()).slice(-1)[0] || '').replace(/\n?ΥΠΟΣΤΗΡΙΞΗ\s*$/, '');
+  const PROPERTY = /δωρεάν|ανώνυμ|24 ώρες|24ωρο|εμπιστευτικ|θα σε ακούσουν|Ξέρουν/;
+  const CALL = 'Σε ακούω. Κάλεσε το 1018 τώρα — είναι δωρεάν, ανώνυμο και ανοιχτό 24 ώρες.\n\nΕίσαι μόνος αυτή τη στιγμή;';
+  for (const q of ['?stageA=1&rec=1', '?stageA=0']) {
+    const s = await sess(q, [CALL, 'Το ακούω.\n\nΗ γραμμή είναι ανοιχτή όλο το 24ωρο. Ξέρουν τι να κάνουν.\n\nΘέλεις να μείνουμε λίγο εδώ;', 'Σε ακούω.']);
+    await send(s.page, 'Θα ήταν καλύτερα να μην ζω.'); await s.page.waitForTimeout(800);
+    const a = await lastAura(s.page);
+    ok('LC-1 (crisis A, ' + q + '): «Κάλεσε το 1018 τώρα — είναι δωρεάν, ανώνυμο …» → «Κάλεσε το 1018 τώρα.»; the question stays; no property on screen',
+      a.startsWith('Σε ακούω. Κάλεσε το 1018 τώρα.') && a.includes('Είσαι μόνος αυτή τη στιγμή;') && !PROPERTY.test(a));
+    if (q !== '?stageA=0') await s.page.screenshot({ path: path.join(OUT, 'LC-1-call-' + (VP ? VP.width : 390) + '.png'), fullPage: false });
+    await send(s.page, 'δεν ξέρω'); await s.page.waitForTimeout(800);
+    const b = await lastAura(s.page);
+    ok('LC-2 (the turn after the crisis, ' + q + '): the two statements about the line go — no John sentence without danger — the question stays',
+      b.startsWith('Το ακούω.') && b.includes('Θέλεις να μείνουμε λίγο εδώ;') && !/24ωρο|Ξέρουν τι να κάνουν/.test(b) && !b.includes('Δεν μπορώ να σου υποσχεθώ'));
+    await send(s.page, 'εντάξει'); await s.page.waitForTimeout(800);
+    ok('LC-3 (' + q + '): the history sent to the model carries the cleaned text, never the property', s.bodies.length === 3 && (() => { try { const m = JSON.parse(s.bodies[2]).messages.map(x => x.content).join('\n'); return m.includes('Κάλεσε το 1018 τώρα.') && !PROPERTY.test(m); } catch (e) { return false; } })());
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1', ['Η 10306 είναι δωρεάν, 24 ώρες, και θα σε ακούσουν. Είσαι ασφαλής αυτή τη στιγμή;']);
+    await send(s.page, 'Δεν αντέχω άλλο.'); await s.page.waitForTimeout(800);
+    const a = await lastAura(s.page);
+    ok('LC-4 (crisis B): «Η 10306 είναι δωρεάν, 24 ώρες, …» → «Γραμμή Ψυχοκοινωνικής Υποστήριξης, 10306.», 10306 once, no property — not even the app\'s own «δωρεάν και ανώνυμη»',
+      a.startsWith('Γραμμή Ψυχοκοινωνικής Υποστήριξης, 10306.') && a.includes('Είσαι ασφαλής αυτή τη στιγμή;') && a.split('10306').length === 2 && !PROPERTY.test(a));
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1', ['Η γραμμή του λεωφορείου είναι δωρεάν, το ξέρω. Τι σε κρατάει εκεί;']);
+    await send(s.page, 'Σκέφτομαι να αλλάξω δουλειά αλλά φοβάμαι.'); await s.page.waitForTimeout(800);
+    ok('LC-5 (no crisis, no danger): the reply is shown as written (under the method line of a first reply)', (await lastAura(s.page)).includes('Η γραμμή του λεωφορείου είναι δωρεάν, το ξέρω. Τι σε κρατάει εκεί;'));
     await s.browser.close();
   }
 }
@@ -4790,7 +4853,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

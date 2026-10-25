@@ -93,9 +93,11 @@ assert('WIRING: one helper counts and cleans (labelLeaks ref)', /const labelLeak
 // STOP MOMENT's limit and gentle form) — still the one line that cleans, still after the tags are read.
 // UPDATED (24/10, Ε2, a safety fix (α), approved by John): inside the same cleaning, no promise under danger from another person
 // (stripDangerPromises, auratests/test_danger_promises_2410.js) — still the one line that cleans, still after the tags are read.
+// UPDATED (25/10, Ε2 v2, a safety fix (α)): first inside the same cleaning, no claim about a line or a service on the safety path
+// (stripLineClaims, auratests/test_line_claims_2510.js) — still the one line that cleans, still after the tags are read.
 assert('WIRING: main reply — cleaned right after the hidden tags are read, before every check, the screen and the history',
-  /const text = guardStopMoment\(stripRepeatedThreeBeat\(stripAraDeclarative\(cleanLabels\(stripDangerPromises\(rawText\.replace\(\/\\s\*\\\[\\\[EXIT:\(yes\|no\)\\\]\\\]\\s\*\$\/i, ""\), dangerInMessages\(msgs\)\)\)\), msgs\), /.test(GEN) &&
-  GEN.indexOf('const exitTagMatch = rawTextWithTags.match(') < GEN.indexOf('cleanLabels(stripDangerPromises(rawText.replace('));
+  /const text = guardStopMoment\(stripRepeatedThreeBeat\(stripAraDeclarative\(cleanLabels\(stripDangerPromises\(stripLineClaims\(rawText\.replace\(\/\\s\*\\\[\\\[EXIT:\(yes\|no\)\\\]\\\]\\s\*\$\/i, ""\), dangerInMessages\(msgs\), _safetyPath\), dangerInMessages\(msgs\)\)\)\), msgs\), /.test(GEN) &&
+  GEN.indexOf('const exitTagMatch = rawTextWithTags.match(') < GEN.indexOf('cleanLabels(stripDangerPromises(stripLineClaims(rawText.replace('));
 // UPDATED (17/10, ADR «17 Οκτωβρίου»): the write carries the method-line display flag.
 assert('WIRING: main reply — no empty bubble', /if \(displayText\.trim\(\)\) setMessages\(prev => \[\.\.\.prev, \{ id: nextMsgId\(\), role: "assistant", content: displayText, msgMode: currentMode, \.\.\.\(_methodLine \? \{ methodLine: true \} : \{\}\) \}\]\);/.test(GEN));
 assert('WIRING: every other model reply is cleaned too (closing Part 1, Part 2, early word, misfire, compression, First-WHY)',
@@ -109,7 +111,7 @@ assert('MEASURE: reset with a new session', /labelLeaks\.current = 0;/.test(extr
 // (modelJudgesEnd) and the early word (awaitingEarlyWord) must read the model's RAW reply, and only then is it cleaned.
 {
   const at = GEN.indexOf('const exitTagMatch = rawTextWithTags.match(');
-  const end = GEN.indexOf('\n', GEN.indexOf('cleanLabels(stripDangerPromises(rawText.replace(')); // UPDATED (24/10, Ε2): the same one line
+  const end = GEN.indexOf('\n', GEN.indexOf('cleanLabels(stripDangerPromises(stripLineClaims(rawText.replace(')); // UPDATED (24/10, Ε2; 25/10, Ε2 v2): the same one line
   const seg = at >= 0 && end > at ? GEN.slice(at, end) : '';
   assert('TAGS BEFORE CLEANING: the raw reply comes straight from callAura — nothing cleans it on the way in',
     /const rawTextWithTags = await callAura\(\[\.\.\.contextRefresh, \.\.\.msgs\], system\);/.test(GEN) &&
@@ -125,8 +127,9 @@ assert('MEASURE: reset with a new session', /labelLeaks\.current = 0;/.test(extr
       'guardStopMoment', 'stripRepeatedThreeBeat', 'countStopMoments', 'stopMomentGentleOnly', 'detectsMentalHealthReferral', 'msgs', 'riskSignalKind',
       'stageAActive', 'dangerFromOther', // UPDATED (23/10, Ο5): the gentle-only check reads the danger latch too (test_danger_from_other_2310.js)
       'stripDangerPromises', 'dangerInMessages', // UPDATED (24/10, Ε2): passed through unchanged here, like the display guards — no danger
+      'stripLineClaims', '_safetyPath', // UPDATED (25/10, Ε2 v2): passed through unchanged too — not the safety path
       seg + '\nreturn { modelJudgesEnd, awaiting: awaitingEarlyWord.current, text };')(rawReply, t => S(t).text, t => t, { current: false }, { current: [] }, () => [], { current: 0 },
-      t => t, t => t, () => 0, () => false, () => false, [], { current: 0 }, { current: false }, { current: false }, t => t, () => null);
+      t => t, t => t, () => 0, () => false, () => false, [], { current: 0 }, { current: false }, { current: false }, t => t, () => null, t => t, false);
   } catch (e) { return { error: e.message }; } };
   const r1 = run('Αυτό που περιέγραψες έχει πια όνομα. [[EXIT:yes]]');
   assert('TAGS BEFORE CLEANING (run): «… [[EXIT:yes]]» → the T5 signal is read, the text shown has no tag',

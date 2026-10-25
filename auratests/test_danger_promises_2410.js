@@ -12,6 +12,9 @@
 //  (Ε) the crisis line is decided on the text after the check (a 10306 the check removes is written again by the app)
 //  (Ζ) wiring: the two paths that write the danger line, inside the cleaning, before the app's lines; the same gate as the line
 //  (Η) KNOWN GAP, not fixed (after the 20, item 66): the same claims on the crisis path WITHOUT danger from another person stay
+// UPDATED (25/10, Ε2 v2, John): the reply now passes stripLineClaims FIRST (a claim about a line or a service on the safety path, the
+// crisis path without danger included — auratests/test_line_claims_2510.js), then this check. (Ζ) reads the new wiring; (Η) stays
+// true of stripDangerPromises alone, and is closed at the reply level by stripLineClaims.
 //  (Θ) nothing else changed: the danger check, its line, the table, the cleaners, the prompt and the crisis prompt
 const fs = require('fs');
 const path = require('path');
@@ -147,8 +150,9 @@ assert('(Δ) not a string, or empty → given back as it came', strip('', DANGER
 // ── (Ζ) wiring ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 {
   const GEN = CODE.slice(CODE.indexOf('const generateResponse = useCallback('), CODE.indexOf('const handleSubmit = useCallback('));
-  const MAIN = 'cleanLabels(stripDangerPromises(rawText.replace(/\\s*\\[\\[EXIT:(yes|no)\\]\\]\\s*$/i, ""), dangerInMessages(msgs)))';
-  const FIRST = 'cleanLabels(stripDangerPromises(await callAura(initMsgs, prompt), dangerInMessages(initMsgs)))';
+  // UPDATED (25/10, Ε2 v2): stripLineClaims runs first, inside this check, on the same messages
+  const MAIN = 'cleanLabels(stripDangerPromises(stripLineClaims(rawText.replace(/\\s*\\[\\[EXIT:(yes|no)\\]\\]\\s*$/i, ""), dangerInMessages(msgs), _safetyPath), dangerInMessages(msgs)))';
+  const FIRST = 'cleanLabels(stripDangerPromises(stripLineClaims(await callAura(initMsgs, prompt), dangerInMessages(initMsgs), riskSignalKind.current === 1 || riskSignalKind.current === 2), dangerInMessages(initMsgs)))';
   assert('(Ζ) exactly two calls: the main reply and the First-WHY reply — the two paths that write the danger line',
     (CODE.match(/stripDangerPromises\(/g) || []).length === 3 && CODE.split(MAIN).length === 2 && CODE.split(FIRST).length === 2);
   const at = GEN.indexOf(MAIN);
@@ -159,7 +163,7 @@ assert('(Δ) not a string, or empty → given back as it came', strip('', DANGER
   assert('(Ζ) First-WHY path: before its danger line', f > 0 && f < CODE.indexOf('const _firstDanger = dangerInMessages(initMsgs);') && CODE.indexOf('const _firstDanger = dangerInMessages(initMsgs);') - f < 6000);
   assert('(Ζ) the same gate as the app\'s line: dangerInMessages of the same messages, in both flows (no switch, no latch read)',
     GEN.includes('const _danger = dangerInMessages(msgs);') && CODE.includes('const _firstDanger = dangerInMessages(initMsgs);') &&
-    [...CODE.matchAll(/stripDangerPromises\((?:rawText\.replace\([^\n]*?""\)|await callAura\(initMsgs, prompt\)), ([^)]*\))\)/g)].map(m => m[1]).join(' ') === 'dangerInMessages(msgs) dangerInMessages(initMsgs)');
+    MAIN.endsWith(', dangerInMessages(msgs)))') && FIRST.endsWith(', dangerInMessages(initMsgs)))') && CODE.split(MAIN).length === 2 && CODE.split(FIRST).length === 2); // UPDATED (25/10, Ε2 v2)
 }
 
 // ── (Η) known gap ───────────────────────────────────────────────────────────────────────────────────────────────────────────────

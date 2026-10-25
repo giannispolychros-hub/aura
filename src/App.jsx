@@ -1810,6 +1810,86 @@ function stripDangerPromises(text, danger) {
     return DANGER_PROMISE_LINE;
   });
 }
+// Ε2 v2 — NO CLAIMS ABOUT A LINE OR A SERVICE ON THE SAFETY PATH (John, 25/10/2026, a safety fix (α); real-model run 55: after Ε2 the
+// model said it again in other words — «Κανείς δεν χρειάζεται να μάθει ότι τηλεφώνησες», «Ξέρουν για καταφύγια που δεν ανακοινώνονται
+// δημόσια» — and on the crisis path, where Ε2 does not run, «10306 — είναι δωρεάν, 24 ώρες, και θα σε ακούσουν»). A rule of TOPIC, not a
+// list of phrases. Only the help-line table counts. On the safety path (`safetyPath`: the crisis turn and every turn after the crisis
+// line, perTurnSafety) or under danger from another person (`danger`: dangerInMessages), per sentence of the MODEL's text, before the
+// app adds its own lines:
+//  · stays: a question; the user's words in «» are not read; the app's own sentences (John's, the number sentences below)
+//  · a STATEMENT ABOUT A LINE OR A SERVICE — a number of HELPLINES, a word of the topic («γραμμή», «καταφύγιο», «ξενώνας», «υπηρεσία»,
+//    «φορέας», «οργάνωση», «αστυνομία», «ΕΚΑΒ», «εισαγγελ…»), a name of the table, or what stripDangerPromises reads — is not shown:
+//      – a call («κάλεσε / τηλεφώνησε … ΑΡΙΘΜΟΣ», «Αν …, ΑΡΙΘΜΟΣ») keeps its words up to the number, and «τώρα», «αμέσως» or «άμεσα»
+//        right after it; the rest goes. A call with nothing else in it stays as written («Κάλεσε το 100 τώρα.»)
+//      – any other statement with a number of the table → the table's name and number, nothing else («Γραμμή Ψυχοκοινωνικής
+//        Υποστήριξης, 10306.»), once per number: THE NUMBER IS NEVER LOST
+//      – a statement without a number → gone; under danger, John's sentence once in its place (as stripDangerPromises does)
+//  · the statements after it in the same paragraph are about it too and go, until a question; so does the first statement of the next
+//    paragraph when it starts «Είναι», «Ξέρουν», «Μπορούν», «Έχουν»; a question that names a line or a number carries on the same way
+// Off the path, or nothing flagged → the very same string. stripDangerPromises still runs after it (a question that promises secrecy).
+// Known gaps and what it cuts: auratests/test_line_claims_2510.js.
+function stripLineClaims(text, danger, safetyPath) {
+  if ((!danger && safetyPath !== true) || typeof text !== "string" || !text) return text;
+  const fold = x => x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ς/g, "σ");
+  // the sentences of a line, as dropModelSentences cuts them (after . ! ; ? … and a space, not before a digit) — without lookBehind
+  const split = line => line.replace(/([.!;?…])[ \t]+(?=[^\s\d])/g, "$1\u0000").split("\u0000");
+  const numbers = HELPLINES.map(h => h.number);
+  const numbersIn = f => numbers.filter(n => new RegExp("(?:^|\\D)" + n + "(?!\\d)").test(f));
+  const named = n => { const h = HELPLINES.find(x => x.number === n); return n === "112" ? "Σε " + h.name + ", 112." : h.name.charAt(0).toUpperCase() + h.name.slice(1) + ", " + n + "."; };
+  const nameWords = new Set(HELPLINES.flatMap(h => fold(h.name).split(/[^a-zα-ω]+/)).filter(Boolean));
+  const topic = new RegExp("(?:^|[^α-ω])(?:γραμμ(?:η|ησ|εσ|ων)(?![α-ω])|καταφυγ|ξενων|υπηρεσι|φορε(?:α|ασ|ισ|ων)(?![α-ω])|οργανωσ|αστυνομ|εκαβ|εισαγγελ|" +
+    "κοινωνικ[^ ]* (?:υπηρεσ|λειτουργ))|" + HELPLINES.map(h => fold(h.name)).filter(n => n.length > 5).map(n => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"));
+  const appOwn = new Set([DANGER_PROMISE_LINE, ...numbers.map(named)].flatMap(split).map(s => s.trim()));
+  const isQuestion = p => /[;?]\s*["»”'*]*\s*$/.test(p);
+  const callWord = /(?:^|[^α-ω])(?:καλεσε|καλεστε|τηλεφωνησε|παρε|παρ|στειλε)(?![α-ω])/;
+  // a call with nothing else in it: once the number, the call words, «το/στο», «τώρα/αμέσως/αυτή τη στιγμή» and the table's name go
+  const bareCall = f => !f.replace(/\*+/g, " ").replace(/(?:^|\D)\d{3,6}(?!\d)/g, " ")
+    .replace(/(?:καλεσε|καλεστε|παρε|παρ|τηλεφωνησε|στειλε|το|στο|τον|στον|την|στην|τη|στη|τωρα|αμεσωσ|αυτη|τη|στιγμη|αριθμο)(?![α-ω])/g, " ")
+    .split(/[^a-zα-ω]+/).filter(w => w && !nameWords.has(w)).length;
+  // a call: its words up to the number (and a name in brackets right after it), and an urgent word right after — unless what comes
+  // before the number already tells what the line is or promises
+  const keepCall = (p, f, ns) => {
+    if (!ns.length || !(callWord.test(f) || /^\s*αν(?![α-ω])/.test(f))) return null;
+    const m = p.match(new RegExp("^([\\s\\S]*?(?:^|\\D)" + ns[0] + "(?!\\d)\\**(?:\\s*\\([^)]*\\))?)"));
+    if (!m) return null;
+    const head = fold(m[1]).replace(new RegExp(ns[0], "g"), " ");
+    if (DANGER_SECRET.test(head) || DANGER_SAFE.test(head) || /(?:^|[^α-ω])(?:ειναι|εχει|ξερει|ξερουν|μπορουν|λειτουργει|υπαρχει)(?![α-ω])/.test(head)) return null;
+    const urgent = p.slice(m[1].length).match(/^[\s,—–-]*(τώρα|τωρα|αμέσως|αμεσως|άμεσα|αμεσα)(?![α-ωά-ώ])/i);
+    return m[1].replace(/[\s,—–:-]+$/, "") + (urgent ? " " + urgent[1] : "") + ".";
+  };
+  const nextParagraph = /^(?:ειναι|ξερουν|μπορουν|εχουν|θα σε|δεν (?:[α-ω]+(?:ει|ουν|εται|ονται)))(?![α-ω])/;
+  const given = new Set();
+  let said = text.includes(DANGER_PROMISE_LINE), carryParagraph = false, hit = false;
+  const lines = text.split("\n").map(line => {
+    if (!line.trim()) return line;
+    const parts = split(line), kept = [];
+    let carry = false;
+    parts.forEach((p, i) => {
+      const own = fold(p).replace(/«[^»]*»|"[^"]*"|“[^”]*”/g, " ");
+      if (appOwn.has(p.trim())) { kept.push(p); return; }
+      if (isQuestion(p)) { carry = topic.test(own) || numbersIn(own).length > 0; carryParagraph = false; kept.push(p); return; }
+      const ns = numbersIn(own);
+      const aboutLine = topic.test(own) || ns.length > 0 || DANGER_SECRET.test(own) || DANGER_SAFE.test(own);
+      const fromParagraph = i === 0 && carryParagraph && nextParagraph.test(own.trim());
+      if (!aboutLine && !carry && !fromParagraph) { kept.push(p); return; }
+      carry = true;
+      if (!aboutLine) return;
+      if (ns.length && bareCall(own)) { kept.push(p); ns.forEach(n => given.add(n)); return; }
+      const call = keepCall(p, own, ns);
+      if (call) { kept.push(call); ns.forEach(n => given.add(n)); return; }
+      const fresh = ns.filter(n => !given.has(n));
+      if (fresh.length) { fresh.forEach(n => given.add(n)); kept.push(fresh.map(named).join(" ")); return; }
+      if (ns.length) return;
+      if (danger && !said) { said = true; kept.push(DANGER_PROMISE_LINE); }
+    });
+    carryParagraph = carry;
+    if (kept.length === parts.length && kept.every((k, j) => k === parts[j])) return line;
+    hit = true;
+    return kept.join(" ").trim() ? kept.join(" ") : null;
+  });
+  if (!hit) return text;
+  return lines.filter(l => l !== null).join("\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
 // Ο5 — Stage A's doors to the root stay shut: crisis A (riskKind 1) as before, or danger from another person seen in this session
 // (`dangerFromOther`, a latch of its own that nothing clears before «Νέα συνεδρία»). Not riskKind 1 itself: that would count as
 // rootSuppressedA in the measure of the 20; not a new riskKind: mergeRiskKind keeps the heaviest, so a later DISTRESS would hide it.
@@ -7737,8 +7817,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       const rawText = rawTextWithTags.replace(/\s*\[\[EARLY_WORD:yes\]\]\s*/gi, "\n").trim();
       // ADR «12 Οκτωβρίου»: the ΗΡΘΕΣ ΜΕ summary once per session, and the STOP MOMENT's limit and gentle form — on the text that
       // reaches the screen AND the history. A referral in this very reply counts as a sign of heaviness too. Ο5 (24/10): under danger from
-      // another person, no promise (stripDangerPromises), before the app's own lines are added below.
-      const text = guardStopMoment(stripRepeatedThreeBeat(stripAraDeclarative(cleanLabels(stripDangerPromises(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""), dangerInMessages(msgs)))), msgs), countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current, stageAActive.current && dangerFromOther.current) || detectsMentalHealthReferral(rawText));
+      // another person, no promise (stripDangerPromises), before the app's own lines are added below. Ε2 v2 (25/10): on the safety path or
+      // under danger, no claim about a line or a service (stripLineClaims) — first, so a number of the table is never lost.
+      const text = guardStopMoment(stripRepeatedThreeBeat(stripAraDeclarative(cleanLabels(stripDangerPromises(stripLineClaims(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""), dangerInMessages(msgs), _safetyPath), dangerInMessages(msgs)))), msgs), countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current, stageAActive.current && dangerFromOther.current) || detectsMentalHealthReferral(rawText));
 
       // If explicit pause was used, record it
       if (explicitPauseCtx && /(τρόπο που ψάχνεις|προτιμάς να φτάσουμε|απόφαση ή να καταλάβεις)/i.test(text)) {
@@ -8893,7 +8974,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         const profileCtx = getProfileSummary(memory);
         const profileWithRules = profileCtx ? profileCtx + HONEST_UNCERTAINTY_RULE : '';
         const prompt = [getLensPrompt(inferred), memCtx, profileWithRules, buildFirstWhyFloor(), buildStageAMarker(stageAActive.current)].filter(Boolean).join('\n');
-        const text = stripAraDeclarative(cleanLabels(stripDangerPromises(await callAura(initMsgs, prompt), dangerInMessages(initMsgs)))); // Ο5 (24/10): no promise under danger
+        const text = stripAraDeclarative(cleanLabels(stripDangerPromises(stripLineClaims(await callAura(initMsgs, prompt), dangerInMessages(initMsgs), riskSignalKind.current === 1 || riskSignalKind.current === 2), dangerInMessages(initMsgs)))); // Ο5 (24/10): no promise under danger; Ε2 v2 (25/10): no claim about a line on the safety path
         // THE NO-ADVICE FLOOR ON THE ENTRY TURN. Neither observer saw this reply before: an opening
         // that offered the user options went uncounted, and the guard built for exactly that failure
         // was blind precisely here. Observation only, identical in kind to the main path — a count
