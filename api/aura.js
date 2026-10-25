@@ -60,6 +60,12 @@ function checkAuraRequest(body, fp, limits, sha) {
 }
 
 export default async function handler(req, res) {
+  // PAUSE SWITCH (John, 25/10/2026, safety): AURA_PAUSED=1 in the server's environment stops AURA in minutes after a serious incident —
+  // no request reaches the model: 503 and a plain message, before the key, the per-IP limit or the body are read. The app shows its own
+  // line for a failed call and, on a crisis or danger turn, the help line from its own code. Any other value, or none: nothing changes.
+  if (process.env.AURA_PAUSED === "1") {
+    return res.status(503).json({ error: "Η AURA είναι σε παύση για λίγο. Δοκίμασε ξανά αργότερα." });
+  }
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }

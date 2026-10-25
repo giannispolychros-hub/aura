@@ -705,6 +705,7 @@ async function runMock() {
   await runMockTX();
   await runMockVO();
   await runMockAP();
+  await runMockPZ(); // 25/10: the pause switch (AURA_PAUSED)
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -1653,6 +1654,86 @@ async function runMockAP() {
   const supp = APP.consts && APP.consts.supportive;
   const r2 = supp ? await viaHandler({ system: [{ type: 'text', text: supp }], messages: big }, null) : { status: 0 };
   ok('AP: a crisis-prompt request with 300 messages → 413, and Anthropic is never called', r2.status === 413 && seen[seen.length - 1].upstream === 0);
+}
+
+// ── PZ: the pause switch (John, 25/10/2026, safety). Every request goes through the REAL api/aura.js with AURA_PAUSED=1 — the call to
+// Anthropic is replaced and counted, and must never happen. A message gets the app's own line for a failed call and is back in the
+// input box; a crisis message, the crisis line from the app's code; danger from another person (Stage A), the danger line from code;
+// the old flow the same. Then the switch off, on the same open page: it answers again. Screenshot PZ-1-paused (-390 / -360).
+// Alone: --only PZ.
+async function runMockPZ() {
+  const src = fs.readFileSync(path.join(REPO, 'api', 'aura.js'), 'utf8');
+  const handler = (await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'))).default;
+  const L1018 = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
+  const SELF = 'Σε άμεσο κίνδυνο, 112. Για βία στο σπίτι, 15900, γραμμή SOS για τη βία κατά των γυναικών.';
+  const ERR = 'Σφάλμα: Κάτι δεν λειτούργησε. Δοκίμασε ξανά σε λίγο.';
+  const REPLY = 'Σε ακούω. Τι σε κρατάει εκεί;';
+  let upstream = 0;
+  const viaApi = async (body, paused) => {
+    const realFetch = globalThis.fetch, hadKey = !!process.env.ANTHROPIC_API_KEY, hadPause = process.env.AURA_PAUSED;
+    globalThis.fetch = async () => { upstream++; return { ok: true, status: 200, json: async () => ({ content: [{ type: 'text', text: REPLY }], usage: { input_tokens: 10, output_tokens: 10 } }) }; };
+    globalThis.__auraRate = new Map();
+    if (!hadKey) process.env.ANTHROPIC_API_KEY = 'e2e-no-network';
+    if (paused) process.env.AURA_PAUSED = '1'; else delete process.env.AURA_PAUSED;
+    const raw = JSON.stringify(body);
+    const out = await new Promise(resolve => {
+      let status = 200;
+      const res = { status(c) { status = c; return res; }, json(d) { resolve({ status, data: d }); }, writeHead(c) { status = c; }, write() {}, end() { resolve({ status, data: null }); } };
+      Promise.resolve(handler({ method: 'POST', headers: { 'content-length': String(Buffer.byteLength(raw)) }, body }, res)).catch(() => resolve({ status: 502, data: {} }));
+    });
+    globalThis.fetch = realFetch;
+    if (!hadKey) delete process.env.ANTHROPIC_API_KEY;
+    if (hadPause === undefined) delete process.env.AURA_PAUSED; else process.env.AURA_PAUSED = hadPause;
+    return out;
+  };
+  const sess = async query => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }) });
+    const state = { paused: true, statuses: [] };
+    await page.route('**/api/aura', async route => {
+      const out = await viaApi(JSON.parse(route.request().postData() || '{}'), state.paused);
+      state.statuses.push(out.status);
+      await route.fulfill({ status: out.status, contentType: 'application/json', body: JSON.stringify(out.data || {}) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await page.waitForTimeout(300);
+    return { browser, page, state };
+  };
+  const fallback = async page => { const l = page.locator('.crisis-fallback'); return (await l.count()) ? (await l.first().innerText()).trim() : ''; };
+  const input = async page => { const t = page.locator('textarea.textarea'); return (await t.count()) ? await t.inputValue() : null; };
+  const errText = async page => { const e = page.locator('.err'); return (await e.count()) ? (await e.first().innerText()).trim() : ''; };
+  const auraHas = async (page, t) => (await page.locator('.turn-aura').allInnerTexts()).some(x => x.includes(t));
+  {
+    upstream = 0;
+    const s = await sess('?stageA=1&rec=1');
+    const M = 'Δεν ξέρω αν πρέπει να αλλάξω δουλειά, κάθε μέρα είναι ίδια.';
+    await send(s.page, M); await s.page.waitForTimeout(2000);
+    ok('PZ-1 (paused, a message): every request → 503, Anthropic never called; the app\'s own line for a failed call; the message is back in the box',
+      s.state.statuses.length >= 1 && s.state.statuses.every(x => x === 503) && upstream === 0 && await errText(s.page) === ERR && await input(s.page) === M && !(await auraHas(s.page, REPLY)));
+    await s.page.screenshot({ path: path.join(OUT, 'PZ-1-paused-' + (VP ? VP.width : 390) + '.png'), fullPage: false });
+    s.state.paused = false;
+    await s.page.getByRole('button', { name: 'Go' }).click({ timeout: 5000 }).catch(() => {}); await s.page.waitForTimeout(1500); // on the old code nothing failed: no crash, the check fails
+    ok('PZ-5 (the switch off, the SAME open page): the message goes through and the reply is shown', upstream === 1 && await auraHas(s.page, REPLY) && await errText(s.page) === '');
+    await s.browser.close();
+  }
+  for (const q of ['?stageA=1&rec=1', '?stageA=0']) {
+    upstream = 0;
+    const s = await sess(q);
+    await send(s.page, 'Θέλω να πεθάνω.'); await s.page.waitForTimeout(2000);
+    ok('PZ-2 (paused, crisis A, ' + q + '): 503, Anthropic never called; the crisis line 1018 / 112 from the app\'s code is on screen',
+      upstream === 0 && s.state.statuses.every(x => x === 503) && await fallback(s.page) === L1018 && await errText(s.page) === ERR);
+    await s.browser.close();
+  }
+  {
+    upstream = 0;
+    const s = await sess('?stageA=1&rec=1');
+    await send(s.page, 'Με χτυπάει ο άντρας μου. Φοβάμαι να φύγω.'); await s.page.waitForTimeout(2000);
+    ok('PZ-3 (paused, danger from another person): 503, Anthropic never called; the danger line from the app\'s code is on screen',
+      upstream === 0 && s.state.statuses.every(x => x === 503) && await fallback(s.page) === SELF);
+    await s.browser.close();
+  }
 }
 
 // ── ST: John, 17/10/2026 (ADR «17 Οκτωβρίου (δ)»), for the test of the 20. The step after «Ναι», on a phone (390×844 unless --viewport),
@@ -4853,7 +4934,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

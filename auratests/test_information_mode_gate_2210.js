@@ -99,7 +99,14 @@ assert('3: … and it still holds the method-failure note back, as before', /if 
 assert('3: the fixed prompt is a409a47\'s, byte for byte', h(PROMPT) === 'b5f303cc9405aa21');
 assert('3: the crisis prompt, the closing prompt and the honest-uncertainty rule are unchanged',
   h(lit('SYSTEM_SUPPORTIVE')) === 'c7815b96d83ebae8' && h(lit('SYSTEM_TERMINATION')) === 'd5a77ca926f9490b' && h(lit('HONEST_UNCERTAINTY_RULE')) === '80b2ffd69933aee9');
-assert('3: api/aura.js is a409a47\'s, byte for byte — guard and fingerprints', h(api) === 'b11fad3a5d793717');
+// UPDATED (25/10, John, safety): api/aura.js has the pause switch (AURA_PAUSED) as the first thing in the handler — without it, the
+// file is still a409a47's byte for byte (auratests/test_pause_switch_2510.js)
+{
+  const at = api.indexOf('  // PAUSE SWITCH (John, 25/10/2026'), endMark = '    return res.status(503).json({ error: "Η AURA είναι σε παύση για λίγο. Δοκίμασε ξανά αργότερα." });\n  }\n';
+  const end = api.indexOf(endMark);
+  const without = at > 0 && end > at ? api.slice(0, at) + api.slice(end + endMark.length) : api;
+  assert('3: api/aura.js is a409a47\'s, byte for byte — guard and fingerprints (UPDATED 25/10: apart from the pause switch)', at > 0 && h(without) === 'b11fad3a5d793717');
+}
 assert('3: the helper is in the file once, outside the prompt, right after perTurnSafety',
   raw.split(HELPER).length === 2 && raw.indexOf(HELPER) > raw.indexOf(fnSrc('perTurnSafety')) && raw.indexOf(HELPER) - (raw.indexOf(fnSrc('perTurnSafety')) + fnSrc('perTurnSafety').length) === 1 &&
   !PROMPT.includes('informationModeNoteDue'));
