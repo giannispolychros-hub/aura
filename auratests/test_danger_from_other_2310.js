@@ -349,7 +349,7 @@ assert('(Ι) the step stops on danger too, and the word is never taken from such
 }
 
 // ── (Κ) unchanged ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
-const PIN = { detectSafetySignal: '6fd4d4b09ab6ed21' /* UPDATED (24/10, Ε1, a safety fix (α)): + the passive-ideation phrases — auratests/test_passive_ideation_2410.js */, classifyCrisisTier: 'afa5cf7a370bb0d5', buildCrisisLine: 'd359e22dd7cf9a95',
+const PIN = { detectSafetySignal: '9af2fd60393b0760' /* UPDATED (25/10, Ε1, the broader version, John): «καλύτερα / μακάρι / εύχομαι» with every ending — auratests/test_passive_ideation_2410.js */ /* UPDATED (24/10, Ε1, a safety fix (α)): + the passive-ideation phrases — auratests/test_passive_ideation_2410.js */, classifyCrisisTier: 'afa5cf7a370bb0d5', buildCrisisLine: 'd359e22dd7cf9a95',
   crisisLineAfterFailedCall: 'c87733effcebde7e', mergeRiskKind: 'd3b56f5bad3ae14f' }; // as on merge-candidate a701c07
 for (const [n, v] of Object.entries(PIN)) assert(`(Κ) UNCHANGED, byte for byte: ${n}`, h(fnSrc(n)) === v);
 assert('(Κ) UNCHANGED, byte for byte: HELPLINES', h(arr('HELPLINES')) === '392f594fe775a4cf');

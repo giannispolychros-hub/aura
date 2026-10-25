@@ -1553,7 +1553,9 @@ function detectSafetySignal(text, tierB) {
     // «καλύτερα να μην ζούσα», «θα ήταν καλύτερα να είχα πεθάνει», «μακάρι να μην ξυπνούσα» matched nothing. Tier A. Like the phrases
     // above, each must END ITS CLAUSE (or go on with «πια», «ποτέ», «άλλο» …), so «καλύτερα να μη ζω με τους γονείς μου» and «μακάρι να μην
     // ξυπνούσα τόσο νωρίς» do not alarm. Known gaps and known false alarms: auratests/test_passive_ideation_2410.js.
-    /(?:καλύτερα(?: [^\s.,;!?]+){0,3} να (?:μην? (?:ζω|ζούσα)|είχα πεθάνει)|μακάρι να μην? ξυπνούσα)(?: (?:ποτέ(?: ξανά| πια)?|πια|πλέον|ξανά|άλλο))?(?=\s*(?:$|[.!;?…,·»"”')]|—|–|και |γιατί |αλλά ))/i,
+    // The broader version (John, 25/10/2026): «καλύτερα», «μακάρι» or «εύχομαι», each with every ending — «να μην ζω / ζούσα / ξυπνούσα /
+    // υπήρχα», «να είχα πεθάνει», «να πέθαινα» — so «καλύτερα να πέθαινα», «μακάρι να πέθαινα», «εύχομαι να μην ξυπνούσα» are caught too.
+    /(?:(?:καλύτερα|μακάρι|εύχομαι)(?: [^\s.,;!?]+){0,3} να (?:μην? (?:ζω|ζούσα|ξυπνούσα|υπήρχα)|είχα πεθάνει|πέθαινα))(?: (?:ποτέ(?: ξανά| πια)?|πια|πλέον|ξανά|άλλο))?(?=\s*(?:$|[.!;?…,·»"”')]|—|–|και |γιατί |αλλά ))/i,
   ];
   const distress = [
     /\b(grief|bereaved|bereavement|trauma|traumatic|abuse|abused|assault|crisis|breakdown|panic attack)\b/i,

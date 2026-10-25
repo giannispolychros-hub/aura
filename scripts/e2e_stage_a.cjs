@@ -3284,6 +3284,22 @@ async function runMockPI() {
       (await lastAura(s.page)).endsWith(LINE_A));
     await s.browser.close();
   }
+  // UPDATED (25/10/2026, the broader version, John): «καλύτερα να πέθαινα», «μακάρι να πέθαινα», «εύχομαι να μην ξυπνούσα» are a crisis too
+  for (const [t, q] of [['Καλύτερα να πέθαινα.', '?stageA=1&rec=1'], ['Μακάρι να πέθαινα.', '?stageA=1&rec=1'], ['Εύχομαι να μην ξυπνούσα.', '?stageA=0']]) {
+    const s = await sess(q);
+    await send(s.page, t); await s.page.waitForTimeout(800);
+    const a = await lastAura(s.page);
+    ok('PI-5 (the broader version, ' + q + '): «' + t + '» → the 1018 + 112 line, once' + (q === '?stageA=0' ? '' : '; SAFETY in the request; no root button'),
+      a.endsWith(LINE_A) && a.split(LINE_A).length === 2 && (q === '?stageA=0' || (s.bodies[0].includes('STAGE: SAFETY') && await rootButtons(s.page) === 0)));
+    await s.browser.close();
+  }
+  {
+    const s = await sess('?stageA=1&rec=1');
+    await send(s.page, 'Εύχομαι να μην ξυπνούσα τόσο νωρίς κάθε πρωί.'); await s.page.waitForTimeout(800);
+    ok('PI-6 (the new words, the clause goes on): «Εύχομαι να μην ξυπνούσα τόσο νωρίς κάθε πρωί.» → no line, no SAFETY stage',
+      !(await lastAura(s.page)).includes('1018') && !s.bodies[0].includes('STAGE: SAFETY'));
+    await s.browser.close();
+  }
 }
 
 // ── SN: ADR «19 Οκτωβρίου (δ)» (John, a safety exception (α)): the per-turn notes put safety first. The EXACT text of every request

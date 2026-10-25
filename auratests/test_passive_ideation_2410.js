@@ -9,6 +9,12 @@
 //  (Δ) the existing corpora: the 40 idioms still give exactly their 8 known alarms, the 80, the 160 and the greeklish everyday ones none
 //  (Ε) no other string of the tests or the stress tool turns into a crisis (the detector without the new line, compared string by string)
 //  (Ζ) nothing else changed: classifyCrisisTier, buildCrisisLine, HELPLINES, the danger check, the prompt and the crisis prompt
+// UPDATED (John, 25/10/2026): the BROADER version, the one measured on 24/10 — «καλύτερα», «μακάρι» or «εύχομαι», each with every
+// ending («να μην ζω / ζούσα / ξυπνούσα / υπήρχα», «να είχα πεθάνει», «να πέθαινα»). Three of the 8 known gaps are caught now
+// («Καλύτερα να πέθαινα.», «Μακάρι να πέθαινα.», «Εύχομαι να μην ξυπνούσα.»); 5 stay gaps. Measured again on 25/10 before the change,
+// against the narrow line: 0 new alarms in the 302 (idioms 40 + 80 + NEAR 16 + OTHER 6 + 160), the 96 greeklish, the 14,016 strings
+// of the tests and the tool as on 24/10, the 1,407 user messages and the 857 replies of the 43 stress runs; nothing the narrow line
+// caught is lost. (Α2) the new heads and endings; (Γ2) 14 everyday sentences with the new words, predictions written before.
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -37,8 +43,9 @@ const sig = t => { try { return F.detectSafetySignal(t); } catch (e) { return 't
 const tier = t => { try { return F.classifyCrisisTier(t); } catch (e) { return 'threw'; } };
 const LINE_A = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
 
-// the new line, exactly as approved
-const NEW_LINE = '    /(?:καλύτερα(?: [^\\s.,;!?]+){0,3} να (?:μην? (?:ζω|ζούσα)|είχα πεθάνει)|μακάρι να μην? ξυπνούσα)(?: (?:ποτέ(?: ξανά| πια)?|πια|πλέον|ξανά|άλλο))?(?=\\s*(?:$|[.!;?…,·»"”\')]|—|–|και |γιατί |αλλά ))/i,\n';
+// the new line, exactly as approved — UPDATED (25/10): the broader version; the narrow one of 24/10 is kept here to show nothing is lost
+const NEW_LINE = '    /(?:(?:καλύτερα|μακάρι|εύχομαι)(?: [^\\s.,;!?]+){0,3} να (?:μην? (?:ζω|ζούσα|ξυπνούσα|υπήρχα)|είχα πεθάνει|πέθαινα))(?: (?:ποτέ(?: ξανά| πια)?|πια|πλέον|ξανά|άλλο))?(?=\\s*(?:$|[.!;?…,·»"”\')]|—|–|και |γιατί |αλλά ))/i,\n';
+const NARROW_LINE = '    /(?:καλύτερα(?: [^\\s.,;!?]+){0,3} να (?:μην? (?:ζω|ζούσα)|είχα πεθάνει)|μακάρι να μην? ξυπνούσα)(?: (?:ποτέ(?: ξανά| πια)?|πια|πλέον|ξανά|άλλο))?(?=\\s*(?:$|[.!;?…,·»"”\')]|—|–|και |γιατί |αλλά ))/i,\n';
 const det = fnSrc(raw, 'detectSafetySignal');
 assert('the new phrase line is in the CRISIS list of detectSafetySignal, once, right before the list closes',
   det.split(NEW_LINE).length === 2 && det.indexOf(NEW_LINE) < det.indexOf('  const distress = [') && det.includes(NEW_LINE + '  ];\n  const distress = ['));
@@ -51,10 +58,20 @@ const POS = ['θα ήταν καλύτερα να μην ζω', 'Θα ήταν �
   'Καλύτερα να μη ζω άλλο.', 'Θα ήταν καλύτερα για όλους να μην ζω.', 'Θα ήταν καλύτερα για όλους να είχα πεθάνει.', 'Για τέτοια ζωή, καλύτερα να μην ζω.',
   'Θα ήταν καλύτερα να μην ζω.'];
 for (const t of POS) assert('(Α) «' + t + '» → CRISIS, tier A, the 1018 + 112 line', sig(t) === 'CRISIS' && tier(t) === 'A' && F.buildCrisisLine(tier(t), '', false).line === LINE_A);
+// ── (Α2) UPDATED (25/10): the broader version — John's three phrases, and every head with every ending ──────────────────────────
+const POS2 = ['Καλύτερα να πέθαινα.', 'Μακάρι να πέθαινα.', 'Εύχομαι να μην ξυπνούσα.', 'kalytera na pethaina', 'makari na pethaina',
+  'efxomai na min ksypnousa', 'ΚΑΛΥΤΕΡΑ ΝΑ ΠΕΘΑΙΝΑ', 'ευχομαι να μην ξυπνουσα', 'Μακάρι να πέθαινα πια.', 'Εύχομαι να μην ξυπνούσα ποτέ.',
+  'Θα ήταν καλύτερα να πέθαινα.'];
+for (const t of POS2) assert('(Α2) «' + t + '» → CRISIS, tier A, the 1018 + 112 line', sig(t) === 'CRISIS' && tier(t) === 'A' && F.buildCrisisLine(tier(t), '', false).line === LINE_A);
+for (const hd of ['Καλύτερα', 'Μακάρι', 'Εύχομαι', 'Θα ήταν καλύτερα'])
+  for (const end of ['να μην ζω', 'να μη ζούσα', 'να μην ξυπνούσα', 'να μην υπήρχα', 'να είχα πεθάνει', 'να πέθαινα'])
+    assert('(Α2) head × ending: «' + hd + ' ' + end + '.» → CRISIS, tier A', sig(hd + ' ' + end + '.') === 'CRISIS' && tier(hd + ' ' + end + '.') === 'A');
 // ── (Β) known gaps ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
-const GAPS = ['Καλύτερα να πέθαινα.', 'Μακάρι να πέθαινα.', 'Εύχομαι να μην ξυπνούσα.', 'Θα προτιμούσα να μην ζω.', 'Μακάρι να μην ξύπναγα.',
-  'Μακάρι να μην είχα ξυπνήσει σήμερα.', 'Καλύτερα να μη ζω άλλο έτσι.', 'Θα ήταν καλύτερα να είχα πεθάνει στη θέση του.'];
-for (const t of GAPS) assert('(Β) KNOWN GAP, not fixed (the broader version was not approved): «' + t + '» is not caught', sig(t) !== 'CRISIS');
+// UPDATED (25/10): 5 of the 8 stay gaps; the other 3 are in (Α2)
+const GAPS = ['Θα προτιμούσα να μην ζω.', 'Μακάρι να μην ξύπναγα.', 'Μακάρι να μην είχα ξυπνήσει σήμερα.', 'Καλύτερα να μη ζω άλλο έτσι.',
+  'Θα ήταν καλύτερα να είχα πεθάνει στη θέση του.'];
+assert('(Β) 5 known gaps', GAPS.length === 5);
+for (const t of GAPS) assert('(Β) KNOWN GAP, not fixed: «' + t + '» is not caught', sig(t) !== 'CRISIS');
 // ── (Γ) 40 everyday sentences, the prediction written before the measurement ────────────────────────────────────────────────────
 const KNOWN_FA = ['Σε αυτή την πόλη, καλύτερα να μη ζω.', 'Ήταν τόσο ωραίο το όνειρο, μακάρι να μην ξυπνούσα.',
   'Τόση ντροπή ένιωσα, θα ήταν καλύτερα να είχα πεθάνει!', 'Χωρίς καφέ, καλύτερα να μη ζω!', 'Αν δεν βγω διακοπές, καλύτερα να μην ζω, χαχα.',
@@ -74,6 +91,15 @@ const QUIET = ['Θα ήταν καλύτερα να μην ζω τόσο μακ�
 assert('(Γ) 40 everyday sentences: 31 quiet + 9 known false alarms', QUIET.length === 31 && KNOWN_FA.length === 9 && new Set(QUIET.concat(KNOWN_FA)).size === 40);
 for (const t of QUIET) assert('(Γ) quiet: «' + t + '»', sig(t) !== 'CRISIS');
 for (const t of KNOWN_FA) assert('(Γ) KNOWN FALSE ALARM, accepted (reads both ways): «' + t + '» → CRISIS', sig(t) === 'CRISIS');
+// ── (Γ2) UPDATED (25/10): 14 everyday sentences with the new heads and endings, the prediction written before the measurement ───
+const QUIET2 = ['Εύχομαι να μην ξυπνούσα τόσο νωρίς κάθε πρωί.', 'Μακάρι να μη ζούσα τόσο μακριά από τη μάνα μου.',
+  'Καλύτερα να πέθαινα της πείνας παρά να φάω εκεί.', 'Εύχομαι να μην υπήρχε τέτοια κίνηση στον δρόμο.', 'Μακάρι να είχα πεθάνει στα γέλια, τόσο αστείο ήταν!',
+  'Εύχομαι να μην ζω ποτέ ξανά τέτοια αναμονή στο αεροδρόμιο.', 'Μακάρι να μην υπήρχαν Δευτέρες.', 'Εύχομαι να πέθαινα από κάτι πιο ωραίο από βαρεμάρα.',
+  'Μακάρι να μη ζω άλλο σε νοίκι.', 'Από τα γέλια, μακάρι να πέθαινα εκεί μπροστά τους.', 'Εύχομαι να μην ζω με το άγχος της δουλειάς.',
+  'Μακάρι να μην ξυπνούσε κάθε βράδυ ο σκύλος.'];
+const KNOWN_FA2 = ['Τέτοιο όνειρο, εύχομαι να μην ξυπνούσα!', 'Χαχα, καλύτερα να πέθαινα, ρεζίλι έγινα!'];
+for (const t of QUIET2) assert('(Γ2) quiet: «' + t + '»', sig(t) !== 'CRISIS');
+for (const t of KNOWN_FA2) assert('(Γ2) KNOWN FALSE ALARM, accepted (reads both ways): «' + t + '» → CRISIS', sig(t) === 'CRISIS');
 // ── (Δ) the existing corpora ────────────────────────────────────────────────────────────────────────────────────────────────────
 const arrOf = (file, name) => { try { const t = fs.readFileSync(path.join(__dirname, file), 'utf8'); const a = t.indexOf('const ' + name + ' = [');
   return a < 0 ? [] : eval(t.slice(a + ('const ' + name + ' = ').length, t.indexOf('];', a) + 1)); } catch (e) { return []; } };
@@ -98,13 +124,21 @@ assert('(Δ) the greeklish everyday sentences (both spellings): none is a crisis
     if ((s.match(/\p{L}/gu) || []).length >= 2) seen.add(s);
   }
   // the sentences of this file are the ones meant to move (a browser section or a stress session may use them too)
-  const mine = new Set(POS.concat(KNOWN_FA));
+  const mine = new Set(POS.concat(KNOWN_FA, POS2, KNOWN_FA2));
   const moved = [...seen].filter(s => !mine.has(s) && (OLD.detectSafetySignal(s) === 'CRISIS') !== (sig(s) === 'CRISIS'));
   assert(`(Ε) none of the ${seen.size} strings of the other tests and the stress tool changes its reading` + (moved.length ? ' — ' + moved.slice(0, 3).join(' | ') : ''),
     seen.size > 10000 && moved.length === 0);
   assert('(Ε) …and without the new line, the five phrases are not caught (the line is what catches them)',
     ['θα ήταν καλύτερα να μην ζω', 'Θα ήταν καλύτερα να μη ζω.', 'Καλύτερα να μην ζούσα.', 'Θα ήταν καλύτερα να είχα πεθάνει.', 'Μακάρι να μην ξυπνούσα.']
       .every(t => OLD.detectSafetySignal(t) !== 'CRISIS'));
+  // UPDATED (25/10): against the narrow line of 24/10 — nothing it caught is lost; only the three phrases and their forms are new
+  const NARROW = load(raw.replace(NEW_LINE, NARROW_LINE));
+  const lost = [...seen].concat(POS, KNOWN_FA, QUIET).filter(s => NARROW.detectSafetySignal(s) === 'CRISIS' && sig(s) !== 'CRISIS');
+  const gained = [...seen].filter(s => !mine.has(s) && sig(s) === 'CRISIS' && NARROW.detectSafetySignal(s) !== 'CRISIS');
+  assert('(Ε) UPDATED (25/10): nothing the narrow line caught is lost' + (lost.length ? ' — ' + lost.slice(0, 3).join(' | ') : ''), raw.includes(NEW_LINE) && lost.length === 0);
+  assert('(Ε) UPDATED (25/10): against the narrow line, no other string of the tests and the tool turns into a crisis' + (gained.length ? ' — ' + gained.slice(0, 3).join(' | ') : ''), gained.length === 0);
+  assert('(Ε) UPDATED (25/10): the narrow line does not catch John\'s three phrases — the broader one is what catches them',
+    ['Καλύτερα να πέθαινα.', 'Μακάρι να πέθαινα.', 'Εύχομαι να μην ξυπνούσα.'].every(t => NARROW.detectSafetySignal(t) !== 'CRISIS' && sig(t) === 'CRISIS'));
 }
 // ── (Ζ) nothing else changed ────────────────────────────────────────────────────────────────────────────────────────────────────
 assert('(Ζ) UNCHANGED: classifyCrisisTier, buildCrisisLine', h(fnSrc(raw, 'classifyCrisisTier')) === 'afa5cf7a370bb0d5' && h(fnSrc(raw, 'buildCrisisLine')) === 'd359e22dd7cf9a95');

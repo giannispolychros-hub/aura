@@ -76,7 +76,7 @@ assert('CRISIS: the app\'s crisis lines themselves are untouched', S(L_A) === L_
   // UPDATED (22/10, ADR «22 Οκτωβρίου (β)», SAFETY): detectSafetySignal and classifyCrisisTier changed on purpose — Greeklish and spelling by
   // ear, additive; the phrase list, the crisis lines and the numbers are unchanged (pinned in test_crisis_greeklish_2210.js).
   assert('UNCHANGED: buildCrisisLine, detectSafetySignal, classifyCrisisTier, replaceBareGoodbye',
-    h(extract('buildCrisisLine')) === 'd359e22dd7cf9a95' && h(extract('detectSafetySignal')) === '6fd4d4b09ab6ed21' /* UPDATED (24/10, Ε1, a safety fix (α)): + the passive-ideation phrases — auratests/test_passive_ideation_2410.js */ /* UPDATED (22/10, final stress test A9): the message is also tried made plain, new phrases and a third person; tier B blanked inside — auratests/test_crisis_a9.js */ &&
+    h(extract('buildCrisisLine')) === 'd359e22dd7cf9a95' && h(extract('detectSafetySignal')) === '9af2fd60393b0760' /* UPDATED (25/10, Ε1, the broader version, John): «καλύτερα / μακάρι / εύχομαι» with every ending — auratests/test_passive_ideation_2410.js */ /* UPDATED (24/10, Ε1, a safety fix (α)): + the passive-ideation phrases — auratests/test_passive_ideation_2410.js */ /* UPDATED (22/10, final stress test A9): the message is also tried made plain, new phrases and a third person; tier B blanked inside — auratests/test_crisis_a9.js */ &&
     h(extract('classifyCrisisTier')) === 'afa5cf7a370bb0d5' && h(extract('replaceBareGoodbye')) === 'e6351d2cb8e28ab5');
 }
 
