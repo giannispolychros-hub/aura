@@ -8625,7 +8625,17 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
   }, [safetyMode, memory, deliverFinalClosure, appendClosingMessage]);
 
   // ── Misfire recovery — user rejected observation ──
+  // Audit 26/10/2026, Α2 (safety, §0.1): the correction box had no safety check — a crisis or danger message typed there reached the
+  // model with the ordinary prompt, no line from code, and stayed out of the history. Such a message now goes into the input box and is
+  // sent by the normal path (handleSubmit, through the effect below it). A correction with no such signal is unchanged.
+  const misfireToSubmit = useRef(null);
   const handleMisfireResponse = useCallback(async (userCorrection) => {
+    const _mt = typeof userCorrection === "string" ? userCorrection.trim() : "";
+    if (_mt && (detectSafetySignal(_mt) === "CRISIS" || detectsDangerFromOther(_mt))) {
+      setMisfirePending(false); setMisfireType(null);
+      misfireToSubmit.current = _mt; setInput(_mt);
+      return;
+    }
     setMisfirePending(false);
     // Record correction in memory
     if (memory.storageEnabled) {
@@ -9150,6 +9160,12 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       submittingRef.current = false; // RT-15: release guard regardless of which path returned
     }
   }, [input, loading, sessionEnded, messages, mode, generateResponse, awaitingRememberedWord, deliverFinalClosure, memory, currentDomain, stageAStepEvent, crisisFallback]);
+  // Audit 26/10/2026, Α2: a crisis or danger message from the correction box, now in the input box — sent once, by the normal path.
+  useEffect(() => {
+    if (misfireToSubmit.current === null || misfirePending || input !== misfireToSubmit.current) return;
+    misfireToSubmit.current = null;
+    handleSubmit();
+  }, [input, misfirePending, handleSubmit]);
 
   // STAGE A handlers (§1.5, §2.1, §2.1α). Fixed texts only; the model is called only by «back» from door 2's card,
   // so the captured answer gets the reply it would have had — the conversation continues, nothing is lost.
@@ -9297,6 +9313,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setCrisisFallback(null);
     setTesterCopy(null);
     stepJustTaken.current = null; // ADR «17 Οκτωβρίου (δ)»
+    misfireToSubmit.current = null; // audit 26/10, Α2
     setClaritySurge(false);
     setIllumLevel(0);
     setFinalDistillation(null);

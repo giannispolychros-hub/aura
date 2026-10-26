@@ -13,7 +13,7 @@
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
-// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only MAIN | ST | W | X | Y | Z | … | R4 | TX | VO | AP | CX | O5 | PI | SN | GL | FC (μόνο μία ενότητα· MAIN = A–V)
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only MAIN | ST | W | X | Y | Z | … | R4 | TX | VO | AP | CX | O5 | PI | SN | GL | FC | MF (μόνο μία ενότητα· MAIN = A–V)
 //   --viewport 390x844 | 360x640 (17/10 (δ): όλος ο έλεγχος σε αυτό το μέγεθος κινητού· οι ενότητες με δικά τους μεγέθη τα κρατούν)
 // ΣΤΡΕΣ ΤΕΣΤ (Μέρος Β, 10/10): --stress (ψεύτικα, κόστος 0) · --stress --real --dry (σχέδιο + εκτίμηση) · --stress --real --yes (ΠΡΑΓΜΑΤΙΚΟ,
 //   όριο --budget έως $25, προεπιλογή $25) · --sessions 14,15,1 (μόνο αυτοί) · --minutes 75 (καμία νέα συνεδρία μετά). Τρέχει και από το
@@ -685,6 +685,7 @@ async function runMock() {
   await runMockY();
   await runMockZ();
   await runMockFC(); // 26/10 (audit, Α1): the line stays after a failed crisis call and another message
+  await runMockMF(); // 26/10 (audit, Α2): a crisis or danger message in the correction box takes the normal path
   await runMockCX();
   await runMockO5(); // 23/10 (Ο5): danger from another person
   await runMockPI(); // 24/10 (Ε1): passive ideation
@@ -3069,6 +3070,111 @@ async function runMockFC() {
   }
 }
 
+// ── MF: SAFETY (audit of 26/10/2026, finding Α2; John: test first, a separate commit he may leave out). The correction box under
+// «αυτό δεν ισχύει →» (shown only under a COMPRESSION reply, i.e. after the «παρατήρηση» card → «Ένα ακόμα πέρασμα») sent its text to
+// the model with no safety check and kept it out of the history. A crisis or danger message typed there must take the normal path:
+// the crisis prompt, the app's line, the text in the history. A correction without a signal stays the correction as today.
+// MF1–MF3 the old flow (?stageA=0, where the card follows a reply that says «η απόφαση είναι δική σου»); MF4 the tester link
+// (?stageA=1&rec=1): the only way there — the root, «Ναι», a step stopped by a DISTRESS message, then the same card. Screenshot MF-1.
+// Alone: --only MF.
+async function runMockMF() {
+  const F1 = 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.', WHY = 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.';
+  const ENDING = 'Η απόφαση είναι δική σου. Τι από τα δύο βαραίνει περισσότερο;';
+  const COMPRESSED = 'Ας το δούμε αλλιώς: τι μένει, αν βγάλεις τον φόβο από τη μέση;';
+  const CRISIS = 'Θέλω να πεθάνω.', DANGER = 'Με χτυπάει ο άντρας μου. Φοβάμαι να φύγω.', PLAIN = 'Δεν είναι ο φόβος, είναι η κούραση.';
+  const L1018 = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
+  const SELF = 'Σε άμεσο κίνδυνο, 112. Για βία στο σπίτι, 15900, γραμμή SOS για τη βία κατά των γυναικών.';
+  const SUPPORT = 'Είμαι εδώ μαζί σου. Θέλεις να μου πεις τι γίνεται τώρα;';
+  const T = APP.texts;
+  const sess = async (query, replies) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }) });
+    const bodies = [];
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      bodies.push(JSON.parse(route.request().postData() || '{}'));
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    return { browser, page, bodies, calls: () => n };
+  };
+  const tap = async (page, name) => { const b = page.getByRole('button', { name, exact: true }); if (await b.count()) { await b.first().click({ timeout: 4000 }); await page.waitForTimeout(600); return true; } return false; };
+  const sys = b => (b && b.system || []).map(x => x.text).join('');
+  const lastUser = b => { const m = (b && b.messages || []).filter(x => x.role === 'user'); return m.length ? m[m.length - 1].content : ''; };
+  const userBubbles = page => page.locator('.turn-user').allInnerTexts();
+  // the «παρατήρηση» card → «Ένα ακόμα πέρασμα» → the COMPRESSION reply → «αυτό δεν ισχύει →» → the correction box, with `text`
+  const toBox = async (s) => {
+    const card = await s.page.getByText('Παρατηρώ ότι επιστρέφουμε στο ίδιο σημείο', { exact: false }).count();
+    await tap(s.page, 'Ένα ακόμα πέρασμα'); await s.page.waitForTimeout(800);
+    const mis = s.page.getByRole('button', { name: 'αυτό δεν ισχύει →' });
+    const hasMis = await mis.count();
+    if (hasMis) { await mis.last().click({ timeout: 4000 }); await s.page.waitForTimeout(400); }
+    const box = s.page.locator('.choice-card textarea');
+    return { card: card > 0, mis: hasMis > 0, box: (await box.count()) > 0 };
+  };
+  const type = async (s, text) => { await s.page.locator('.choice-card textarea').fill(text); await tap(s.page, 'Αποστολή'); await s.page.waitForTimeout(1200); };
+  const oldFlowTo = async (replies) => {
+    const s = await sess('?stageA=0', replies);
+    await send(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, WHY);
+    await send(s.page, 'Ο μισθός και ο φόβος.'); await s.page.waitForTimeout(600);
+    return s;
+  };
+  // MF1 — old flow, a crisis message in the box
+  {
+    const s = await oldFlowTo(['Τι σε κρατάει εκεί;', ENDING, COMPRESSED, SUPPORT]);
+    const r = await toBox(s);
+    ok('MF (old flow): the way to the box exists — «παρατήρηση» card, «Ένα ακόμα πέρασμα», «αυτό δεν ισχύει →», the box', r.card && r.mis && r.box);
+    const n0 = s.calls();
+    await type(s, CRISIS);
+    const b = s.bodies[s.bodies.length - 1] || {}, body = await s.page.locator('body').innerText();
+    ok('MF1 (old flow, crisis in the box): it goes the normal way — the crisis prompt, not the correction prompt; the message is the last one sent',
+      s.calls() === n0 + 1 && !sys(b).includes('MISFIRE RECOVERY') && !!APP.consts.supportive && sys(b).startsWith(APP.consts.supportive) && lastUser(b) === CRISIS);
+    ok('MF1 (old flow): the app\'s line 1018 / 112 is on screen', body.includes(L1018));
+    ok('MF1 (old flow): the message is in the history (shown as the user\'s)', (await userBubbles(s.page)).some(t => t.includes(CRISIS)));
+    await s.page.screenshot({ path: path.join(OUT, 'MF-1-crisis-in-box-' + (VP ? VP.width : 390) + '.png'), fullPage: false });
+    await s.browser.close();
+  }
+  // MF2 — old flow, danger from another person in the box
+  {
+    const s = await oldFlowTo(['Τι σε κρατάει εκεί;', ENDING, COMPRESSED, 'Σε ακούω.']);
+    await toBox(s);
+    await type(s, DANGER);
+    const b = s.bodies[s.bodies.length - 1] || {}, body = await s.page.locator('body').innerText();
+    ok('MF2 (old flow, danger in the box): the normal way — the danger line from code is on screen, the message in the history',
+      !sys(b).includes('MISFIRE RECOVERY') && lastUser(b) === DANGER && body.includes(SELF) && (await userBubbles(s.page)).some(t => t.includes(DANGER)));
+    await s.browser.close();
+  }
+  // MF3 — old flow, a correction with no signal: the correction as today
+  {
+    const s = await oldFlowTo(['Τι σε κρατάει εκεί;', ENDING, COMPRESSED, 'Understood. My interpretation appears incomplete. What am I missing that changes the picture?']);
+    await toBox(s);
+    const n0 = s.calls();
+    await type(s, PLAIN);
+    const b = s.bodies[s.bodies.length - 1] || {};
+    ok('MF3 (old flow, no signal): unchanged — the correction prompt, one call, the text not shown as a message of its own',
+      s.calls() === n0 + 1 && sys(b).includes('MISFIRE RECOVERY') && lastUser(b) === PLAIN && !(await userBubbles(s.page)).some(t => t.includes(PLAIN)));
+    await s.browser.close();
+  }
+  // MF4 — the tester link: the root, «Ναι», a step stopped by DISTRESS, the card, the box, a crisis message
+  {
+    const s = await sess('?stageA=1&rec=1', ['Τι σε κρατάει εκεί;', ENDING, COMPRESSED, SUPPORT]);
+    await send(s.page, F1);
+    await tap(s.page, T.button); await send(s.page, 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.');
+    await tap(s.page, T.yes);
+    await send(s.page, 'Το πένθος για τη μητέρα μου με έχει παραλύσει.'); await s.page.waitForTimeout(600);
+    const r = await toBox(s);
+    ok('MF4 (Stage A): the box can be reached — after the root, a step stopped by a DISTRESS message, the «παρατήρηση» card', r.card && r.mis && r.box);
+    await type(s, CRISIS);
+    const b = s.bodies[s.bodies.length - 1] || {}, body = await s.page.locator('body').innerText();
+    ok('MF4 (Stage A, crisis in the box): the normal way — the crisis prompt, the line 1018 / 112 on screen, the message in the history',
+      !sys(b).includes('MISFIRE RECOVERY') && lastUser(b) === CRISIS && body.includes(L1018) && (await userBubbles(s.page)).some(t => t.includes(CRISIS)));
+    await s.browser.close();
+  }
+}
+
 // ── CX: ADR «19 Οκτωβρίου (β)» (John, a safety exception (α); real-model run 32, session 34). After the crisis line, a goodbye gets
 // «Είμαι εδώ όταν χρειαστεί να συνεχίσουμε. Κι αν βαρύνει, οι αριθμοί που σου έδωσα είναι εκεί.» word for word and nothing else: the
 // user's goodbye → from the app, no model call; a goodbye the exit test does not know, answered by the model with a bare goodbye → the
@@ -5329,7 +5435,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
