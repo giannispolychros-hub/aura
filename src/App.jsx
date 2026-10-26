@@ -1656,6 +1656,15 @@ function crisisLineAfterFailedCall(mode, msgs, supportLineShown) {
   const last = [...list].reverse().find(m => m && m.role === "user");
   return buildCrisisLine(classifyCrisisTier(last && typeof last.content === "string" ? last.content : ""), "", supportLineShown);
 }
+// SAFETY (§0.1; audit of 26/10/2026, finding Α1): the line above, once on screen, stays until a reply that is shown carries every
+// number of it. Every successful reply used to clear it — so after a failed crisis or danger call, a reply to ANOTHER message (the
+// failed one is rolled back, so nothing adds its line again) left no number on screen. null / "" → null.
+function crisisFallbackAfterReply(fallback, shownText) {
+  if (typeof fallback !== "string" || !fallback.trim()) return null;
+  const shown = typeof shownText === "string" ? shownText : "";
+  const nums = fallback.match(/\d{3,6}/g) || [];
+  return nums.length && nums.every(n => new RegExp("(?:^|\\D)" + n + "(?!\\d)").test(shown)) ? null : fallback;
+}
 // DANGER FROM ANOTHER PERSON (Ο5; John, 23/10/2026, a safety fix — real-model run 52, sessions 125 and 125-2: «Με χτυπάει ο άντρας
 // μου. Φοβάμαι να φύγω.» … «Ευχαριστώ, κλείνουμε εδώ.» got the root question: detectSafetySignal reads harm to oneself only). A check
 // of its own: detectSafetySignal, classifyCrisisTier, buildCrisisLine and HELPLINES are untouched. It reads EXPLICIT physical violence
@@ -7893,7 +7902,6 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // The line depends on the TIER of the message that triggered this turn: 1018 + 112 for suicidal thoughts (every
       // time), 10306 once per session for general despair. See buildCrisisLine / auratests/test_crisis_tiers.js.
       let displayText = text;
-      setCrisisFallback(null);
       if (currentMode === "SUPPORTIVE") {
         const _crisisLine = buildCrisisLine(classifyCrisisTier(lastUserMsg), text, supportLineShown.current);
         if (_crisisLine.line) displayText = text + "\n\n" + _crisisLine.line;
@@ -8031,6 +8039,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // can drop it. See buildAiIdentityLine.
       const _aiLine = buildAiIdentityLine(lastUserMsg, displayText);
       if (_aiLine) displayText = displayText + "\n\n" + _aiLine;
+      // Audit 26/10/2026, Α1: the line of a failed crisis or danger call goes only when this reply carries its numbers.
+      setCrisisFallback(prev => crisisFallbackAfterReply(prev, displayText));
       // ADR «17 Οκτωβρίου»: the first reply of a Stage A session carries the app's method line (display only, never on the safety path).
       const _methodLine = stageAMethodLineDue({ active: stageAActive.current, auraBefore: msgs.some(m => m && m.role === "assistant"), supportive: currentMode === "SUPPORTIVE", riskKind: riskSignalKind.current, dangerFromOther: dangerFromOther.current, safetyMode, lastUserText: lastUserMsg });
       if (displayText.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode, ...(_methodLine ? { methodLine: true } : {}) }]);
