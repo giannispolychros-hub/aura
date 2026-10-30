@@ -3675,6 +3675,16 @@ function rootAuraShare(found, msgs) {
   }
   return Math.round(100 * aura / words.length);
 }
+// ADR «30 Οκτωβρίου» (John; audit #4, part Γ, rule V2) — a PASSIVE COUNTER of a confirmed root that SAYS nothing was clarified
+// («Δεν ξεκαθάρισε τίποτα.», «Δεν το βρήκα.»): 1 when the root, folded (no accents, lower case, ς → σ), BEGINS with such a statement
+// and ends there or at punctuation; else 0. A CANDIDATE, a number for the device log only: never shown, never sent, read by nothing —
+// the root stays confirmed. Checked before the code on 30 roots written first (0 of 15 true roots counted; 8 of the 15 «not
+// clarified» found, 7 missed): auratests/test_root_unclear_candidate_3010.js.
+function rootUnclearCandidate(found) {
+  if (typeof found !== "string") return 0;
+  const t = found.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ").trim();
+  return /^(?:ε |μμ |ειλικρινα |οχι )?(?:δεν (?:μου )?ξεκαθαρισε|τιποτα δεν ξεκαθαρισε|δεν (?:το )?βρηκα|δεν βρεθηκε τιποτα)(?:(?:\s+(?:ακομα|ακομη|τιποτα|κατι|καλα))+)?(?=\s*(?:[.,…!;:—–-]|$))/.test(t) ? 1 : 0;
+}
 // INTENT WITHOUT ROADS — a PASSIVE COUNTER, nothing else (founder decision, 2026-10-01; see
 // auratests/test_intent_no_roads.js). A fifth real session had the user say "ίσως ασχοληθώ και το χτίσω", answer
 // "Τίποτα" to "τι σε εμποδίζει", and be closed with a goodbye — no road was laid out. The founder chose NOT to add a
@@ -9178,6 +9188,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     stageADispatch({ type: "yes", riskKind: riskSignalKind.current, step: !STAGE_A_COACH_OFFER });
     // P4 (ADR «11 Οκτωβρίου (ζ)»): passive, numbers only — how much of the confirmed root the model said first, and its door
     if (stageARef.current.stats.rootConfirmed === 1) recordTelemetry("root_provenance", { auraShare: rootAuraShare(_found, messages), door: lastCardDoor.current });
+    // ADR «30 Οκτωβρίου»: passive, a 0/1 only — does the confirmed root SAY nothing was clarified (a candidate; nothing reads it)
+    if (stageARef.current.stats.rootConfirmed === 1) recordTelemetry("root_unclear_candidate", { candidate: rootUnclearCandidate(_found) });
   }, [stageADispatch, messages, addUiBubble]);
   // ADR «17 Οκτωβρίου (δ)» — the step's buttons: «Δεν ξέρω ακόμα» (the step, «Πότε»), «Ναι» / «Όχι, είναι μεγάλο» (the size question).
   // A second tap finds the phase moved on and does nothing.

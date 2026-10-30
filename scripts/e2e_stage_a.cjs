@@ -707,6 +707,7 @@ async function runMock() {
   await runMockAP();
   await runMockPZ(); // 25/10: the pause switch (AURA_PAUSED)
   await runMockNT(); // 30/10: no money / road-map note in Stage A before the root
+  await runMockRU(); // 30/10: the passive counter of a root that says nothing was clarified
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -4131,6 +4132,60 @@ async function runMockPV() {
   ok('PV (first exit, the root in the user\'s own words): { auraShare: 0, door: 4 }', b.prov.length === 1 && b.prov[0].auraShare === 0 && b.prov[0].door === 4);
 }
 
+// ── RU: ADR «30 Οκτωβρίου» (John; audit #4, part Γ) — a passive counter. On «Ναι» one record root_unclear_candidate { candidate }:
+// 1 when the confirmed root SAYS nothing was clarified, 0 for a real root with a negation in it. A number only: nothing new on screen,
+// no model call, the root still confirmed; and it is in the file the tester sends (the start screen's button, ?rec=1). Alone: --only RU.
+async function runMockRU() {
+  const F1 = 'Έχω μια προαγωγή σε άλλη πόλη και δεν ξέρω αν πρέπει να τη δεχτώ.', WHY = 'Γιατί πρέπει να απαντήσω σε μια εβδομάδα.';
+  const T = APP.texts;
+  const run = async (root) => {
+    const browser = await launch();
+    const ctx = await browser.newContext({ viewport: vpOr({ width: 390, height: 844 }), acceptDownloads: true });
+    const page = await ctx.newPage();
+    const bodies = [];
+    await page.route('**/api/aura', async route => {
+      let b = {}; try { b = JSON.parse(route.request().postData() || '{}'); } catch (e) {}
+      bodies.push(b);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: 'Τι σε κρατάει εδώ;' }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/?stageA=1&rec=1');
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await send(page, F1); if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, WHY);
+    const btn = name => page.getByRole('button', { name, exact: true });
+    if (await btn(T.button).count()) { await btn(T.button).click(); await page.waitForTimeout(400); }
+    await send(page, root); await page.waitForTimeout(400);
+    const callsBefore = bodies.length;
+    const card = await btn(T.yes).count();
+    if (card) { await btn(T.yes).click(); await page.waitForTimeout(600); }
+    const after = await page.locator('body').innerText();
+    const log = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
+    // the tester's file: a new visit of the tester link, the start screen's button
+    await page.goto(BASE + '/?stageA=1&rec=1'); await page.waitForTimeout(600);
+    let file = null;
+    try {
+      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }), btn('Στείλε τα στοιχεία της δοκιμής').click({ timeout: 4000 })]);
+      file = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
+    } catch (e) { file = null; }
+    await browser.close();
+    return { card, after, calls: bodies.length - callsBefore, bodies, log, file,
+      unclear: log.filter(e => e.ev === 'root_unclear_candidate'), answer: log.filter(e => e.ev === 'root_answer'), prov: log.filter(e => e.ev === 'root_provenance') };
+  };
+  const inFile = (r, v) => !!r.file && Array.isArray(r.file.events) && r.file.events.filter(e => e.ev === 'root_unclear_candidate').length === 1 &&
+    r.file.events.find(e => e.ev === 'root_unclear_candidate').candidate === v && !/ξεκαθ|σίγουρ|φοβάμαι/i.test(JSON.stringify(r.file));
+  const a = await run('Δεν ξεκαθάρισε τίποτα.');
+  console.log('NOTE — RU1: card ' + a.card + ', model calls on «Ναι» ' + a.calls + ', file ' + (a.file ? a.file.records + ' records' : 'none') + ', events: ' + a.log.map(e => e.ev + (e.ev === 'root_answer' ? ':' + e.answer : '')).join(' '));
+  ok('RU1 (root «Δεν ξεκαθάρισε τίποτα.»): on «Ναι» one root_unclear_candidate { candidate: 1 } — the number and nothing else',
+    a.card > 0 && a.unclear.length === 1 && a.unclear[0].candidate === 1 && Object.keys(a.unclear[0]).sort().join(',') === 'candidate,ev,t');
+  ok('RU1: the root is still confirmed as before (root_answer 1, root_provenance), nothing new on screen, «Ναι» calls no model',
+    a.answer.some(e => e.answer === 1) && a.prov.length === 1 && !/candidate|unclear/i.test(a.after) && a.calls === 0 &&
+    !a.bodies.some(b => /root_unclear_candidate|rootUnclearCandidate/.test(JSON.stringify(b)))); // the prompt itself says «ROOT CANDIDATE»: only the event is looked for
+  ok('RU1: the file the tester sends carries it (candidate 1), with no text of the session', inFile(a, 1));
+  const b = await run('Δεν είμαι σίγουρος, αλλά φοβάμαι την αλλαγή.');
+  ok('RU2 (a real root with a negation): { candidate: 0 }, in the device log and in the tester\'s file',
+    b.card > 0 && b.unclear.length === 1 && b.unclear[0].candidate === 0 && b.answer.some(e => e.answer === 1) && inFile(b, 0));
+}
+
 // ── IM: ADR «22 Οκτωβρίου (στ)» (John): the INFORMATION MODE note («concise information … no Socratic questions») is not sent on the
 // safety path (the crisis turn and every turn after the crisis line) nor in Stage A before the root; with no crisis the old flow
 // (?stageA=0) sends it exactly as before. «Πες μου τι να κάνω», «χωρίς ερωτήσεις» and «μη με ρωτάς» set the held state; every request
@@ -5331,7 +5386,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'NT') await runMockNT(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
