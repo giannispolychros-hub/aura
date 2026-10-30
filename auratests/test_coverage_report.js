@@ -119,14 +119,17 @@ assert("a structural output on this very reply reads as zero",
 const SRC = extract('buildCoverageReport');
 assert("the function spells out no label pattern of its own",
   !/ΔΡ|ΚΕΡΔ|ΚΟΣΤ|ΗΡΘΕΣ|ΒΡΗΚΕΣ|ΦΕΥΓΕΙΣ/.test(SRC));
+// UPDATED (30/10, ADR «30 Οκτωβρίου», John — safety (α)): a fourth argument, omitStructural (Stage A before the root drops the
+// road-map line); the predicate is still the third argument, as before.
 assert("it takes the structural predicate as an argument",
-  /function buildCoverageReport\(messages, families, structural\)/.test(SRC));
+  /function buildCoverageReport\(messages, families, structural(?:, omitStructural)?\)/.test(SRC));
 // Found by mutation: every fixture above passes its OWN predicate, so none of them can
 // see what the APP actually injects. Halving it there — road only, three-beat dropped —
 // left the whole suite green while the report stopped seeing half of what it counts.
 // Boundary note: the lazy match must not stop at the ");" inside structuralLabelsIn(t);
 // it ends at the arrow function's own closing "});".
-const injected = (raw.match(/buildCoverageReport\(msgs, familiesUsed\.current,([\s\S]{0,240}?)\}\);/) || [])[1] || "";
+// UPDATED (30/10, ADR «30 Οκτωβρίου»): the call now ends «}, _saNotesHeld);» — the predicate is read up to the same arrow function's end.
+const injected = (raw.match(/buildCoverageReport\(msgs, familiesUsed\.current,([\s\S]{0,240}?)\}(?:, _saNotesHeld)?\);/) || [])[1] || "";
 assert("the app injects the shared structuralLabelsIn as that predicate",
   /structuralLabelsIn\(/.test(injected));
 assert("the injected predicate covers BOTH structural forms, road map and three-beat",

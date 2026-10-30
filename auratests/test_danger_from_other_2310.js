@@ -366,7 +366,9 @@ assert('(Κ) UNCHANGED: the Stage A texts (no new text: the goodbye is the exist
   // UPDATED (25/10, the pause switch): the pause section (runMockPZ) holds one danger message on purpose too — the danger line from code
   // while AURA is paused — and is left out the same way
   const without = name => t => { const a = t.indexOf('async function ' + name + '('); return a < 0 ? t : t.slice(0, a) + t.slice(t.indexOf('\n}\n', a) + 3); };
-  const withoutO5 = t => without('runMockPZ')(without('runMockO5')(t));
+  // UPDATED (30/10, ADR «30 Οκτωβρίου»): the notes section (runMockNT) holds one danger message on purpose — it checks that Stage A
+  // with danger from another person keeps its notes byte for byte — and is left out the same way
+  const withoutO5 = t => without('runMockNT')(without('runMockPZ')(without('runMockO5')(t)));
   // UPDATED (24/10, Π3 step 2, the stress tool brought onto this branch): the stress tool's two danger-from-another sessions — 125
   // (risk: 'violence') and 126 (risk: 'child') — are meant to hold danger messages too, like runMockO5: left out, and checked below to
   // be CAUGHT; no other persona is left out

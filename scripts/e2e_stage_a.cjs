@@ -706,6 +706,7 @@ async function runMock() {
   await runMockVO();
   await runMockAP();
   await runMockPZ(); // 25/10: the pause switch (AURA_PAUSED)
+  await runMockNT(); // 30/10: no money / road-map note in Stage A before the root
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -1734,6 +1735,92 @@ async function runMockPZ() {
       upstream === 0 && s.state.statuses.every(x => x === 503) && await fallback(s.page) === SELF);
     await s.browser.close();
   }
+}
+
+// ── NT: SAFETY (John, 30/10/2026, a safety exception (α), Constitution §0.1; audits #3 and #4). In Stage A, before the root and off
+// the safety path, the code no longer sends the [STRUCTURAL EVIDENCE …] note («Money amounts the user stated …») nor the road-map line
+// of [SESSION COVERAGE …] («Replies since your last structural output (road map or three-beat)»). A made-up session that presses for
+// information and money (23 messages, nothing from a real person); the request of the 4th and of the 22nd message is read.
+// NT1 the tester link (?stageA=1&rec=1): neither note (the rest of the coverage note and the marker stay). Guards, unchanged from main:
+// NT2 the old flow (?stageA=0) still gets both; NT3 Stage A after a crisis line (crisis B) and NT4 Stage A with danger from another
+// person get both, as before (the safety path keeps its notes byte for byte). Alone: --only NT.
+async function runMockNT() {
+  const MSGS = [
+    'Είμαι νοσηλεύτρια σε δημόσιο νοσοκομείο, παίρνω 1.150 ευρώ και σκέφτομαι εδώ και καιρό να κάνω κάτι άλλο, αλλά έχω δύο παιδιά και δάνειο.',
+    'Θέλω να με βοηθήσεις να δω τι μπορώ να κάνω.',
+    'Θέλω να βγάζω τουλάχιστον 2.800 ευρώ τον μήνα.',
+    'Στη δουλειά δεν υπάρχει περιθώριο, οι μισθοί είναι κλειδωμένοι.',
+    'Σκέφτηκα νοσηλείες κατ\' οίκον ή μια δουλειά στο εξωτερικό.',
+    'Πες μου ποιο από τα δύο βγάζει περισσότερα.',
+    'Θέλω απλώς έναν αριθμό, πόσα βγάζει κάποιος με νοσηλείες κατ\' οίκον;',
+    'Τα παιδιά πάνε σχολείο εδώ, το εξωτερικό είναι δύσκολο.',
+    'Οπότε μένει το κατ\' οίκον. Πώς ξεκινάει κανείς;',
+    'Έχω κάποιες οικονομίες, γύρω στα 6.000 ευρώ.',
+    'Αν τα επενδύσω, πόσο γρήγορα θα πιάσω τα 2.800;',
+    'Η οικογένειά μου λέει να μην ρισκάρω.',
+    'Εγώ πάλι νιώθω ότι αν δεν κάνω κάτι τώρα, δεν θα το κάνω ποτέ.',
+    'Πες μου τα βήματα, με τη σειρά.',
+    'Χρειάζομαι άδεια ή αρκεί το πτυχίο μου;',
+    'Δουλεύω βάρδιες, έχω λίγο χρόνο.',
+    'Μπορώ να το κάνω παράλληλα με τη δουλειά;',
+    'Ας πούμε ότι κάνω τρεις επισκέψεις την εβδομάδα, πόσα βγαίνουν;',
+    'Θέλω απαντήσεις, όχι μόνο ερωτήσεις.',
+    'Το ξέρω ότι δεν δίνεις συμβουλές, αλλά κάτι πρέπει να μου πεις.',
+    'Τα 1.150 δεν φτάνουν, αυτό είναι το θέμα.',
+    'Πες μου ειλικρινά, αξίζει το ρίσκο;',
+    'Αν ήσουν στη θέση μου, τι θα έκανες;',
+  ];
+  const REPLIES = ['Τι σε κρατάει πιο πολύ εκεί;', 'Τι θα άλλαζε για σένα, αν γινόταν αυτό;', 'Από όλα αυτά, τι βαραίνει περισσότερο;',
+    'Τι λείπει για να το δεις πιο καθαρά;', 'Πότε το ένιωσες πιο έντονα;', 'Τι σε σταματά, όταν το σκέφτεσαι;', 'Τι θα ήθελες να μείνει ίδιο;'];
+  const EVID = '[STRUCTURAL EVIDENCE', MONEY = 'Money amounts the user stated', ROAD = 'Replies since your last structural output (road map or three-beat)';
+  const COVER = '[SESSION COVERAGE', MARKER = '[FREE PART: ENDS AT ROOT]';
+  const run = async (query, msgs, upto) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }) });
+    const bodies = []; let n = 0;
+    await page.route('**/api/aura', async route => {
+      let body = {}; try { body = JSON.parse(route.request().postData() || '{}'); } catch (e) {}
+      bodies.push(body);
+      const r = REPLIES[n % REPLIES.length]; n++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    const at = {};
+    for (let k = 0; k < upto; k++) {
+      if (!(await page.locator('textarea.textarea').count())) break;
+      const before = bodies.length;
+      await send(page, msgs[k]);
+      // the old flow asks First-WHY itself (no call): answer it, the 1st message is then the one before it
+      if (k === 0 && await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, 'Γιατί κουράστηκα να μετράω κάθε ευρώ.');
+      // the per-turn part only (the second system block): the fixed prompt itself names the marker, so reading it would always match
+      if (bodies.length > before) at[k + 1] = (bodies[bodies.length - 1].system || []).slice(1).map(x => x.text).join('');
+    }
+    await browser.close();
+    return at;
+  };
+  const has = (s, x) => typeof s === 'string' && s.includes(x);
+  // NT1 — the tester link
+  const A = await run('?stageA=1&rec=1', MSGS, 23);
+  ok('NT1 (Stage A, before the root): the 4th and the 22nd message each reach the model', !!A[4] && !!A[22]);
+  ok('NT1: no [STRUCTURAL EVIDENCE …] note in either request — no «Money amounts the user stated»', !has(A[4], EVID) && !has(A[22], EVID) && !has(A[4], MONEY) && !has(A[22], MONEY));
+  ok('NT1: the coverage note has no road-map line in either request', !has(A[4], ROAD) && !has(A[22], ROAD));
+  ok('NT1: …but the coverage note itself and the Stage A marker are still sent (only the two pieces go)', has(A[22], COVER) && has(A[4], MARKER) && has(A[22], MARKER));
+  ok('NT1: no other request of the session carries either piece', Object.values(A).every(s => !has(s, EVID) && !has(s, ROAD)));
+  // NT2 — the old flow: as on main
+  const O = await run('?stageA=0', MSGS, 5);
+  const pieces = x => x ? [EVID, MONEY, ROAD, COVER, MARKER].map(y => (has(x, y) ? '+' : '-') + y.replace(/^\[/, '').split(' ').slice(0, 2).join(' ')).join(' ') : 'no request';
+  results.push('NOTE — NT what each request carried: Stage A #4 ' + pieces(A[4]) + ' | Stage A #22 ' + pieces(A[22]) + ' | old flow #4 ' + pieces(O[4]));
+  ok('NT2 (old flow, ?stageA=0): unchanged — the 4th message still carries the evidence note with the money line, and the road-map line',
+    has(O[4], EVID) && has(O[4], MONEY) && has(O[4], ROAD) && !has(O[4], MARKER));
+  // NT3 — Stage A after a crisis line (crisis B): the safety path keeps its notes
+  const C = await run('?stageA=1&rec=1', [MSGS[0], MSGS[1], 'Δεν αντέχω άλλο.', MSGS[3], MSGS[4]], 5);
+  ok('NT3 (Stage A, after a crisis line): unchanged — the next message still carries both (the safety path keeps its notes)',
+    has(C[4], EVID) && has(C[4], MONEY) && has(C[4], ROAD));
+  // NT4 — Stage A, danger from another person
+  const D = await run('?stageA=1&rec=1', [MSGS[0], MSGS[1], 'Με χτυπάει ο άντρας μου. Φοβάμαι να φύγω.', MSGS[3], MSGS[4]], 5);
+  ok('NT4 (Stage A, danger from another person): unchanged — the next message still carries both', has(D[4], EVID) && has(D[4], MONEY) && has(D[4], ROAD));
 }
 
 // ── ST: John, 17/10/2026 (ADR «17 Οκτωβρίου (δ)»), for the test of the 20. The step after «Ναι», on a phone (390×844 unless --viewport),
@@ -3857,8 +3944,12 @@ async function runMockDF() {
   }
 }
 // Recorded on 013a4de (before ADR «19 Οκτωβρίου (δ)»), with the SN scripts above.
+// UPDATED (30/10, ADR «30 Οκτωβρίου», John — a safety exception (α)): `open`, requests 4 and 5 (were 61bf3231070537bc 967978c1d9b0572c).
+// In Stage A before the root the coverage note no longer carries its road-map line. Checked on 30/10 with this session: main 17334b2
+// still sends the old two, and its per-turn part minus that one line is, byte for byte, what this branch sends. Requests 1–3 and the
+// switch-closed flow are unchanged.
 const SN_BASELINE = { closed: '9cc0489d84cd11e3 a4c883a93feb0f09 599d159dd7d6e616 56c94429f4ecc181 1311a6c72dc7db4b 04d947de9e723755',
-  open: 'b7117c3a6d998739 319083b10b16b87e 6ebd5644c901c40e 61bf3231070537bc 967978c1d9b0572c' };
+  open: 'b7117c3a6d998739 319083b10b16b87e 6ebd5644c901c40e a562e9934d7447dd d86935d67c4667d1' };
 
 // ── MC: the MODEL's own closing summary before the root (ADR «11 Οκτωβρίου (β)», found by the stress test with the real model,
 // run 10, sessions 2.1 and 4.1). Switch open: the summary is not shown, door 1's question is; the card it opens is door 5 in
@@ -5240,7 +5331,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'NT') await runMockNT(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

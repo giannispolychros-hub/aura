@@ -1476,6 +1476,14 @@ function perTurnSafety(currentMode, riskKind, dangerFromOther) {
 function informationModeNoteDue(active, safetyPath, stageAPreRoot) {
   return active === true && !safetyPath && !stageAPreRoot;
 }
+// ADR «30 Οκτωβρίου» (John, a safety exception (α), Constitution §0.1 — «no facts about law or money»): in Stage A before a confirmed
+// root, off the safety path, two notes that point toward money and roads are held — [STRUCTURAL EVIDENCE …] (money amounts, material
+// for ROAD DISCOVERY, which Stage A suspends) is not sent, and [SESSION COVERAGE …] goes without its road-map line. Both are older than
+// Stage A and no ADR asked for them there. The old flow, Stage A after the root, the crisis turn and every turn after the crisis line,
+// danger from another person: both notes exactly as before. auratests/test_stage_a_notes_3010.js; browser: section NT.
+function stageAPreRootNotesHeld(stageAActive, rootConfirmed, safetyPath) {
+  return stageAActive === true && rootConfirmed !== true && safetyPath !== true;
+}
 // ADR «19 Οκτωβρίου (δ)», 5 (John): with the switch open the app does not ask First-WHY (ADR «17 Οκτωβρίου (δ)»), but the fixed prompt
 // still says ENTRY — FIRST-WHY PROTOCOL. On the session's first reply only — never on a crisis turn, never with the switch closed — one
 // note says so; the fixed prompt is untouched.
@@ -3962,7 +3970,7 @@ function tallyRoadTrace(totals, trace) {
 // It owns no knowledge of what "structural" looks like: the caller injects that predicate,
 // built from structuralLabelsIn, which stays the single place the label patterns are spelled
 // out. That also keeps the function liftable by the suites, which eval each one on its own.
-function buildCoverageReport(messages, families, structural) {
+function buildCoverageReport(messages, families, structural, omitStructural) {
   const list = Array.isArray(messages) ? messages : [];
   // CLOSING-SEQUENCE REPLIES ARE EXCLUDED, not merely uncounted. Part 1's returning-user
   // variant ends in a question mark — "…ποια λέξη ή ποια σύντομη φράση θα ήθελες να
@@ -4004,6 +4012,8 @@ function buildCoverageReport(messages, families, structural) {
       ? `\n· Replies since your last structural output (road map or three-beat): none this session.`
       : `\n· Replies since your last structural output (road map or three-beat): ${since}.`,
   ];
+  // ADR «30 Οκτωβρίου»: Stage A before the root (stageAPreRootNotesHeld) — the road-map line is left out, nothing else changes.
+  if (omitStructural === true) lines.splice(1, 1);
   if (used.length) lines.push(`\n· Signal families already used this session: ${used.join(", ")}.`);
   return `\n[SESSION COVERAGE — COUNTED, NOT JUDGED, AND NOT AN INSTRUCTION. The numbers below are counted mechanically from this session's own replies and surfaced so they do not have to be recalled from a long history. They describe what has already happened, never what should happen next: the rules that act on them — COGNITIVE PROPORTIONALITY, PROBLEM STRUCTURE MAP, EXPLORATION COVERAGE PRINCIPLE — are stated above and unchanged by this block. A high number here is not a verdict that anything went wrong, and a low one is not permission.${lines.join("")}]\n`;
 }
@@ -7232,9 +7242,11 @@ export default function AURAv2() {
       // `msgs` every turn, so it tracks the conversation instead of latching, and it holds no
       // session state of its own. Placed in the informational tier on purpose: it reports, it
       // never directs. It is NOT wired to any gate, and the tests assert that it stays that way.
+      // ADR «30 Οκτωβρίου» (safety, Constitution §0.1): Stage A before the root, off the safety path — no money / road-map note.
+      const _saNotesHeld = stageAPreRootNotesHeld(stageAActive.current, stageARef.current.stats.rootConfirmed === 1, _safetyPath);
       const materialEvidenceCtx = (() => {
         const userMsgs = msgs.filter(m => m.role === "user");
-        if (userMsgs.length === 0) return '';
+        if (userMsgs.length === 0 || _saNotesHeld) return '';
         const amounts = [];
         const kinds = [];
         let permissionTurns = 0;
@@ -7334,7 +7346,7 @@ A line missing above means only that one pattern was not matched — the absence
       // families are accumulated after the reply exists, which is the correct meaning of
       // "already used". Deliberately reads no state from the road-map exit contract.
       const coverageReportCtx = _crisisTurn ? '' : buildCoverageReport(msgs, familiesUsed.current,
-        t => { const l = structuralLabelsIn(t); return l.road || l.beat; });
+        t => { const l = structuralLabelsIn(t); return l.road || l.beat; }, _saNotesHeld);
       const explicitPauseCtx = canUseExplicitPause(memory) && currentMode === "ANSWER" &&
         msgs.filter(m => m.role === "user").length >= 3 ?
         `\n[EXPLICIT PAUSE AVAILABLE — optional, use at most once this session if conversation has reached a natural reflection point: briefly pause topic, ask one question about HOW the user prefers to search for clarity (e.g. "Έχω μια απορία για τον τρόπο που ψάχνεις — όχι για το θέμα σου. Προτιμάς να φτάσουμε σε μια απόφαση ή να καταλάβεις γιατί κολλάς;"), then return naturally to session. Never announce it as a special feature.]\n` : '';
