@@ -1476,6 +1476,14 @@ function perTurnSafety(currentMode, riskKind, dangerFromOther) {
 function informationModeNoteDue(active, safetyPath, stageAPreRoot) {
   return active === true && !safetyPath && !stageAPreRoot;
 }
+// ADR «30 Οκτωβρίου» (John, a safety exception (α), Constitution §0.1 — «no facts about law or money»): in Stage A before a confirmed
+// root, off the safety path, two notes that point toward money and roads are held — [STRUCTURAL EVIDENCE …] (money amounts, material
+// for ROAD DISCOVERY, which Stage A suspends) is not sent, and [SESSION COVERAGE …] goes without its road-map line. Both are older than
+// Stage A and no ADR asked for them there. The old flow, Stage A after the root, the crisis turn and every turn after the crisis line,
+// danger from another person: both notes exactly as before. auratests/test_stage_a_notes_3010.js; browser: section NT.
+function stageAPreRootNotesHeld(stageAActive, rootConfirmed, safetyPath) {
+  return stageAActive === true && rootConfirmed !== true && safetyPath !== true;
+}
 // ADR «19 Οκτωβρίου (δ)», 5 (John): with the switch open the app does not ask First-WHY (ADR «17 Οκτωβρίου (δ)»), but the fixed prompt
 // still says ENTRY — FIRST-WHY PROTOCOL. On the session's first reply only — never on a crisis turn, never with the switch closed — one
 // note says so; the fixed prompt is untouched.
@@ -3676,6 +3684,16 @@ function rootAuraShare(found, msgs) {
   }
   return Math.round(100 * aura / words.length);
 }
+// ADR «30 Οκτωβρίου» (John; audit #4, part Γ, rule V2) — a PASSIVE COUNTER of a confirmed root that SAYS nothing was clarified
+// («Δεν ξεκαθάρισε τίποτα.», «Δεν το βρήκα.»): 1 when the root, folded (no accents, lower case, ς → σ), BEGINS with such a statement
+// and ends there or at punctuation; else 0. A CANDIDATE, a number for the device log only: never shown, never sent, read by nothing —
+// the root stays confirmed. Checked before the code on 30 roots written first (0 of 15 true roots counted; 8 of the 15 «not
+// clarified» found, 7 missed): auratests/test_root_unclear_candidate_3010.js.
+function rootUnclearCandidate(found) {
+  if (typeof found !== "string") return 0;
+  const t = found.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ").trim();
+  return /^(?:ε |μμ |ειλικρινα |οχι )?(?:δεν (?:μου )?ξεκαθαρισε|τιποτα δεν ξεκαθαρισε|δεν (?:το )?βρηκα|δεν βρεθηκε τιποτα)(?:(?:\s+(?:ακομα|ακομη|τιποτα|κατι|καλα))+)?(?=\s*(?:[.,…!;:—–-]|$))/.test(t) ? 1 : 0;
+}
 // INTENT WITHOUT ROADS — a PASSIVE COUNTER, nothing else (founder decision, 2026-10-01; see
 // auratests/test_intent_no_roads.js). A fifth real session had the user say "ίσως ασχοληθώ και το χτίσω", answer
 // "Τίποτα" to "τι σε εμποδίζει", and be closed with a goodbye — no road was laid out. The founder chose NOT to add a
@@ -3971,7 +3989,7 @@ function tallyRoadTrace(totals, trace) {
 // It owns no knowledge of what "structural" looks like: the caller injects that predicate,
 // built from structuralLabelsIn, which stays the single place the label patterns are spelled
 // out. That also keeps the function liftable by the suites, which eval each one on its own.
-function buildCoverageReport(messages, families, structural) {
+function buildCoverageReport(messages, families, structural, omitStructural) {
   const list = Array.isArray(messages) ? messages : [];
   // CLOSING-SEQUENCE REPLIES ARE EXCLUDED, not merely uncounted. Part 1's returning-user
   // variant ends in a question mark — "…ποια λέξη ή ποια σύντομη φράση θα ήθελες να
@@ -4013,6 +4031,8 @@ function buildCoverageReport(messages, families, structural) {
       ? `\n· Replies since your last structural output (road map or three-beat): none this session.`
       : `\n· Replies since your last structural output (road map or three-beat): ${since}.`,
   ];
+  // ADR «30 Οκτωβρίου»: Stage A before the root (stageAPreRootNotesHeld) — the road-map line is left out, nothing else changes.
+  if (omitStructural === true) lines.splice(1, 1);
   if (used.length) lines.push(`\n· Signal families already used this session: ${used.join(", ")}.`);
   return `\n[SESSION COVERAGE — COUNTED, NOT JUDGED, AND NOT AN INSTRUCTION. The numbers below are counted mechanically from this session's own replies and surfaced so they do not have to be recalled from a long history. They describe what has already happened, never what should happen next: the rules that act on them — COGNITIVE PROPORTIONALITY, PROBLEM STRUCTURE MAP, EXPLORATION COVERAGE PRINCIPLE — are stated above and unchanged by this block. A high number here is not a verdict that anything went wrong, and a low one is not permission.${lines.join("")}]\n`;
 }
@@ -7241,9 +7261,11 @@ export default function AURAv2() {
       // `msgs` every turn, so it tracks the conversation instead of latching, and it holds no
       // session state of its own. Placed in the informational tier on purpose: it reports, it
       // never directs. It is NOT wired to any gate, and the tests assert that it stays that way.
+      // ADR «30 Οκτωβρίου» (safety, Constitution §0.1): Stage A before the root, off the safety path — no money / road-map note.
+      const _saNotesHeld = stageAPreRootNotesHeld(stageAActive.current, stageARef.current.stats.rootConfirmed === 1, _safetyPath);
       const materialEvidenceCtx = (() => {
         const userMsgs = msgs.filter(m => m.role === "user");
-        if (userMsgs.length === 0) return '';
+        if (userMsgs.length === 0 || _saNotesHeld) return '';
         const amounts = [];
         const kinds = [];
         let permissionTurns = 0;
@@ -7343,7 +7365,7 @@ A line missing above means only that one pattern was not matched — the absence
       // families are accumulated after the reply exists, which is the correct meaning of
       // "already used". Deliberately reads no state from the road-map exit contract.
       const coverageReportCtx = _crisisTurn ? '' : buildCoverageReport(msgs, familiesUsed.current,
-        t => { const l = structuralLabelsIn(t); return l.road || l.beat; });
+        t => { const l = structuralLabelsIn(t); return l.road || l.beat; }, _saNotesHeld);
       const explicitPauseCtx = canUseExplicitPause(memory) && currentMode === "ANSWER" &&
         msgs.filter(m => m.role === "user").length >= 3 ?
         `\n[EXPLICIT PAUSE AVAILABLE — optional, use at most once this session if conversation has reached a natural reflection point: briefly pause topic, ask one question about HOW the user prefers to search for clarity (e.g. "Έχω μια απορία για τον τρόπο που ψάχνεις — όχι για το θέμα σου. Προτιμάς να φτάσουμε σε μια απόφαση ή να καταλάβεις γιατί κολλάς;"), then return naturally to session. Never announce it as a special feature.]\n` : '';
@@ -9192,6 +9214,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     stageADispatch({ type: "yes", riskKind: riskSignalKind.current, step: !STAGE_A_COACH_OFFER });
     // P4 (ADR «11 Οκτωβρίου (ζ)»): passive, numbers only — how much of the confirmed root the model said first, and its door
     if (stageARef.current.stats.rootConfirmed === 1) recordTelemetry("root_provenance", { auraShare: rootAuraShare(_found, messages), door: lastCardDoor.current });
+    // ADR «30 Οκτωβρίου»: passive, a 0/1 only — does the confirmed root SAY nothing was clarified (a candidate; nothing reads it)
+    if (stageARef.current.stats.rootConfirmed === 1) recordTelemetry("root_unclear_candidate", { candidate: rootUnclearCandidate(_found) });
   }, [stageADispatch, messages, addUiBubble]);
   // ADR «17 Οκτωβρίου (δ)» — the step's buttons: «Δεν ξέρω ακόμα» (the step, «Πότε»), «Ναι» / «Όχι, είναι μεγάλο» (the size question).
   // A second tap finds the phase moved on and does nothing.
