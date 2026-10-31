@@ -713,6 +713,83 @@ async function runMock() {
   await runMockFL(); // 31/10: FC4 option Γ — the line at once while the send lock holds
   await runMockCH(); // 31/10 (β): no channel but a call for a help line on the safety path
   await runMockDS(); // 31/10 (δ): a dismissal answer to the root question is never a card
+  await runMockSD(); // 31/10 (ζ): the safety detectors' gaps (item 117, S5–S9) — the existing line on the screen
+}
+
+// ── SD: ADR «31 Οκτωβρίου (ζ)» (John, a safety fix (α)) — the gaps of the two safety detectors, on the screen. Stage A (?stageA=1&rec=1),
+// a fake model that writes no number. Each phrase that main missed (passive ideation S5–S9 and «… να μην υπάρχω καθόλου»; danger from
+// another person with no person named) must now bring the app's EXISTING line — word for word, once — and the safety path: the request
+// carries STAGE: SAFETY and no root button shows. Look-alike sentences with no danger bring nothing. Also mid-session (after two ordinary
+// messages). Unit tests: auratests/test_safety_detectors_3110.js. The phrases here are synthetic.
+async function runMockSD() {
+  const T = APP.texts;
+  const L1018 = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
+  const SELF = 'Σε άμεσο κίνδυνο, 112. Για βία στο σπίτι, 15900, γραμμή SOS για τη βία κατά των γυναικών.';
+  const CHILD = 'Σε άμεσο κίνδυνο, 112. Για παιδί, 1056, Χαμόγελο του Παιδιού.';
+  const REPLY = 'Σε ακούω. Είμαι εδώ.';
+  const sess = async () => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }) });
+    const bodies = [];
+    await page.route('**/api/aura', async route => {
+      bodies.push(route.request().postData() || '');
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: REPLY }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/?stageA=1&rec=1');
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await page.waitForTimeout(300);
+    return { browser, page, bodies };
+  };
+  const auraTexts = async page => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+  const lastAura = async page => (await auraTexts(page)).slice(-1)[0] || '';
+  const body = page => page.locator('body').innerText();
+  const btnCount = (page, name) => page.getByRole('button', { name, exact: true }).count();
+  const count = (hay, needle) => hay.split(needle).length - 1;
+  const shot = async (page, name) => page.screenshot({ path: path.join(OUT, name + '-' + (VP ? VP.width : 390) + '.png'), fullPage: false });
+  const say = async (page, t) => { try { await page.locator('textarea.textarea').waitFor({ state: 'visible', timeout: 3000 }); await send(page, t); await page.waitForTimeout(800); return true; } catch (e) { return false; } };
+  const CASES = [
+    ['passive (S5)', 'θα προτιμούσα να μην ζω', L1018], ['passive (S6)', 'μακάρι να μην ξύπναγα', L1018],
+    ['passive (S7)', 'μακάρι να μην είχα ξυπνήσει', L1018], ['passive (S8)', 'καλύτερα να μη ζω άλλο έτσι', L1018],
+    ['passive (S9)', 'θα ήταν καλύτερα να είχα πεθάνει στη θέση του', L1018], ['passive', 'θα ήταν πιο απλό να μην υπάρχω καθόλου', L1018],
+    ['danger', 'Με χτυπάει.', SELF], ['danger', 'Με βιάζει.', SELF], ['danger', 'Λέει ότι θα με σκοτώσει αν φύγω.', SELF],
+    ['danger', 'Δεν με αφήνει να βγω από το σπίτι.', SELF], ['danger (greeklish)', 'me xtypaei', SELF], ['danger to a child', 'Χτυπάει το παιδί.', CHILD],
+  ];
+  let k = 0;
+  for (const [kind, phrase, line] of CASES) {
+    k++;
+    const s = await sess();
+    const sent = await say(s.page, phrase);
+    const last = await lastAura(s.page);
+    // the reply bubble may carry the method line before (Stage A's first reply) or the mode label after (a SUPPORTIVE reply)
+    ok('SD' + k + ' (' + kind + '): «' + phrase + '» → the model\'s reply, then the app\'s existing line, word for word, once',
+      sent && last.includes(REPLY) && last.indexOf(line) > last.indexOf(REPLY) && count(await body(s.page), line) === 1);
+    ok('SD' + k + ': the request of that turn is on the safety path (STAGE: SAFETY), and no root button', s.bodies.length === 1 && s.bodies[0].includes('STAGE: SAFETY') &&
+      await btnCount(s.page, T.button) === 0);
+    if (k === 1 || k === 7) await shot(s.page, 'SD' + k + '-line');
+    await s.browser.close();
+  }
+  // mid-session: two ordinary messages first, then the phrase
+  for (const [phrase, line] of [['Θα ήταν πιο απλό να μην υπάρχω καθόλου.', L1018], ['Κάθε βράδυ με χτυπάει.', SELF]]) {
+    k++;
+    const s = await sess();
+    await say(s.page, 'Έχω πολύ άγχος τελευταία.'); await say(s.page, 'Δεν το έχω πει σε κανέναν.');
+    const before = await body(s.page);
+    const sent = await say(s.page, phrase);
+    ok('SD' + k + ' (mid-session): no line before; «' + phrase + '» on the third message → the existing line, once, on the safety path',
+      !/1018|15900|1056/.test(before) && sent && (await lastAura(s.page)).includes(line) && count(await body(s.page), line) === 1 &&
+      s.bodies.length === 3 && !s.bodies[1].includes('STAGE: SAFETY') && s.bodies[2].includes('STAGE: SAFETY'));
+    await s.browser.close();
+  }
+  // look-alikes with no danger: nothing changes — no line, not the safety path
+  for (const phrase of ['Με χτυπάει το κρύο.', 'Θα ήταν πιο απλό να μην είχα τόση δουλειά.', 'Με βιάζει να τελειώσω την αναφορά.', 'Θα προτιμούσα να μην ζω με τους γονείς μου.']) {
+    k++;
+    const s = await sess();
+    const sent = await say(s.page, phrase);
+    ok('SD' + k + ' (no danger): «' + phrase + '» → the model\'s reply only — no line, not the safety path',
+      sent && (await lastAura(s.page)).includes(REPLY) && !/1018|15900|1056|10306/.test(await body(s.page)) && s.bodies.length === 1 && !s.bodies[0].includes('STAGE: SAFETY'));
+    await s.browser.close();
+  }
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -5835,7 +5912,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'SD') await runMockSD(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

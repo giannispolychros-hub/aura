@@ -350,7 +350,7 @@ assert('(Ι) the step stops on danger too, and the word is never taken from such
 }
 
 // ── (Κ) unchanged ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
-const PIN = { detectSafetySignal: '9af2fd60393b0760' /* UPDATED (25/10, Ε1, the broader version, John): «καλύτερα / μακάρι / εύχομαι» with every ending — auratests/test_passive_ideation_2410.js */ /* UPDATED (24/10, Ε1, a safety fix (α)): + the passive-ideation phrases — auratests/test_passive_ideation_2410.js */, classifyCrisisTier: 'afa5cf7a370bb0d5', buildCrisisLine: 'd359e22dd7cf9a95',
+const PIN = { detectSafetySignal: '1f7c3cb8fe568f31' /* UPDATED (31/10, ADR «31 Οκτωβρίου (ζ)», a safety fix (α), John): + one narrow, closed line for the passive-ideation gaps (S5–S9 and «θα ήταν πιο απλό να μην υπάρχω καθόλου») — auratests/test_safety_detectors_3110.js */ /* UPDATED (25/10, Ε1, the broader version, John): «καλύτερα / μακάρι / εύχομαι» with every ending — auratests/test_passive_ideation_2410.js */ /* UPDATED (24/10, Ε1, a safety fix (α)): + the passive-ideation phrases — auratests/test_passive_ideation_2410.js */, classifyCrisisTier: 'afa5cf7a370bb0d5', buildCrisisLine: 'd359e22dd7cf9a95',
   crisisLineAfterFailedCall: 'c87733effcebde7e', mergeRiskKind: 'd3b56f5bad3ae14f' }; // as on merge-candidate a701c07
 for (const [n, v] of Object.entries(PIN)) assert(`(Κ) UNCHANGED, byte for byte: ${n}`, h(fnSrc(n)) === v);
 assert('(Κ) UNCHANGED, byte for byte: HELPLINES', h(arr('HELPLINES')) === '392f594fe775a4cf');
@@ -361,7 +361,11 @@ assert('(Κ) UNCHANGED: the Stage A texts (no new text: the goodbye is the exist
 {
   // UPDATED (31/10, FC4 option Γ, ADR «31 Οκτωβρίου»): test_fc4_locked_line_3110.js holds danger messages on purpose (the line shown at
   // once while the send lock holds) and is left out, like this file itself
-  const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && f !== path.basename(__filename) && f !== 'test_fc4_locked_line_3110.js').map(f => path.join(__dirname, f))
+  // UPDATED (31/10, ADR «31 Οκτωβρίου (ζ)», a safety fix (α)): test_safety_detectors_3110.js holds danger messages on purpose (the gaps of
+  // item 117 and their variants, which must now be caught) and is left out the same way. Measured when it was added: of the 27.017
+  // strings of every other test and browser script, the changed detectors read differently only the four passive-ideation «KNOWN GAP»
+  // phrases of test_passive_ideation_2410.js — no other string moved, none was lost
+  const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && f !== path.basename(__filename) && f !== 'test_fc4_locked_line_3110.js' && f !== 'test_safety_detectors_3110.js').map(f => path.join(__dirname, f))
     .concat(['e2e_stress_lib.cjs', 'e2e_stage_a.cjs', 'e2e_stage_a_lib.cjs'].map(f => path.join(ROOT, 'scripts', f)).filter(f => fs.existsSync(f)));
   const STR = /'((?:[^'\\\n]|\\.){3,600})'|"((?:[^"\\\n]|\\.){3,600})"|`((?:[^`\\]|\\.){3,600})`/g;
   const seen = new Set();
@@ -379,7 +383,9 @@ assert('(Κ) UNCHANGED: the Stage A texts (no new text: the goodbye is the exist
   // message on purpose too, and is left out the same way
   // UPDATED (31/10, ADR «31 Οκτωβρίου (β)»): the channel section (runMockCH — no channel but a call for a help line) holds one danger
   // message on purpose too, and is left out the same way
-  const withoutO5 = t => without('runMockCH')(without('runMockFL')(without('runMockNT')(without('runMockMF')(without('runMockFC')(without('runMockPZ')(without('runMockO5')(t)))))));
+  // UPDATED (31/10, ADR «31 Οκτωβρίου (ζ)», a safety fix (α)): the section of the detectors' gaps (runMockSD) holds danger messages on
+  // purpose — the gaps of item 117, which must now bring the line — and is left out the same way
+  const withoutO5 = t => without('runMockSD')(without('runMockCH')(without('runMockFL')(without('runMockNT')(without('runMockMF')(without('runMockFC')(without('runMockPZ')(without('runMockO5')(t))))))));
   // UPDATED (24/10, Π3 step 2, the stress tool brought onto this branch): the stress tool's two danger-from-another sessions — 125
   // (risk: 'violence') and 126 (risk: 'child') — are meant to hold danger messages too, like runMockO5: left out, and checked below to
   // be CAUGHT; no other persona is left out

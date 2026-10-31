@@ -1564,6 +1564,13 @@ function detectSafetySignal(text, tierB) {
     // The broader version (John, 25/10/2026): «καλύτερα», «μακάρι» or «εύχομαι», each with every ending — «να μην ζω / ζούσα / ξυπνούσα /
     // υπήρχα», «να είχα πεθάνει», «να πέθαινα» — so «καλύτερα να πέθαινα», «μακάρι να πέθαινα», «εύχομαι να μην ξυπνούσα» are caught too.
     /(?:(?:καλύτερα|μακάρι|εύχομαι)(?: [^\s.,;!?]+){0,3} να (?:μην? (?:ζω|ζούσα|ξυπνούσα|υπήρχα)|είχα πεθάνει|πέθαινα))(?: (?:ποτέ(?: ξανά| πια)?|πια|πλέον|ξανά|άλλο))?(?=\s*(?:$|[.!;?…,·»"”')]|—|–|και |γιατί |αλλά ))/i,
+    // PASSIVE IDEATION, the gaps of 31/10/2026 (John, a safety fix (α); ADR «31 Οκτωβρίου (ζ)»): «θα προτιμούσα να μην ζω», «μακάρι να μην
+    // ξύπναγα», «μακάρι να μην είχα ξυπνήσει», «καλύτερα να μη ζω άλλο έτσι», «θα ήταν καλύτερα να είχα πεθάνει στη θέση του», «θα ήταν πιο
+    // απλό να μην υπάρχω καθόλου» matched nothing. ADDITIVE: the line above is untouched. A closed list only — the leads «προτιμούσα /
+    // προτιμώ / πιο απλό / πιο εύκολο», the forms «ξύπναγα / υπάρχω / είχα ξυπνήσει / είχα γεννηθεί», the endings «καθόλου», «έτσι», «στη θέση
+    // του / της / τους» — and, as above, each must END ITS CLAUSE: «θα προτιμούσα να μην ζω με τους γονείς μου», «μακάρι να μην ξύπναγα
+    // τόσο νωρίς», «θα ήταν πιο απλό να μην είχα τόση δουλειά» do not alarm. Tier A. See auratests/test_safety_detectors_3110.js.
+    /(?:(?:καλύτερα|μακάρι|εύχομαι|προτιμούσα|προτιμώ|πιο απλό|πιο εύκολο)(?: [^\s.,;!?]+){0,3} να (?:μην? (?:ζω|ζούσα|ξυπνούσα|ξύπναγα|υπήρχα|υπάρχω|είχα ξυπνήσει|είχα γεννηθεί)|είχα πεθάνει|πέθαινα))(?: (?:ποτέ(?: ξανά| πια)?|πια|πλέον|ξανά|άλλο|καθόλου))?(?: (?:έτσι|στη θέση (?:του|της|τους)))?(?=\s*(?:$|[.!;?…,·»"”')]|—|–|και |γιατί |αλλά ))/i,
   ];
   const distress = [
     /\b(grief|bereaved|bereavement|trauma|traumatic|abuse|abused|assault|crisis|breakdown|panic attack)\b/i,
@@ -1717,6 +1724,9 @@ function detectsDangerFromOther(text) {
   const ONLY_A_PERSON = "(?:οταν|οποτε|μολισ|σαν) (?:πινει|πιει|μεθαει|μεθυσει|θυμωνει|θυμωσει|νευριαζει|νευριασει|τσακωνομαστε|τσακωθουμε|γυρναει|γυριζει)";
   const CHILD = "(?:(?:το|τα) (?:παιδι|παιδια|παιδακι|παιδακια|μωρο|μωρα|ανιψι|ανιψακι)|τον (?:γιο|μικρο)|(?:την|τη) (?:κορη|μικρη))";
   const ME = " (?:θα |να )?με (?:εχει |ειχε |εχουν |ειχαν )?";
+  // 31/10/2026 (ADR «31 Οκτωβρίου (ζ)»): the end of the sentence, after at most two of these few words — «Με χτυπάει.», «Κάθε βράδυ με
+  // χτυπάει.», «Με χτυπάει συνέχεια.»; anything else after the verb («το κρύο», «να τελειώσω», «η προθεσμία») and the new rules do not read it
+  const TAIL = "(?:(?:παλι|ξανα|συνεχεια|συχνα|ακομα|καθε βραδυ|καθε μερα|καθε φορα|ολη την ωρα) ){0,2}$";
   const R = {
     notMe: S(" (?:δεν|δε|μη|μην)$"),                                        // «δεν με χτυπάει», «μη με χτυπάς»
     who: S(" " + WHO + " "), partner: S(" " + PARTNER + " "), onlyPerson: S(" " + ONLY_A_PERSON + " "),
@@ -1753,6 +1763,27 @@ function detectsDangerFromOther(text) {
     childHit: S(" (?:χτυπ|κλωτσ|κλοτσ)[^ ]* " + CHILD + " "),
     childBeat: S(" (?:(?:δερν|εδειρ|δειρ|εδερν|χαστουκ)[^ ]*|κακοπ(?:οιει|οιουν|οιησε|οιουσε)) " + CHILD + " "),
     harmChild: S(" (?:σκοτωσ|σφαξ|χτυπησ|δειρ|πνιξ|καψ)[^ ]* " + CHILD + " "),
+    // THE GAPS OF 31/10/2026 (John, a safety fix (α); ADR «31 Οκτωβρίου (ζ)»; item 117: 20 of 30 phrases with no person named matched
+    // nothing). ADDITIVE and NARROW: no rule above changed; each new one is a closed list of verb forms, and most must END THE SENTENCE
+    // (TAIL) — so «με χτυπάει το κρύο», «με απειλεί η προθεσμία», «με βιάζει να τελειώσω», «με σπρώχνει να γραφτώ» do not alarm. `artBefore`:
+    // the two words right before «με» are not an article and its noun («το παπούτσι με χτυπάει», «ο ήλιος με χτυπάει»).
+    artBefore: S("(?:^| )(?:ο|η|οι|το|τα|τον|την|τη|ενασ|μια|ενα|αυτο|αυτα|κατι) [^ ]+$"),
+    hitBare: S(ME + "(?:χτυπαει|χτυπησε|χτυπουσε|χτυπαγε) " + TAIL),                                     // «Με χτυπάει.», «… και με χτυπάει.»
+    hitWitness: S(ME + "(?:χτυπαει|χτυπησε|χτυπουσε|χτυπαγε|δερνει|εδειρε) μπροστα (?:στο|στα|στον|στην|στη) (?:μωρο|μωρα|παιδι|παιδια|παιδακι|παιδακια|γιο|κορη) "),
+    threatBare: S(ME + "(?:απειλει|απειλησε|απειλουσε) " + TAIL),                                       // «Με απειλεί.»
+    scareHome: S(ME + "φοβιζει (?:πολυ )?(?:μεσα )?στο σπιτι " + TAIL),                                  // «Με φοβίζει στο σπίτι.»
+    pushBare: S(ME + "(?:σπρωχνει|εσπρωξε|σπρωξε|εσπρωχνε) " + TAIL),                                    // «Με βρίζει και με σπρώχνει.»
+    lockIn: S(ME + "(?:κλειδωνει|κλειδωσε|εκλειδωσε|κλειδωνε) μεσα (?:στο σπιτι |στο δωματιο )?" + TAIL), // «Με κλειδώνει μέσα.»
+    noLeave: S(" δεν με (?:αφηνει|αφησε|αφηνε) να (?:βγω|βγαινω|φυγω) απο το σπιτι " + TAIL),            // «Δεν με αφήνει να βγω από το σπίτι.»
+    brokeBody: S(" μου (?:εσπασε|σπασε) (?:το χερι|τη μυτη|την μυτη|το πλευρο|τα πλευρα|το δοντι|τα δοντια|το ποδι|το σαγονι) " + TAIL),
+    killIf: S(" θα με (?:σκοτωσει|σφαξει) αν (?:φυγω|τον αφησω|την αφησω|τον χωρισω|την χωρισω|τη χωρισω|μιλησω|το πω|παω στην αστυνομια) " + TAIL),
+    rapeBare: S(ME + "(?:βιαζει|βιαζε) " + TAIL),                                                        // «Με βιάζει.» — never with «να» after
+    hairAny: S(" με (?:τραβ|εσυρ|σερν)[^ ]* απο τα μαλλια "),                                           // «με τραβάει από τα μαλλιά» (every form)
+    bruises: S(" (?:απο|με) (?:τισ )?(?:μπουνιεσ|κλωτσιεσ|σφαλιαρεσ|χαστουκια) (?:του|τησ) "),          // «μελανιές από τις μπουνιές του»
+    sport: S(" (?:μποξ|πυγμαχια|πυγμαχιασ|καρατε|ταεκβοντο|προπονηση|προπονησησ|ρινγκ|αγωνα|αγωνασ|ματσ|παιχνιδι) "),
+    raisedHand: S(" (?:σηκωσε|σηκωνει|σηκωνε) (?:το )?χερι (?:πανω μου |σε μενα )?" + TAIL),            // «Σήμερα πάλι σήκωσε χέρι.»
+    throwThings: S(" (?:με|μου) (?:πεταει|πεταξε|πεταγε|πετουσε|εριξε|ριχνει) (?:πραγματα|πιατα|ποτηρια|καρεκλεσ) " + TAIL),
+    childBare: S("^ (?:χτυπαει|χτυπησε|χτυπουσε|δερνει|εδειρε) " + CHILD + " " + TAIL),                 // «Χτυπάει το παιδί.»
   };
   // every occurrence of `re` in `s` that passes `keep(before, after)`
   const any = (re, s, keep) => {
@@ -1774,8 +1805,13 @@ function detectsDangerFromOther(text) {
       (R.blows.test(s) && !R.figurative.test(s) && !R.game.test(s)) ||
       (R.wood.test(s) && !R.game.test(s) && (why || R.home.test(s))) ||
       (R.threat.test(s) && !R.harmChild.test(s)) || R.threatArmed.test(s) ||
-      (R.partnerKill.test(s) && R.partner.test(s));
-    const child = (R.childHit.test(s) && person) || R.childBeat.test(s) || (R.threat.test(s) && R.harmChild.test(s));
+      (R.partnerKill.test(s) && R.partner.test(s)) ||
+      // 31/10/2026 (ADR «31 Οκτωβρίου (ζ)»): the new narrow rules — none of them where «δεν / μη» comes right before
+      [R.hitBare, R.hitWitness, R.threatBare, R.scareHome, R.pushBare, R.lockIn, R.rapeBare, R.brokeBody].some(re => any(re, s, b => yes(b) && !R.artBefore.test(b))) ||
+      any(R.noLeave, s, () => true) || any(R.killIf, s, yes) || R.hairAny.test(s) || (R.bruises.test(s) && !R.sport.test(s)) ||
+      [R.raisedHand, R.throwThings].some(re => any(re, s, b => yes(b) && (person || !R.subject.test(s))));
+    const child = (R.childHit.test(s) && person) || R.childBeat.test(s) || (R.threat.test(s) && R.harmChild.test(s)) ||
+      R.childBare.test(s) || (R.childHit.test(s) && R.onlyPerson.test(s));                   // 31/10: «Χτυπάει το παιδί.», «… όταν θυμώνει.»
     return { self: !!self, child: !!child };
   };
   const plain = String(text).normalize("NFKC").replace(/[\u200b-\u200f\u2060\ufeff\u00ad]/g, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")

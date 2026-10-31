@@ -47,8 +47,12 @@ const LINE_A = 'Υπάρχει η γραμμή παρέμβασης για τη�
 const NEW_LINE = '    /(?:(?:καλύτερα|μακάρι|εύχομαι)(?: [^\\s.,;!?]+){0,3} να (?:μην? (?:ζω|ζούσα|ξυπνούσα|υπήρχα)|είχα πεθάνει|πέθαινα))(?: (?:ποτέ(?: ξανά| πια)?|πια|πλέον|ξανά|άλλο))?(?=\\s*(?:$|[.!;?…,·»"”\')]|—|–|και |γιατί |αλλά ))/i,\n';
 const NARROW_LINE = '    /(?:καλύτερα(?: [^\\s.,;!?]+){0,3} να (?:μην? (?:ζω|ζούσα)|είχα πεθάνει)|μακάρι να μην? ξυπνούσα)(?: (?:ποτέ(?: ξανά| πια)?|πια|πλέον|ξανά|άλλο))?(?=\\s*(?:$|[.!;?…,·»"”\')]|—|–|και |γιατί |αλλά ))/i,\n';
 const det = fnSrc(raw, 'detectSafetySignal');
-assert('the new phrase line is in the CRISIS list of detectSafetySignal, once, right before the list closes',
-  det.split(NEW_LINE).length === 2 && det.indexOf(NEW_LINE) < det.indexOf('  const distress = [') && det.includes(NEW_LINE + '  ];\n  const distress = ['));
+// UPDATED (31/10, ADR «31 Οκτωβρίου (ζ)», a safety fix (α), John): one more passive-ideation line now follows this one, with its comment —
+// test_safety_detectors_3110.js; this line itself is unchanged, once, and still the last line of the list before the 31/10 one
+const LINE_3110 = (raw.match(/\n    \/\(\?:\(\?:καλύτερα\|μακάρι\|εύχομαι\|προτιμούσα[^\n]*\n/) || [''])[0].slice(1);
+assert('the new phrase line is in the CRISIS list of detectSafetySignal, once, right before the list closes — UPDATED (31/10): right before the 31/10 passive-ideation comment and line',
+  det.split(NEW_LINE).length === 2 && det.indexOf(NEW_LINE) < det.indexOf('  const distress = [') && det.includes(NEW_LINE + '    // PASSIVE IDEATION, the gaps of 31/10/2026') &&
+  !!LINE_3110 && det.includes(LINE_3110 + '  ];\n  const distress = ['));
 
 // ── (Α) caught ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 const POS = ['θα ήταν καλύτερα να μην ζω', 'Θα ήταν καλύτερα να μη ζω.', 'Καλύτερα να μην ζούσα.', 'Θα ήταν καλύτερα να είχα πεθάνει.',
@@ -71,7 +75,11 @@ for (const hd of ['Καλύτερα', 'Μακάρι', 'Εύχομαι', 'Θα ή
 const GAPS = ['Θα προτιμούσα να μην ζω.', 'Μακάρι να μην ξύπναγα.', 'Μακάρι να μην είχα ξυπνήσει σήμερα.', 'Καλύτερα να μη ζω άλλο έτσι.',
   'Θα ήταν καλύτερα να είχα πεθάνει στη θέση του.'];
 assert('(Β) 5 known gaps', GAPS.length === 5);
-for (const t of GAPS) assert('(Β) KNOWN GAP, not fixed: «' + t + '» is not caught', sig(t) !== 'CRISIS');
+// UPDATED (31/10, ADR «31 Οκτωβρίου (ζ)», a safety fix (α), John): four of the five are now caught, tier A, by the 31/10 line
+// (test_safety_detectors_3110.js). The fifth stays a gap: «σήμερα» is not in that line's closed list of endings, and the clause must end.
+const GAPS_CLOSED = GAPS.filter(t => t !== 'Μακάρι να μην είχα ξυπνήσει σήμερα.');
+for (const t of GAPS_CLOSED) assert('(Β) UPDATED (31/10): CLOSED GAP — «' + t + '» → CRISIS, tier A, the 1018 + 112 line', sig(t) === 'CRISIS' && tier(t) === 'A' && F.buildCrisisLine(tier(t), '', false).line === LINE_A);
+assert('(Β) KNOWN GAP, not fixed: «Μακάρι να μην είχα ξυπνήσει σήμερα.» is not caught', GAPS_CLOSED.length === 4 && sig('Μακάρι να μην είχα ξυπνήσει σήμερα.') !== 'CRISIS');
 // ── (Γ) 40 everyday sentences, the prediction written before the measurement ────────────────────────────────────────────────────
 const KNOWN_FA = ['Σε αυτή την πόλη, καλύτερα να μη ζω.', 'Ήταν τόσο ωραίο το όνειρο, μακάρι να μην ξυπνούσα.',
   'Τόση ντροπή ένιωσα, θα ήταν καλύτερα να είχα πεθάνει!', 'Χωρίς καφέ, καλύτερα να μη ζω!', 'Αν δεν βγω διακοπές, καλύτερα να μην ζω, χαχα.',
@@ -128,21 +136,25 @@ assert('(Δ) the greeklish everyday sentences (both spellings): none is a crisis
   const moved = [...seen].filter(s => !mine.has(s) && (OLD.detectSafetySignal(s) === 'CRISIS') !== (sig(s) === 'CRISIS'));
   assert(`(Ε) none of the ${seen.size} strings of the other tests and the stress tool changes its reading` + (moved.length ? ' — ' + moved.slice(0, 3).join(' | ') : ''),
     seen.size > 10000 && moved.length === 0);
-  assert('(Ε) …and without the new line, the five phrases are not caught (the line is what catches them)',
-    ['θα ήταν καλύτερα να μην ζω', 'Θα ήταν καλύτερα να μη ζω.', 'Καλύτερα να μην ζούσα.', 'Θα ήταν καλύτερα να είχα πεθάνει.', 'Μακάρι να μην ξυπνούσα.']
-      .every(t => OLD.detectSafetySignal(t) !== 'CRISIS'));
+  // UPDATED (31/10, ADR «31 Οκτωβρίου (ζ)»): the 31/10 line catches these five too, so both passive-ideation lines are taken out here
+  const OLD_BOTH = load(raw.replace(NEW_LINE, '').replace(LINE_3110, ''));
+  assert('(Ε) …and without the new line, the five phrases are not caught (the line is what catches them) — UPDATED (31/10): without both passive-ideation lines',
+    !!LINE_3110 && ['θα ήταν καλύτερα να μην ζω', 'Θα ήταν καλύτερα να μη ζω.', 'Καλύτερα να μην ζούσα.', 'Θα ήταν καλύτερα να είχα πεθάνει.', 'Μακάρι να μην ξυπνούσα.']
+      .every(t => OLD_BOTH.detectSafetySignal(t) !== 'CRISIS'));
   // UPDATED (25/10): against the narrow line of 24/10 — nothing it caught is lost; only the three phrases and their forms are new
   const NARROW = load(raw.replace(NEW_LINE, NARROW_LINE));
   const lost = [...seen].concat(POS, KNOWN_FA, QUIET).filter(s => NARROW.detectSafetySignal(s) === 'CRISIS' && sig(s) !== 'CRISIS');
   const gained = [...seen].filter(s => !mine.has(s) && sig(s) === 'CRISIS' && NARROW.detectSafetySignal(s) !== 'CRISIS');
   assert('(Ε) UPDATED (25/10): nothing the narrow line caught is lost' + (lost.length ? ' — ' + lost.slice(0, 3).join(' | ') : ''), raw.includes(NEW_LINE) && lost.length === 0);
   assert('(Ε) UPDATED (25/10): against the narrow line, no other string of the tests and the tool turns into a crisis' + (gained.length ? ' — ' + gained.slice(0, 3).join(' | ') : ''), gained.length === 0);
+  // UPDATED (31/10, ADR «31 Οκτωβρίου (ζ)»): compared with the narrow line ALONE — the 31/10 line, which also reads these heads, taken out
+  const NARROW_ALONE = load(raw.replace(NEW_LINE, NARROW_LINE).replace(LINE_3110, ''));
   assert('(Ε) UPDATED (25/10): the narrow line does not catch John\'s three phrases — the broader one is what catches them',
-    ['Καλύτερα να πέθαινα.', 'Μακάρι να πέθαινα.', 'Εύχομαι να μην ξυπνούσα.'].every(t => NARROW.detectSafetySignal(t) !== 'CRISIS' && sig(t) === 'CRISIS'));
+    ['Καλύτερα να πέθαινα.', 'Μακάρι να πέθαινα.', 'Εύχομαι να μην ξυπνούσα.'].every(t => NARROW_ALONE.detectSafetySignal(t) !== 'CRISIS' && sig(t) === 'CRISIS'));
 }
 // ── (Ζ) nothing else changed ────────────────────────────────────────────────────────────────────────────────────────────────────
 assert('(Ζ) UNCHANGED: classifyCrisisTier, buildCrisisLine', h(fnSrc(raw, 'classifyCrisisTier')) === 'afa5cf7a370bb0d5' && h(fnSrc(raw, 'buildCrisisLine')) === 'd359e22dd7cf9a95');
-assert('(Ζ) UNCHANGED: HELPLINES and the danger check', h(arr('HELPLINES')) === '392f594fe775a4cf' && h(fnSrc(raw, 'detectsDangerFromOther')) === 'e456cb8d14847cd4');
+assert('(Ζ) UNCHANGED: HELPLINES and the danger check', h(arr('HELPLINES')) === '392f594fe775a4cf' && h(fnSrc(raw, 'detectsDangerFromOther')) === 'dfd68c2a876b1a7b' /* UPDATED (31/10, ADR «31 Οκτωβρίου (ζ)», a safety fix (α), John): + narrow, closed rules for danger from another person with no person named (item 117) — auratests/test_safety_detectors_3110.js */);
 assert('(Ζ) UNCHANGED: the prompt (AURA_CORE_PERSONALITY) and the crisis prompt', h(raw.slice(_s, _e)) === 'b5f303cc9405aa21' && h(lit('SYSTEM_SUPPORTIVE')) === 'ff063670f20343a7');
 
 console.log(`\n${passed} passed, ${failed} failed`);

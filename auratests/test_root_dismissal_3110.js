@@ -148,7 +148,7 @@ assert('(Ζ) the prompt (AURA_CORE_PERSONALITY) is unchanged', h(lit('AURA_CORE_
 let gen = ''; try { gen = cp.execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'gen_prompt_fingerprints.cjs'), '--check'], { encoding: 'utf8' }); } catch (e) { gen = String(e.stdout || ''); }
 assert('(Ζ) the prompt fingerprints in api/aura.js are up to date', /up to date/.test(gen));
 const PINS = { rootAnswerIsUnsure: '2c6461315a960668', rootTextHasSubstance: '11d0cb226862ec80', stageAAfterCrisisText: 'e19c2a413a9ad99c',
-  stageACaptureAllowed: 'f8a46ebc62fe4ecd', stageAStep: '67bb9bcb504396e8', detectSafetySignal: '9af2fd60393b0760', detectsDangerFromOther: 'e456cb8d14847cd4',
+  stageACaptureAllowed: 'f8a46ebc62fe4ecd', stageAStep: '67bb9bcb504396e8', detectSafetySignal: '1f7c3cb8fe568f31' /* UPDATED (31/10, ADR «31 Οκτωβρίου (ζ)», a safety fix (α), John): + one narrow, closed line for the passive-ideation gaps (S5–S9 and «θα ήταν πιο απλό να μην υπάρχω καθόλου») — auratests/test_safety_detectors_3110.js */, detectsDangerFromOther: 'dfd68c2a876b1a7b' /* UPDATED (31/10, ADR «31 Οκτωβρίου (ζ)», a safety fix (α), John): + narrow, closed rules for danger from another person with no person named (item 117) — auratests/test_safety_detectors_3110.js */,
   stageALeavingDoorOpens: 'a319ffa8afded157', replaceBareGoodbye: 'e6351d2cb8e28ab5' };
 for (const [n, v] of Object.entries(PINS)) assert('(Ζ) unchanged: ' + n, h(fnSrc(n)) === v);
 assert('(Ζ) unchanged: the Stage A texts and the goodbye text', h(textsSrc) === '9f64812e26b48d3d' && constLine('BARE_GOODBYE_TEXT') === 'const BARE_GOODBYE_TEXT = "Ευχαριστώ που το μοιράστηκες. Να είσαι καλά.";');

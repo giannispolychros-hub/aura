@@ -174,7 +174,7 @@ assert('(Η) KNOWN GAP: a claim without the words the check reads stays, under d
   strip('Η 15900 έχει ανθρώπους που έχουν βοηθήσει μητέρες. Αυτό είναι η δουλειά τους.', DANGER) === 'Η 15900 έχει ανθρώπους που έχουν βοηθήσει μητέρες. Αυτό είναι η δουλειά τους.');
 
 // ── (Θ) nothing else changed ────────────────────────────────────────────────────────────────────────────────────────────────────
-assert('(Θ) UNCHANGED: detectsDangerFromOther, dangerInMessages, buildDangerLine', h(fnSrc('detectsDangerFromOther')) === 'e456cb8d14847cd4' &&
+assert('(Θ) UNCHANGED: detectsDangerFromOther, dangerInMessages, buildDangerLine', h(fnSrc('detectsDangerFromOther')) === 'dfd68c2a876b1a7b' /* UPDATED (31/10, ADR «31 Οκτωβρίου (ζ)», a safety fix (α), John): + narrow, closed rules for danger from another person with no person named (item 117) — auratests/test_safety_detectors_3110.js */ &&
   h(fnSrc('dangerInMessages')) === '8d5baab173a81fbe' && h(fnSrc('buildDangerLine')) === 'df6f7df2a56379a2');
 assert('(Θ) UNCHANGED: dropModelSentences, stripForeignHelplines, lookBehind, HELPLINES', h(fnSrc('dropModelSentences')) === 'fc3e2f15320beae4' &&
   h(fnSrc('stripForeignHelplines')) === '1230688f6654ee84' && h(fnSrc('lookBehind')) === '0f4e7d856673bb16' && h(CODE.slice(CODE.indexOf('const HELPLINES = ['), CODE.indexOf('\n];', CODE.indexOf('const HELPLINES = [')) + 3)) === '392f594fe775a4cf');
