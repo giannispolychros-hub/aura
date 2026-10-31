@@ -42,7 +42,11 @@ const iHs = CODE.indexOf(END_HS);
 const EFFECT = 'useEffect(() => {\n    if (misfireToSubmit.current === null || misfirePending || input !== misfireToSubmit.current) return;\n    misfireToSubmit.current = null;\n    handleSubmit();\n  }, [input, misfirePending, handleSubmit]);';
 assert('(Β) one effect, right after handleSubmit, sends it once by the normal path (handleSubmit itself unchanged)',
   iHs > 0 && CODE.indexOf(EFFECT) > iHs && CODE.indexOf(EFFECT) - iHs < 400 && (CODE.split(EFFECT).length - 1) === 1);
-assert('(Β) handleSubmit keeps its signature and first lines', CODE.includes('const handleSubmit = useCallback(async () => {\n    if (!input.trim() || loading || sessionEnded || submittingRef.current) return;'));
+// UPDATED (31/10, FC4 option Γ, ADR «31 Οκτωβρίου» — John): one check now comes before the lock line — while the lock holds, a crisis or
+// danger line from code (test_fc4_locked_line_3110.js). The signature and the lock line itself are unchanged, and nothing before it sends.
+assert('(Β) handleSubmit keeps its signature and its lock line (after option Γ\'s line-only check)',
+  CODE.includes('const handleSubmit = useCallback(async () => {\n    // FC4, option Γ') &&
+  CODE.includes('\n    }\n    if (!input.trim() || loading || sessionEnded || submittingRef.current) return;'));
 
 // ── (Γ) ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 assert('(Γ) without a signal: the correction prompt and the call as before',

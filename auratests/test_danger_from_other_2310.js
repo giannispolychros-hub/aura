@@ -358,7 +358,9 @@ assert('(Κ) UNCHANGED: the Stage A texts (no new text: the goodbye is the exist
 
 // ── (Λ) no existing flow moves ──────────────────────────────────────────────────────────────────────────────────────────────────
 {
-  const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && f !== path.basename(__filename)).map(f => path.join(__dirname, f))
+  // UPDATED (31/10, FC4 option Γ, ADR «31 Οκτωβρίου»): test_fc4_locked_line_3110.js holds danger messages on purpose (the line shown at
+  // once while the send lock holds) and is left out, like this file itself
+  const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && f !== path.basename(__filename) && f !== 'test_fc4_locked_line_3110.js').map(f => path.join(__dirname, f))
     .concat(['e2e_stress_lib.cjs', 'e2e_stage_a.cjs', 'e2e_stage_a_lib.cjs'].map(f => path.join(ROOT, 'scripts', f)).filter(f => fs.existsSync(f)));
   const STR = /'((?:[^'\\\n]|\\.){3,600})'|"((?:[^"\\\n]|\\.){3,600})"|`((?:[^`\\]|\\.){3,600})`/g;
   const seen = new Set();
@@ -372,7 +374,9 @@ assert('(Κ) UNCHANGED: the Stage A texts (no new text: the goodbye is the exist
   const without = name => t => { const a = t.indexOf('async function ' + name + '('); return a < 0 ? t : t.slice(0, a) + t.slice(t.indexOf('\n}\n', a) + 3); };
   // UPDATED (30/10, ADR «30 Οκτωβρίου»): the notes section (runMockNT) holds one danger message on purpose — it checks that Stage A
   // with danger from another person keeps its notes byte for byte — and is left out the same way
-  const withoutO5 = t => without('runMockNT')(without('runMockMF')(without('runMockFC')(without('runMockPZ')(without('runMockO5')(t)))));
+  // UPDATED (31/10, FC4 option Γ): the section of the line shown at once while the send lock holds (runMockFL) holds one danger
+  // message on purpose too, and is left out the same way
+  const withoutO5 = t => without('runMockFL')(without('runMockNT')(without('runMockMF')(without('runMockFC')(without('runMockPZ')(without('runMockO5')(t))))));
   // UPDATED (24/10, Π3 step 2, the stress tool brought onto this branch): the stress tool's two danger-from-another sessions — 125
   // (risk: 'violence') and 126 (risk: 'child') — are meant to hold danger messages too, like runMockO5: left out, and checked below to
   // be CAUGHT; no other persona is left out

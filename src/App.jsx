@@ -1673,6 +1673,19 @@ function crisisFallbackAfterReply(fallback, shownText) {
   const nums = fallback.match(/\d{3,6}/g) || [];
   return nums.length && nums.every(n => new RegExp("(?:^|\\D)" + n + "(?!\\d)").test(shown)) ? null : fallback;
 }
+// SAFETY (FC4, option Γ — John, 31/10/2026, a safety fix (α); the FC4 characterisation of 26/10): while an earlier send still holds the
+// one-at-a-time lock (a slow failure and its retry can outlast the 30-second guard), «Go» sends nothing. A crisis message, or danger
+// from another person, typed then stayed in the box with no number on screen until that call ended. This gives the app's line for such
+// a text AT ONCE, by the rules of a failed call — the tier's crisis line (buildCrisisLine), the danger line (buildDangerLine) — not
+// marked as shown, so the reply to the message, once it is sent, carries the line and clears it (crisisFallbackAfterReply). The text is
+// still NOT sent while the lock holds. Any other text: "". See auratests/test_fc4_locked_line_3110.js; browser: section FL.
+function lockedSendSafetyLine(text, supportLineShown, dangerShown) {
+  if (typeof text !== "string" || !text.trim()) return "";
+  const crisis = detectSafetySignal(text) === "CRISIS" ? buildCrisisLine(classifyCrisisTier(text), "", supportLineShown).line : "";
+  const danger = detectsDangerFromOther(text);
+  const dangerLine = danger ? buildDangerLine(danger, crisis, dangerShown).line : "";
+  return crisis && dangerLine ? crisis + "\n\n" + dangerLine : crisis || dangerLine;
+}
 // DANGER FROM ANOTHER PERSON (Ο5; John, 23/10/2026, a safety fix — real-model run 52, sessions 125 and 125-2: «Με χτυπάει ο άντρας
 // μου. Φοβάμαι να φύγω.» … «Ευχαριστώ, κλείνουμε εδώ.» got the root question: detectSafetySignal reads harm to oneself only). A check
 // of its own: detectSafetySignal, classifyCrisisTier, buildCrisisLine and HELPLINES are untouched. It reads EXPLICIT physical violence
@@ -8801,6 +8814,11 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
 
   // ── Main submit ──
   const handleSubmit = useCallback(async () => {
+    // FC4, option Γ (ADR «31 Οκτωβρίου»): «Go» while the lock below holds — a crisis or danger line from code now; nothing is sent.
+    if (input.trim() && !sessionEnded && (loading || submittingRef.current)) {
+      const _lockedLine = lockedSendSafetyLine(input, supportLineShown.current, dangerLineShown.current);
+      if (_lockedLine) setCrisisFallback(prev => !crisisFallbackAfterReply(_lockedLine, prev) ? prev : prev ? prev + "\n\n" + _lockedLine : _lockedLine);
+    }
     if (!input.trim() || loading || sessionEnded || submittingRef.current) return;
     submittingRef.current = true; // RT-15: close same-tick double-invocation window
     try {

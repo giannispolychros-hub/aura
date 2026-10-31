@@ -710,6 +710,7 @@ async function runMock() {
   await runMockPZ(); // 25/10: the pause switch (AURA_PAUSED)
   await runMockNT(); // 30/10: no money / road-map note in Stage A before the root
   await runMockRU(); // 30/10: the passive counter of a root that says nothing was clarified
+  await runMockFL(); // 31/10: FC4 option Γ — the line at once while the send lock holds
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -3142,10 +3143,12 @@ async function runMockFC() {
       guardFired && callsAtGuard === 3 && !(await lastAura(s.page)).includes('Τι σε κουράζει περισσότερο;'));
     await send(s.page, A); await s.page.waitForTimeout(800);
     // MEASURED, NOT A REQUIREMENT (26/10: the guard is not changed — John). The earlier send still holds the one-at-a-time lock
-    // (submittingRef) until its call ends, so «Go» does nothing: no request, no line, the message stays in the box. Pinned here so
+    // (submittingRef) until its call ends, so «Go» sends nothing: no request, the message stays in the box. Pinned here so
     // that a change to it is seen; see the ADR of 26/10.
-    ok('FC4 (measured, today\'s behaviour, not a requirement): in that window «Go» with a crisis message sends nothing and shows no line — the message stays in the box',
-      s.calls() === callsAtGuard && await fallback(s.page) === '' && await input(s.page) === A);
+    // UPDATED (31/10, FC4 option Γ, ADR «31 Οκτωβρίου» — John): it still sends nothing, but the line 1018 / 112 is now shown at once,
+    // from code (was: no line). The full acceptance checks are in section FL.
+    ok('FC4 (measured): in that window «Go» with a crisis message sends nothing — the message stays in the box — and the line 1018 / 112 shows at once (option Γ)',
+      s.calls() === callsAtGuard && await fallback(s.page) === L1018 && await input(s.page) === A);
     const t1 = Date.now();
     while (Date.now() - t1 < 10000 && !(await lastAura(s.page)).includes('Τι σε κουράζει περισσότερο;')) await s.page.waitForTimeout(250);
     await s.page.waitForTimeout(500);
@@ -3155,6 +3158,92 @@ async function runMockFC() {
     ok('FC4: the late reply of the earlier call arrives; «Go» again sends the crisis message, and the line 1018 / 112 is on screen',
       lateArrived && s.calls() === callsAtGuard + 1 && b4.includes('1018') && b4.includes('112'));
     await s.browser.close();
+  }
+}
+
+// ── FL: SAFETY — FC4, option Γ (John, 31/10/2026, a safety fix (α); ADR «31 Οκτωβρίου»). The earlier call runs long: a 503 after
+// 10 s, then the app's one retry. The 30-second guard frees the box while the one-at-a-time lock still holds. «Go» in that window with a
+// crisis message, or danger from another person: the app's line at once, from code, under the box; nothing is sent; the text stays in
+// the box. John's acceptance criteria, in both flows here (the suite runs at both sizes):
+//  FL1 crisis A, the earlier call then ends with its late reply · FL2 the same, the earlier call fails · FL3 danger from another person
+//  — each: the line at once, once (also after «Go» again and after the earlier call ends), the text still in the box, no request
+//  (no second request in parallel); then «Go» sends it, its reply carries the line and the separate line goes (once). FL4 a message
+//  with no signal: nothing changes (no line, no request, the text stays). Alone: --only FL.
+async function runMockFL() {
+  const F1 = 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.', WHY = 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.';
+  const SLOW = 'Η δουλειά με κουράζει πολύ.', LATE = 'Τι σε κουράζει περισσότερο;';
+  const A = 'Δεν θέλω να ζω άλλο.', DANGER = 'Με χτυπάει ο άντρας μου. Φοβάμαι να φύγω.', OTHER = 'Γιατί δεν απαντάς;';
+  const L1018 = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
+  const SELF = 'Σε άμεσο κίνδυνο, 112. Για βία στο σπίτι, 15900, γραμμή SOS για τη βία κατά των γυναικών.';
+  // replies: a string = 200 with that text; a number = that HTTP status; { delay, status | text } = the same, after delay ms
+  const sess = async (query, replies) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }) });
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      let r = replies[Math.min(n, replies.length - 1)]; n++;
+      if (r && typeof r === 'object') { await new Promise(res => setTimeout(res, r.delay || 0)); r = r.status || r.text; }
+      try {
+        if (typeof r === 'number') return await route.fulfill({ status: r, contentType: 'application/json', body: JSON.stringify({ type: 'error', error: { type: 'x', message: 'x' } }) });
+        return await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+      } catch (e) { /* the page aborted the request */ }
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await send(page, F1); if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, WHY);
+    return { browser, page, calls: () => n };
+  };
+  const fallback = async page => { const l = page.locator('.crisis-fallback'); return (await l.count()) ? (await l.first().innerText()).trim() : ''; };
+  const input = async page => { const t = page.locator('textarea.textarea'); return (await t.count()) ? await t.inputValue() : null; };
+  const lastAura = async page => ((await page.locator('.turn-aura').allInnerTexts()).slice(-1)[0] || '').replace(/^\s*aura\s*\n/i, '').trim();
+  const errText = async page => { const e = page.locator('.err'); return (await e.count()) ? (await e.first().innerText()).trim() : ''; };
+  const times = async (page, needle) => (await page.locator('body').innerText()).split(needle).length - 1;
+  const go = async page => { await page.getByRole('button', { name: 'Go' }).click(); await page.waitForTimeout(600); };
+  // the window: the slow message is sent; wait for the guard (≈30 s); the retry is still running
+  const open = async (q, retry) => {
+    const s = await sess(q, ['Τι σε κρατάει εκεί;', { delay: 10000, status: 503 }, retry, 'Είμαι εδώ μαζί σου. Θέλεις να μου πεις τι γίνεται τώρα;']);
+    await send(s.page, SLOW);
+    const t0 = Date.now();
+    while (Date.now() - t0 < 40000 && !(await errText(s.page)).includes('Διακοπή σύνδεσης')) await s.page.waitForTimeout(250);
+    return { ...s, guard: (await errText(s.page)).includes('Διακοπή σύνδεσης') && s.calls() === 3, at: s.calls(), t0 };
+  };
+  for (const q of ['?stageA=1&rec=1', '?stageA=0']) {
+    const flow = q === '?stageA=0' ? 'old flow' : 'Stage A';
+    for (const [tag, label, msg, line, retry] of [
+      ['FL1', 'crisis A, the earlier call ends with its late reply', A, L1018, { delay: 22500, text: LATE }],
+      ['FL2', 'crisis A, the earlier call fails', A, L1018, { delay: 22500, status: 503 }],
+      ['FL3', 'danger from another person, the earlier call ends with its late reply', DANGER, SELF, { delay: 22500, text: LATE }]]) {
+      const s = await open(q, retry);
+      await s.page.locator('textarea.textarea').fill(msg);
+      const tGo = Date.now(); await go(s.page);
+      const num = line === L1018 ? '1018' : '15900';
+      const now = { fb: await fallback(s.page), box: await input(s.page), calls: s.calls(), n: await times(s.page, num), ms: Date.now() - tGo };
+      ok(`${tag} (${flow}, ${label}): «Go» in the window — the line at once, from code, once; the text stays in the box; no request`,
+        s.guard && now.fb === line && now.box === msg && now.calls === s.at && now.n === 1);
+      await go(s.page);
+      ok(`${tag} (${flow}): «Go» again in the window — still once, the text still there, still no request`,
+        await fallback(s.page) === line && await times(s.page, num) === 1 && await input(s.page) === msg && s.calls() === s.at);
+      // the earlier call ends (≈33 s after it was sent): its late reply, or its failure
+      while (Date.now() - s.t0 < 39000) await s.page.waitForTimeout(250);
+      const ended = retry.text ? (await lastAura(s.page)).includes(LATE) : true;
+      ok(`${tag} (${flow}): the earlier call ${retry.text ? 'ends with its late reply' : 'fails'} — the line stays, once; the text is not lost; nothing is sent by itself`,
+        ended && await fallback(s.page) === line && await times(s.page, num) === 1 && await input(s.page) === msg && s.calls() === s.at);
+      if (tag !== 'FL3') {
+        await go(s.page); await s.page.waitForTimeout(1000);
+        ok(`${tag} (${flow}): «Go» once the lock is open sends the message (one request); its reply carries the line and the separate line goes — on screen once`,
+          s.calls() === s.at + 1 && (await lastAura(s.page)).includes('1018') && await fallback(s.page) === '' && await times(s.page, '1018') === 1);
+      }
+      if (tag === 'FL1' && q !== '?stageA=0') await s.page.screenshot({ path: path.join(OUT, 'FL-1-line-at-once-' + (VP ? VP.width : 390) + '.png'), fullPage: false });
+      await s.browser.close();
+    }
+    {
+      const s = await open(q, { delay: 22500, text: LATE });
+      await s.page.locator('textarea.textarea').fill(OTHER); await go(s.page);
+      ok(`FL4 (${flow}): a message with no signal in the window — nothing changes: no line, no request, the text stays in the box`,
+        s.guard && await fallback(s.page) === '' && s.calls() === s.at && await input(s.page) === OTHER);
+      await s.browser.close();
+    }
   }
 }
 
@@ -5581,7 +5670,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
