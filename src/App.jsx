@@ -1917,8 +1917,64 @@ function stripLineClaims(text, danger, safetyPath) {
     hit = true;
     return kept.join(" ").trim() ? kept.join(" ") : null;
   });
-  if (!hit) return text;
-  return lines.filter(l => l !== null).join("\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  if (!hit) return stripLineChannels(text, danger, safetyPath);
+  return stripLineChannels(lines.filter(l => l !== null).join("\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim(), danger, safetyPath);
+}
+// NO CHANNEL BUT A CALL FOR A HELP LINE (John, 31/10/2026, a safety fix (α), Constitution §0.1 — the help-line table holds a name and a
+// number, no channel but a call; real-model run 57, session 125, on the screen: «Ένα μόνο: μπορείς να στείλεις SMS στο 15900 …;», «Μπορείς
+// να τους στείλεις SMS τώρα, χωρίς να μιλήσεις;», «Ένα SMS, τώρα.» — Ε2 v2 keeps questions). The gate of stripLineClaims, which ends with
+// it. Per sentence of the MODEL's text — a question or a prompt too; the user's words in «» are not read — a sentence that proposes or
+// implies a channel other than a call FOR A NUMBER OF THE TABLE is not shown:
+//  · the channel: SMS, chat, e-mail / «μέιλ», «ηλεκτρονικό ταχυδρομείο», viber / whatsapp / messenger; «μήνυμα» with «στείλε / γράψε /
+//    δέχεται» (the forms said to the user, or of the line), with the number, with «εκεί / τους» or with a word of silence («αντί να
+//    μιλήσεις», «χωρίς φωνή», «σιωπηλά»); «γράψε / στείλε» with the number, with «εκεί / τους» or with a word of silence — not when the
+//    message goes to someone named («σε κάποιον», «στην αδερφή σου») or to AURA («μου γράφεις»)
+//  · for the table: a number of the table is in the sentence, or anywhere else in the same reply
+// Under danger, a sentence that stripDangerPromises replaces with John's sentence (secrecy; a safe outcome) is left to it, so his sentence
+// still comes. The number is never lost: a number that was only in such a sentence comes back as the table's name and number, once,
+// nothing else. His messages («σου έστειλε μήνυμα»), «γράψε μου», a reply with no number of the table: stay. Off the gate, or nothing
+// flagged → the very same string. See auratests/test_line_channels_3110.js.
+function stripLineChannels(text, danger, safetyPath) {
+  if ((!danger && safetyPath !== true) || typeof text !== "string" || !text) return text;
+  const numbers = HELPLINES.map(h => h.number);
+  const numbersIn = f => numbers.filter(n => new RegExp("(?:^|\\D)" + n + "(?!\\d)").test(f));
+  const named = n => { const h = HELPLINES.find(x => x.number === n); return n === "112" ? "Σε " + h.name + ", 112." : h.name.charAt(0).toUpperCase() + h.name.slice(1) + ", " + n + "."; };
+  const CHANNEL = /(?:^|[^a-z])(?:sms|chat|e-?mail|viber|whatsapp|messenger)(?![a-z])|(?:^|[^α-ω])(?:ι|η)?με[ιη]λ(?![α-ω])|(?:^|[^α-ω])(?:εσεμεσ|τσατ)(?![α-ω])|ηλεκτρονικ[α-ω]* ταχυδρομει/;
+  const MESSAGE = /(?:^|[^α-ω])μηνυμ/;
+  const WRITE = /(?:^|[^α-ω])(?:στειλ(?:ε|εισ|ετε|τε|ουμε)|στελν(?:ε|εισ|ετε|ουμε)|γραψ(?:ε|εισ|ετε|τε|ουμε)|γραφ(?:ε|εισ|ετε|ουμε))(?![α-ω])/;
+  const ACCEPT = /(?:^|[^α-ω])δεχ(?:εται|ονται|τει|τουν|εστε)(?![α-ω])/;
+  const THERE = /(?:^|[^α-ω])(?:εκει|τουσ|σε αυτουσ|στη γραμμη|στον αριθμο|στο νουμερο|στο τηλεφωνο)(?![α-ω])/;
+  const OTHER = /(?:^|[^α-ω])(?:(?:στον|στην|στη|στουσ|στισ|στο)\s+(?!\d|εκει|γραμμ|αριθμ|νουμερ|τηλεφων|ιδιο|μηνυμ)[α-ω]|σε\s+(?:καποι|εναν|ενα|μια|ανθρωπ|φιλ|δικ|οποιον))/;
+  const TO_ME = /(?:^|[^α-ω])(?:μου|μασ)\s+(?:[α-ω]+\s+)?(?:γραφ|γραψ|στελν|στειλ)/;
+  const SILENT = /αντι να μιλ|χωρισ (?:να μιλ|φωνη)|σιωπηλ|γραπτ/;
+  const inReply = numbersIn(text.replace(/«[^»]*»|"[^"]*"|“[^”]*”/g, " ")).length > 0;
+  const forTheLine = (own, ns, p) => {
+    if (!ns.length && !inReply) return false;
+    if (OTHER.test(own) || TO_ME.test(own)) return false;
+    if (danger && (DANGER_SECRET.test(own) || (DANGER_SAFE.test(own) && !/[;?]\s*["»”']*\s*$/.test(p)))) return false;
+    if (CHANNEL.test(own)) return true;
+    if (MESSAGE.test(own) && (WRITE.test(own) || ACCEPT.test(own) || ns.length > 0 || THERE.test(own) || SILENT.test(own))) return true;
+    return WRITE.test(own) && (ns.length > 0 || THERE.test(own) || SILENT.test(own));
+  };
+  // first the decisions, in reading order; then the text, with a number that would be lost given back once
+  const plan = [];
+  dropModelSentences(text, (f, p) => {
+    const own = f.replace(/«[^»]*»|"[^"]*"|“[^”]*”/g, " ");
+    const ns = numbersIn(own);
+    plan.push({ drop: forTheLine(own, ns, p), ns });
+    return false;
+  });
+  if (!plan.some(x => x.drop)) return text;
+  const kept = new Set(plan.filter(x => !x.drop).flatMap(x => x.ns));
+  const given = new Set();
+  let k = 0;
+  return dropModelSentences(text, () => {
+    const d = plan[k++];
+    if (!d || !d.drop) return false;
+    const lost = d.ns.filter(n => !kept.has(n) && !given.has(n));
+    lost.forEach(n => given.add(n));
+    return lost.length ? lost.map(named).join(" ") : true;
+  });
 }
 // Ο5 — Stage A's doors to the root stay shut: crisis A (riskKind 1) as before, or danger from another person seen in this session
 // (`dangerFromOther`, a latch of its own that nothing clears before «Νέα συνεδρία»). Not riskKind 1 itself: that would count as

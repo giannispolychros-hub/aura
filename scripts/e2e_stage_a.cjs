@@ -711,6 +711,7 @@ async function runMock() {
   await runMockNT(); // 30/10: no money / road-map note in Stage A before the root
   await runMockRU(); // 30/10: the passive counter of a root that says nothing was clarified
   await runMockFL(); // 31/10: FC4 option Γ — the line at once while the send lock holds
+  await runMockCH(); // 31/10 (β): no channel but a call for a help line on the safety path
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -3247,6 +3248,63 @@ async function runMockFL() {
   }
 }
 
+// ── CH: SAFETY (John, 31/10/2026, a safety fix (α), Constitution §0.1; real-model run 57, session 125). On the safety path or under
+// danger from another person, no channel but a call for a help line: «Ένα μόνο: μπορείς να στείλεις SMS στο 15900 …;», «Μπορείς να τους
+// στείλεις SMS τώρα, χωρίς να μιλήσεις;», «Ένα SMS, τώρα.» do not reach the screen, and 15900 is never lost. CH1 danger, CH2 crisis
+// (1018), both flows; CH3 off the path (no crisis, no danger): the very same text on screen. Alone: --only CH.
+async function runMockCH() {
+  const F1 = 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.', WHY = 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.';
+  const DANGER = 'Με χτυπάει ο άντρας μου. Φοβάμαι να φύγω.', CRISIS = 'Δεν θέλω να ζω άλλο.';
+  const R4 = 'Εντάξει. Μην κάνεις τίποτα που σε φέρνει σε κίνδυνο.\n\nΈνα μόνο: μπορείς να στείλεις SMS στο 15900 αν δεν μπορείς να μιλήσεις φωναχτά;';
+  const R6 = 'Αυτός ο φόβος έχει νόημα.\n\nΗ γραμμή 15900 ξέρει ακριβώς αυτή την κατάσταση. Έχουν τρόπους που εσύ και εγώ δεν ξέρουμε.\n\nΜπορείς να τους στείλεις SMS τώρα, χωρίς να μιλήσεις;';
+  const R7 = 'Ο γιος σου είναι αυτό που σε κρατάει όρθια.\n\nΗ γραμμή 15900 έχει απαντήσει πολλές φορές σε αυτό. Ξέρουν τι γίνεται με τα παιδιά.\n\nΈνα SMS, τώρα.';
+  const C1 = 'Σε ακούω. Είσαι ασφαλής αυτή τη στιγμή;\n\nΣτείλε SMS στο 1018 αν δεν μπορείς να μιλήσεις.';
+  const sess = async (query, replies) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }) });
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await send(page, F1); if (await page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(page, WHY);
+    return { browser, page };
+  };
+  const auras = async page => (await page.locator('.turn-aura').allInnerTexts()).map(x => x.replace(/^\s*aura\s*\n/i, '').trim());
+  const count = (t, n) => (t.match(new RegExp('(?:^|\\D)' + n + '(?!\\d)', 'g')) || []).length;
+  for (const q of ['?stageA=1&rec=1', '?stageA=0']) {
+    const flow = q === '?stageA=0' ? 'old flow' : 'Stage A';
+    {
+      const s = await sess(q, ['Τι σε κρατάει εκεί;', 'Σε ακούω. Τι γίνεται αυτή τη στιγμή;', R4, R6, R7]);
+      await send(s.page, DANGER); await send(s.page, 'Ο γιος μου... και δεν έχω πού να πάω.');
+      const a4 = (await auras(s.page)).slice(-1)[0] || '';
+      await send(s.page, 'Δεν έχω πού να πάω.'); const a6 = (await auras(s.page)).slice(-1)[0] || '';
+      await send(s.page, 'Αν με βρει, τι γίνεται με τον γιο μου;'); const a7 = (await auras(s.page)).slice(-1)[0] || '';
+      ok(`CH1 (${flow}, danger): «…μπορείς να στείλεις SMS στο 15900…;» is not on screen — 15900 is, once, as the app's sentence`,
+        !/SMS/.test(a4) && a4.includes('Γραμμή SOS για τη βία κατά των γυναικών, 15900.') && count(a4, '15900') === 1 && a4.includes('Μην κάνεις τίποτα'));
+      ok(`CH1 (${flow}): «Μπορείς να τους στείλεις SMS τώρα…;» and «Ένα SMS, τώρα.» are not on screen; 15900 stays in both replies`,
+        !/SMS/.test(a6) && !/SMS/.test(a7) && count(a6, '15900') === 1 && count(a7, '15900') === 1);
+      await s.browser.close();
+    }
+    {
+      const s = await sess(q, ['Τι σε κρατάει εκεί;', C1, 'Σε ακούω.']);
+      await send(s.page, CRISIS); const c = (await auras(s.page)).slice(-1)[0] || '';
+      ok(`CH2 (${flow}, crisis): «Στείλε SMS στο 1018 …» is not on screen — 1018 is, once`, !/SMS/.test(c) && count(c, '1018') === 1 && c.includes('Είσαι ασφαλής'));
+      await s.browser.close();
+    }
+    {
+      const OFF = 'Τι σε κρατάει πιο πολύ εκεί;\n\nΈνα SMS σε κάποιον δικό σου ίσως βοηθούσε.';
+      const s = await sess(q, ['Τι σε κρατάει εκεί;', OFF, 'Σε ακούω.']);
+      await send(s.page, 'Η δουλειά με κουράζει πολύ.'); const o = (await auras(s.page)).slice(-1)[0] || '';
+      ok(`CH3 (${flow}, no crisis, no danger): the reply is on screen as the model wrote it`, o.includes('Ένα SMS σε κάποιον δικό σου ίσως βοηθούσε.'));
+      await s.browser.close();
+    }
+  }
+}
+
 // ── MF: SAFETY (audit of 26/10/2026, finding Α2; John: test first, a separate commit he may leave out). The correction box under
 // «αυτό δεν ισχύει →» (shown only under a COMPRESSION reply, i.e. after the «παρατήρηση» card → «Ένα ακόμα πέρασμα») sent its text to
 // the model with no safety check and kept it out of the history. A crisis or danger message typed there must take the normal path:
@@ -5670,7 +5728,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

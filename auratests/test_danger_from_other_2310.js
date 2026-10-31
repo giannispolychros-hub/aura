@@ -376,7 +376,9 @@ assert('(Κ) UNCHANGED: the Stage A texts (no new text: the goodbye is the exist
   // with danger from another person keeps its notes byte for byte — and is left out the same way
   // UPDATED (31/10, FC4 option Γ): the section of the line shown at once while the send lock holds (runMockFL) holds one danger
   // message on purpose too, and is left out the same way
-  const withoutO5 = t => without('runMockFL')(without('runMockNT')(without('runMockMF')(without('runMockFC')(without('runMockPZ')(without('runMockO5')(t))))));
+  // UPDATED (31/10, ADR «31 Οκτωβρίου (β)»): the channel section (runMockCH — no channel but a call for a help line) holds one danger
+  // message on purpose too, and is left out the same way
+  const withoutO5 = t => without('runMockCH')(without('runMockFL')(without('runMockNT')(without('runMockMF')(without('runMockFC')(without('runMockPZ')(without('runMockO5')(t)))))));
   // UPDATED (24/10, Π3 step 2, the stress tool brought onto this branch): the stress tool's two danger-from-another sessions — 125
   // (risk: 'violence') and 126 (risk: 'child') — are meant to hold danger messages too, like runMockO5: left out, and checked below to
   // be CAUGHT; no other persona is left out

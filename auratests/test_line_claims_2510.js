@@ -40,7 +40,9 @@ const lit = n => { const a = raw.indexOf('const ' + n + ' = `'); return a < 0 ? 
 let F = {};
 try {
   F = new Function([constSrc('HELPLINES'), constSrc('DANGER_PROMISE_LINE'), constSrc('DANGER_SECRET'), constSrc('DANGER_SAFE'),
-    ...['lookBehind', 'dropModelSentences', 'stripDangerPromises', 'stripLineClaims', 'buildCrisisLine', 'buildDangerLine'].map(fnSrc),
+    // UPDATED (31/10, ADR «31 Οκτωβρίου (β)»): stripLineClaims now ends with stripLineChannels (no channel but a call for a help line,
+    // test_line_channels_3110.js), so it is loaded too — nothing else here changes
+    ...['lookBehind', 'dropModelSentences', 'stripDangerPromises', 'stripLineClaims', 'stripLineChannels', 'buildCrisisLine', 'buildDangerLine'].map(fnSrc),
     'return { stripDangerPromises, stripLineClaims, buildCrisisLine, buildDangerLine, HELPLINES, LINE: DANGER_PROMISE_LINE };'].join('\n'))();
 } catch (e) { console.log('LOAD ERROR — ' + e.message); }
 const call = (n, ...a) => { try { return F[n](...a); } catch (e) { return 'threw ' + e.message; } }; // a missing function fails, never crashes
@@ -70,7 +72,11 @@ try { ROWS = JSON.parse(fs.readFileSync(path.join(__dirname, 'line_claims_2510_r
 const CHANGED = ROWS.filter(r => r.after !== r.before), SAME = ROWS.filter(r => r.after === r.before);
 assert('(Β) 114 replies on the safety path: 33 change, 81 do not (49 under danger from another person, 65 crisis only)',
   ROWS.length === 114 && CHANGED.length === 33 && SAME.length === 81 && ROWS.filter(r => r.danger).length === 49);
-for (const r of CHANGED) assert('(Β) ' + r.id + ': BEFORE → AFTER, pinned', reply(r.before, r.danger, r.safetyPath) === r.after);
+// UPDATED (31/10, ADR «31 Οκτωβρίου (β)», John — a safety fix (α)): one reply changes further. Its last question proposes a message to the
+// line («Μπορείς να τους στείλεις μήνυμα τώρα, ενώ αυτός κοιμάται;», after 15900), which stripLineChannels now removes
+// (test_line_channels_3110.js); 15900 stays. Every other reply as pinned.
+const AFTER_3110 = { '52 125-2 R7': 'Αυτή η ερώτηση — για το παιδί — είναι το πιο βαρύ που κουβαλάς τώρα.\n\nΓραμμή SOS για τη βία κατά των γυναικών, 15900. Δεν μπορώ να σου υποσχεθώ τι θα γίνει. Για το πώς κρατιέται κάτι κρυφό, ρώτα απευθείας τη γραμμή. Οι αριθμοί που σου έδωσα είναι εκεί.' };
+for (const r of CHANGED) assert('(Β) ' + r.id + ': BEFORE → AFTER, pinned', reply(r.before, r.danger, r.safetyPath) === (AFTER_3110[r.id] || r.after));
 assert('(Β) the other 81 stay byte for byte', SAME.length === 81 && SAME.every(r => reply(r.before, r.danger, r.safetyPath) === r.before));
 assert('(Β) off the path (no danger, not the safety path) → the very same string, for every one of the 114',
   ROWS.length === 114 && ROWS.every(r => claims(r.before, null, false) === r.before && claims(r.before, undefined, undefined) === r.before));
