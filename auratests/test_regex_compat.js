@@ -69,7 +69,8 @@ const OLD = [
 ];
 // The three places where one letter before is all that mattered: written the usual way of this file, (?:^|[^…]), no helper.
 const PLAIN = [
-  { at: 'stageAAfterCrisisText, the numbers', old: /(?<!\d)(?:1018|10306|112)(?!\d)/, text: '/(?:^|\\D)(?:1018|10306|112)(?!\\d)/.test(m.content)', count: 1 },
+  // UPDATED (31/10/2026, ADR «31 Οκτωβρίου (δ)»): the same check, written the same way, also in stageADismissalGoodbye — count 2.
+  { at: 'stageAAfterCrisisText and stageADismissalGoodbye, the numbers', old: /(?<!\d)(?:1018|10306|112)(?!\d)/, text: '/(?:^|\\D)(?:1018|10306|112)(?!\\d)/.test(m.content)', count: 2 },
 ];
 const WORD = { old: w => new RegExp('(?<![a-zα-ω0-9])' + w + '(?![a-zα-ω0-9])', 'i'), text: 'new RegExp("(?:^|[^a-zα-ω0-9])" + escaped + "(?![a-zα-ω0-9])", "i")', count: 2,
   now: w => new RegExp('(?:^|[^a-zα-ω0-9])' + w + '(?![a-zα-ω0-9])', 'i') };

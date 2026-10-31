@@ -2195,6 +2195,18 @@ function rootAnswerIsUnsure(text) {
   const f = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^α-ωa-z\s]/g, " ").replace(/\s+/g, " ").trim();
   return /^(?:(?:ε|μμ|χμ|ειλικρινα|οχι|ναι|λοιπον|ακομα|ακομη) )*(?:δεν (?:το )?ξερω|δεν ειμαι σιγουρ(?:ος|η|ο)|δεν μπορω να (?:το )?πω|ιδεα δεν εχω|δεν εχω ιδεα|καμια ιδεα|δεν το εχω βρει)(?: (?:ακομα|ακομη|ακριβως|καλα|σιγουρα|πραγματικα))*(?: τι (?:με απασχολει|ειναι|να πω|με κραταει|θελω|νιωθω)(?: (?:ακομα|ακομη|ακριβως))*)?$/.test(f);
 }
+// ROOT MEASUREMENT (β) — John, 31/10/2026 (ADR «31 Οκτωβρίου (δ)»; a real session, described only): at the leaving door the user
+// answered the root question with a dismissal («τίποτα, άστο» kind) and it became «Τι βρήκες» with «Ναι, αυτό είναι» under it —
+// one tap and a dismissal counts as a confirmed root. An answer that is, as a WHOLE message, one of this CLOSED list (accents, case,
+// punctuation and spaces aside), with or without «ευχαριστώ» before or after, is never a root. Not «contains»: «τίποτα δεν έχει
+// νόημα», «δεν ξέρω τίποτα», «άστο, δεν αντέχω» are not on it. Read only after the crisis and danger checks (handleSubmit).
+const ROOT_DISMISSALS = ["τιποτα", "τιποτα ιδιαιτερο", "αστο", "ασ το", "αστο τιποτα", "τιποτα αστο"];
+function rootAnswerIsDismissal(text) {
+  if (typeof text !== "string") return false;
+  const f = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ς/g, "σ").replace(/[^α-ωa-z\s]/g, " ").replace(/\s+/g, " ").trim();
+  const core = f.replace(/^ευχαριστω /, "").replace(/ ευχαριστω$/, "");
+  return ROOT_DISMISSALS.includes(core);
+}
 // §2.1α step 5 — «λέξη που κρατάς» equal to «Τι βρήκες»: lower case, no accents, no edge punctuation/space.
 function sameAsRootText(a, b) {
   const n = x => (typeof x === "string" ? x : "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
@@ -2685,6 +2697,17 @@ function stageAAfterCrisisText(st) {
   const modelBye = typeof o.reply === "string" && replaceBareGoodbye(o.reply).includes(BARE_GOODBYE_TEXT);
   if (!leaving && !modelBye) return null;
   return o.fallbackLine || o.dangerLine || aura.some(m => /(?:^|\D)(?:1018|10306|112)(?!\d)/.test(m.content)) ? STAGE_A_TEXTS.afterCrisis : STAGE_A_TEXTS.afterCrisisNoNumbers;
+}
+// ROOT MEASUREMENT (β), John 31/10/2026 — the goodbye after a dismissal at the leaving door: John's text («Ευχαριστώ που το
+// μοιράστηκες. Να είσαι καλά.», the app's BARE_GOODBYE_TEXT). In a session with a crisis (its line shown, in a reply or in the box, the
+// danger line, or the crisis latch of tier A or B) the crisis goodbye of 19/10 instead, by the same rule as stageAAfterCrisisText:
+// the whole phrase when a number was shown, its first sentence when none was.
+function stageADismissalGoodbye(st) {
+  const o = st || {};
+  const aura = (Array.isArray(o.messages) ? o.messages : []).filter(m => m && m.role === "assistant" && typeof m.content === "string");
+  const crisis = !!o.fallbackLine || o.dangerLine === true || o.riskKind === 1 || o.riskKind === 2 || aura.some(m => m.msgMode === "SUPPORTIVE");
+  if (!crisis) return BARE_GOODBYE_TEXT;
+  return o.fallbackLine || o.dangerLine === true || aura.some(m => /(?:^|\D)(?:1018|10306|112)(?!\d)/.test(m.content)) ? STAGE_A_TEXTS.afterCrisis : STAGE_A_TEXTS.afterCrisisNoNumbers;
 }
 // ADR «11 Οκτωβρίου (β)» — the MODEL's own closing before the root. Found by the stress test with the real model (run 10,
 // sessions 2.1 and 4.1): after «Νιώθεις ότι κάτι άλλαξε…;» → «Ναι, άλλαξε…», the model wrote the old closing summary
@@ -6934,6 +6957,21 @@ export default function AURAv2() {
     });
     if (stageARef.current.phase === "card") rootCardOpenedOnce.current = true;
   }, [stageADispatch]);
+  // ROOT MEASUREMENT (β) — John, 31/10/2026 (ADR «31 Οκτωβρίου (δ)»): an answer to the root question that is a dismissal of the closed
+  // list (rootAnswerIsDismissal) is never a card. Called from handleSubmit only after the crisis and danger checks of the message.
+  // At the leaving door (the user is leaving): the question, the user's words and the app's goodbye in the history — John's text, or
+  // the crisis goodbye of 19/10 in a session with a crisis (stageADismissalGoodbye) — and nothing else: no model call. Returns true.
+  // At any other root question: «Δεν το βρήκα ακόμα», as «Δεν ξέρω» today; returns false and the message goes on to the model.
+  const stageADismiss = useCallback((userText, phase) => {
+    if (phase === "ask" && stageARef.current.leaving) {
+      const _bye = stageADismissalGoodbye({ messages, fallbackLine: crisisFallback, dangerLine: dangerLineShown.current.length > 0, riskKind: riskSignalKind.current });
+      setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: STAGE_A_TEXTS.askLeaving, msgMode: "STAGE_A" }, { id: nextMsgId(), role: "user", content: userText }, { id: nextMsgId(), role: "assistant", content: _bye, msgMode: "STAGE_A" }]);
+      stageADispatch({ type: "back" });
+      return true;
+    }
+    stageADispatch({ type: "back" });
+    return false;
+  }, [messages, crisisFallback, stageADispatch]);
   // RT-hardening: replaces text-based detection ("does the model's reply say 'το κρατάω'?")
   // with a plain count of how many replies have happened during the brand-new-user window —
   // works regardless of the model's exact phrasing.
@@ -8922,6 +8960,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // «Δεν το βρήκα ακόμα» (the same event), and the message goes on to the model below.
         stageARootArmed.current = false;
         stageADispatch({ type: "back" });
+      } else if (rootAnswerIsDismissal(userText) && !detectSafetySignal(userText) && !detectsDangerFromOther(userText)) {
+        stageARootArmed.current = false; // ROOT MEASUREMENT (β), 31/10: a dismissal is never a card — stageADismiss
+        if (stageADismiss(userText, _saPhase)) return;
       } else if ((_saPhase === "ask" || _saPhase === "correct") && !rootTextHasSubstance(userText)) {
         addUiBubble(userText, messages.length); // ADR «8 Οκτωβρίου (δ)», 5: shown, not sent
         stageADispatch({ type: "tooShort" });

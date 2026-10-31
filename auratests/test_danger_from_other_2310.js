@@ -327,8 +327,9 @@ assert('(Ι) Stage A only: the notes, the stop moment and the closing decision r
   (GEN.match(/stageAActive\.current && dangerFromOther\.current/g) || []).length === 6);
 assert('(Ι) every Stage A door gets the latch: the button, the leaving door ×2, the model\'s close, the method line, door 2/3 ×3, armed',
   (CODE.match(/dangerFromOther: dangerFromOther\.current/g) || []).length === 5 && (CODE.match(/!stageASafetyHold\(riskSignalKind\.current, dangerFromOther\.current\)/g) || []).length === 4);
-assert('(Ι) the pre-model goodbye after the line, and the post-reply one, both know the line was shown',
-  (CODE.match(/dangerLine: dangerLineShown\.current\.length > 0/g) || []).length === 2);
+// UPDATED (31/10/2026, ADR «31 Οκτωβρίου (δ)»): a third reader — the goodbye after a dismissal at the leaving door (stageADismiss).
+assert('(Ι) the pre-model goodbye after the line, the post-reply one, and the goodbye after a dismissal, all know the line was shown',
+  (CODE.match(/dangerLine: dangerLineShown\.current\.length > 0/g) || []).length === 3);
 assert('(Ι) the step stops on danger too, and the word is never taken from such a message (nor in Stage A after it)',
   HS.includes('if (detectSafetySignal(userText) || detectsDangerFromOther(userText)) {') &&
   HS.includes('if (awaitingRememberedWord && !detectSafetySignal(userText) && !detectsDangerFromOther(userText) && !(stageAActive.current && dangerFromOther.current)) {'));

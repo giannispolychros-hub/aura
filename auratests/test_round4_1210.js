@@ -104,8 +104,10 @@ assert('WIRING: the gate no longer reads the old closing\'s decision (the caller
     ['Δεν ξέρω αν θέλω να μείνω στη δουλειά', 'Τα λεφτά', 'Περίπου δηλαδή', 'Φοβάμαι την απόρριψη', 'Ότι δεν ξέρω τι θέλω από τη ζωή μου'].every(t => u(t) === false));
   assert('SHORT ATTEMPT: «Τα λεφτά», «Περίπου δηλαδή» still get «Γράψ\' το λίγο πιο ολοκληρωμένα» (too short, not unsure)',
     ['Τα λεφτά', 'Περίπου δηλαδή'].every(t => T('rootTextHasSubstance', t) === false && u(t) === false));
+  // UPDATED (31/10/2026, ADR «31 Οκτωβρίου (δ)», John's root-measurement fix (β)): between «Δεν ξέρω» and «too short» now sits the
+  // dismissal branch («τίποτα», «άστο»… — test_root_dismissal_3110.js); «Δεν ξέρω» is still right after the crisis check, before «too short».
   assert('WIRING: right after the crisis check, BEFORE the «too short» check — «Δεν το βρήκα ακόμα» (back), then the message goes to the model',
-    /if \(!stageACaptureAllowed\(userText\)\) \{\s*stageARootArmed\.current = false;\s*stageADispatch\(\{ type: "cancel" \}\);\s*\} else if \(rootAnswerIsUnsure\(userText\)\) \{(?:\s*\/\/[^\n]*)+\s*stageARootArmed\.current = false;\s*stageADispatch\(\{ type: "back" \}\);\s*\} else if \(\(_saPhase === "ask"/.test(HS));
+    /if \(!stageACaptureAllowed\(userText\)\) \{\s*stageARootArmed\.current = false;\s*stageADispatch\(\{ type: "cancel" \}\);\s*\} else if \(rootAnswerIsUnsure\(userText\)\) \{(?:\s*\/\/[^\n]*)+\s*stageARootArmed\.current = false;\s*stageADispatch\(\{ type: "back" \}\);\s*\} else if \(rootAnswerIsDismissal\(userText\) && !detectSafetySignal\(userText\) && !detectsDangerFromOther\(userText\)\) \{\s*stageARootArmed\.current = false;[^\n]*\n\s*if \(stageADismiss\(userText, _saPhase\)\) return;\s*\} else if \(\(_saPhase === "ask"/.test(HS));
   const ask = { phase: 'ask', door: 1, stats: {} }, none = { phase: null, door: 0, stats: {} };
   const ev = T('stageAFlowTelemetry', ask, none, { type: 'back' }) || [];
   assert('COUNTED like «Δεν το βρήκα ακόμα»: root_answer «not yet» from the question',

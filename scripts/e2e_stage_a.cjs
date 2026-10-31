@@ -712,6 +712,7 @@ async function runMock() {
   await runMockRU(); // 30/10: the passive counter of a root that says nothing was clarified
   await runMockFL(); // 31/10: FC4 option Γ — the line at once while the send lock holds
   await runMockCH(); // 31/10 (β): no channel but a call for a help line on the safety path
+  await runMockDS(); // 31/10 (δ): a dismissal answer to the root question is never a card
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -3252,6 +3253,112 @@ async function runMockFL() {
 // danger from another person, no channel but a call for a help line: «Ένα μόνο: μπορείς να στείλεις SMS στο 15900 …;», «Μπορείς να τους
 // στείλεις SMS τώρα, χωρίς να μιλήσεις;», «Ένα SMS, τώρα.» do not reach the screen, and 15900 is never lost. CH1 danger, CH2 crisis
 // (1018), both flows; CH3 off the path (no crisis, no danger): the very same text on screen. Alone: --only CH.
+// 31/10/2026 (John, a root-measurement fix (β), ADR «31 Οκτωβρίου (δ)»): a DISMISSAL answer to the root question is never a card.
+// DS1 is the SHAPE of a real session of 31/10 (description only — none of its words are here): Stage A, a bare «Γεια» first, a few
+// replies, then the user leaves with a dismissal and thanks; the leaving door asks its question once; the user answers with a dismissal
+// again. Before: that answer became «Τι βρήκες» with «Ναι, αυτό είναι» under it. Now: the app's goodbye, nothing else, no model call.
+async function runMockDS() {
+  const T = APP.texts;
+  const BYE = 'Ευχαριστώ που το μοιράστηκες. Να είσαι καλά.';
+  const PHRASE = 'Είμαι εδώ όταν χρειαστεί να συνεχίσουμε. Κι αν βαρύνει, οι αριθμοί που σου έδωσα είναι εκεί.';
+  const L10306 = 'Υπάρχει η Γραμμή Ψυχοκοινωνικής Υποστήριξης, 10306 — δωρεάν και ανώνυμη.';
+  const L1018 = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
+  const sess = async (replies) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 700 }) });
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: r }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/?stageA=1&rec=1');
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    return { browser, page, calls: () => n };
+  };
+  const auraTexts = async page => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+  const lastAura = async page => (await auraTexts(page)).slice(-1)[0] || '';
+  const body = page => page.locator('body').innerText();
+  const btnCount = (page, name) => page.getByRole('button', { name, exact: true }).count();
+  const input = page => page.locator('textarea').first().isVisible().catch(() => false);
+  const shot = async (page, name) => page.screenshot({ path: path.join(OUT, name + '-' + (VP ? VP.width : 390) + '.png'), fullPage: false });
+  const noCard = async page => { const b = await body(page); return !b.includes('Τι βρήκες') && await btnCount(page, T.yes) === 0 && await btnCount(page, 'Διόρθωσε') === 0; };
+  // a send that cannot happen (the box hidden, e.g. under a card) is a failed check below, never a crash of the section
+  const say = async (page, t) => { try { await page.locator('textarea.textarea').waitFor({ state: 'visible', timeout: 3000 }); await send(page, t); await page.waitForTimeout(800); return true; } catch (e) { return false; } };
+  {
+    const s = await sess(['Γεια σου. Τι σε απασχολεί σήμερα;', 'Τι σε τραβάει προς τα εκεί;', 'Τι θα άλλαζε για σένα αν γινόταν;', 'Τι σε κρατάει πίσω;']);
+    await say(s.page, 'Γεια');
+    ok('DS1 (the shape of the session of 31/10): a bare «Γεια» first goes to the model (as decided 22/10)', s.calls() === 1 && await lastAura(s.page) !== '');
+    await say(s.page, 'Σκέφτομαι αν να αλλάξω πόλη για δουλειά.');
+    await say(s.page, 'Ίσως περισσότερα λεφτά, δεν ξέρω.');
+    await say(s.page, 'Θα ήθελα κάτι πιο εύκολο.');
+    const n0 = s.calls();
+    await say(s.page, 'Τίποτα, άσ\' το. Ευχαριστώ.');
+    ok('DS1: leaving with a dismissal and thanks → the leaving door\'s question, from the app (no model call) — unchanged',
+      s.calls() === n0 && (await body(s.page)).includes(T.askLeaving) && await input(s.page));
+    await say(s.page, 'Άστο τίποτα.');
+    const b = await body(s.page);
+    ok('DS1: the dismissal as the answer → NO card: no «Τι βρήκες», no «Ναι, αυτό είναι», no «Διόρθωσε»', await noCard(s.page));
+    ok('DS1: … the app\'s goodbye, word for word, as the last AURA bubble', await lastAura(s.page) === BYE);
+    ok('DS1: … from the app — no model call', s.calls() === n0);
+    ok('DS1: … the question and the user\'s words stay in the history, above the goodbye',
+      b.includes(T.askLeaving) && (await s.page.locator('.turn-user').allInnerTexts()).slice(-1)[0].trim() === 'Άστο τίποτα.' && b.indexOf(T.askLeaving) < b.lastIndexOf(BYE));
+    ok('DS1: … no other question, no step, no «Πότε;», no crisis phrase',
+      !/[;?]\s*$/.test(await lastAura(s.page)) && !b.includes(T.stepQ) && !b.includes(T.whenQ) && !b.includes(PHRASE));
+    // Not changed (not asked): the root button is back under the conversation, as after any «Δεν το βρήκα ακόμα» today.
+    ok('DS1: … the root button stays where it always is in Stage A (unchanged; as after «Δεν ξέρω» today)', await btnCount(s.page, T.button) === 1);
+    await shot(s.page, 'DS-1-dismissal-goodbye');
+    const wrote = await say(s.page, 'Τελικά θέλω να πω κάτι ακόμα.');
+    ok('DS1: the door stays open — writing again goes to the model, as after any goodbye today', wrote && s.calls() === n0 + 1 && await noCard(s.page));
+    await s.browser.close();
+  }
+  {
+    const s = await sess(['Σε ακούω. Τι γίνεται τώρα;', 'Τι σε βαραίνει πιο πολύ;']);
+    await say(s.page, 'Δεν αντέχω άλλο.');
+    ok('DS2 (a crisis, tier B, earlier in the session): the reply carries the 10306 line', (await lastAura(s.page)).includes(L10306));
+    await say(s.page, 'Η δουλειά, όλα μαζί.');
+    const n0 = s.calls();
+    await say(s.page, 'Τίποτα, άσ\' το. Ευχαριστώ.');
+    const opened = (await body(s.page)).includes(T.askLeaving);
+    if (opened) await say(s.page, 'Τίποτα ιδιαίτερο.');
+    ok('DS2: after a crisis the dismissal never gets the general goodbye: the crisis goodbye of 19/10 (or, as today, before any door)',
+      await lastAura(s.page) === PHRASE && !(await body(s.page)).includes(BYE) && await noCard(s.page) && s.calls() === n0);
+    results.push('NOTE — DS2: after the tier-B crisis the leaving door ' + (opened ? 'opened (the dismissal answered it)' : 'did not open (the exit itself was answered)'));
+    await shot(s.page, 'DS-2-after-crisis');
+    await s.browser.close();
+  }
+  {
+    const s = await sess(['Τι σε απασχολεί περισσότερο;', 'Εντάξει. Τι άλλο υπάρχει εκεί;']);
+    await say(s.page, 'Δεν ξέρω αν να αλλάξω πόλη για δουλειά.');
+    await s.page.getByRole('button', { name: T.button, exact: true }).first().click({ timeout: 4000 }); await s.page.waitForTimeout(500);
+    ok('DS3 (the root button, not leaving): its question is open', (await body(s.page)).includes(T.ask));
+    const n0 = s.calls();
+    await say(s.page, 'Τίποτα');
+    ok('DS3: a dismissal → no card, no goodbye: «Δεν το βρήκα ακόμα», the message goes to the model (as «Δεν ξέρω» today)',
+      await noCard(s.page) && s.calls() === n0 + 1 && await lastAura(s.page) === 'Εντάξει. Τι άλλο υπάρχει εκεί;' && !(await body(s.page)).includes(BYE));
+    await s.browser.close();
+  }
+  {
+    const s = await sess(['Τι σε τραβάει προς τα εκεί;', 'Τι σε κρατάει πίσω;']);
+    await say(s.page, 'Σκέφτομαι αν να αλλάξω πόλη για δουλειά.');
+    await say(s.page, 'Ευχαριστώ.');
+    ok('DS4 (control): leaving → the leaving door\'s question', (await body(s.page)).includes(T.askLeaving));
+    await say(s.page, 'Ότι φοβάμαι να αφήσω τους δικούς μου.');
+    ok('DS4: a real answer opens the card with the user\'s words, as today', (await body(s.page)).includes('Ότι φοβάμαι να αφήσω τους δικούς μου.') && await btnCount(s.page, T.yes) === 1);
+    await s.browser.close();
+  }
+  {
+    const s = await sess(['Τι σε τραβάει προς τα εκεί;', 'Σε ακούω. Θέλω να σε ρωτήσω απευθείας — σκέφτεσαι να κάνεις κακό στον εαυτό σου;']);
+    await say(s.page, 'Σκέφτομαι αν να αλλάξω πόλη για δουλειά.');
+    await say(s.page, 'Ευχαριστώ.');
+    const n0 = s.calls();
+    await say(s.page, 'Θα ήταν καλύτερα να μην ζω.');
+    ok('DS5 (safety first): a crisis message as the answer to the leaving question → the crisis path: the model, the 1018/112 line, no card, no goodbye',
+      s.calls() === n0 + 1 && (await lastAura(s.page)).includes(L1018) && await noCard(s.page) && !(await body(s.page)).includes(BYE));
+    await s.browser.close();
+  }
+}
+
 async function runMockCH() {
   const F1 = 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.', WHY = 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.';
   const DANGER = 'Με χτυπάει ο άντρας μου. Φοβάμαι να φύγω.', CRISIS = 'Δεν θέλω να ζω άλλο.';
@@ -5728,7 +5835,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
