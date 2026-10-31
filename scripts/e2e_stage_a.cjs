@@ -4943,6 +4943,9 @@ async function runScenarios(makeModel, budget) {
 //   Προαιρετικά: --budget 25 (ανώτατο $25) · --sessions 14,15,1 (μόνο αυτοί οι χρήστες) · --out <φάκελος μέσα στο %TEMP%>
 // Οι καθαρές συναρτήσεις (χρήστες, έλεγχοι, εκτίμηση, αναφορά) είναι στο scripts/e2e_stress_lib.cjs.
 const SL = require('./e2e_stress_lib.cjs');
+// 31/10 (John, ADR «31 Οκτωβρίου (ε)» / «(η)»): the efficiency benchmark — benchmark/scenarios.json, numbers 9001–9199 (scripts/e2e_bench_lib.cjs)
+const BL = require('./e2e_bench_lib.cjs');
+let BENCH_SIM = null, BENCH_DATA = null; const BENCH_LINES = [];
 // ADR «22 Οκτωβρίου (γ)»: the app's own crisis tier of a typed message (classifyCrisisTier, on the app's own detector) — for the report of 73–75
 const CRISIS_TIER = (() => {
   try {
@@ -5036,6 +5039,105 @@ function stressUserFake(persona) {
     return { data: { message: lines[(replies - 1) % lines.length], found_root: replies >= 3 }, usage };
   })(o));
 }
+// ── 31/10 (John, ADR «31 Οκτωβρίου (ε)» / «(η)»): THE BENCHMARK'S SIMULATED USER — a gate that only says which locked fact AURA's last
+// message asked for directly (an id from a list, or none), and a speaker that sees only the facts already unlocked. The hidden state is
+// kept here, in code, per session (sess.benchState). The speaker's text passes the app's own crisis and danger checks before it is sent:
+// one more try, then the session ends as not evaluable. Its cost and time are counted apart from AURA's (budget «sim»).
+function benchSim(real, budget) {
+  const Anthropic = real ? loadAnthropic() : null;
+  const client = real ? new Anthropic({ apiKey: KEY, maxRetries: 0 }) : null;
+  const callSim = async (st, role, system, prompt, maxTokens, temperature) => {
+    if (!real) { const f = fakeSim(role, system, prompt); st.calls.push({ role, model: 'fake', cost: 0, ms: 0 }); return f; }
+    const hold = BL.holdFor(BL.PRICES_SIM, system, prompt, maxTokens);
+    while (!budget.reserve(hold)) { if (!budget.inflight()) return { stop: 'όριο δαπάνης' }; await new Promise(r => setTimeout(r, 400)); }
+    const t0 = Date.now(); let r;
+    try { r = await client.messages.create({ model: BL.SIM_MODEL, max_tokens: maxTokens, temperature, system, messages: [{ role: 'user', content: prompt }] }); }
+    catch (e) {
+      const cost = budget.add({ output_tokens: Math.ceil(hold * 1e6 / BL.PRICES_SIM.output) }, 'sim'); budget.release(hold);
+      st.calls.push({ role, model: BL.SIM_MODEL, cost, ms: Date.now() - t0, charged: true });
+      return { error: e instanceof Anthropic.APIError ? SL.apiErrorLabel(e.status, e.message) : 'σφάλμα σύνδεσης', cost };
+    }
+    const cost = budget.add(r.usage, 'sim'); budget.release(hold);
+    st.calls.push({ role, model: BL.SIM_MODEL, inTok: (r.usage || {}).input_tokens || 0, outTok: (r.usage || {}).output_tokens || 0, cost, ms: Date.now() - t0, charged: false });
+    if (r.stop_reason === 'refusal') return { error: 'άρνηση', cost };
+    return { text: (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim(), cost };
+  };
+  return async (p, sess, need, extra) => {
+    const st = sess.benchState || (sess.benchState = BL.newBenchState(p));
+    let cost = 0;
+    const locked = p.bench.hidden.filter(h => !st.unlocked.includes(h.id)).map(h => h.id), last = BL.lastAuraText(sess.turns);
+    if (need === 'reply' && locked.length && last) {
+      const g = await callSim(st, 'gate', BL.GATE_SYSTEM, BL.gateTurn(p, st, last), 10, BL.GATE_TEMPERATURE);
+      if (g.stop) return { stop: g.stop };
+      cost += g.cost || 0;
+      const id = g.error ? null : BL.parseGate(g.text, locked);
+      st.gate.push({ typed: sess.typed.length, id, error: g.error || null });
+      if (id) st.unlocked.push(id);
+    }
+    const speak = async () => callSim(st, 'speaker', BL.speakerSystem(p, st), BL.speakerTurn(sess.turns, need, extra), 200, BL.SPEAKER_TEMPERATURE);
+    let sp = await speak();
+    if (sp.stop) return { stop: sp.stop };
+    cost += sp.cost || 0;
+    if (sp.error) return { error: sp.error, cost };
+    if (need === 'card') { const t = sp.text.trim(), v = /^correct/i.test(t) ? 'correct' : /^not\s*yet/i.test(t) ? 'notyet' : 'yes';
+      return { data: { verdict: v, sentence: v === 'correct' ? t.split('\n').slice(1).join(' ').trim() : '' }, cost }; }
+    if (need === 'clarity') { const n = Number((sp.text.match(/\d+/) || [])[0]); return { data: { value: Math.min(10, Math.max(1, n || 5)) }, cost }; }
+    const opt = { maxWords: p.bench.maxWords, crisis: APP.fns.detectSafetySignal, danger: DANGER_FROM_OTHER };
+    let chk = BL.simCheck(sp.text, opt);
+    if (chk.unsafe) {
+      st.unsafeRetries += 1;
+      sp = await speak(); if (sp.stop) return { stop: sp.stop }; cost += sp.cost || 0;
+      chk = sp.error ? { unsafe: true } : BL.simCheck(sp.text, opt);
+      if (chk.unsafe) { sess.benchUnsafe = true; return { error: 'ο προσομοιωτής έγραψε φράση κρίσης ή κινδύνου δύο φορές — μη αξιολογήσιμη', cost }; }
+    }
+    for (const d of chk.deviations) st.deviations.push({ typed: sess.typed.length + 1, kind: d });
+    return { data: { message: chk.text, found_root: need === 'reply' ? BL.benchFoundRoot(p, st, sess.typed.length + 1) : true }, cost };
+  };
+}
+// the free version: deterministic, cost 0 — the gate opens the first locked fact whose topic's first word is in AURA's message
+function fakeSim(role, system, prompt) {
+  const fold = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  if (role === 'gate') {
+    const app = fold((prompt.split('<app>')[1] || '').split('</app>')[0]);
+    for (const m of prompt.matchAll(/^- (h\d+): ([^—\n]+) —/gm)) { const w = fold(m[2]).split(/\s+/).filter(x => x.length > 3)[0]; if (w && app.includes(w.slice(0, 5))) return { text: m[1], cost: 0 }; }
+    return { text: 'none', cost: 0 };
+  }
+  if (/answer: yes/.test(prompt)) return { text: 'yes', cost: 0 };
+  if (/from 1 to 10/.test(prompt)) return { text: '6', cost: 0 };
+  if (/«Πότε;»/.test(prompt)) return { text: 'Αύριο το πρωί.', cost: 0 };
+  const facts = (system.split('(only these facts exist for you):\n')[1] || '').split('\n\nRULES')[0].split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2));
+  return { text: facts.length ? facts[facts.length - 1] : 'Δεν ξέρω, κάτι τέτοιο.', cost: 0 };
+}
+// ── 31/10: the blind evaluator's sheets — anonymous, one per scenario session (not S1–S9), the key apart; A1 (claude-opus-5-5) reads them
+// after the sessions, with its own hold. Nothing here is shown to the evaluator but the sheet and the written instructions.
+async function benchEvaluate(sessions, real, budget) {
+  fs.mkdirSync(path.join(OUT, 'bench-eval', 'sheets'), { recursive: true }); // every file below goes through writeOut (redacted, checked for the key)
+  const byId = {}; for (const sc of BENCH_DATA.scenarios) byId[sc.id] = sc;
+  const main = sessions.filter(s => s.persona.bench && byId[s.persona.bench]);
+  const instr = BL.evalInstructions(), key = {}, rows = [];
+  const Anthropic = real ? loadAnthropic() : null, client = real ? new Anthropic({ apiKey: KEY, maxRetries: 0 }) : null;
+  for (const s of main) {
+    const code = BL.codeOf(s.label); key[code] = { label: s.label, id: s.persona.bench };
+    const sheet = BL.evalSheet(s.turns, byId[s.persona.bench], BENCH_DATA.common, code);
+    writeOut('bench-eval/sheets/' + code + '.txt', sheet + '\n');
+    if (has('--no-eval')) continue;
+    let text = '', cost = 0; const t0 = Date.now();
+    if (real) {
+      const hold = BL.holdFor(BL.PRICES_EVAL, instr, sheet, 4000);
+      if (!budget.reserve(hold)) { rows.push({ code, error: 'όριο δαπάνης — δεν αξιολογήθηκε' }); continue; }
+      try { const r = await client.messages.create({ model: BL.EVAL_MODEL, max_tokens: 4000, output_config: { effort: 'low' }, system: instr, messages: [{ role: 'user', content: sheet }] });
+        cost = budget.add(r.usage, 'eval'); text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim(); }
+      catch (e) { cost = budget.add({ output_tokens: Math.ceil(hold * 1e6 / BL.PRICES_EVAL.output) }, 'eval'); text = ''; }
+      budget.release(hold);
+    } else text = 'ΑΠΟΤΕΛΕΣΜΑ: μη_αξιολογήσιμο — ψεύτικος αξιολογητής — 0\nΡΙΖΑ: δ — 0 — «»\nΠΑΡΑΒΑΣΕΙΣ:\nΧΡΗΣΤΗΣ: κανένα';
+    rows.push(Object.assign({ code, cost, ms: Date.now() - t0 }, BL.parseEval(text), { text }));
+  }
+  writeOut('bench-eval/KEY_not_for_the_evaluator.json', JSON.stringify(key, null, 1) + '\n');
+  writeOut('bench-eval/a1.jsonl', rows.map(r => JSON.stringify(r)).join('\n') + (rows.length ? '\n' : ''));
+  const sample = BL.kappaSample(main.map(s => s.label)).map(l => BL.codeOf(l));
+  writeOut('bench-eval/kappa_sample_for_John.json', JSON.stringify(sample) + '\n');
+  return { sheets: main.length, evaluated: rows.filter(r => r.ok).length, notEvaluated: rows.filter(r => !r.ok).length, sample };
+}
 // Ψεύτικη AURA για τον έλεγχο μηχανισμού: πάντα ερώτηση, σωστό κλείσιμο, γραμμή υποστήριξης σε κρίση.
 // 23/10 (John, Theme C): for a mechanism session the fake model never repeats itself — a different opening and words each reply — so
 // the app's «your last replies were alike» note does not fire from the fake, and the notes of the proof come from the user's messages.
@@ -5098,6 +5200,7 @@ async function runStressSession(item, aura, user, budget) {
     turns: [], typed: [], notes: [], cost: 0, calls: [], modelTexts: [], crisisTurns: [], rootConfirmed: false, root: null, cardAt: null, yesAt: null, clarity: null, violations: [],
     checks: { labels: [], closing: [], verbatim: [], safety: [], pressure: [], stacked: [], advice: [], telemetry: [], voice: [] },
     applies: { safety: !!p.risk && p.risk !== 'leak', verbatim: !p.closed && !p.short, telemetry: !p.short } };
+  if (p.bench) sess.persona.bench = p.bench.id; // 31/10: the benchmark scenario
   if (p.final) { sess.errorsSeen = []; sess.brake = []; sess.stuck = []; sess.riskHold = []; sess.riskSince = 0; sess.dangerAt = 0; sess.persona.final = true; sess.persona.composite = !!p.composite; sess.persona.gender = p.gender || null; sess.persona.steps = p.steps || null; sess.persona.third = !!p.third; sess.persona.caps = !!p.caps; }
   // risk: a signal known BEFORE the offer (14, 15) — the offer must not appear. 16 meets its crisis after the offer.
   const acts = { card: 0, yes: 0, correct: 0, back: 0, offerShown: false, want: false, notNow: false, help: null, clarity: null, completed: false, risk: p.offerRisk ? p.risk : null,
@@ -5123,6 +5226,7 @@ async function runStressSession(item, aura, user, budget) {
         if (!budget.inflight()) { stopped = stopped || 'όριο δαπάνης'; return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"budget"}' }); }
         await new Promise(res => setTimeout(res, 400));
       }
+      var _t0 = Date.now(); // 31/10 (benchmark, ADR «31 Οκτωβρίου (η)»): the time of every call
       try { r = await aura(body, cls, { risk: 'stress' }); }
       catch (e) { r = { status: 502, data: { error: 'handler error' } }; }
       const u0 = (r.data && r.data.usage) || null;
@@ -5137,9 +5241,16 @@ async function runStressSession(item, aura, user, budget) {
     const sysText = (Array.isArray(body.system) ? body.system : [{ text: body.system }]).map(x => (x && typeof x.text === 'string') ? x.text : '').join('');
     sess.calls.push({ kind: cls.kind, status: r.status, cacheWrite: u.cache_creation_input_tokens || 0, cacheRead: u.cache_read_input_tokens || 0,
       typed: sess.typed.length, stage: SL.masterStage(sysText), notes: SL.noteLabels(body.system), cost: callCost, hold, charged }); // 23/10 (Theme C): the notes sent, by label; 25/10: the call's cost and hold
+    // 31/10 (benchmark, ADR «31 Οκτωβρίου (η)»): + the call's time and its input / output tokens — numbers only, still no text
+    Object.assign(sess.calls[sess.calls.length - 1], { ms: Date.now() - _t0, inTok: u.input_tokens || 0, outTok: u.output_tokens || 0 });
     if (r.data && r.data.usage && !r._counted) sess.cost += budget.add(r.data.usage, 'aura');
     { const t = r.data && Array.isArray(r.data.content) ? r.data.content.filter(b => b && b.type === 'text').map(b => b.text).join('') : '';
-      if (t) sess.modelTexts.push({ kind: cls.kind, typed: sess.typed.length, text: t, filtered: afterFilters(t) }); }
+      if (t) sess.modelTexts.push({ kind: cls.kind, typed: sess.typed.length, text: t, filtered: afterFilters(t) });
+      // 31/10 (John, ADR «31 Οκτωβρίου (ε)»): in the benchmark the brake stops the session AT ONCE when the app removes a number of the
+      // help-line table that the model wrote — no further call, no later session; the exact reply, raw and filtered, stays in the report
+      if (t && p.bench && !sess.benchBrake) { const f = afterFilters(t); const lost = f === null ? [] : BL.numbersRemoved(t, f, APP.helplines);
+        if (lost.length) { sess.benchBrake = { typed: sess.typed.length, lost, raw: t, filtered: f };
+          if (!FINAL_HALT.reason) FINAL_HALT.reason = sess.label + ': η εφαρμογή αφαίρεσε αριθμό (' + lost.join(', ') + ') που έγραψε το μοντέλο'; } } }
     return route.fulfill({ status: r.status, contentType: 'application/json', body: JSON.stringify(r.data || {}) });
   });
   await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
@@ -5226,7 +5337,8 @@ async function runStressSession(item, aura, user, budget) {
     }
   };
   const ask = async (need, extra, schema) => {
-    const r = await user({ system: SL.personaSystem(p), prompt: SL.personaPrompt(sess.turns, need, extra), schema: schema || SL.USER_SCHEMA });
+    const r = p.bench ? await BENCH_SIM(p, sess, need, extra) // 31/10: the benchmark's gate + speaker (scripts/e2e_bench_lib.cjs)
+      : await user({ system: SL.personaSystem(p), prompt: SL.personaPrompt(sess.turns, need, extra), schema: schema || SL.USER_SCHEMA });
     if (r.stop) { stopped = stopped || r.stop; return null; }
     if (r.cost) sess.cost += r.cost;
     if (r.error || r.refusal || !r.data) { sess.notes.push('ο προσομοιωμένος χρήστης δεν απάντησε (' + (r.refusal ? 'άρνηση' : r.error || 'κενό') + ')'); return null; }
@@ -5286,7 +5398,15 @@ async function runStressSession(item, aura, user, budget) {
   const crisisPending = () => crisisFirst && !crisisKs.length;
   let chatTyped = 0;
   while (steps++ < 60 && !stopped) {
+    if (p.bench && sess.benchBrake) { sess.notes.push('ΦΡΕΝΟ ΑΜΕΣΩΣ: η εφαρμογή αφαίρεσε ' + sess.benchBrake.lost.join(', ') + ' μετά το μήνυμα ' + sess.benchBrake.typed); break; }
+    if (p.bench && sess.cost >= BL.SESSION_CAP) { sess.notes.push('όριο συνεδρίας $' + BL.SESSION_CAP + ' — μη αξιολογήσιμη'); sess.benchCapped = true; break; } // 31/10: AURA + simulator of this session
     if (p.final && FINAL_HALT.reason) { sess.notes.push('σταμάτησε από το φρένο άλλης συνεδρίας: ' + FINAL_HALT.reason); break; }
+    if (p.bench && sess.typed.length > 0) { // 31/10 (benchmark): the app's goodbye or end screen ends a session; a scenario's «only if asked again»
+      const _s0 = await screen(), _last = (_s0.last && _s0.last.who === 'aura' && _s0.last.text) || '';
+      if (_s0.ended || BL.isAppGoodbye(_last)) { sess.notes.push('τέλος: αντίο ή οθόνη τέλους της εφαρμογής, μετά από ' + sess.typed.length + ' μηνύματα'); break; }
+      const _n = sess.typed.length + 1;
+      if (p.bench.onlyIfAsked.includes(_n) && !(_s0.ask || BL.asksSomething(_last))) { sess.notes.push('το μήνυμα ' + _n + ' δεν στάλθηκε: η εφαρμογή δεν ρώτησε ξανά'); break; }
+    }
     // 23/10 (John, Theme C): a mechanism session is about the conversation before the root — it ends at a confirmed root
     if (p.mechanism && sess.rootConfirmed) { sess.notes.push('η ρίζα επιβεβαιώθηκε μετά από ' + sess.typed.length + ' μηνύματα — η συνεδρία μηχανισμού τελειώνει εδώ'); break; }
     await sync();
@@ -5571,6 +5691,15 @@ async function runStressSession(item, aura, user, budget) {
   }
   await page.screenshot({ path: path.join(OUT, 'stress-' + item.label + '-end.png'), fullPage: true }).catch(() => {});
   await browser.close();
+  if (p.bench) { // 31/10 (benchmark): the session is saved the moment it ends — a later crash or time limit keeps it
+    const a = sess.calls.reduce((x, c) => x + (c.cost || 0), 0), sm = (sess.benchState ? sess.benchState.calls : []).reduce((x, c) => x + (c.cost || 0), 0);
+    try { BENCH_LINES.push(JSON.stringify({ label: sess.label, id: p.bench.id, typed: sess.typed.length, rootConfirmed: sess.rootConfirmed,
+      root: sess.root, brake: sess.benchBrake || null, capped: !!sess.benchCapped, stopped: stopped || null, costAura: a, costSim: sm,
+      auraMs: sess.calls.reduce((x, c) => x + (c.ms || 0), 0), auraWords: sess.turns.filter(t => t.who === 'aura').reduce((x, t) => x + (String(t.text).match(/\S+/g) || []).length, 0),
+      deviations: sess.benchState ? sess.benchState.deviations : [], gate: sess.benchState ? sess.benchState.gate : [], violations: sess.violations, turns: sess.turns, calls: sess.calls,
+      simCalls: sess.benchState ? sess.benchState.calls : [] }));
+      writeOut('bench-sessions.jsonl', BENCH_LINES.join('\n') + '\n'); } catch (e) {} // the whole file again, through writeOut
+  }
   return { sess, stopped };
 }
 
@@ -5668,6 +5797,11 @@ async function mainStress() {
   // «επιλογή» (--sessions) can re-run a session of either round; the full test without --sessions stays the 16 users
   const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17), SL.FOUNDER_PERSONAS || [], SL.VOICE_PERSONAS || [], SL.LOOP_PERSONAS || [], SL.REHEARSAL_PERSONAS || [], SL.TARGETED_PERSONAS || [], SL.FINAL_PERSONAS || [], SL.MECHANISM_PERSONAS || [], SL.P3_PERSONAS || []) : SL.PERSONAS;
   if (only.length && !has('--hard')) PEOPLE.push(...(SL.COMPOSITE_PERSONAS || [])); // 24/10 (John): the composite session (171), tool only
+  // 31/10 (John, ADR «31 Οκτωβρίου (ε)» / «(η)»): numbers 9001–9199 are the benchmark (benchmark/scenarios.json) — on their own, never mixed
+  const BENCH = only.length > 0 && only.every(x => BL.isBenchAlias(x));
+  if (!BENCH && only.some(x => BL.isBenchAlias(x))) { console.error('Οι συνεδρίες 9001–9199 (benchmark) τρέχουν μόνες τους, όχι μαζί με άλλες.'); process.exit(2); }
+  if (BENCH) { BENCH_DATA = BL.loadBench(); PEOPLE.length = 0; PEOPLE.push(...BL.benchPersonas(BENCH_DATA)); }
+  const VMETA = BENCH ? BL.versionMeta(REPO) : null;
   const plan = SL.planRuns(PEOPLE, only.length ? only : null);
   // 22/10 (the last hard test): in waves, the sessions run in the order they were asked for (the crisis ones first)
   // 23/10 (John, Phase 2): a session asked twice runs the second time where it was asked the second time (SL.askedOrder)
@@ -5692,7 +5826,7 @@ async function mainStress() {
     const Anthropic = loadAnthropic();
     if (ks.found && Anthropic) {
       const client = new Anthropic({ apiKey: KEY, maxRetries: 1 });
-      for (const id of ['claude-sonnet-4-6', SL.USER_MODEL]) {
+      for (const id of ['claude-sonnet-4-6', SL.USER_MODEL].concat(BENCH ? [BL.SIM_MODEL, BL.EVAL_MODEL] : [])) { // 31/10: + the benchmark's two models
         try { await client.models.retrieve(id); accept.push('Το Anthropic δέχεται το κλειδί για το ' + id + ' (έλεγχος χωρίς κόστος).'); }
         catch (e) { accept.push('Το Anthropic ΑΠΕΡΡΙΨΕ το κλειδί για το ' + id + ': ' + (e instanceof Anthropic.APIError ? 'HTTP ' + (e.status || '?') : 'σφάλμα σύνδεσης') + '.'); }
       }
@@ -5727,10 +5861,24 @@ async function mainStress() {
   fs.mkdirSync(OUT, { recursive: true });
   const budget = SL.makeStressBudget(want);
   if (FAKE_COST) FAKE_BUDGET = budget;
+  // 31/10 (Step 8): a benchmark run starts only on the expected prompt, with no local change to the app; and, if a scenario needs the
+  // simulator or the evaluator, only when Anthropic answers for both models (models.retrieve: free, no tokens) — else no call at all
+  if (BENCH && real) {
+    const why = BL.versionGuard(VMETA, BENCH_DATA.baseline.prompt_fingerprint);
+    if (why.length) { console.error('Benchmark: ΔΕΝ ξεκινά — ' + why.join(' · ')); process.exit(2); }
+    if (plan.some(i => !i.persona.bench.safety)) {
+      const Anthropic = loadAnthropic(), client = new Anthropic({ apiKey: KEY, maxRetries: 1 });
+      for (const id of [BL.SIM_MODEL, BL.EVAL_MODEL]) {
+        try { await client.models.retrieve(id); console.log('Μοντέλο διαθέσιμο: ' + id + ' (έλεγχος χωρίς κόστος)'); }
+        catch (e) { console.error('Benchmark: ΔΕΝ ξεκινά — το ' + id + ' δεν είναι διαθέσιμο (' + (e && e.status ? 'HTTP ' + e.status : 'σφάλμα σύνδεσης') + ')'); process.exit(2); }
+      }
+    }
+  }
+  if (BENCH) BENCH_SIM = benchSim(real, budget);
   const app = await startApp();
   BASE = app.url;
   const sessions = [];
-  let stopped = null;
+  let stopped = null, BENCH_EVAL = null;
   // --minutes N: no new session starts after N minutes — the report is then always written before a time limit stops the job
   const minutes = Number(opt('--minutes', '0')) || 0, t0 = Date.now();
   // 22/10 (the last hard test): --parallel N — the sessions run in waves of N at once (each with its own address); the cost of each wave,
@@ -5782,6 +5930,10 @@ async function mainStress() {
     }
     else for (const item of plan) {
       if (minutes && Date.now() - t0 > minutes * 60000) { stopped = 'χρονικό όριο (' + minutes + ' λεπτά) — δεν ξεκίνησαν οι συνεδρίες από την ' + item.label; break; }
+      if (item.persona.bench && budget.cap - budget.spent() < BL.SESSION_CAP) { // 31/10: never a session cut short by the run's cap
+        for (const rest of plan.slice(plan.indexOf(item))) skipped.push({ label: rest.label, est: BL.SESSION_CAP, left: budget.cap - budget.spent() });
+        stopped = 'όριο δαπάνης — δεν ξεκίνησαν ' + plan.slice(plan.indexOf(item)).map(i => i.label).join(', '); break;
+      }
       console.log('… ' + item.label + ' — ' + item.persona.name);
       const r = await runStressSession(item, real ? await realModel() : stressFakeAura(item.persona), real ? stressUserReal(budget) : stressUserFake(item.persona), budget);
       sessions.push(r.sess);
@@ -5797,11 +5949,15 @@ async function mainStress() {
         if (crit.length) { stopped = 'κρίσιμο εύρημα στη ' + item.label + ' (' + crit.join(', ') + ') — οι επόμενες συνεδρίες δεν ξεκίνησαν'; break; }
       }
     }
-    for (const s of sessions) s.judge = await judgeSession(s, real ? stressUserReal(budget) : stressUserFake(null));
-    for (const s of sessions) await judgeVoice(s, real ? stressUserReal(budget) : stressUserFake(null));
+    // 31/10: the benchmark's sessions go to A1 (benchEvaluate), not to the session and voice judges (the loop and mechanism judges skip them
+    // on their own: a benchmark persona is neither)
+    const older = sessions.filter(s => !s.persona.bench);
+    for (const s of older) s.judge = await judgeSession(s, real ? stressUserReal(budget) : stressUserFake(null));
+    for (const s of older) await judgeVoice(s, real ? stressUserReal(budget) : stressUserFake(null));
     for (const s of sessions) await judgeLoop(s, real ? stressUserReal(budget) : stressUserFake(null));
     for (const s of sessions) await judgeMechanism(s, real ? stressUserReal(budget) : stressUserFake(null));
     for (const s of sessions) await judgeCrisis(s, real ? stressUserReal(budget) : stressUserFake(null));
+    if (BENCH && !FINAL_HALT.reason) BENCH_EVAL = await benchEvaluate(sessions, real, budget); // 31/10: never after the brake
   } finally {
     await app.close();
   }
@@ -5809,6 +5965,11 @@ async function mainStress() {
   if (waves.length) meta.waves = waves;
   meta.filters = !!ORGF_FILTERS; // 24/10: whether the AFTER FILTERS layer could be written
   meta.plan = PLAN_ROWS; meta.shortNames = SL.shortNameMap(plan); meta.holdExceeded = HOLD_EXCEEDED; meta.userCalls = USER_CALLS; // 25/10
+  // 31/10 (Step 8): which code and prompt ran — and for the benchmark, the scenarios' sha256 and the evaluator's sheets
+  meta.version = VMETA || BL.versionMeta(REPO);
+  if (BENCH) meta.bench = { scenariosSha256: BENCH_DATA._sha256, simModel: BL.SIM_MODEL, evalModel: BL.EVAL_MODEL, sessionCap: BL.SESSION_CAP,
+    eval: BENCH_EVAL, brakeNow: sessions.filter(s => s.benchBrake).map(s => ({ label: s.label, lost: s.benchBrake.lost, typed: s.benchBrake.typed })),
+    capped: sessions.filter(s => s.benchCapped).map(s => s.label), simulatorUnsafe: sessions.filter(s => s.benchUnsafe).map(s => s.label) };
   for (const s of sessions) { s.orgFlags = ORGF.flagsForSession(s, ORGF_FILTERS, ORGF_HELPLINES); s.filterChanges = ORGF.filterChangesForSession(s, ORGF_FILTERS); }
   writeOut('stress-report.md', SL.buildStressReport(sessions, meta));
   writeSummary(SL.buildStressReport(sessions, meta));
