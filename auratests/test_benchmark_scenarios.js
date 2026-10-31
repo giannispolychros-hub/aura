@@ -98,6 +98,17 @@ const pilot = (S && S.pilot) || {};
 assert('(Δ) pilot: 3 scenarios from 3 different categories', Array.isArray(pilot.scenarios) && pilot.scenarios.length === 3 && pilot.scenarios.every(i => ids.has(i)) && new Set(pilot.scenarios.map(cat)).size === 3);
 assert('(Δ) pilot results stay out of the ranking (stated in the file)', /ΔΕΝ μπαίνουν στην κατάταξη/.test(pilot.why || ''));
 
+// (Δ) UPDATED (31/10, ADR «31 Οκτωβρίου (η)», John's answers): the reduced Phase 2 — variant A of the 12 categories + the 7 types = 19;
+// the noise check is 9 runs in all, its first run counted inside Phase 2 when the scenario is there
+const red = (S && S.phase2_reduced && S.phase2_reduced.scenarios) || [];
+assert('(Δ) reduced Phase 2: 19 scenarios — B01A … B12A and B13 … B19, each a real id, none twice',
+  red.length === 19 && new Set(red).size === 19 && red.every(i => ids.has(i)) && red.every(i => /^B\d\dA$/.test(i) || cat(i) >= 13) &&
+  [1,2,3,4,5,6,7,8,9,10,11,12].every(c => red.filter(i => cat(i) === c).length === 1));
+assert('(Δ) noise: 9 runs in all; extra runs = 9 minus the noise scenarios already in a phase (full 31 → 6 extra, 37; reduced 19 → 7 extra, 26)',
+  noise.total_runs === 9 && (9 - noise.scenarios.filter(i => ids.has(i)).length) === 6 && (9 - noise.scenarios.filter(i => red.includes(i)).length) === 7 &&
+  31 + 6 === 37 && 19 + 7 === 26 && /37/.test(noise.counting) && /26/.test(noise.counting));
+assert('(Δ) the four root types are in the common rules', !!S && /\(α\)[^]*\(β\)[^]*\(γ\)[^]*\(δ\)/.test(S.common.root_rule));
+
 // (Ε) the baseline is the version of the 20
 assert('(Ε) baseline: main 24aab8e, code 99178c5, prompt b5f303cc9405aa21', !!S && S.baseline.commit === '24aab8e' && /^99178c5/.test(S.baseline.code) && S.baseline.prompt_fingerprint === 'b5f303cc9405aa21');
 const fp = fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8').match(/core: \{ length: \d+, sha256: "([0-9a-f]{16})/);
