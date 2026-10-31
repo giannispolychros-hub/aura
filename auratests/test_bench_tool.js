@@ -118,6 +118,21 @@ if (BL && SL) {
   assert('(Ζ) the old prices are untouched (AURA Sonnet 4.6, user Haiku 5.5)', SL.PRICES.aura.input === 3 && SL.PRICES.user.input === 0.10);
   assert('(Ζ) a call\'s hold covers every character as a token plus its max output', Math.abs(BL.holdFor(BL.PRICES_SIM, 'abc', 'de', 10) - (5 * 1 + 10 * 5) / 1e6) < 1e-12);
   assert('(Ζ) the session cap is $1.25; 14 turns', BL.SESSION_CAP === 1.25 && BL.MAX_TYPED_BENCH === 14);
+  // 31/10 (found before the report): with ONE cap of $1.25, the start rule («only if a whole session's cap is left») stops Phase 0 ($2) after
+  // about 5 of its 9 short safety sessions. A safety session has only its fixed messages (at most 6, S4) and no simulator or evaluator:
+  // its own cap is $0.85 (a cold first call ~$0.33 + 6 replies, each with a possible second call, ~$0.04 → $0.81).
+  const PB = BL.benchPersonas(BL.loadBench());
+  const capOf = id => typeof BL.capFor === 'function' ? BL.capFor(PB.find(p => p.bench.id === id)) : BL.SESSION_CAP; // before: one cap for all
+  assert('(Ζ) the cap per session: $0.85 for S1–S9 (fixed messages only), $1.25 for every scenario of the ranking',
+    ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S9'].every(id => capOf(id) === 0.85) && ['B01A', 'B12B', 'B13', 'B18', 'B19'].every(id => capOf(id) === 1.25) &&
+    BL.SAFETY_SESSION_CAP === 0.85 && Math.max(...PB.filter(p => p.bench.safety).map(p => p.maxTyped)) === 6 && 0.33 + 6 * 2 * 0.04 <= BL.SAFETY_SESSION_CAP);
+  const starts = (cap, costs, capFn) => { let spent = 0, n = 0; for (const [id, c] of costs) { if (cap - spent < capFn(id)) break; spent += c; n++; } return n; };
+  // the measured basis (PLAN §5.1): a cold first call $0.32, then ~$0.032 a call (crisis calls $0.004–0.007); S4 has 6 messages
+  const PHASE0 = [['S1', 0.32 + 0.07], ['S2', 0.07], ['S3', 0.07], ['S4', 0.20], ['S5', 0.07], ['S6', 0.07], ['S7', 0.07], ['S8', 0.07], ['S9', 0.07]];
+  assert('(Ζ) Phase 0 at its limit of $2: all 9 safety sessions start (with one cap of $1.25 for all, only 5 would)',
+    starts(2, PHASE0, capOf) === 9 && starts(2, PHASE0, () => 1.25) === 5);
+  const PILOT = [['B03A', 0.75], ['B11B', 0.46], ['B14', 0.46]];
+  assert('(Ζ) the pilot at its limit of $4: all 3 start, even at the high estimate', starts(4, PILOT, capOf) === 3 && starts(4, [['B03A', 1.24], ['B11B', 0.95], ['B14', 0.95]], capOf) === 3);
 
   // ── (Η) ──
   const sheet = BL.evalSheet([{ who: 'user', text: 'α' }, { who: 'aura', text: 'β' }, { who: 'app', text: 'γ' }, { who: 'user', text: 'δ' }], sc10, D.common, 'abcd1234');
@@ -158,8 +173,10 @@ if (BL && SL) {
   assert('(Θ) runner: the simulator and the evaluator are not inside stressUserReal … stressUserFake (an SDK error by its status only)',
     R.indexOf('function benchSim(') > R.indexOf('function stressUserFake(') && R.indexOf('async function benchEvaluate(') > R.indexOf('function stressUserFake(') &&
     /e instanceof Anthropic\.APIError \? SL\.apiErrorLabel\(e\.status, e\.message\) : 'σφάλμα σύνδεσης', cost \}/.test(R));
-  assert('(Θ) runner: a session starts only if a whole session\'s cap is left; the rest are written as not run', /budget\.cap - budget\.spent\(\) < BL\.SESSION_CAP/.test(R));
-  assert('(Θ) runner: the session cap, the time and tokens of every AURA call', /sess\.cost >= BL\.SESSION_CAP/.test(R) &&
+  // UPDATED (31/10, before the report): the cap is the session's own (BL.capFor) — $0.85 for S1–S9, $1.25 for the rest
+  assert('(Θ) runner: a session starts only if its whole cap is left; the rest are written as not run', /budget\.cap - budget\.spent\(\) < BL\.capFor\(item\.persona\)/.test(R) &&
+    /est: BL\.capFor\(rest\.persona\)/.test(R) && !/BL\.SESSION_CAP\b(?!,)/.test(R.replace('sessionCap: BL.SESSION_CAP, safetySessionCap', '')));
+  assert('(Θ) runner: the session cap, the time and tokens of every AURA call', /sess\.cost >= BL\.capFor\(p\)/.test(R) &&
     /Object\.assign\(sess\.calls\[sess\.calls\.length - 1\], \{ ms: Date\.now\(\) - _t0, inTok: u\.input_tokens \|\| 0, outTok: u\.output_tokens \|\| 0 \}\);/.test(R));
   assert('(Θ) runner: the older judges (which read hiddenRoot) skip the benchmark; A1 never runs after the brake', /const older = sessions\.filter\(s => !s\.persona\.bench\)/.test(R) &&
     /if \(BENCH && !FINAL_HALT\.reason\) BENCH_EVAL = await benchEvaluate/.test(R));

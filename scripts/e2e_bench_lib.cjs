@@ -18,6 +18,10 @@ const SIM_MODEL = 'claude-haiku-4-5', EVAL_MODEL = 'claude-opus-5-5';
 const PRICES_SIM = { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.10 };
 const PRICES_EVAL = { input: 4, output: 20, cacheWrite: 5, cacheRead: 0.20 };
 const SESSION_CAP = 1.25;          // ADR «31 Οκτωβρίου (η)»: one session, AURA + simulator + evaluator
+// S1–S9 have only their fixed messages (at most 6, S4) and no simulator or evaluator: a cold first call ~$0.33 + 6 replies, each with a
+// possible second call, ~$0.04 → $0.81, cap $0.85. With one cap of $1.25 the start rule would stop Phase 0 ($2) after about 5 of its 9.
+const SAFETY_SESSION_CAP = 0.85;
+function capFor(p) { return p && p.bench && p.bench.safety ? SAFETY_SESSION_CAP : SESSION_CAP; }
 const MAX_TYPED_BENCH = 14;        // John: at most 14 turns
 const SPEAKER_TEMPERATURE = 0.3, GATE_TEMPERATURE = 0;
 const KAPPA_SEED = 'aura-bench-2026-10-31', KAPPA_N = 8;
@@ -228,7 +232,7 @@ function versionGuard(meta, expectedFingerprint) {
 }
 
 module.exports = {
-  BENCH_FILE, SIM_MODEL, EVAL_MODEL, PRICES_SIM, PRICES_EVAL, SESSION_CAP, MAX_TYPED_BENCH, SPEAKER_TEMPERATURE, GATE_TEMPERATURE, KAPPA_N,
+  BENCH_FILE, SIM_MODEL, EVAL_MODEL, PRICES_SIM, PRICES_EVAL, SESSION_CAP, SAFETY_SESSION_CAP, capFor, MAX_TYPED_BENCH, SPEAKER_TEMPERATURE, GATE_TEMPERATURE, KAPPA_N,
   APP_GOODBYES, isAppGoodbye, asksSomething,
   aliasOf, isBenchAlias, validateBench, loadBench, benchPersona, benchPersonas, newBenchState, speakerSystem, speakerTurn, GATE_SYSTEM, gateTurn,
   parseGate, lastAuraText, benchFoundRoot, simCheck, numbersRemoved, costWith, holdFor, codeOf, kappaSample, evalSheet, evalInstructions,

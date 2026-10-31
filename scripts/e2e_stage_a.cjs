@@ -5399,7 +5399,7 @@ async function runStressSession(item, aura, user, budget) {
   let chatTyped = 0;
   while (steps++ < 60 && !stopped) {
     if (p.bench && sess.benchBrake) { sess.notes.push('ΦΡΕΝΟ ΑΜΕΣΩΣ: η εφαρμογή αφαίρεσε ' + sess.benchBrake.lost.join(', ') + ' μετά το μήνυμα ' + sess.benchBrake.typed); break; }
-    if (p.bench && sess.cost >= BL.SESSION_CAP) { sess.notes.push('όριο συνεδρίας $' + BL.SESSION_CAP + ' — μη αξιολογήσιμη'); sess.benchCapped = true; break; } // 31/10: AURA + simulator of this session
+    if (p.bench && sess.cost >= BL.capFor(p)) { sess.notes.push('όριο συνεδρίας $' + BL.capFor(p) + ' — μη αξιολογήσιμη'); sess.benchCapped = true; break; } // 31/10: AURA + simulator of this session
     if (p.final && FINAL_HALT.reason) { sess.notes.push('σταμάτησε από το φρένο άλλης συνεδρίας: ' + FINAL_HALT.reason); break; }
     if (p.bench && sess.typed.length > 0) { // 31/10 (benchmark): the app's goodbye or end screen ends a session; a scenario's «only if asked again»
       const _s0 = await screen(), _last = (_s0.last && _s0.last.who === 'aura' && _s0.last.text) || '';
@@ -5930,8 +5930,8 @@ async function mainStress() {
     }
     else for (const item of plan) {
       if (minutes && Date.now() - t0 > minutes * 60000) { stopped = 'χρονικό όριο (' + minutes + ' λεπτά) — δεν ξεκίνησαν οι συνεδρίες από την ' + item.label; break; }
-      if (item.persona.bench && budget.cap - budget.spent() < BL.SESSION_CAP) { // 31/10: never a session cut short by the run's cap
-        for (const rest of plan.slice(plan.indexOf(item))) skipped.push({ label: rest.label, est: BL.SESSION_CAP, left: budget.cap - budget.spent() });
+      if (item.persona.bench && budget.cap - budget.spent() < BL.capFor(item.persona)) { // 31/10: never a session cut short by the run's cap ($0.85 for S1–S9, $1.25 otherwise)
+        for (const rest of plan.slice(plan.indexOf(item))) skipped.push({ label: rest.label, est: BL.capFor(rest.persona), left: budget.cap - budget.spent() });
         stopped = 'όριο δαπάνης — δεν ξεκίνησαν ' + plan.slice(plan.indexOf(item)).map(i => i.label).join(', '); break;
       }
       console.log('… ' + item.label + ' — ' + item.persona.name);
@@ -5967,7 +5967,7 @@ async function mainStress() {
   meta.plan = PLAN_ROWS; meta.shortNames = SL.shortNameMap(plan); meta.holdExceeded = HOLD_EXCEEDED; meta.userCalls = USER_CALLS; // 25/10
   // 31/10 (Step 8): which code and prompt ran — and for the benchmark, the scenarios' sha256 and the evaluator's sheets
   meta.version = VMETA || BL.versionMeta(REPO);
-  if (BENCH) meta.bench = { scenariosSha256: BENCH_DATA._sha256, simModel: BL.SIM_MODEL, evalModel: BL.EVAL_MODEL, sessionCap: BL.SESSION_CAP,
+  if (BENCH) meta.bench = { scenariosSha256: BENCH_DATA._sha256, simModel: BL.SIM_MODEL, evalModel: BL.EVAL_MODEL, sessionCap: BL.SESSION_CAP, safetySessionCap: BL.SAFETY_SESSION_CAP,
     eval: BENCH_EVAL, brakeNow: sessions.filter(s => s.benchBrake).map(s => ({ label: s.label, lost: s.benchBrake.lost, typed: s.benchBrake.typed })),
     capped: sessions.filter(s => s.benchCapped).map(s => s.label), simulatorUnsafe: sessions.filter(s => s.benchUnsafe).map(s => s.label) };
   for (const s of sessions) { s.orgFlags = ORGF.flagsForSession(s, ORGF_FILTERS, ORGF_HELPLINES); s.filterChanges = ORGF.filterChangesForSession(s, ORGF_FILTERS); }
