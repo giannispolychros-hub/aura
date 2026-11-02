@@ -25,7 +25,7 @@ const CONSTS = ['HELPLINES', 'KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_DISMISSALS', 'BRA
 const FNS = ['lookBehind', 'detectSafetySignal', 'classifyCrisisTier', 'detectsDangerFromOther', 'detectsMentalHealthReferral', 'mergeRiskKind',
   'stageASafetyHold', 'rootAnswerIsDismissal', 'rootAnswerIsUnsure', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord',
   'substanceOfSentence', 'branchSentenceSpans', 'branchAuraEndsWithQuestion', 'branchWords', 'branchJaccard', 'branchSessionSafe',
-  'pickBranches', 'thoughtMapView', 'thoughtMapCapFirst'];
+  'pickBranches', 'thoughtMapView', 'thoughtMapCapFirst', 'thoughtMapRecFields', 'recordTelemetry', 'buildTesterExport'];
 let F = {};
 try {
   F = new Function([...CONSTS.map(n => constSrc(n) || `const ${n} = undefined;`),
@@ -181,17 +181,28 @@ const VIEW = fnSrc('thoughtMapView') + fnSrc('branchSessionSafe') + fnSrc('pickB
   const sinks = /setMessages|addUiBubble|setUiBubbles|recordTelemetry|localStorage|sessionStorage|indexedDB|saveMemory|_writeMemoryNow|setMemory|console\.|fetch\(|callAura|generateResponse|navigator\.|clipboard|createObjectURL|download|sendBeacon|XMLHttpRequest/;
   assert('(Δ) the screen block and its functions write NOWHERE: no messages or UI bubbles, telemetry, storage, memory, console, network, clipboard or download',
     !sinks.test(JSX) && !sinks.test(VIEW));
+  // CHANGED (John, 2/11/2026, branchCount): besides the screen, the view is read by the map's ONE record (the effect below) — and nowhere else
   const uses = (raw.match(/\bthoughtMap\b/g) || []).length, defs = raw.indexOf('const thoughtMap = thoughtMapView(');
-  assert('(Δ) the view is read only by the screen block (one variable, computed on render, used nowhere else)',
-    defs > 0 && (raw.match(/thoughtMapView\(/g) || []).length === 2 && raw.replace(JSX, '').split(/\bthoughtMap\b/).length - 1 === 1 && uses > 1);
+  const outside = raw.replace(JSX, '').split('\n').filter(l => /\bthoughtMap\b/.test(l)).map(l => l.trim());
+  assert('(Δ) the view is read only by the screen block and by the one record (computed on render, used nowhere else)',
+    defs > 0 && (raw.match(/thoughtMapView\(/g) || []).length === 2 && uses > 3 && JSON.stringify(outside) === JSON.stringify([
+      'const thoughtMap = thoughtMapView({ active: stageAActive.current, phase: stageAPhase, loading, stage: stageAView,',
+      'const thoughtMapShown = thoughtMap !== null;', 'const f = thoughtMapRecFields(thoughtMap, recMode.current);']));
   assert('(Δ) the number kept for the screen: set only when the card opens, reset with the session, read only to cut `messages`',
     (raw.match(/rootCardMsgCount\.current = /g) || []).length === 2 && /if \(stageARef\.current\.phase === "card"\) rootCardMsgCount\.current = \(msgsNow \|\| \[\]\)\.length;/.test(raw) &&
     /rootCardMsgCount\.current = 0;/.test(raw) && (raw.match(/rootCardMsgCount\.current\b/g) || []).length === 3 && /messages\.slice\(0, rootCardMsgCount\.current\)/.test(raw));
   assert('(Δ) the copy and the download carry the step card\'s text exactly as on main (buildStageAShareText unchanged; it never sees the screen)',
     h16(fnSrc('buildStageAShareText')) === '9a8af7bdebab8fae' && h16(fnSrc('buildStepCardText')) === 'a2a9b53459dff368' && !/thoughtMap/.test(fnSrc('buildStageAShareText')));
-  assert('(Δ) telemetry and the tester export unchanged (counts only; no event of the screen; rec=1 keeps no text)',
+  // CHANGED (John, 2/11/2026): the map may record ONE integer, branchCount, with ?rec=1 only — recordTelemetry and the tester export
+  // themselves stay byte-identical (they are what drops anything else); the map has exactly one record call, fed only by thoughtMapRecFields
+  assert('(Δ) telemetry and the tester export unchanged (counts only; rec=1 keeps no text); the map\'s only record is branchCount',
     h16(fnSrc('recordTelemetry')) === 'bc79a4b2654cf306' && h16(fnSrc('buildTesterExport')) === 'd73e0a9179c9a751' && h16(fnSrc('exportTesterData')) === 'd3ee9ebe10c78f7a' &&
-    !/recordTelemetry\("thought|thought_map/.test(raw));
+    (raw.match(/recordTelemetry\("thought/g) || []).length === 1 && /const f = thoughtMapRecFields\(thoughtMap, recMode\.current\);\s*if \(f\) recordTelemetry\("thought_map", f\);/.test(raw) &&
+    !/recordTelemetry/.test(JSX) && !/recordTelemetry/.test(VIEW) &&
+    /const recMode = useRef\(typeof window !== 'undefined' && new URLSearchParams\(window\.location\.search\)\.get\('rec'\) === '1'\);/.test(raw));
+  assert('(Δ) … once per session: a latch set on the first showing, reset with the session',
+    /if \(!thoughtMapShown \|\| thoughtMapLogged\.current\) return;\s*thoughtMapLogged\.current = true;/.test(raw) &&
+    (raw.match(/thoughtMapLogged\.current = /g) || []).length === 2 && /thoughtMapLogged\.current = false; \/\/ Thought Map/.test(raw) && /\}, \[thoughtMapShown\]\);/.test(raw));
   assert('(Δ) memory and its consent unchanged (aura_v2_memory, the consent toggle): the screen never reaches them',
     h16(fnSrc('saveMemory')) === 'd609850541386c09' && h16(fnSrc('_writeMemoryNow')) === 'c141fc2423719aea' && h16(fnSrc('loadMemory')) === '5b173dba223a13d5' && h16(fnSrc('exportMemory')) === '6e4e47cfab7f0f4d');
 }
@@ -216,6 +227,15 @@ const stripThoughtMap = t => {
         '  // memory only; the screen reads `messages` up to it. Never stored, sent or logged.\n  const rootCardMsgCount = useRef(0);\n',
       '    if (stageARef.current.phase === "card") rootCardMsgCount.current = (msgsNow || []).length; // Thought Map (2/11): a number only\n',
       '    rootCardMsgCount.current = 0; // Thought Map (2/11)\n',
+      // UPDATED (John, 2/11/2026, branchCount): the map's one record — the latch, its reset and the effect
+      '  // THOUGHT MAP (John, 2/11/2026): the map\'s one record (branchCount, ?rec=1 only) is written once per session — reset with the session\n' +
+        '  const thoughtMapLogged = useRef(false);\n',
+      '    thoughtMapLogged.current = false; // Thought Map (2/11): the map\'s one record, once per session\n',
+      '  // THOUGHT MAP (John, 2/11/2026): when the map first shows in a session and ?rec=1 is on — ONE integer, branchCount (0, 2 or 3).\n' +
+        '  // Nothing without ?rec=1; nothing else ever (thoughtMapRecFields builds the only fields; recordTelemetry drops anything else).\n' +
+        '  const thoughtMapShown = thoughtMap !== null;\n  useEffect(() => {\n    if (!thoughtMapShown || thoughtMapLogged.current) return;\n' +
+        '    thoughtMapLogged.current = true;\n    const f = thoughtMapRecFields(thoughtMap, recMode.current);\n' +
+        '    if (f) recordTelemetry("thought_map", f);\n  }, [thoughtMapShown]); // eslint-disable-line react-hooks/exhaustive-deps\n',
       '  // THOUGHT MAP (2/11): computed on every render from what the page already holds; nothing is kept\n' +
         '  const thoughtMap = thoughtMapView({ active: stageAActive.current, phase: stageAPhase, loading, stage: stageAView,\n' +
         '    messagesAtCard: messages.slice(0, rootCardMsgCount.current), allMessages: messages, riskKind: riskSignalKind.current,\n' +
@@ -225,6 +245,38 @@ const stripThoughtMap = t => {
   assert('(Ε) without the Thought Map pieces (the block of functions, the screen, the one number, the view) src/App.jsx is byte-identical to main 24aab8e',
     sha(stripThoughtMap(raw)) === '3a5cca6638432536ff9d93cb24a591f2e915449bfdd07c113841e90d9eb67d07');
   assert('(Ε) api/aura.js is byte-identical to main (c2ce3892c094224d)', h16(fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8')) === 'c2ce3892c094224d');
+}
+
+// ── (ΣΤ) branchCount — the map's ONE record (John, 2/11/2026) ────────────────────────────────────────────────────────────────────
+{
+  const R = (v, on) => { try { return F.thoughtMapRecFields(v, on); } catch (e) { return 'threw'; } };
+  const T = (ev, f) => { try { return F.recordTelemetry(ev, f); } catch (e) { return 'threw'; } };
+  const v3 = view(base(3)), v2 = view(base(2)), v0 = view(base(0));
+  const keys = o => JSON.stringify(Object.keys(o || {}).sort());
+  // (α) the number is recorded
+  assert('(ΣΤ α) with ?rec=1 the map gives ONE field, branchCount = 3 / 2 / 0 — and the record is the event, its time and that integer only',
+    JSON.stringify(R(v3, true)) === '{"branchCount":3}' && JSON.stringify(R(v2, true)) === '{"branchCount":2}' && JSON.stringify(R(v0, true)) === '{"branchCount":0}' &&
+    (() => { const r = T('thought_map', R(v3, true)); return r && r.ev === 'thought_map' && r.branchCount === 3 && keys(r) === '["branchCount","ev","t"]'; })());
+  // (β) nothing without ?rec=1
+  assert('(ΣΤ β) without ?rec=1 nothing at all (only true counts — not "1", not 1, not missing); no map → nothing',
+    [false, undefined, null, '1', 1, 'true'].every(on => R(v3, on) === null) && R(null, true) === null && R(undefined, true) === null && R({}, true) === null);
+  assert('(ΣΤ β) … only the counts 0, 2, 3 — any other shape of the view gives nothing; the root, the words and the step never come out',
+    [{ branches: ['a'] }, { branches: ['a', 'b', 'c', 'd'] }, { branches: 'abc' }].every(v => R(v, true) === null) &&
+    keys(R({ root: 'Ρίζα', branches: ['x', 'y'], knew: 'κ', step: 'σ', when: 'π' }, true)) === '["branchCount"]');
+  // (γ) text in the field is dropped by the (unchanged) mechanism
+  const TXT = 'Ο μισθός είναι καλός και φοβάμαι την αλλαγή.';
+  assert('(ΣΤ γ) text passed in branchCount is DROPPED by recordTelemetry — and so are fractions, negatives, too-large numbers, lists and objects',
+    [TXT, '3', 2.5, -1, 10000, [3], { n: 3 }, null, undefined].every(x => { const r = T('thought_map', { branchCount: x }); return r && !('branchCount' in r); }));
+  assert('(ΣΤ γ) … and any other field with text is dropped too; a bad event name records nothing',
+    (() => { const r = T('thought_map', { branchCount: 2, root: TXT, branchText: TXT }); return keys(r) === '["branchCount","ev","t"]' && !JSON.stringify(r).includes('μισθός'); })() &&
+    T('thought map', { branchCount: 2 }) === null && T('Χάρτης', { branchCount: 2 }) === null);
+  // (δ) the tester export shows only the integer
+  assert('(ΣΤ δ) the tester export shows the map\'s record as its event name, its time and the integer only — no text',
+    (() => { const x = F.buildTesterExport([T('thought_map', R(v3, true))], '2026-11-02'); const e = x.events[0];
+      return x.records === 1 && e.ev === 'thought_map' && e.branchCount === 3 && keys(e) === '["branchCount","ev","t"]' && !/[α-ωά-ώΑ-Ω]/.test(JSON.stringify(x.events)); })());
+  assert('(ΣΤ δ) … even a tampered record in the device log (text in branchCount, a text field) leaves the export with no text',
+    (() => { const x = F.buildTesterExport([{ ev: 'thought_map', t: 5, branchCount: TXT, root: TXT }], '2026-11-02');
+      return keys(x.events[0]) === '["ev","t"]' && !JSON.stringify(x).includes('μισθός'); })());
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

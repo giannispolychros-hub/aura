@@ -147,7 +147,8 @@ async function runMockTM() {
     if (!hadKey) delete process.env.ANTHROPIC_API_KEY;
     return out;
   };
-  const sess = async replies => {
+  // UPDATED (John, 2/11/2026, branchCount): a session can be opened without ?rec=1 (q), to check that the map then records nothing
+  const sess = async (replies, q) => {
     const browser = await launch();
     const ctx = await browser.newContext({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true, acceptDownloads: true });
     await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE }).catch(() => {});
@@ -163,7 +164,7 @@ async function runMockTM() {
       await route.fulfill({ status: out.status, contentType: 'application/json', body: JSON.stringify(out.data || {}) });
     });
     await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
-    await page.goto(BASE + '/?stageA=1&rec=1');
+    await page.goto(BASE + (q || '/?stageA=1&rec=1'));
     await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
     return { browser, page, calls, cons };
   };
@@ -279,8 +280,20 @@ async function runMockTM() {
     ok(`TM3 (${tag}): nothing of the screen in localStorage, sessionStorage, IndexedDB, caches, cookies or a service worker`,
       [B1, B2, B3, ...LABELS].every(t => !stored.includes(t)) && Object.keys(d.ss).length === 0 && d.idb.length === 0 && d.caches.length === 0 && d.cookie === '' && !d.sw);
     let tel = []; try { tel = JSON.parse(d.ls.aura_telemetry_log || '[]'); } catch (e) { tel = ['unreadable']; }
-    ok(`TM3 (${tag}): rec=1 — the device log keeps counts only, and no event of the screen`, tel.length > 0 &&
-      tel.every(r => r && typeof r.ev === 'string' && Object.entries(r).every(([k, v]) => k === 'ev' || typeof v === 'number' || typeof v === 'boolean')) && !tel.some(r => /thought|map|branch/i.test(r.ev)));
+    // CHANGED (John, 2/11/2026, branchCount): with rec=1 the map adds exactly ONE record — its name, its time and one integer
+    const tmRecs = tel.filter(r => r && r.ev === 'thought_map');
+    ok(`TM3 (${tag}): rec=1 — the device log keeps counts only; the map adds ONE record: branchCount = 3, nothing else`, tel.length > 0 &&
+      tel.every(r => r && typeof r.ev === 'string' && Object.entries(r).every(([k, v]) => k === 'ev' || typeof v === 'number' || typeof v === 'boolean')) &&
+      tmRecs.length === 1 && JSON.stringify(Object.keys(tmRecs[0]).sort()) === '["branchCount","ev","t"]' && tmRecs[0].branchCount === 3 &&
+      !tel.some(r => r.ev !== 'thought_map' && (/thought|branch/i.test(r.ev) || 'branchCount' in r)));
+    // the tester's own export («Στείλε τα στοιχεία της δοκιμής», at the end of the session): the map's record is the integer only
+    let tx = null;
+    try { const [x] = await Promise.all([s.page.waitForEvent('download', { timeout: 8000 }), s.page.getByRole('button', { name: 'Στείλε τα στοιχεία της δοκιμής' }).click({ timeout: 4000 })]);
+      tx = JSON.parse(fs.readFileSync(await x.path(), 'utf8')); } catch (e) { tx = null; }
+    const txTm = tx && Array.isArray(tx.events) ? tx.events.filter(e => e.ev === 'thought_map') : [];
+    ok(`TM3 (${tag}): the tester export shows the map as its name, its time and the integer — no text of the session`,
+      txTm.length === 1 && JSON.stringify(Object.keys(txTm[0]).sort()) === '["branchCount","ev","t"]' && txTm[0].branchCount === 3 &&
+      [B1, B2, B3, ROOT, STEP, WHEN, WORD, ...LABELS].every(t => !JSON.stringify(tx.events).includes(t)));
     let dl = { text: '' };
     try { const [x] = await Promise.all([s.page.waitForEvent('download', { timeout: 8000 }), btn(s.page, T.download).click({ timeout: 4000 })]); dl = { text: fs.readFileSync(await x.path(), 'utf8') }; } catch (e) { dl = { text: '', error: String(e.message || e).slice(0, 60) }; }
     await tap(s.page, T.copy);
@@ -302,15 +315,17 @@ async function runMockTM() {
     const kn = await MAP(s.page).locator('[data-tm-knew="1"] > div').nth(1).innerText().catch(() => '');
     let dl2 = '';
     try { const [x] = await Promise.all([s.page.waitForEvent('download', { timeout: 8000 }), btn(s.page, T.download).click({ timeout: 4000 })]); dl2 = fs.readFileSync(await x.path(), 'utf8'); } catch (e) { dl2 = ''; }
+    const tel2 = await s.page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]').filter(r => r.ev === 'thought_map'); } catch (e) { return ['x']; } });
+    ok(`TM2 (${tag}): rec=1 — the map's one record says branchCount = 2`, tel2.length === 1 && tel2[0].branchCount === 2);
     ok(`TM2 (${tag}): «Πώς μπήκες» starts with a capital on the screen only — the card's download keeps the user's text as typed`,
       kn.trim() === '«Θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει»' && dl2.includes('«θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει»') && !dl2.includes('Θέλω να αλλάξω'));
     await s.page.evaluate(() => { const e = document.querySelector('[data-tm-root="1"]'); if (e) e.scrollIntoView({ block: 'start' }); });
     await shot(s.page, 'TM-2');
     await s.browser.close();
   }
-  // ── TM0: no branch (a short answer only) ──
+  // ── TM0: no branch (a short answer only) — UPDATED (John, 2/11/2026, branchCount): opened WITHOUT ?rec=1, so the map records nothing ──
   {
-    const s = await sess([Q[0], Q[1], END]);
+    const s = await sess([Q[0], Q[1], END], '/?stageA=1');
     await toEnd(s, ['Ναι, έτσι.']);
     const t = await MAP(s.page).textContent().catch(() => '');
     ok(`TM0 (${tag}): no branch → no heading, no section, no empty box or dash; the root, «Πώς μπήκες» and the step still there`,
@@ -318,6 +333,11 @@ async function runMockTM() {
       !/»\s*[—–-]\s*|^\s*[—–-]|[—–-]\s*$/.test(t) && t.includes('«' + ROOT + '»') && t.includes(TM.knewTitle) && t.includes('«' + STEP + '»'));
     await s.page.evaluate(() => { const e = document.querySelector('[data-tm-root="1"]'); if (e) e.scrollIntoView({ block: 'start' }); });
     await shot(s.page, 'TM-0');
+    await s.page.waitForTimeout(800);
+    const quiet = await s.page.evaluate(() => ({ mem: (window.__auraTelemetry || []).filter(r => r && r.ev === 'thought_map').length,
+      log: (localStorage.getItem('aura_telemetry_log') || '').includes('thought_map') }));
+    ok(`TM0 (${tag}): without ?rec=1 the map records nothing — not on the device, not in the page's memory, not in the console`,
+      quiet.mem === 0 && !quiet.log && s.cons.every(c => !c.includes('thought_map')));
     await s.browser.close();
   }
   // ── TMU: «Δεν ξέρω ακόμα» at the step ──
@@ -341,7 +361,8 @@ async function runMockTM() {
       onTop = await box.evaluate(el => { const r = el.getBoundingClientRect(); const x = r.left + Math.min(r.width / 2, 20), yy = r.top + r.height / 2;
         const top = document.elementFromPoint(x, yy); return !!top && (top === el || el.contains(top) || top.contains(el)) && r.right <= window.innerWidth + 1 && r.left >= -1; }).catch(() => false);
     }
-    ok(`TMC (${tag}): a crisis typed at the word → no Thought Map`, !(await mapOn(s.page)));
+    const telC = await s.page.evaluate(() => (localStorage.getItem('aura_telemetry_log') || '').includes('thought_map'));
+    ok(`TMC (${tag}): a crisis typed at the word → no Thought Map, and no record of one (rec=1)`, !(await mapOn(s.page)) && !telC);
     ok(`TMC (${tag}): … and the crisis line (1018) is on the screen, in view, not covered by anything`, seen && onTop);
     await shot(s.page, 'TM-C');
     await s.browser.close();

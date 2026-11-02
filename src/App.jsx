@@ -2384,6 +2384,14 @@ function thoughtMapCapFirst(text) {
   const C = c.toUpperCase();
   return C.length === 1 && C !== c && C.toLowerCase() === c ? C + text.slice(1) : text;
 }
+// The ONE thing the map may record (John, 2/11/2026): with ?rec=1 only, how many branches it shows — 0, 2 or 3 — as one integer,
+// `branchCount`. No text, no identifier, no other field. null = record nothing. recordTelemetry (unchanged) still drops anything
+// that is not a small integer or a yes/no, and the tester export (unchanged) filters again.
+function thoughtMapRecFields(view, recOn) {
+  if (recOn !== true || !view || !Array.isArray(view.branches)) return null;
+  const n = view.branches.length;
+  return n === 0 || n === 2 || n === 3 ? { branchCount: n } : null;
+}
 // A root typed into the flow (door 1's answer, «Διόρθωσε») becomes the root only if at least one of its sentences
 // passes the same rule, with the root's limit. The root itself stays WHOLE (decision «(στ)» 1) — the rule only decides yes/no.
 function rootTextHasSubstance(text) {
@@ -7125,6 +7133,8 @@ export default function AURAv2() {
   // THOUGHT MAP (John, 2/11/2026, ADR «2 Νοεμβρίου (β)»): how many messages there were when the root card opened — a number only, page
   // memory only; the screen reads `messages` up to it. Never stored, sent or logged.
   const rootCardMsgCount = useRef(0);
+  // THOUGHT MAP (John, 2/11/2026): the map's one record (branchCount, ?rec=1 only) is written once per session — reset with the session
+  const thoughtMapLogged = useRef(false);
   const stageADispatch = useCallback((ev) => {
     const _prev = stageARef.current;
     stageARef.current = stageAStep(_prev, ev);
@@ -9559,6 +9569,15 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
   const thoughtMap = thoughtMapView({ active: stageAActive.current, phase: stageAPhase, loading, stage: stageAView,
     messagesAtCard: messages.slice(0, rootCardMsgCount.current), allMessages: messages, riskKind: riskSignalKind.current,
     dangerFromOther: dangerFromOther.current, safetyMode, crisisFallback });
+  // THOUGHT MAP (John, 2/11/2026): when the map first shows in a session and ?rec=1 is on — ONE integer, branchCount (0, 2 or 3).
+  // Nothing without ?rec=1; nothing else ever (thoughtMapRecFields builds the only fields; recordTelemetry drops anything else).
+  const thoughtMapShown = thoughtMap !== null;
+  useEffect(() => {
+    if (!thoughtMapShown || thoughtMapLogged.current) return;
+    thoughtMapLogged.current = true;
+    const f = thoughtMapRecFields(thoughtMap, recMode.current);
+    if (f) recordTelemetry("thought_map", f);
+  }, [thoughtMapShown]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleKey = (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
@@ -9607,6 +9626,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     freeActionOffered.current = 0; freeDeferral.current = 0; askedActionBeforeRoot.current = false; rootCardOpenedOnce.current = false;
     riskSignalKind.current = 0; labelLeaks.current = 0; dangerFromOther.current = false; dangerLineShown.current = [];
     rootCardMsgCount.current = 0; // Thought Map (2/11)
+    thoughtMapLogged.current = false; // Thought Map (2/11): the map's one record, once per session
     stageARef.current = initialStageAState(); stageARootArmed.current = false; setStageAPhase(null); lastCardDoor.current = 0;
     setUiBubbles([]);
     abandonMark.current = { started: false, ended: false, done: false };

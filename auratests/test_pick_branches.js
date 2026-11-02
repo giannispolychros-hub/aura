@@ -204,7 +204,11 @@ const S = t => call('branchSentenceSpans', t);
   // UPDATED (2/11, phase 2): the block now also holds the screen's view (thoughtMapView), the one caller of pickBranches
   assert('(Ζ) pickBranches and its helpers are defined once, inside the block, and used nowhere else in the app (thoughtMapView, inside it, is the one caller)',
     (block.match(/\nfunction pickBranches\(/g) || []).length === 1 && !/pickBranches|branchSentenceSpans|branchAuraEndsWithQuestion|branchJaccard|branchWords|BRANCH_/.test(raw.replace(block, '')));
-  assert('(Ζ) no storage, log, network or telemetry inside the new functions', !!block && !/localStorage|sessionStorage|indexedDB|console\.|fetch\(|recordTelemetry|XMLHttpRequest|sendBeacon|navigator\./.test(block));
+  // UPDATED (John, 2/11/2026, branchCount): the block's comments now NAME the app's telemetry function (thoughtMapRecFields builds the
+  // map's one field, which the component — outside the block — passes to it); the check reads the CODE only, and the code calls nothing
+  const blockCode = block.replace(/\/\/[^\n]*/g, '');
+  assert('(Ζ) no storage, log, network or telemetry inside the new functions', !!block && blockCode.length > 1000 && /function thoughtMapRecFields\(/.test(blockCode) &&
+    !/localStorage|sessionStorage|indexedDB|console\.|fetch\(|recordTelemetry|XMLHttpRequest|sendBeacon|navigator\./.test(blockCode));
   // UPDATED (2/11, phase 2, ADR «2 Νοεμβρίου (β)»): the screen added a few pieces outside the block (the screen itself, one number,
   // the view on render); without them — and without the block — the file is still byte-identical to main
   const stripThoughtMap = t => {
@@ -215,6 +219,15 @@ const S = t => call('branchSentenceSpans', t);
         '  // memory only; the screen reads `messages` up to it. Never stored, sent or logged.\n  const rootCardMsgCount = useRef(0);\n',
       '    if (stageARef.current.phase === "card") rootCardMsgCount.current = (msgsNow || []).length; // Thought Map (2/11): a number only\n',
       '    rootCardMsgCount.current = 0; // Thought Map (2/11)\n',
+      // UPDATED (John, 2/11/2026, branchCount): the map's one record — the latch, its reset and the effect
+      '  // THOUGHT MAP (John, 2/11/2026): the map\'s one record (branchCount, ?rec=1 only) is written once per session — reset with the session\n' +
+        '  const thoughtMapLogged = useRef(false);\n',
+      '    thoughtMapLogged.current = false; // Thought Map (2/11): the map\'s one record, once per session\n',
+      '  // THOUGHT MAP (John, 2/11/2026): when the map first shows in a session and ?rec=1 is on — ONE integer, branchCount (0, 2 or 3).\n' +
+        '  // Nothing without ?rec=1; nothing else ever (thoughtMapRecFields builds the only fields; recordTelemetry drops anything else).\n' +
+        '  const thoughtMapShown = thoughtMap !== null;\n  useEffect(() => {\n    if (!thoughtMapShown || thoughtMapLogged.current) return;\n' +
+        '    thoughtMapLogged.current = true;\n    const f = thoughtMapRecFields(thoughtMap, recMode.current);\n' +
+        '    if (f) recordTelemetry("thought_map", f);\n  }, [thoughtMapShown]); // eslint-disable-line react-hooks/exhaustive-deps\n',
       '  // THOUGHT MAP (2/11): computed on every render from what the page already holds; nothing is kept\n' +
         '  const thoughtMap = thoughtMapView({ active: stageAActive.current, phase: stageAPhase, loading, stage: stageAView,\n' +
         '    messagesAtCard: messages.slice(0, rootCardMsgCount.current), allMessages: messages, riskKind: riskSignalKind.current,\n' +
