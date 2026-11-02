@@ -2179,6 +2179,149 @@ function pickKnewSnippet(userMessages) {
   }
   return null;
 }
+// THOUGHT MAP, phase 1 (John, 2/11/2026; ADR «2 Νοεμβρίου»): «Τα λόγια σου στη διαδρομή» — up to 4 phrases the user typed on the way
+// to the root. Pure functions; NOTHING calls them yet (the screen is phase 2, after John's approval). They pick ONLY verbatim phrases
+// from `messages` as they were when the root card opened (the list stageAOpen gets): no model call, no interpretation, nothing
+// stored, sent or logged. The rule was fixed before any measurement and does not change without John's approval.
+const BRANCH_MAX = 4;
+const BRANCH_MAX_CHARS = 200;
+const BRANCH_JACCARD = 0.6;
+const BRANCH_ABBREVIATIONS = ["δηλ", "κλπ", "κτλ", "σελ", "τηλ", "βλ", "αρ", "κα", "κος", "κυρ", "χλμ", "λεπ", "περ", "παρ", "οδ", "εκ", "τμ", "etc", "vs", "dr", "mr", "mrs"];
+// «δεν ξέρω / τίποτα / άστο και αντίστοιχα» (John): besides the app's own checks (rootAnswerIsDismissal, rootAnswerIsUnsure, the closing
+// detectors), two CLOSED lists, matched without accents or case: a phrase that STARTS with «άστο / άσ' το / τίποτα / δεν (το) ξέρω /
+// δεν είμαι σίγουρος-η / δεν έχω ιδέα», and a message with words of not coping. Both only leave a message OUT; neither is a safety
+// detector and neither changes one. In doubt, out: «Δεν ξέρω αν θέλω να μείνω» is left out too.
+const BRANCH_DISMISS_START = /^(?:αστο|ασ το|τιποτα|δεν (?:το )?ξερω|δεν ειμαι σιγουρ(?:ος|οσ|η|ο)|δεν εχω ιδεα|ιδεα δεν εχω)(?![α-ω])/;
+const BRANCH_HEAVY_WORDS = /(?:^|[^α-ω])(?:δεν αντεχω|δεν μπορω αλλο|δεν την παλευω|δεν παλευεται|δεν εχει νοημα|τα παρατησα)(?![α-ω])/;
+// The sentences of a text as exact [start, end) spans (the end mark kept), and whether a cut is UNCERTAIN. A boundary is a run of
+// . ! ? ; ; followed by a space or the end, or a line break. «...» and «…» are NOT a boundary (the thought goes on), nor is a mark with
+// no space after it («3.5», «π.χ», a «!» right before a closing quote). A dot after an abbreviation or a lone letter («π.χ.», «κ.λπ.»,
+// «δηλ.», «Α.») or after
+// a bare number («1.») makes the cut uncertain.
+function branchSentenceSpans(text) {
+  const t = typeof text === "string" ? text : "";
+  const isMark = c => c === "." || c === "!" || c === "?" || c === ";" || c === "\u037e";
+  const raw = [];
+  let start = 0, uncertain = false, i = 0;
+  while (i < t.length) {
+    const c = t[i];
+    if (c === "\n") { raw.push([start, i]); start = i + 1; i++; continue; }
+    if (!isMark(c)) { i++; continue; }
+    let j = i;
+    while (j < t.length && isMark(t[j])) j++;
+    const run = t.slice(i, j);
+    if (/^\.{2,}$/.test(run) || !(j >= t.length || /\s/.test(t[j]))) { i = j; continue; }
+    if (run[0] === ".") {
+      const before = t.slice(start, i);
+      const tok = ((before.match(/(\S+)$/) || [])[1] || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/^[^a-zα-ω0-9]+/, "");
+      if (/^\d+$/.test(before.trim()) || /[a-zα-ω]\.[a-zα-ω]/.test(tok) || /^[a-zα-ω]$/.test(tok) || BRANCH_ABBREVIATIONS.includes(tok)) uncertain = true;
+    }
+    raw.push([start, j]); start = j; i = j;
+  }
+  if (start < t.length) raw.push([start, t.length]);
+  const spans = [];
+  for (const [a, b] of raw) {
+    let s = a, e = b;
+    while (s < e && /\s/.test(t[s])) s++;
+    while (e > s && /\s/.test(t[e - 1])) e--;
+    if (e > s) spans.push([s, e]);
+  }
+  return { spans, uncertain };
+}
+// AURA's message ends in a question: its LAST sentence ends with ? or ; (Greek or Latin) and nothing after it. Anything uncertain → no:
+// a quote or bracket after the mark («…;»), «?!», an uncertain cut anywhere in the message, a last «sentence» with no word.
+function branchAuraEndsWithQuestion(text) {
+  const t = typeof text === "string" ? text.replace(/\s+$/, "") : "";
+  if (!t) return false;
+  const last = t[t.length - 1];
+  if (last !== "?" && last !== ";" && last !== "\u037e") return false;
+  const { spans, uncertain } = branchSentenceSpans(t);
+  if (uncertain || !spans.length) return false;
+  const s = t.slice(spans[spans.length - 1][0], spans[spans.length - 1][1]);
+  const marks = (s.match(/[.!?;\u037e]+$/) || [""])[0];
+  if (/[.!]/.test(marks)) return false;
+  return /[a-zα-ωά-ώϊϋΐΰ]{2,}/i.test(s);
+}
+// Jaccard of the unique words (shared / all). Normalised ONLY for the comparison: NFC, lower case, punctuation and spaces out. The
+// phrase shown stays exactly as typed.
+function branchWords(text) {
+  const t = String(text || "").normalize("NFC").toLowerCase();
+  return new Set(t.split(/[^0-9a-z\u00c0-\u024f\u0386\u0388-\u038a\u038c\u038e-\u03a1\u03a3-\u03ff\u1f00-\u1fff]+/).filter(Boolean));
+}
+function branchJaccard(a, b) {
+  const A = branchWords(a), B = branchWords(b);
+  if (!A.size || !B.size) return 0;
+  let n = 0;
+  for (const w of A) if (B.has(w)) n++;
+  return n / (A.size + B.size - n);
+}
+// pickBranches(messages, found, knew, risk) → [{ text, msg, start, end }] in time order, 0 or 2–4 of them; never null, never throws.
+// `text` === messages[msg].content.slice(start, end): an exact, continuous piece of what the user typed. `messages` = the list as it
+// was when the root card opened: its first user message is the entrance («Τι ήξερες»), its last is the root's own message — neither is
+// a candidate. With `trace` (an object), the reason of every candidate left out is counted there (measurement only; the app never
+// passes it). Safety first: nothing at all when the session carries any risk — the app's latch passed in `risk`, the same latch
+// recomputed from the user's messages (crisis A or B, DISTRESS, danger from another person), AURA's own referral or a help-line number,
+// a supportive reply. The step is not shown there either.
+function pickBranches(messages, found, knew, risk, trace) {
+  const out = [];
+  const tr = trace && typeof trace === "object" ? trace : null;
+  const why = k => { if (tr) tr[k] = (tr[k] || 0) + 1; };
+  try {
+    if (!Array.isArray(messages)) return out;
+    const r = risk && typeof risk === "object" ? risk : {};
+    if (r.safetyMode === true) { why("session_risk"); return out; }
+    let rk = typeof r.riskKind === "number" ? r.riskKind : 0;
+    let dfo = r.dangerFromOther === true;
+    const helpNumber = new RegExp("(?:^|[^0-9])(?:" + HELPLINES.map(h => h.number).join("|") + ")(?![0-9])");
+    let risky = false;
+    for (const m of messages) {
+      if (!m || typeof m.content !== "string") continue;
+      if (m.role === "user") {
+        rk = mergeRiskKind(rk, detectSafetySignal(m.content), classifyCrisisTier(m.content));
+        if (detectsDangerFromOther(m.content)) dfo = true;
+      } else if (m.role === "assistant") {
+        if (m.msgMode === "SUPPORTIVE" || detectsMentalHealthReferral(m.content) || helpNumber.test(m.content)) risky = true;
+      }
+    }
+    if (risky || stageASafetyHold(rk, dfo) || rk !== 0) { why("session_risk"); return out; }
+    const userIdx = [];
+    messages.forEach((m, i) => { if (m && m.role === "user" && typeof m.content === "string") userIdx.push(i); });
+    const fold = x => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+      .replace(/[^a-zα-ω0-9]+/g, " ").replace(/\s+/g, " ").trim();
+    const fFound = fold(found), fKnew = fold(knew);
+    const kept = [];
+    for (const i of userIdx.slice(1, -1)) {
+      const content = messages[i].content;
+      const prev = messages[i - 1];
+      if (!prev || prev.role !== "assistant" || prev.msgMode !== "ANSWER") { why("no_aura_question_before"); continue; }
+      if (!branchAuraEndsWithQuestion(prev.content)) { why("aura_last_sentence_not_question"); continue; }
+      if (detectSafetySignal(content) || detectsDangerFromOther(content)) { why("safety"); continue; }
+      if (rootAnswerIsDismissal(content) || rootAnswerIsUnsure(content) || isExplicitClosure(content) || declaresClosing(content) || matchesClosingWord(content)) { why("dismissal_or_closing"); continue; }
+      if (BRANCH_HEAVY_WORDS.test(fold(content))) { why("heavy_words"); continue; }
+      const { spans, uncertain } = branchSentenceSpans(content);
+      if (uncertain) { why("uncertain_cut"); continue; }
+      const first = spans.find(([a, b]) => substanceOfSentence(content.slice(a, b), KNEW_MIN_SUBSTANCE_WORDS) !== null);
+      if (!first) { why("no_sentence_4_words"); continue; }
+      const text = content.slice(first[0], first[1]);
+      if (text.length > BRANCH_MAX_CHARS) { why("sentence_over_200"); continue; }
+      const fText = fold(text);
+      if (detectSafetySignal(text) || detectsDangerFromOther(text) || rootAnswerIsDismissal(text) || rootAnswerIsUnsure(text) || BRANCH_DISMISS_START.test(fText)) { why("phrase_check"); continue; }
+      if (!fText || (fFound && fFound.includes(fText)) || (fKnew && fKnew.includes(fText))) { why("in_found_or_knew"); continue; }
+      if ((found && branchJaccard(text, found) >= BRANCH_JACCARD) || (knew && branchJaccard(text, knew) >= BRANCH_JACCARD)) { why("like_found_or_knew"); continue; }
+      if (kept.some(k => branchJaccard(text, k.text) >= BRANCH_JACCARD)) { why("repeat"); continue; }
+      kept.push({ text, msg: i, start: first[0], end: first[1] });
+    }
+    if (kept.length < 2) { if (kept.length) why("only_one"); return out; }
+    if (kept.length <= BRANCH_MAX) return kept;
+    const pick = [];
+    for (let k = 0; k < BRANCH_MAX; k++) pick.push(kept[Math.round(k * (kept.length - 1) / (BRANCH_MAX - 1))]);
+    for (let k = 0; k < kept.length - BRANCH_MAX; k++) why("over_4");
+    return pick;
+  } catch (e) {
+    why("error");
+    return [];
+  }
+}
 // A root typed into the flow (door 1's answer, «Διόρθωσε») becomes the root only if at least one of its sentences
 // passes the same rule, with the root's limit. The root itself stays WHOLE (decision «(στ)» 1) — the rule only decides yes/no.
 function rootTextHasSubstance(text) {

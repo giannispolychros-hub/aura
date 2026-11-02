@@ -361,7 +361,9 @@ assert('(Κ) UNCHANGED: the Stage A texts (no new text: the goodbye is the exist
 {
   // UPDATED (31/10, FC4 option Γ, ADR «31 Οκτωβρίου»): test_fc4_locked_line_3110.js holds danger messages on purpose (the line shown at
   // once while the send lock holds) and is left out, like this file itself
-  const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && f !== path.basename(__filename) && f !== 'test_fc4_locked_line_3110.js').map(f => path.join(__dirname, f))
+  // UPDATED (2/11, Thought Map phase 1, ADR «2 Νοεμβρίου»): test_pick_branches.js holds danger and crisis messages on purpose (a session
+  // with one must give NO branches at all) and is left out the same way; that test checks itself that its danger messages are CAUGHT
+  const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && f !== path.basename(__filename) && f !== 'test_fc4_locked_line_3110.js' && f !== 'test_pick_branches.js').map(f => path.join(__dirname, f))
     .concat(['e2e_stress_lib.cjs', 'e2e_stage_a.cjs', 'e2e_stage_a_lib.cjs'].map(f => path.join(ROOT, 'scripts', f)).filter(f => fs.existsSync(f)));
   const STR = /'((?:[^'\\\n]|\\.){3,600})'|"((?:[^"\\\n]|\\.){3,600})"|`((?:[^`\\]|\\.){3,600})`/g;
   const seen = new Set();
