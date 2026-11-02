@@ -3,7 +3,9 @@
 // NOTHING in the app calls pickBranches yet (the screen is phase 2, after John's approval of 10 examples).
 //  (Α) AURA's last sentence is a question — and only then   (Β) the user's phrase: exact, first sentence of ≥ 4 words, ≤ 200 chars
 //  (Γ) what is left out (safety first, dismissals, the entrance, the root, «Τι ήξερες»)   (Δ) repeats (Jaccard ≥ 0.6)
-//  (Ε) how many: 0 / 2–4 / 4 spread over the way   (ΣΤ) never throws, never changes its input, never null
+//  (Ε) how many: 0 / 2–3 / the first, the middle and the last   (ΣΤ) never throws, never changes its input, never null
+// CHANGED (John, 2/11, after his review of phase 1): at most 3 (was 4); a «δεν ξέρω / τίποτα / άστο…» start leaves a phrase out only
+// when no word with content follows (αν, εάν, γιατί, τι, πώς, ποιος/ποια/ποιο, πότε, πού, ή, αλλά, ότι).
 //  (Ζ) phase 1 touched nothing else: not called, no storage / log / network inside, prompt and api unchanged, the rest of the file
 //      byte-identical to main 24aab8e
 // All text here is synthetic; no words of any real session.
@@ -20,7 +22,7 @@ const fnSrc = n => { const a = raw.indexOf('\nfunction ' + n + '('); return a < 
 const constSrc = n => { const a = raw.indexOf('\nconst ' + n + ' = '); if (a < 0) return ''; const eol = raw.indexOf('\n', a + 1);
   const line = raw.slice(a + 1, eol); if (/;\s*(?:\/\/.*)?$/.test(line)) return line; return raw.slice(a + 1, raw.indexOf('\n];', a) + 3); };
 const CONSTS = ['HELPLINES', 'KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_DISMISSALS', 'BRANCH_MAX', 'BRANCH_MAX_CHARS', 'BRANCH_JACCARD', 'BRANCH_ABBREVIATIONS',
-  'BRANCH_DISMISS_START', 'BRANCH_HEAVY_WORDS'];
+  'BRANCH_DISMISS_START', 'BRANCH_HEAVY_WORDS', 'BRANCH_CONTENT_WORDS'];
 const FNS = ['lookBehind', 'detectSafetySignal', 'classifyCrisisTier', 'detectsDangerFromOther', 'detectsMentalHealthReferral', 'mergeRiskKind',
   'stageASafetyHold', 'rootAnswerIsDismissal', 'rootAnswerIsUnsure', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord',
   'substanceOfSentence', 'splitSentences', 'pickKnewSnippet', 'branchSentenceSpans', 'branchAuraEndsWithQuestion', 'branchWords',
@@ -49,7 +51,7 @@ const P4 = 'Κάθε πρωί σηκώνομαι με βάρος στο στομ
 const P5 = 'Ονειρευόμουν να ανοίξω ένα μικρό εργαστήρι κεραμικής στο χωριό.';
 const P6 = 'Ο προϊστάμενος δεν αναγνωρίζει ποτέ τη δουλειά που κάνω.';
 
-assert('(load) all functions and constants load from src/App.jsx', FNS.every(n => typeof F[n] === 'function') && F.BRANCH_MAX === 4 && F.BRANCH_MAX_CHARS === 200 && F.BRANCH_JACCARD === 0.6);
+assert('(load) all functions and constants load from src/App.jsx', FNS.every(n => typeof F[n] === 'function') && F.BRANCH_MAX === 3 && F.BRANCH_MAX_CHARS === 200 && F.BRANCH_JACCARD === 0.6);
 
 // ── (Α) AURA's LAST sentence is a question ─────────────────────────────────────────────────────────────────────────────────────
 const Q = t => call('branchAuraEndsWithQuestion', t);
@@ -112,14 +114,30 @@ const S = t => call('branchSentenceSpans', t);
   assert('(Γ) the first and the last user message are out by position alone (AURA spoke first; a corrected root)', JSON.stringify(texts(iso)) === JSON.stringify([P2, P3]));
   assert('(Γ) a closing message with ≥ 4 words («Αρκετά για σήμερα, κλείνουμε εδώ.») → not picked',
     texts(pick(conv(A('Τι σε κρατάει;'), U('Αρκετά για σήμερα, κλείνουμε εδώ.'), A('Τι θα έχανες;'), U(P2), A('Και η οικογένεια;'), U(P3)))).join('|') === [P2, P3].join('|'));
-  assert('(Γ) «δεν ξέρω» and its kind with ≥ 4 words → not picked («Δεν ξέρω ακόμα τι ακριβώς με απασχολεί.», «Δεν είμαι σίγουρη αν θέλω…», «Ειλικρινά δεν ξέρω τι να πω.»)',
-    texts(pick(conv(A('Τι σε κρατάει;'), U('Δεν ξέρω ακόμα τι ακριβώς με απασχολεί.'), A('Και;'), U('Δεν είμαι σίγουρη αν θέλω να μείνω στη δουλειά.'), A('Και τότε;'), U('Ειλικρινά δεν ξέρω τι να πω.'), A('Τι θα έχανες;'), U(P2), A('Και η οικογένεια;'), U(P3)))).join('|') === [P2, P3].join('|'));
+  // CHANGED (John, 2/11): John's own examples — these two are TAKEN …
+  const KEEP1 = 'Δεν ξέρω αν θέλω να μείνω στη δουλειά.', KEEP2 = 'Δεν ξέρω αν φοβάμαι περισσότερο την αποτυχία ή την αλλαγή.';
+  assert('(Γ) John\'s examples that must pass: «Δεν ξέρω αν θέλω να μείνω στη δουλειά.», «Δεν ξέρω αν φοβάμαι περισσότερο την αποτυχία ή την αλλαγή.»',
+    texts(pick(conv(A('Τι σε κρατάει;'), U(KEEP1), A('Και τι φοβάσαι;'), U(KEEP2)))).join('|') === [KEEP1, KEEP2].join('|'));
+  // … and these four are left out
+  assert('(Γ) John\'s examples that must be left out: «Δεν ξέρω.», «Δεν ξέρω, άστο.», «Δεν ξέρω, δεν έχω καμία ιδέα.», «Δεν είμαι σίγουρη.»',
+    texts(pick(conv(A('α;'), U('Δεν ξέρω.'), A('β;'), U('Δεν ξέρω, άστο.'), A('γ;'), U('Δεν ξέρω, δεν έχω καμία ιδέα.'), A('δ;'), U('Δεν είμαι σίγουρη.'), A('Τι θα έχανες;'), U(P2), A('Και η οικογένεια;'), U(P3)))).join('|') === [P2, P3].join('|'));
+  // the new rule on its own: ≥ 4 words with substance, a «δεν ξέρω / δεν είμαι σίγουρη / τίποτα» start and no word of content after it
+  assert('(Γ) a «δεν ξέρω / δεν είμαι σίγουρη / τίποτα» start with ≥ 4 words but nothing of content after it → left out',
+    texts(pick(conv(A('α;'), U('Δεν ξέρω, ειλικρινά δεν έχω καμία απολύτως ιδέα πια.'), A('β;'), U('Δεν είμαι σίγουρη, έχω μπερδευτεί τελείως σήμερα.'), A('γ;'), U('Τίποτα, απλώς είμαι πολύ κουρασμένη σήμερα.'), A('Τι θα έχανες;'), U(P2), A('Και η οικογένεια;'), U(P3)))).join('|') === [P2, P3].join('|'));
+  assert('(Γ) each word of content after such a start lets the phrase in (αν, εάν, γιατί, τι, πώς, ποιος, ποια, ποιο, πότε, πού, ή, αλλά, ότι)',
+    ['αν', 'εάν', 'γιατί', 'τι', 'πώς', 'ποιος', 'ποια', 'ποιο', 'πότε', 'πού', 'ή', 'αλλά', 'ότι'].every(w => {
+      const y = 'Δεν ξέρω ' + w + ' δουλειά αυτή θα κρατήσει πολύ ακόμα.';
+      return texts(pick(conv(A('Τι σε κρατάει;'), U(y), A('Και τι φοβάσαι;'), U(P2)))).join('|') === [y, P2].join('|'); }) &&
+    texts(pick(conv(A('Τι σε κρατάει;'), U('Δεν ξέρω, δουλειά αυτή θα κρατήσει πολύ ακόμα.'), A('Και τι φοβάσαι;'), U(P2)))).length === 0);
+  assert('(Γ) the app\'s own «δεν ξέρω» check still leaves out what it did («Ειλικρινά δεν ξέρω τι να πω.»)',
+    texts(pick(conv(A('α;'), U('Ειλικρινά δεν ξέρω τι να πω.'), A('Τι θα έχανες;'), U(P2), A('Και η οικογένεια;'), U(P3)))).join('|') === [P2, P3].join('|'));
   assert('(Γ) a phrase that is the root or inside it → not picked', texts(pick(conv(A('Τι σε κρατάει;'), U(P1), A('Τι θα έχανες;'), U(P2), A('Και η οικογένεια;'), U(P3)), P2 + ' Και ' + P3)).join('|') === '');
   assert('(Γ) a phrase that is «Τι ήξερες» or inside it → not picked', texts(pick(conv(A('Τι σε κρατάει;'), U(P1), A('Τι θα έχανες;'), U(P2), A('Και η οικογένεια;'), U(P3)), ROOT_T, P1)).join('|') === [P2, P3].join('|'));
   assert('(Γ) dismissals and «I don\'t know» → not picked («τίποτα, άστο», «Δεν ξέρω.», «άστο, δεν αντέχω»)',
     texts(pick(conv(A('Τι σε κρατάει;'), U('τίποτα, άστο'), A('Και;'), U('Δεν ξέρω.'), A('Και τότε;'), U('άστο, δεν αντέχω'), A('Τι θα έχανες;'), U(P2), A('Και η οικογένεια;'), U(P3)))).join('|') === [P2, P3].join('|'));
-  assert('(Γ) a longer «άστο …» or a message with «δεν αντέχω» is left out even with ≥ 4 words',
-    texts(pick(conv(A('Τι σε κρατάει;'), U('Άστο, δεν έχει σημασία τι θέλω εγώ στη ζωή μου.'), A('Και;'), U('Η δουλειά είναι καλή, αλλά δεν αντέχω τον προϊστάμενο πια.'), A('Τι θα έχανες;'), U(P2), A('Και η οικογένεια;'), U(P3)))).join('|') === [P2, P3].join('|'));
+  // CHANGED (John, 2/11): «Άστο, … τι …» has a word of content after the start, so it is taken now; «δεν αντέχω» still leaves a message out
+  assert('(Γ) a message with «δεν αντέχω» is left out even with ≥ 4 words; «Άστο, δεν έχει σημασία τι θέλω…» (a word of content) is taken',
+    texts(pick(conv(A('Τι σε κρατάει;'), U('Άστο, δεν έχει σημασία τι θέλω εγώ στη ζωή μου.'), A('Και;'), U('Η δουλειά είναι καλή, αλλά δεν αντέχω τον προϊστάμενο πια.'), A('Τι θα έχανες;'), U(P2), A('Και η οικογένεια;'), U(P3)))).join('|') === ['Άστο, δεν έχει σημασία τι θέλω εγώ στη ζωή μου.', P2, P3].join('|'));
   assert('(Γ) a closing message («Ευχαριστώ, κλείνουμε εδώ.») → not picked', texts(pick(conv(A('Τι σε κρατάει;'), U('Ευχαριστώ, κλείνουμε εδώ.'), A('Τι θα έχανες;'), U(P2), A('Και η οικογένεια;'), U(P3)))).join('|') === [P2, P3].join('|'));
   // safety first: the whole session gives nothing
   const crisisMid = conv(A('Τι σε κρατάει;'), U(P1), A('Πώς νιώθεις τελευταία;'), U('Δεν θέλω να ζω άλλο.'), A('Τι θα έχανες;'), U(P2), A('Και η οικογένεια;'), U(P3));
@@ -158,9 +176,11 @@ const S = t => call('branchSentenceSpans', t);
 {
   const mk = n => conv(...[P1, P2, P3, P4, P5, P6].slice(0, n).flatMap((p, i) => [A('Ερώτηση ' + (i + 1) + ';'), U(p)]));
   assert('(Ε) 0 or 1 fitting phrase → nothing (never a lone branch)', pick(mk(0)).length === 0 && pick(mk(1)).length === 0);
-  assert('(Ε) 2, 3, 4 → all of them, in time order', [2, 3, 4].every(n => JSON.stringify(texts(pick(mk(n)))) === JSON.stringify([P1, P2, P3, P4, P5, P6].slice(0, n))));
-  assert('(Ε) 5 → 4 spread over the whole way, first and last in: 1st, 2nd, 4th, 5th', JSON.stringify(texts(pick(mk(5)))) === JSON.stringify([P1, P2, P4, P5]));
-  assert('(Ε) 6 → 1st, 3rd, 4th, 6th — not the last four', JSON.stringify(texts(pick(mk(6)))) === JSON.stringify([P1, P3, P4, P6]));
+  // CHANGED (John, 2/11): at most 3 — the first, the middle (position round((n − 1) / 2)) and the last
+  assert('(Ε) 2, 3 → all of them, in time order', [2, 3].every(n => JSON.stringify(texts(pick(mk(n)))) === JSON.stringify([P1, P2, P3, P4, P5, P6].slice(0, n))));
+  assert('(Ε) 4 → the first, the middle, the last: 1st, 3rd, 4th', JSON.stringify(texts(pick(mk(4)))) === JSON.stringify([P1, P3, P4]));
+  assert('(Ε) 5 → 1st, 3rd, 5th', JSON.stringify(texts(pick(mk(5)))) === JSON.stringify([P1, P3, P5]));
+  assert('(Ε) 6 → 1st, 4th, 6th — never the last three', JSON.stringify(texts(pick(mk(6)))) === JSON.stringify([P1, P4, P6]));
   assert('(Ε) the same input gives the same output (deterministic)', JSON.stringify(pick(mk(6))) === JSON.stringify(pick(mk(6))));
   const tr = {};
   pick(conv(A('Τι σε κρατάει;'), U('Ο μισθός.'), A('Κατάλαβα.'), U(P1), A('Τι θα έχανες;'), U(P2), A('Και η οικογένεια;'), U(P3)), ROOT_T, null, null, tr);

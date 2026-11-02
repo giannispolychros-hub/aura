@@ -2183,15 +2183,20 @@ function pickKnewSnippet(userMessages) {
 // to the root. Pure functions; NOTHING calls them yet (the screen is phase 2, after John's approval). They pick ONLY verbatim phrases
 // from `messages` as they were when the root card opened (the list stageAOpen gets): no model call, no interpretation, nothing
 // stored, sent or logged. The rule was fixed before any measurement and does not change without John's approval.
-const BRANCH_MAX = 4;
+// CHANGED (John, 2/11/2026, after his review of phase 1): at most 3 branches — the first, the middle and the last in time (was 4).
+const BRANCH_MAX = 3;
 const BRANCH_MAX_CHARS = 200;
 const BRANCH_JACCARD = 0.6;
 const BRANCH_ABBREVIATIONS = ["δηλ", "κλπ", "κτλ", "σελ", "τηλ", "βλ", "αρ", "κα", "κος", "κυρ", "χλμ", "λεπ", "περ", "παρ", "οδ", "εκ", "τμ", "etc", "vs", "dr", "mr", "mrs"];
 // «δεν ξέρω / τίποτα / άστο και αντίστοιχα» (John): besides the app's own checks (rootAnswerIsDismissal, rootAnswerIsUnsure, the closing
 // detectors), two CLOSED lists, matched without accents or case: a phrase that STARTS with «άστο / άσ' το / τίποτα / δεν (το) ξέρω /
 // δεν είμαι σίγουρος-η / δεν έχω ιδέα», and a message with words of not coping. Both only leave a message OUT; neither is a safety
-// detector and neither changes one. In doubt, out: «Δεν ξέρω αν θέλω να μείνω» is left out too.
+// detector and neither changes one.
+// CHANGED (John, 2/11/2026, after his review of phase 1): such a start leaves the phrase out ONLY when nothing with content follows it —
+// when the rest of the phrase has none of the words αν, εάν, γιατί, τι, πώς, ποιος / ποια / ποιο, πότε, πού, ή, αλλά, ότι (matched
+// without accents, so «πως», «που», «η» count too). «Δεν ξέρω αν θέλω να μείνω στη δουλειά.» is taken; «Δεν ξέρω, άστο.» is not.
 const BRANCH_DISMISS_START = /^(?:αστο|ασ το|τιποτα|δεν (?:το )?ξερω|δεν ειμαι σιγουρ(?:ος|οσ|η|ο)|δεν εχω ιδεα|ιδεα δεν εχω)(?![α-ω])/;
+const BRANCH_CONTENT_WORDS = /(?:^|[^α-ω])(?:αν|εαν|γιατι|τι|πως|ποιος|ποιοσ|ποια|ποιο|ποτε|που|η|αλλα|οτι)(?![α-ω])/;
 const BRANCH_HEAVY_WORDS = /(?:^|[^α-ω])(?:δεν αντεχω|δεν μπορω αλλο|δεν την παλευω|δεν παλευεται|δεν εχει νοημα|τα παρατησα)(?![α-ω])/;
 // The sentences of a text as exact [start, end) spans (the end mark kept), and whether a cut is UNCERTAIN. A boundary is a run of
 // . ! ? ; ; followed by a space or the end, or a line break. «...» and «…» are NOT a boundary (the thought goes on), nor is a mark with
@@ -2255,7 +2260,8 @@ function branchJaccard(a, b) {
   for (const w of A) if (B.has(w)) n++;
   return n / (A.size + B.size - n);
 }
-// pickBranches(messages, found, knew, risk) → [{ text, msg, start, end }] in time order, 0 or 2–4 of them; never null, never throws.
+// pickBranches(messages, found, knew, risk) → [{ text, msg, start, end }] in time order, 0 or 2–3 of them; never null, never throws.
+// More than 3 that fit → the first, the middle (position round((n − 1) / 2)) and the last.
 // `text` === messages[msg].content.slice(start, end): an exact, continuous piece of what the user typed. `messages` = the list as it
 // was when the root card opened: its first user message is the entrance («Τι ήξερες»), its last is the root's own message — neither is
 // a candidate. With `trace` (an object), the reason of every candidate left out is counted there (measurement only; the app never
@@ -2305,7 +2311,9 @@ function pickBranches(messages, found, knew, risk, trace) {
       const text = content.slice(first[0], first[1]);
       if (text.length > BRANCH_MAX_CHARS) { why("sentence_over_200"); continue; }
       const fText = fold(text);
-      if (detectSafetySignal(text) || detectsDangerFromOther(text) || rootAnswerIsDismissal(text) || rootAnswerIsUnsure(text) || BRANCH_DISMISS_START.test(fText)) { why("phrase_check"); continue; }
+      const dismissStart = fText.match(BRANCH_DISMISS_START);
+      if (detectSafetySignal(text) || detectsDangerFromOther(text) || rootAnswerIsDismissal(text) || rootAnswerIsUnsure(text) ||
+        (dismissStart && !BRANCH_CONTENT_WORDS.test(fText.slice(dismissStart[0].length)))) { why("phrase_check"); continue; }
       if (!fText || (fFound && fFound.includes(fText)) || (fKnew && fKnew.includes(fText))) { why("in_found_or_knew"); continue; }
       if ((found && branchJaccard(text, found) >= BRANCH_JACCARD) || (knew && branchJaccard(text, knew) >= BRANCH_JACCARD)) { why("like_found_or_knew"); continue; }
       if (kept.some(k => branchJaccard(text, k.text) >= BRANCH_JACCARD)) { why("repeat"); continue; }
@@ -2315,7 +2323,7 @@ function pickBranches(messages, found, knew, risk, trace) {
     if (kept.length <= BRANCH_MAX) return kept;
     const pick = [];
     for (let k = 0; k < BRANCH_MAX; k++) pick.push(kept[Math.round(k * (kept.length - 1) / (BRANCH_MAX - 1))]);
-    for (let k = 0; k < kept.length - BRANCH_MAX; k++) why("over_4");
+    for (let k = 0; k < kept.length - BRANCH_MAX; k++) why("over_max");
     return pick;
   } catch (e) {
     why("error");
