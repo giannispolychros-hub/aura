@@ -212,14 +212,16 @@ const VIEW = fnSrc('thoughtMapView') + fnSrc('branchSessionSafe') + fnSrc('pickB
   // RE-BASED (John, 2/11/2026, branch candidate-tm): the base is now 469e194 = main 24aab8e + safety-detectors, exactly as approved. Only
   // the reference moves: the two detectors that safety-detectors changed carry ITS fingerprints (computed from 469e194, not from this
   // branch); the other 19 are the same as on main. Same list, same check (each function byte for byte), same purpose.
-  const MAIN = { detectSafetySignal: '1f7c3cb8fe568f31', classifyCrisisTier: 'afa5cf7a370bb0d5', detectsDangerFromOther: 'dfd68c2a876b1a7b',
+  // RE-BASED again (John, 2/11/2026, ADR «2 Νοεμβρίου (δ)»): safety-detectors moved to 75a2aa9 (the football fix). Only the reference
+  // moves, computed from 75a2aa9 itself; same list, same check, same purpose.
+  const MAIN = { detectSafetySignal: '1f7c3cb8fe568f31', classifyCrisisTier: 'afa5cf7a370bb0d5', detectsDangerFromOther: '5d82ebd017f51e05',
     detectsMentalHealthReferral: 'd03b71d681025b79', mergeRiskKind: 'd3b56f5bad3ae14f', stageASafetyHold: 'f1fbe27ef7643815', stageACaptureAllowed: 'f8a46ebc62fe4ecd',
     initialStageAState: '514233db37b55461', stageAStep: '67bb9bcb504396e8', buildRootStepLines: 'a7f337a9d5e18db5', buildRootEndLines: 'd8486e581871a4fb',
     buildRootCopyText: 'df52b00bf523b132', stageAFlowTelemetry: '92646b9fff31a68f', stageAStepTelemetry: '4962b5c6625fbcd7', stageAHelpTelemetry: 'bb9ea23634eab049',
     stripForeignHelplines: '1230688f6654ee84', buildCrisisLine: 'd359e22dd7cf9a95', buildDangerLine: 'df6f7df2a56379a2', pickKnewSnippet: '0d82ae28ee73256e',
     isVerbatimUserText: '17f490c8ee4ba990', storedTelemetryCount: '905d5655bd54bf28' };
   const diff = Object.keys(MAIN).filter(n => h16(fnSrc(n)) !== MAIN[n]);
-  assert('(Ε) the safety, flow, line, telemetry and memory functions are byte-identical to the base 469e194 (main 24aab8e + safety-detectors)' + (diff.length ? ' — changed: ' + diff.join(', ') : ''), diff.length === 0);
+  assert('(Ε) the safety, flow, line, telemetry and memory functions are byte-identical to the base 75a2aa9 (main 24aab8e + safety-detectors with the fix of 2/11)' + (diff.length ? ' — changed: ' + diff.join(', ') : ''), diff.length === 0);
   const ci = raw.indexOf('const AURA_CORE_PERSONALITY'), cs = raw.indexOf('`', ci) + 1, ce = raw.indexOf('`;', cs);
   assert('(Ε) the prompt is b5f303cc9405aa21', h16(raw.slice(cs, ce)) === 'b5f303cc9405aa21');
 const stripThoughtMap = t => {
@@ -247,8 +249,10 @@ const stripThoughtMap = t => {
   };
   // RE-BASED (John, 2/11/2026, branch candidate-tm): the same strip, the same full sha256 — the reference is now src/App.jsx of 469e194
   // (main 24aab8e + safety-detectors), no longer of 24aab8e
-  assert('(Ε) without the Thought Map pieces (the block of functions, the screen, the one number, the view) src/App.jsx is byte-identical to the base 469e194 (main 24aab8e + safety-detectors)',
-    sha(stripThoughtMap(raw)) === '8dc65d62213d0469cb9a5db35685d0ea133ed5086454a762cbc0bf40c86ca849');
+  // RE-BASED again (John, 2/11/2026, ADR «2 Νοεμβρίου (δ)»): safety-detectors moved to 75a2aa9 (the football fix). Only the reference
+  // moves, computed from 75a2aa9 itself; same list, same check, same purpose.
+  assert('(Ε) without the Thought Map pieces (the block of functions, the screen, the one number, the view) src/App.jsx is byte-identical to the base 75a2aa9 (main 24aab8e + safety-detectors with the fix of 2/11)',
+    sha(stripThoughtMap(raw)) === '039f41c175228c978bdaf7ee4bdc29c46443c61518c6495ea60af53c59782e9c');
   assert('(Ε) api/aura.js is byte-identical to main (c2ce3892c094224d)', h16(fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8')) === 'c2ce3892c094224d');
 }
 

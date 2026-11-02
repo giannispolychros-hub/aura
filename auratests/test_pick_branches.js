@@ -236,8 +236,10 @@ const S = t => call('branchSentenceSpans', t);
   };
   // RE-BASED (John, 2/11/2026, branch candidate-tm): the same strip, the same full sha256 — the reference is now src/App.jsx of 469e194
   // (main 24aab8e + safety-detectors), no longer of 24aab8e
-  assert('(Ζ) the rest of src/App.jsx is byte-identical to the base 469e194 (main 24aab8e + safety-detectors) (the block and the phase-2 pieces aside)',
-    sha(stripThoughtMap(raw)) === '8dc65d62213d0469cb9a5db35685d0ea133ed5086454a762cbc0bf40c86ca849');
+  // RE-BASED again (John, 2/11/2026, ADR «2 Νοεμβρίου (δ)»): safety-detectors moved to 75a2aa9 (the football fix). Only the reference
+  // moves, computed from 75a2aa9 itself; same list, same check, same purpose.
+  assert('(Ζ) the rest of src/App.jsx is byte-identical to the base 75a2aa9 (main 24aab8e + safety-detectors with the fix of 2/11) (the block and the phase-2 pieces aside)',
+    sha(stripThoughtMap(raw)) === '039f41c175228c978bdaf7ee4bdc29c46443c61518c6495ea60af53c59782e9c');
   const fp = fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8').match(/core: \{ length: \d+, sha256: "([0-9a-f]{16})/);
   assert('(Ζ) api/aura.js carries the prompt fingerprint b5f303cc9405aa21', !!fp && fp[1] === 'b5f303cc9405aa21');
   const ci = raw.indexOf('const AURA_CORE_PERSONALITY'), cs = raw.indexOf('`', ci) + 1, ce = raw.indexOf('`;', cs);
