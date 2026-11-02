@@ -1781,6 +1781,13 @@ function detectsDangerFromOther(text) {
     hairAny: S(" με (?:τραβ|εσυρ|σερν)[^ ]* απο τα μαλλια "),                                           // «με τραβάει από τα μαλλιά» (every form)
     bruises: S(" (?:απο|με) (?:τισ )?(?:μπουνιεσ|κλωτσιεσ|σφαλιαρεσ|χαστουκια) (?:του|τησ) "),          // «μελανιές από τις μπουνιές του»
     sport: S(" (?:μποξ|πυγμαχια|πυγμαχιασ|καρατε|ταεκβοντο|προπονηση|προπονησησ|ρινγκ|αγωνα|αγωνασ|ματσ|παιχνιδι) "),
+    // 2/11/2026 (John, a safety fix (α); ADR «2 Νοεμβρίου (δ)»): «μελανιές από τις κλωτσιές του μικρού στο ποδόσφαιρο» is a child at play.
+    // NARROW: only KICKS, only a CHILD right after them (a closed list, then the end or one of a few small words — so never «του μικρού μου
+    // αδερφού»), and only with one of these sport or play-place words in the sentence. An adult («του άντρα μου … στο γήπεδο») or any
+    // other blow still alarms, sport word or not. `sport` above is unchanged.
+    kidKicks: S(" (?:απο|με) (?:τισ )?κλωτσιεσ (?:του|τησ|των) (?=(?:μικρου|μικρησ|μικρων|παιδιου|παιδιων|γιου|κορησ)(?: μου| μασ)? " +
+      "(?:$|(?:στο|στη|στην|στον|στα|στισ|στουσ|σε|μετα|οταν|ενω|καθωσ|παιζοντασ|χθεσ|χτεσ|σημερα) ))"),
+    kidSport: S(" (?:ποδοσφαιρο|ποδοσφαιρου|μπασκετ|βολει|τενισ|χαντμπολ|πολο|γυμναστηριο|γυμναστηριου|γηπεδο|γηπεδου|παιδικη χαρα|παιδικησ χαρασ) "),
     raisedHand: S(" (?:σηκωσε|σηκωνει|σηκωνε) (?:το )?χερι (?:πανω μου |σε μενα )?" + TAIL),            // «Σήμερα πάλι σήκωσε χέρι.»
     throwThings: S(" (?:με|μου) (?:πεταει|πεταξε|πεταγε|πετουσε|εριξε|ριχνει) (?:πραγματα|πιατα|ποτηρια|καρεκλεσ) " + TAIL),
     childBare: S("^ (?:χτυπαει|χτυπησε|χτυπουσε|δερνει|εδειρε) " + CHILD + " " + TAIL),                 // «Χτυπάει το παιδί.»
@@ -1808,7 +1815,9 @@ function detectsDangerFromOther(text) {
       (R.partnerKill.test(s) && R.partner.test(s)) ||
       // 31/10/2026 (ADR «31 Οκτωβρίου (ζ)»): the new narrow rules — none of them where «δεν / μη» comes right before
       [R.hitBare, R.hitWitness, R.threatBare, R.scareHome, R.pushBare, R.lockIn, R.rapeBare, R.brokeBody].some(re => any(re, s, b => yes(b) && !R.artBefore.test(b))) ||
-      any(R.noLeave, s, () => true) || any(R.killIf, s, yes) || R.hairAny.test(s) || (R.bruises.test(s) && !R.sport.test(s)) ||
+      any(R.noLeave, s, () => true) || any(R.killIf, s, yes) || R.hairAny.test(s) ||
+      // 2/11: a child's kicks with a sport or play-place word are taken out first; any other «από τις … του / της» still reads
+      (R.bruises.test(R.kidSport.test(s) ? s.replace(new RegExp(R.kidKicks.source, "g"), " ") : s) && !R.sport.test(s)) ||
       [R.raisedHand, R.throwThings].some(re => any(re, s, b => yes(b) && (person || !R.subject.test(s))));
     const child = (R.childHit.test(s) && person) || R.childBeat.test(s) || (R.threat.test(s) && R.harmChild.test(s)) ||
       R.childBare.test(s) || (R.childHit.test(s) && R.onlyPerson.test(s));                   // 31/10: «Χτυπάει το παιδί.», «… όταν θυμώνει.»
