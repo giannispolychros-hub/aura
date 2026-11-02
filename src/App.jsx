@@ -2215,6 +2215,219 @@ function pickKnewSnippet(userMessages) {
   }
   return null;
 }
+// THOUGHT MAP, phase 1 (John, 2/11/2026; ADR «2 Νοεμβρίου»): «Τα λόγια σου στη διαδρομή» — up to 4 phrases the user typed on the way
+// to the root. Pure functions; since phase 2 (approved by John, 2/11) only the Thought Map screen calls them, through thoughtMapView. They pick ONLY verbatim phrases
+// from `messages` as they were when the root card opened (the list stageAOpen gets): no model call, no interpretation, nothing
+// stored, sent or logged. The rule was fixed before any measurement and does not change without John's approval.
+// CHANGED (John, 2/11/2026, after his review of phase 1): at most 3 branches — the first, the middle and the last in time (was 4).
+const BRANCH_MAX = 3;
+const BRANCH_MAX_CHARS = 200;
+const BRANCH_JACCARD = 0.6;
+const BRANCH_ABBREVIATIONS = ["δηλ", "κλπ", "κτλ", "σελ", "τηλ", "βλ", "αρ", "κα", "κος", "κυρ", "χλμ", "λεπ", "περ", "παρ", "οδ", "εκ", "τμ", "etc", "vs", "dr", "mr", "mrs"];
+// «δεν ξέρω / τίποτα / άστο και αντίστοιχα» (John): besides the app's own checks (rootAnswerIsDismissal, rootAnswerIsUnsure, the closing
+// detectors), two CLOSED lists, matched without accents or case: a phrase that STARTS with «άστο / άσ' το / τίποτα / δεν (το) ξέρω /
+// δεν είμαι σίγουρος-η / δεν έχω ιδέα», and a message with words of not coping. Both only leave a message OUT; neither is a safety
+// detector and neither changes one.
+// CHANGED (John, 2/11/2026, after his review of phase 1): such a start leaves the phrase out ONLY when nothing with content follows it —
+// when the rest of the phrase has none of the words αν, εάν, γιατί, τι, πώς, ποιος / ποια / ποιο, πότε, πού, ή, αλλά, ότι (matched
+// without accents, so «πως», «που», «η» count too). «Δεν ξέρω αν θέλω να μείνω στη δουλειά.» is taken; «Δεν ξέρω, άστο.» is not.
+const BRANCH_DISMISS_START = /^(?:αστο|ασ το|τιποτα|δεν (?:το )?ξερω|δεν ειμαι σιγουρ(?:ος|οσ|η|ο)|δεν εχω ιδεα|ιδεα δεν εχω)(?![α-ω])/;
+const BRANCH_CONTENT_WORDS = /(?:^|[^α-ω])(?:αν|εαν|γιατι|τι|πως|ποιος|ποιοσ|ποια|ποιο|ποτε|που|η|αλλα|οτι)(?![α-ω])/;
+const BRANCH_HEAVY_WORDS = /(?:^|[^α-ω])(?:δεν αντεχω|δεν μπορω αλλο|δεν την παλευω|δεν παλευεται|δεν εχει νοημα|τα παρατησα)(?![α-ω])/;
+// The sentences of a text as exact [start, end) spans (the end mark kept), and whether a cut is UNCERTAIN. A boundary is a run of
+// . ! ? ; ; followed by a space or the end, or a line break. «...» and «…» are NOT a boundary (the thought goes on), nor is a mark with
+// no space after it («3.5», «π.χ», a «!» right before a closing quote). A dot after an abbreviation or a lone letter («π.χ.», «κ.λπ.»,
+// «δηλ.», «Α.») or after
+// a bare number («1.») makes the cut uncertain.
+function branchSentenceSpans(text) {
+  const t = typeof text === "string" ? text : "";
+  const isMark = c => c === "." || c === "!" || c === "?" || c === ";" || c === "\u037e";
+  const raw = [];
+  let start = 0, uncertain = false, i = 0;
+  while (i < t.length) {
+    const c = t[i];
+    if (c === "\n") { raw.push([start, i]); start = i + 1; i++; continue; }
+    if (!isMark(c)) { i++; continue; }
+    let j = i;
+    while (j < t.length && isMark(t[j])) j++;
+    const run = t.slice(i, j);
+    if (/^\.{2,}$/.test(run) || !(j >= t.length || /\s/.test(t[j]))) { i = j; continue; }
+    if (run[0] === ".") {
+      const before = t.slice(start, i);
+      const tok = ((before.match(/(\S+)$/) || [])[1] || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/^[^a-zα-ω0-9]+/, "");
+      if (/^\d+$/.test(before.trim()) || /[a-zα-ω]\.[a-zα-ω]/.test(tok) || /^[a-zα-ω]$/.test(tok) || BRANCH_ABBREVIATIONS.includes(tok)) uncertain = true;
+    }
+    raw.push([start, j]); start = j; i = j;
+  }
+  if (start < t.length) raw.push([start, t.length]);
+  const spans = [];
+  for (const [a, b] of raw) {
+    let s = a, e = b;
+    while (s < e && /\s/.test(t[s])) s++;
+    while (e > s && /\s/.test(t[e - 1])) e--;
+    if (e > s) spans.push([s, e]);
+  }
+  return { spans, uncertain };
+}
+// AURA's message ends in a question: its LAST sentence ends with ? or ; (Greek or Latin) and nothing after it. Anything uncertain → no:
+// a quote or bracket after the mark («…;»), «?!», an uncertain cut anywhere in the message, a last «sentence» with no word.
+function branchAuraEndsWithQuestion(text) {
+  const t = typeof text === "string" ? text.replace(/\s+$/, "") : "";
+  if (!t) return false;
+  const last = t[t.length - 1];
+  if (last !== "?" && last !== ";" && last !== "\u037e") return false;
+  const { spans, uncertain } = branchSentenceSpans(t);
+  if (uncertain || !spans.length) return false;
+  const s = t.slice(spans[spans.length - 1][0], spans[spans.length - 1][1]);
+  const marks = (s.match(/[.!?;\u037e]+$/) || [""])[0];
+  if (/[.!]/.test(marks)) return false;
+  return /[a-zα-ωά-ώϊϋΐΰ]{2,}/i.test(s);
+}
+// Jaccard of the unique words (shared / all). Normalised ONLY for the comparison: NFC, lower case, punctuation and spaces out. The
+// phrase shown stays exactly as typed.
+function branchWords(text) {
+  const t = String(text || "").normalize("NFC").toLowerCase();
+  return new Set(t.split(/[^0-9a-z\u00c0-\u024f\u0386\u0388-\u038a\u038c\u038e-\u03a1\u03a3-\u03ff\u1f00-\u1fff]+/).filter(Boolean));
+}
+function branchJaccard(a, b) {
+  const A = branchWords(a), B = branchWords(b);
+  if (!A.size || !B.size) return 0;
+  let n = 0;
+  for (const w of A) if (B.has(w)) n++;
+  return n / (A.size + B.size - n);
+}
+// pickBranches(messages, found, knew, risk) → [{ text, msg, start, end }] in time order, 0 or 2–3 of them; never null, never throws.
+// More than 3 that fit → the first, the middle (position round((n − 1) / 2)) and the last.
+// `text` === messages[msg].content.slice(start, end): an exact, continuous piece of what the user typed. `messages` = the list as it
+// was when the root card opened: its first user message is the entrance («Τι ήξερες»), its last is the root's own message — neither is
+// a candidate. With `trace` (an object), the reason of every candidate left out is counted there (measurement only; the app never
+// passes it). Safety first: nothing at all when the session carries any risk — the app's latch passed in `risk`, the same latch
+// recomputed from the user's messages (crisis A or B, DISTRESS, danger from another person), AURA's own referral or a help-line number,
+// a supportive reply. The step is not shown there either.
+// Safety first, for the whole session (phase 2: the same check, moved out of pickBranches unchanged, so the Thought Map screen reads it
+// too): false when the app's latch passed in `risk` holds anything (crisis A or B, DISTRESS, danger from another person, safety mode),
+// when the same latch recomputed from the user's messages does, or when an AURA message is supportive, refers to a psychologist /
+// psychiatrist or carries a number of the help-line table. The detectors are only called, never changed.
+function branchSessionSafe(messages, risk) {
+  if (!Array.isArray(messages)) return false;
+  const r = risk && typeof risk === "object" ? risk : {};
+  if (r.safetyMode === true) return false;
+  let rk = typeof r.riskKind === "number" ? r.riskKind : 0;
+  let dfo = r.dangerFromOther === true;
+  const helpNumber = new RegExp("(?:^|[^0-9])(?:" + HELPLINES.map(h => h.number).join("|") + ")(?![0-9])");
+  let risky = false;
+  for (const m of messages) {
+    if (!m || typeof m.content !== "string") continue;
+    if (m.role === "user") {
+      rk = mergeRiskKind(rk, detectSafetySignal(m.content), classifyCrisisTier(m.content));
+      if (detectsDangerFromOther(m.content)) dfo = true;
+    } else if (m.role === "assistant") {
+      if (m.msgMode === "SUPPORTIVE" || detectsMentalHealthReferral(m.content) || helpNumber.test(m.content)) risky = true;
+    }
+  }
+  return !(risky || stageASafetyHold(rk, dfo) || rk !== 0);
+}
+function pickBranches(messages, found, knew, risk, trace) {
+  const out = [];
+  const tr = trace && typeof trace === "object" ? trace : null;
+  const why = k => { if (tr) tr[k] = (tr[k] || 0) + 1; };
+  try {
+    if (!Array.isArray(messages)) return out;
+    if (!branchSessionSafe(messages, risk)) { why("session_risk"); return out; }
+    const userIdx = [];
+    messages.forEach((m, i) => { if (m && m.role === "user" && typeof m.content === "string") userIdx.push(i); });
+    const fold = x => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+      .replace(/[^a-zα-ω0-9]+/g, " ").replace(/\s+/g, " ").trim();
+    const fFound = fold(found), fKnew = fold(knew);
+    const kept = [];
+    for (const i of userIdx.slice(1, -1)) {
+      const content = messages[i].content;
+      const prev = messages[i - 1];
+      if (!prev || prev.role !== "assistant" || prev.msgMode !== "ANSWER") { why("no_aura_question_before"); continue; }
+      if (!branchAuraEndsWithQuestion(prev.content)) { why("aura_last_sentence_not_question"); continue; }
+      if (detectSafetySignal(content) || detectsDangerFromOther(content)) { why("safety"); continue; }
+      if (rootAnswerIsDismissal(content) || rootAnswerIsUnsure(content) || isExplicitClosure(content) || declaresClosing(content) || matchesClosingWord(content)) { why("dismissal_or_closing"); continue; }
+      if (BRANCH_HEAVY_WORDS.test(fold(content))) { why("heavy_words"); continue; }
+      const { spans, uncertain } = branchSentenceSpans(content);
+      if (uncertain) { why("uncertain_cut"); continue; }
+      const first = spans.find(([a, b]) => substanceOfSentence(content.slice(a, b), KNEW_MIN_SUBSTANCE_WORDS) !== null);
+      if (!first) { why("no_sentence_4_words"); continue; }
+      const text = content.slice(first[0], first[1]);
+      if (text.length > BRANCH_MAX_CHARS) { why("sentence_over_200"); continue; }
+      const fText = fold(text);
+      const dismissStart = fText.match(BRANCH_DISMISS_START);
+      if (detectSafetySignal(text) || detectsDangerFromOther(text) || rootAnswerIsDismissal(text) || rootAnswerIsUnsure(text) ||
+        (dismissStart && !BRANCH_CONTENT_WORDS.test(fText.slice(dismissStart[0].length)))) { why("phrase_check"); continue; }
+      if (!fText || (fFound && fFound.includes(fText)) || (fKnew && fKnew.includes(fText))) { why("in_found_or_knew"); continue; }
+      if ((found && branchJaccard(text, found) >= BRANCH_JACCARD) || (knew && branchJaccard(text, knew) >= BRANCH_JACCARD)) { why("like_found_or_knew"); continue; }
+      if (kept.some(k => branchJaccard(text, k.text) >= BRANCH_JACCARD)) { why("repeat"); continue; }
+      kept.push({ text, msg: i, start: first[0], end: first[1] });
+    }
+    if (kept.length < 2) { if (kept.length) why("only_one"); return out; }
+    if (kept.length <= BRANCH_MAX) return kept;
+    const pick = [];
+    for (let k = 0; k < BRANCH_MAX; k++) pick.push(kept[Math.round(k * (kept.length - 1) / (BRANCH_MAX - 1))]);
+    for (let k = 0; k < kept.length - BRANCH_MAX; k++) why("over_max");
+    return pick;
+  } catch (e) {
+    why("error");
+    return [];
+  }
+}
+// THOUGHT MAP, phase 2 (John, 2/11/2026; ADR «2 Νοεμβρίου (β)») — the screen at the very END of the existing flow (phase "done": the
+// step, the clarity question, the word and the closing are all over). John's texts, word for word. Display only: nothing here is
+// stored, sent, logged, copied or downloaded, and no model is called.
+// CHANGED (John, 2/11/2026, the look of the screen): the root gets its own card with the small label «Η ΡΙΖΑ» (drawn in capitals by the
+// app's existing label style, like the other labels).
+const THOUGHT_MAP_TEXTS = {
+  rootLabel: "Η ρίζα",
+  rootNote: "Αυτή είναι η ρίζα που αναγνώρισες και επιβεβαίωσες.",
+  branchesTitle: "Τα λόγια σου στη διαδρομή",
+  knewTitle: "Πώς μπήκες",
+  closing: "Ωραία, το πρώτο επόμενο βήμα είναι αυτό.",
+};
+// What the screen shows, or null. null wherever the step is not allowed today and on ANY safety stop: crisis A or B, DISTRESS, danger
+// from another person, the safety hold, safety mode, the failed-call crisis line, the step stopped by a safety signal, the risk end of
+// «Ναι» (riskOffer) — and the whole session checked again (branchSessionSafe). The root and the step are the user's own words as the
+// flow kept them; the branches come from pickBranches on the messages as they were when the root card opened (`messagesAtCard`).
+function thoughtMapView(o) {
+  try {
+    const x = o || {};
+    const st = x.stage || {};
+    if (x.active !== true || x.phase !== "done" || x.loading === true) return null;
+    if (!st.stats || st.stats.rootConfirmed !== 1 || st.riskOffer === true || (st.stepEnd !== "card" && st.stepEnd !== "none")) return null;
+    const risk = { riskKind: typeof x.riskKind === "number" ? x.riskKind : 0, dangerFromOther: x.dangerFromOther === true, safetyMode: x.safetyMode === true };
+    if (risk.riskKind !== 0 || risk.dangerFromOther || risk.safetyMode || x.crisisFallback) return null;
+    if (!branchSessionSafe(x.allMessages, risk)) return null;
+    const root = typeof st.found === "string" ? st.found.trim() : "";
+    if (!root) return null;
+    const branches = pickBranches(x.messagesAtCard, root, st.knew, risk).map(b => b.text);
+    const knew = typeof st.knew === "string" && st.knew.trim() ? st.knew + (st.knewTruncated ? "…" : "") : null;
+    const step = st.stepEnd === "card" && typeof st.step === "string" ? st.step.trim() : "";
+    const when = step && typeof st.when === "string" ? st.when.trim() : "";
+    return { root, branches: branches.length >= 2 ? branches : [], knew, step, when, closing: !!step };
+  } catch (e) {
+    return null;
+  }
+}
+// «Πώς μπήκες» starts with a capital like the rest (John, 2/11/2026) — ON THE SCREEN ONLY: the text the flow keeps, copies and downloads
+// is never changed. Only when the first character is a small Greek letter whose capital is one letter that turns back into the same
+// small letter (ά → Ά, θ → Θ). Anything else stays exactly as typed: a Latin word (iPhone), a number, a quote, ΐ / ΰ, a final ς.
+function thoughtMapCapFirst(text) {
+  if (typeof text !== "string" || !text) return text;
+  const c = text[0];
+  if (!/^[ά-ώ]$/.test(c)) return text;
+  const C = c.toUpperCase();
+  return C.length === 1 && C !== c && C.toLowerCase() === c ? C + text.slice(1) : text;
+}
+// The ONE thing the map may record (John, 2/11/2026): with ?rec=1 only, how many branches it shows — 0, 2 or 3 — as one integer,
+// `branchCount`. No text, no identifier, no other field. null = record nothing. recordTelemetry (unchanged) still drops anything
+// that is not a small integer or a yes/no, and the tester export (unchanged) filters again.
+function thoughtMapRecFields(view, recOn) {
+  if (recOn !== true || !view || !Array.isArray(view.branches)) return null;
+  const n = view.branches.length;
+  return n === 0 || n === 2 || n === 3 ? { branchCount: n } : null;
+}
 // A root typed into the flow (door 1's answer, «Διόρθωσε») becomes the root only if at least one of its sentences
 // passes the same rule, with the root's limit. The root itself stays WHOLE (decision «(στ)» 1) — the rule only decides yes/no.
 function rootTextHasSubstance(text) {
@@ -6953,6 +7166,11 @@ export default function AURAv2() {
   const cleanLabels = useCallback((t) => { const r = stripInternalLabels(t); if (r.count) labelLeaks.current += r.count; return stripPressurePhrases(stripRootDeclaration(stripForeignHelplines(r.text))); }, []);
   // P4 (ADR «11 Οκτωβρίου (ζ)»): the door of the card shown, as root_card_shown logged it — read when the root is confirmed.
   const lastCardDoor = useRef(0);
+  // THOUGHT MAP (John, 2/11/2026, ADR «2 Νοεμβρίου (β)»): how many messages there were when the root card opened — a number only, page
+  // memory only; the screen reads `messages` up to it. Never stored, sent or logged.
+  const rootCardMsgCount = useRef(0);
+  // THOUGHT MAP (John, 2/11/2026): the map's one record (branchCount, ?rec=1 only) is written once per session — reset with the session
+  const thoughtMapLogged = useRef(false);
   const stageADispatch = useCallback((ev) => {
     const _prev = stageARef.current;
     stageARef.current = stageAStep(_prev, ev);
@@ -6992,6 +7210,7 @@ export default function AURAv2() {
       riskKind: riskSignalKind.current,
     });
     if (stageARef.current.phase === "card") rootCardOpenedOnce.current = true;
+    if (stageARef.current.phase === "card") rootCardMsgCount.current = (msgsNow || []).length; // Thought Map (2/11): a number only
   }, [stageADispatch]);
   // ROOT MEASUREMENT (β) — John, 31/10/2026 (ADR «31 Οκτωβρίου (δ)»): an answer to the root question that is a dismissal of the closed
   // list (rootAnswerIsDismissal) is never a card. Called from handleSubmit only after the crisis and danger checks of the message.
@@ -9382,6 +9601,19 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setAwaitingRememberedWord(true);
   }, [stageADispatch, appendClosingMessage]);
   const stageAView = stageARef.current;
+  // THOUGHT MAP (2/11): computed on every render from what the page already holds; nothing is kept
+  const thoughtMap = thoughtMapView({ active: stageAActive.current, phase: stageAPhase, loading, stage: stageAView,
+    messagesAtCard: messages.slice(0, rootCardMsgCount.current), allMessages: messages, riskKind: riskSignalKind.current,
+    dangerFromOther: dangerFromOther.current, safetyMode, crisisFallback });
+  // THOUGHT MAP (John, 2/11/2026): when the map first shows in a session and ?rec=1 is on — ONE integer, branchCount (0, 2 or 3).
+  // Nothing without ?rec=1; nothing else ever (thoughtMapRecFields builds the only fields; recordTelemetry drops anything else).
+  const thoughtMapShown = thoughtMap !== null;
+  useEffect(() => {
+    if (!thoughtMapShown || thoughtMapLogged.current) return;
+    thoughtMapLogged.current = true;
+    const f = thoughtMapRecFields(thoughtMap, recMode.current);
+    if (f) recordTelemetry("thought_map", f);
+  }, [thoughtMapShown]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleKey = (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
@@ -9429,6 +9661,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     coreReadinessConfirmed.current = false;
     freeActionOffered.current = 0; freeDeferral.current = 0; askedActionBeforeRoot.current = false; rootCardOpenedOnce.current = false;
     riskSignalKind.current = 0; labelLeaks.current = 0; dangerFromOther.current = false; dangerLineShown.current = [];
+    rootCardMsgCount.current = 0; // Thought Map (2/11)
+    thoughtMapLogged.current = false; // Thought Map (2/11): the map's one record, once per session
     stageARef.current = initialStageAState(); stageARootArmed.current = false; setStageAPhase(null); lastCardDoor.current = 0;
     setUiBubbles([]);
     abandonMark.current = { started: false, ended: false, done: false };
@@ -10314,6 +10548,52 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                       <button key={n} className="choice-btn" style={{minWidth:"38px"}} onClick={() => handleStageAClarity(n)}>{n}</button>
                     ))}
                   </div>
+                </div>
+              )}
+              {/* THOUGHT MAP (John, 2/11/2026, ADR «2 Νοεμβρίου (β)») — at the very end of the flow, display only.
+                  CHANGED (John, 2/11/2026, the look only — no new logic, data or text besides the label «Η ΡΙΖΑ» he asked for; ONLY the app's
+                  existing colours, fonts and label styles): (1) the root is its own card, the strongest thing on the screen — the label
+                  «Η ΡΙΖΑ», the root, John's line under it; (2) «Τα λόγια σου στη διαδρομή» only with 2 or more branches (otherwise nothing
+                  at all, no empty box, no dash), each branch in a box of its own, its words whole, with NO line, arrow or trunk to the root
+                  (no connecting lines at all); (3) «Πώς μπήκες» a block of its own after the branches, its first letter a capital on the
+                  screen only (thoughtMapCapFirst); (4) «Τι θα κάνεις» / «Πότε» inside one frame, apart from the exploration; (5) the closing
+                  line larger and calmer, without a frame. In the normal flow of the page — no fixed or absolute position, no z-index — so it
+                  can never cover the crisis or danger box. The two card buttons below («Αντίγραψε» / «Κατέβασε») are unchanged and never
+                  carry the branches. */}
+              {thoughtMap && (
+                <div data-thought-map="1" style={{margin:"20px 0 8px 0",maxWidth:"100%"}}>
+                  <div data-tm-root="1" style={{border:"1px solid rgba(201,168,76,0.5)",background:"rgba(201,168,76,.08)",borderRadius:"4px",padding:"16px 16px 14px 16px",marginBottom:"30px"}}>
+                    <div className="mem-label">{THOUGHT_MAP_TEXTS.rootLabel}</div>
+                    <div data-tm-root-text="1" style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",lineHeight:1.4,color:"var(--gold-text)",overflowWrap:"anywhere"}}>«{thoughtMap.root}»</div>
+                    <div style={{fontSize:"11px",lineHeight:1.6,color:"var(--text-secondary)",marginTop:"10px"}}>{THOUGHT_MAP_TEXTS.rootNote}</div>
+                  </div>
+                  {thoughtMap.branches.length >= 2 && (
+                    <div data-tm-branches="1" style={{marginBottom:"24px"}}>
+                      <div className="warning-label" style={{fontSize:"9px"}}>{THOUGHT_MAP_TEXTS.branchesTitle}</div>
+                      {thoughtMap.branches.map((b, i) => (
+                        <div key={i} data-tm-branch="1" style={{border:"1px solid #2a2a2a",borderRadius:"4px",padding:"10px 12px",fontSize:"13px",lineHeight:1.7,color:"#f6eee0",margin:"0 0 8px 0",overflowWrap:"anywhere"}}>«{b}»</div>
+                      ))}
+                    </div>
+                  )}
+                  {thoughtMap.knew && (
+                    <div data-tm-knew="1" style={{background:"var(--border-mid)",borderRadius:"4px",padding:"12px 14px",marginBottom:"30px"}}>
+                      <div className="warning-label" style={{fontSize:"9px"}}>{THOUGHT_MAP_TEXTS.knewTitle}</div>
+                      <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"16px",lineHeight:1.55,color:"#c3bdb3",fontStyle:"italic",overflowWrap:"anywhere"}}>«{thoughtMapCapFirst(thoughtMap.knew)}»</div>
+                    </div>
+                  )}
+                  {thoughtMap.step && (
+                    <div data-tm-step="1" style={{border:"1px solid rgba(201,168,76,0.25)",borderRadius:"4px",padding:"14px 16px"}}>
+                      <div className="warning-label" style={{fontSize:"9px"}}>{STAGE_A_TEXTS.doLabel}</div>
+                      <div style={{fontSize:"13px",lineHeight:1.7,color:"#f6eee0",overflowWrap:"anywhere"}}>«{thoughtMap.step}»</div>
+                      {thoughtMap.when && (
+                        <>
+                          <div className="warning-label" style={{fontSize:"9px",marginTop:"12px"}}>{STAGE_A_TEXTS.whenLabel}</div>
+                          <div style={{fontSize:"13px",lineHeight:1.7,color:"#f6eee0",overflowWrap:"anywhere"}}>«{thoughtMap.when}»</div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {thoughtMap.closing && <div data-tm-closing="1" style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"20px",lineHeight:1.5,color:"#ddd6cd",margin:"20px 0 4px 0",overflowWrap:"anywhere"}}>{THOUGHT_MAP_TEXTS.closing}</div>}
                 </div>
               )}
               {/* ADR «17 Οκτωβρίου (δ)», (ε): not while the step's questions are open, never after a safety stop; with the step card,

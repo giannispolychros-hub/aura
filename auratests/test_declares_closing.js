@@ -246,8 +246,13 @@ assert('the pair is still pushed when the message is a real answer — the guard
 // stageAAfterCrisisText — the SAME two detectors (`isExplicitClosure(u) || declaresClosing(u)`) on the whole message, and again on
 // each of its sentences, to tell a goodbye after the crisis line from a message that still talks about the difficulty. Stage A
 // only (switch closed: null). Additive, replaces nothing; the detector itself is unchanged (test_after_crisis_1910.js pins it).
+// UPDATED (2/11/2026, Thought Map phase 1, ADR «2 Νοεμβρίου»; phase 2: called only by the Thought Map screen, thoughtMapView): pickBranches reads the SAME detector,
+// unchanged, only to LEAVE a closing message out of «Τα λόγια σου στη διαδρομή». The count of the flow's call sites is the same 15, now
+// read outside that block; the block's own use is pinned apart (exactly one).
+const _tm = (() => { const a = raw.indexOf('// THOUGHT MAP, phase 1'); const b = raw.indexOf("// A root typed into the flow (door 1's answer"); return a < 0 || b < a ? '' : raw.slice(a, b); })();
 assert('exactly fifteen call sites are wired, matching the current stated scope',
-  (raw.match(/declaresClosing\s*\(/g) || []).length === 16); // 15 call sites + the definition
+  (raw.replace(_tm, '').match(/declaresClosing\s*\(/g) || []).length === 16); // 15 call sites + the definition
+assert('the Thought Map block (phase 1) reads it once, only to leave a message out', (_tm.match(/declaresClosing\s*\(/g) || []).length === 1);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);

@@ -124,7 +124,9 @@ if ([crisis, tier, danger, crisisLine, dangerLine].every(f => typeof f === 'func
 }
 // ── (Ε) nothing else changed ───────────────────────────────────────────────────────────────────────────────────────────────────────
 const cut = (s, n) => { const a = s.indexOf('\nfunction ' + n + '('); const e = s.indexOf('\n}', a + 1) + 2; return s.slice(0, a + 1) + 'function ' + n + '(){}' + s.slice(e); };
-assert('(Ε) src/App.jsx outside the two detectors is byte-identical to main 24aab8e', h(cut(cut(raw, 'detectSafetySignal'), 'detectsDangerFromOther')) === '81472788a4552b9d');
+// RE-BASED (John, 2/11/2026, branch candidate-tm): the same cut of the two detectors, the same fingerprint — the reference is now
+// src/App.jsx of thought-map bf93c7c (main 24aab8e + the Thought Map, exactly as approved), no longer of 24aab8e
+assert('(Ε) src/App.jsx outside the two detectors is byte-identical to thought-map bf93c7c (main 24aab8e + the Thought Map)', h(cut(cut(raw, 'detectSafetySignal'), 'detectsDangerFromOther')) === '2592ee046186e524');
 assert('(Ε) api/aura.js is byte-identical to main 24aab8e', h(fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8')) === 'c2ce3892c094224d');
 const fp = fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8').match(/core: \{ length: \d+, sha256: "([0-9a-f]{16})/);
 assert('(Ε) the prompt fingerprint is still b5f303cc9405aa21', !!fp && fp[1] === 'b5f303cc9405aa21');

@@ -122,8 +122,14 @@ assert('(Δ) … then «Δεν το βρήκα ακόμα» (event «back»: no 
   /stageADispatch\(\{ type: "back" \}\);\s*return true;/.test(lv) && !/generateResponse|callAura|stageAOpen\(|recordTelemetry|setSessionEnded/.test(DS));
 assert('(Δ) at any other root question → «back» and false: the message goes on as «Δεν ξέρω» does today',
   /\}\s*stageADispatch\(\{ type: "back" \}\);\s*return false;\s*$/.test(DS));
+// UPDATED (2/11/2026, Thought Map phase 1, ADR «2 Νοεμβρίου»; phase 2: called only by the Thought Map screen, thoughtMapView): pickBranches reads the SAME check,
+// unchanged, only to LEAVE a dismissal out of «Τα λόγια σου στη διαδρομή» (the message and its phrase). In the flow it is still read at
+// one place only — counted outside that block; the block's two uses are pinned apart.
+const _tm = (() => { const a = CODE.indexOf('// THOUGHT MAP, phase 1'); const b = CODE.indexOf("// A root typed into the flow (door 1's answer"); return a < 0 || b < a ? '' : CODE.slice(a, b); })();
 assert('(Δ) the check is read at one place only, the goodbye chooser and the helper too',
-  (CODE.split('rootAnswerIsDismissal(').length - 1) === 2 && (CODE.split('stageADismissalGoodbye(').length - 1) === 2 && (CODE.split('stageADismiss(').length - 1) === 1);
+  (CODE.replace(_tm, '').split('rootAnswerIsDismissal(').length - 1) === 2 && (CODE.split('stageADismissalGoodbye(').length - 1) === 2 && (CODE.split('stageADismiss(').length - 1) === 1);
+assert('(Δ) the Thought Map block (phase 1) reads it twice, only to leave a dismissal out, and never the goodbye or stageADismiss',
+  (_tm.split('rootAnswerIsDismissal(').length - 1) === 2 && !/stageADismissalGoodbye|stageADismiss\(/.test(_tm));
 assert('(Δ) the door-3 path and the step answers are not touched', !/rootAnswerIsDismissal|stageADismiss/.test(CODE.slice(CODE.indexOf('// STAGE A — door 2 (§1.4, §1.5).'), CODE.indexOf('// STAGE A — door 2 (§1.4, §1.5).') + 1500)) &&
   !/rootAnswerIsDismissal|stageADismiss/.test(HS.slice(HS.indexOf('if (stageAActive.current && (_saPhase === "step"'), HS.indexOf('if (stageAActive.current && (_saPhase === "ask"'))));
 
