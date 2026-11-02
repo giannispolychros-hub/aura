@@ -122,7 +122,7 @@ assert('(Δ) … then «Δεν το βρήκα ακόμα» (event «back»: no 
   /stageADispatch\(\{ type: "back" \}\);\s*return true;/.test(lv) && !/generateResponse|callAura|stageAOpen\(|recordTelemetry|setSessionEnded/.test(DS));
 assert('(Δ) at any other root question → «back» and false: the message goes on as «Δεν ξέρω» does today',
   /\}\s*stageADispatch\(\{ type: "back" \}\);\s*return false;\s*$/.test(DS));
-// UPDATED (2/11/2026, Thought Map phase 1, ADR «2 Νοεμβρίου»): pickBranches (a pure function nothing calls yet) reads the SAME check,
+// UPDATED (2/11/2026, Thought Map phase 1, ADR «2 Νοεμβρίου»; phase 2: called only by the Thought Map screen, thoughtMapView): pickBranches reads the SAME check,
 // unchanged, only to LEAVE a dismissal out of «Τα λόγια σου στη διαδρομή» (the message and its phrase). In the flow it is still read at
 // one place only — counted outside that block; the block's two uses are pinned apart.
 const _tm = (() => { const a = CODE.indexOf('// THOUGHT MAP, phase 1'); const b = CODE.indexOf("// A root typed into the flow (door 1's answer"); return a < 0 || b < a ? '' : CODE.slice(a, b); })();

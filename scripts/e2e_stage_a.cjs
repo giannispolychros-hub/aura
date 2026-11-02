@@ -109,6 +109,265 @@ async function send(page, text) {
   await page.getByRole('button', { name: 'Go' }).click();
   await page.waitForTimeout(700);
 }
+
+// ── TM: THOUGHT MAP, phase 2 (John, 2/11/2026; ADR «2 Νοεμβρίου (β)») — the screen at the very END of Stage A, on a phone (390×844 or
+// the --viewport size). Fake model through the REAL api/aura.js (no network, no key). TM3 / TM2 / TM0: 3, 2 and 0 branches; TMU: «Δεν
+// ξέρω ακόμα» at the step; TMC / TMD / TMO: a crisis at the word, DISTRESS before the root, danger from another — the screen must NOT
+// show and the crisis / danger box must be there and in view. Every data path is checked: the chat bubbles, the API, the console,
+// storage, the telemetry log, the copy and the download. John's texts are written out here on purpose (so the old code fails).
+// Screenshots TM-3, TM-2, TM-0, TM-C (-WxH). Alone: --only TM.
+async function runMockTM() {
+  const T = APP.texts;
+  // CHANGED (John, 2/11/2026, the look of the screen): + the label «Η ΡΙΖΑ» over the root
+  const TM = { rootLabel: 'Η ρίζα', rootNote: 'Αυτή είναι η ρίζα που αναγνώρισες και επιβεβαίωσες.', branchesTitle: 'Τα λόγια σου στη διαδρομή', knewTitle: 'Πώς μπήκες',
+    closing: 'Ωραία, το πρώτο επόμενο βήμα είναι αυτό.' };
+  const LABELS = Object.values(TM);
+  const F1 = 'Θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει.';
+  const B1 = 'Ο μισθός είναι καλός και φοβάμαι την αλλαγή.', B2 = 'Η μητέρα μου πιστεύει ότι πρέπει να μείνω εκεί για πάντα.',
+    B3 = 'Κάθε πρωί σηκώνομαι με βάρος στο στομάχι για το γραφείο.';
+  const ROOT = 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.', STEP = 'Να στείλω μήνυμα στη Μαρία για καφέ.', WHEN = 'Αύριο το απόγευμα.', WORD = 'Θάρρος';
+  const Q = ['Τι σε κρατάει εκεί;', 'Και τι θα έχανες αν έφευγες;', 'Πώς το βλέπει η οικογένειά σου;', 'Τι άλλο σε βαραίνει;'];
+  const END = 'Καλή συνέχεια.', SUP = 'Είμαι εδώ μαζί σου. Είσαι ασφαλής αυτή τη στιγμή;';
+  const CRISIS = 'Δεν θέλω να ζω άλλο.', DISTRESS = 'Το πένθος για τη μητέρα μου με έχει παραλύσει.', DANGER = 'Ο σύντροφός μου με χτυπάει όταν πίνει.';
+  const src = fs.readFileSync(path.join(REPO, 'api', 'aura.js'), 'utf8');
+  const handler = (await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'))).default;
+  const viaApi = async (body, text) => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ content: [{ type: 'text', text }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    globalThis.__auraRate = new Map();
+    const hadKey = !!process.env.ANTHROPIC_API_KEY;
+    if (!hadKey) process.env.ANTHROPIC_API_KEY = 'e2e-no-network';
+    const raw = JSON.stringify(body);
+    const out = await new Promise(resolve => {
+      let status = 200;
+      const res = { status(c) { status = c; return res; }, json(d) { resolve({ status, data: d }); }, writeHead(c) { status = c; }, write() {}, end() { resolve({ status, data: null }); } };
+      Promise.resolve(handler({ method: 'POST', headers: { 'content-length': String(Buffer.byteLength(raw)) }, body }, res)).catch(() => resolve({ status: 502, data: {} }));
+    });
+    globalThis.fetch = realFetch;
+    if (!hadKey) delete process.env.ANTHROPIC_API_KEY;
+    return out;
+  };
+  const sess = async replies => {
+    const browser = await launch();
+    const ctx = await browser.newContext({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true, acceptDownloads: true });
+    await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE }).catch(() => {});
+    const page = await ctx.newPage();
+    const calls = [], cons = [];
+    page.on('console', m => cons.push(m.text()));
+    page.on('pageerror', e => cons.push('pageerror: ' + e.message));
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      const body = JSON.parse(route.request().postData() || '{}');
+      calls.push(body);
+      const out = await viaApi(body, replies[Math.min(n, replies.length - 1)]); n++;
+      await route.fulfill({ status: out.status, contentType: 'application/json', body: JSON.stringify(out.data || {}) });
+    });
+    await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/?stageA=1&rec=1');
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    return { browser, page, calls, cons };
+  };
+  const btn = (page, name) => page.getByRole('button', { name, exact: true });
+  const tap = async (page, name) => { const b = btn(page, name); if (await b.count()) { await b.first().click({ timeout: 4000 }); await page.waitForTimeout(400); return true; } return false; };
+  const say = async (page, text) => { if (await page.locator('textarea.textarea').count()) await send(page, text); };
+  const MAP = page => page.locator('[data-thought-map="1"]');
+  const mapOn = async page => (await MAP(page).count()) === 1;
+  const settle = async page => { for (let i = 0; i < 20 && (await page.locator('.typing').count()); i++) await page.waitForTimeout(250); await page.waitForTimeout(500); };
+  const bubbles = page => page.locator('.msg-aura, .msg-user').count();
+  const dump = page => page.evaluate(async () => {
+    const ls = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); ls[k] = localStorage.getItem(k); }
+    const ss = {}; for (let i = 0; i < sessionStorage.length; i++) { const k = sessionStorage.key(i); ss[k] = sessionStorage.getItem(k); }
+    let idb = []; try { idb = indexedDB.databases ? (await indexedDB.databases()).map(d => d.name) : []; } catch (e) { idb = ['error']; }
+    let ck = []; try { ck = typeof caches !== 'undefined' ? await caches.keys() : []; } catch (e) { ck = ['error']; }
+    return { ls, ss, idb, caches: ck, cookie: document.cookie, sw: !!(navigator.serviceWorker && navigator.serviceWorker.controller) };
+  });
+  const shot = async (page, name) => { await page.screenshot({ path: path.join(OUT, name + (VP ? '-' + VP.width + 'x' + VP.height : '') + '.png'), fullPage: false }); };
+  // a whole session up to the very end: the entrance, n answers to AURA's questions, the root, «Ναι», the step (or «Δεν ξέρω ακόμα»), the
+  // clarity question, the word, the closing reply
+  const toEnd = async (s, answers, o) => {
+    await say(s.page, (o && o.entry) || F1);
+    for (const a of answers) await say(s.page, a);
+    await tap(s.page, T.button); await say(s.page, ROOT);
+    await tap(s.page, T.yes);
+    s.beforeEnd = [];
+    s.beforeEnd.push(await mapOn(s.page));
+    if (o && o.unknown) await tap(s.page, T.stepUnknown); else { await say(s.page, STEP); await tap(s.page, T.fitsYes); s.beforeEnd.push(await mapOn(s.page)); await say(s.page, WHEN); }
+    s.beforeEnd.push(await mapOn(s.page));
+    await tap(s.page, '7');
+    s.beforeEnd.push(await mapOn(s.page));
+    await say(s.page, (o && o.word) || WORD);
+    await settle(s.page);
+  };
+  const tag = VP ? VP.width + 'x' + VP.height : '390x844';
+
+  // ── TM3: three branches ──
+  {
+    const s = await sess([Q[0], Q[1], Q[2], Q[3], END]);
+    await toEnd(s, [B1, B2, B3]);
+    ok(`TM3 (${tag}): not before the very end — not after «Ναι», at the step, «Πότε» or the clarity question`, s.beforeEnd.length === 4 && s.beforeEnd.every(x => x === false));
+    ok(`TM3 (${tag}): at the end, one Thought Map`, await mapOn(s.page));
+    const m = MAP(s.page);
+    // CHANGED (John, 2/11/2026, the look): the root is a card — the label «Η ΡΙΖΑ» (the app's label style draws it in capitals), the root,
+    // John's line under it
+    const rootT = await m.locator('[data-tm-root-text="1"]').innerText().catch(() => '');
+    const rootAll = await m.locator('[data-tm-root="1"]').textContent().catch(() => '');
+    const rootLab = (await m.locator('[data-tm-root="1"] .mem-label').innerText().catch(() => '')).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    ok(`TM3 (${tag}): the root card — «Η ΡΙΖΑ», the root whole, John's line under it`, rootT.trim() === '«' + ROOT + '»' && rootLab.trim() === 'Η ΡΙΖΑ' &&
+      rootAll.indexOf(TM.rootLabel) === 0 && rootAll.indexOf(TM.rootLabel) < rootAll.indexOf('«' + ROOT + '»') && rootAll.indexOf('«' + ROOT + '»') < rootAll.indexOf(TM.rootNote));
+    const br = await m.locator('[data-tm-branch="1"]').allInnerTexts();
+    ok(`TM3 (${tag}): «Τα λόγια σου στη διαδρομή» and the three answers, in time order, word for word`,
+      await m.getByText(TM.branchesTitle, { exact: true }).count() === 1 && JSON.stringify(br) === JSON.stringify(['«' + B1 + '»', '«' + B2 + '»', '«' + B3 + '»']));
+    // textContent, not innerText: the small labels are drawn in capitals by the app's existing style (text-transform)
+    const knewT = await m.locator('[data-tm-knew="1"]').textContent().catch(() => '');
+    ok(`TM3 (${tag}): «Πώς μπήκες» with the card's «Τι ήξερες»`, knewT.includes(TM.knewTitle) && knewT.includes('Θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει'));
+    // CHANGED (John, 2/11/2026, the look): «Τι θα κάνεις» / «Πότε» inside one frame; John's closing line after it, outside the frame
+    const stepT = await m.locator('[data-tm-step="1"]').textContent().catch(() => '');
+    const closeT = await m.locator('[data-tm-closing="1"]').textContent().catch(() => '');
+    ok(`TM3 (${tag}): the step — «Τι θα κάνεις», «Πότε» — the user's words in one frame, then John's closing line outside it`,
+      stepT.includes('«' + STEP + '»') && stepT.includes('«' + WHEN + '»') && stepT.includes(T.doLabel) && stepT.includes(T.whenLabel) && !stepT.includes(TM.closing) &&
+      closeT.trim() === TM.closing && await m.locator('[data-tm-step="1"] [data-tm-closing="1"]').count() === 0);
+    const ys = await s.page.evaluate(() => ['root', 'branches', 'knew', 'step', 'closing'].map(k => { const e = document.querySelector('[data-tm-' + k + '="1"]'); return e ? e.getBoundingClientRect().top : null; }));
+    ok(`TM3 (${tag}): order on the screen — root, branches, «Πώς μπήκες», step, closing line`, ys.every((v, i) => v !== null && (i === 0 || v > ys[i - 1])));
+    // CHANGED (John, 2/11/2026, the look): frames around the root card, each branch and the step — and NOTHING that joins them: no line,
+    // arrow, trunk or picture, no one-sided border, no pseudo-element, no element drawn in the gap between the root card and the branches
+    const look = await s.page.evaluate(() => {
+      const mp = document.querySelector('[data-thought-map="1"]'); if (!mp) return null;
+      const fs_ = el => parseFloat(getComputedStyle(el).fontSize);
+      const rootCard = mp.querySelector('[data-tm-root="1"]'), rootTx = mp.querySelector('[data-tm-root-text="1"]'), branch = mp.querySelector('[data-tm-branch="1"]');
+      const all = [mp, ...mp.querySelectorAll('*')];
+      const bw = (e, k) => parseFloat(getComputedStyle(e)['border' + k + 'Width']) || 0;
+      const framed = all.filter(e => ['Top', 'Left', 'Right', 'Bottom'].some(k => bw(e, k) > 0));
+      const textEls = all.filter(e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()));
+      const rb = rootCard.getBoundingClientRect().bottom, bt = branch ? branch.getBoundingClientRect().top : rb;
+      const inGap = all.filter(e => { if (e === mp || e.matches('[data-tm-branches="1"]') || e.closest('[data-tm-root="1"]')) return false;
+        const r = e.getBoundingClientRect(); if (!r.width || !r.height) return false;
+        if (e.className === 'warning-label') return false; return r.bottom > rb + 1 && r.top < bt - 1; });
+      const cs = getComputedStyle(rootCard), kn = mp.querySelector('[data-tm-knew="1"]'), ks = getComputedStyle(kn), cl = mp.querySelector('[data-tm-closing="1"]');
+      return { rootPx: fs_(rootTx), maxOtherPx: Math.max(...textEls.filter(e => e !== rootTx).map(fs_)), branchPx: branch ? fs_(branch) : 0,
+        rootCard: bw(rootCard, 'Top') > 0 && cs.backgroundColor !== 'rgba(0, 0, 0, 0)',
+        knewBlock: ks.backgroundColor !== 'rgba(0, 0, 0, 0)' && bw(kn, 'Top') === 0,
+        closingCalm: !!cl && fs_(cl) > fs_(mp.querySelector('[data-tm-step="1"] div:nth-child(2)')) && bw(cl, 'Top') === 0 && getComputedStyle(cl).backgroundColor === 'rgba(0, 0, 0, 0)',
+        positions: [...new Set(all.map(e => getComputedStyle(e).position))], svg: mp.querySelectorAll('svg, canvas, img').length,
+        arrows: /[→←↑↓➝⟶▶]/.test(mp.innerText),
+        oneSided: framed.filter(e => !['Top', 'Left', 'Right', 'Bottom'].every(k => bw(e, k) > 0)).length,
+        framedAre: framed.map(e => e.getAttribute('data-tm-root') ? 'root' : e.getAttribute('data-tm-branch') ? 'branch' : e.getAttribute('data-tm-step') ? 'step' : 'OTHER').join(','),
+        pseudo: all.filter(e => ['::before', '::after'].some(p => { const c = getComputedStyle(e, p).content; return c && c !== 'none' && c !== 'normal'; })).length,
+        gap: { px: Math.round(bt - rb), drawn: inGap.length },
+        inBubble: !!mp.closest('.turn-aura, .turn-user, .msg-aura, .msg-user'),
+        overflow: document.documentElement.scrollWidth - window.innerWidth,
+        outside: all.filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.left < -1 || r.right > window.innerWidth + 1); }).length };
+    });
+    ok(`TM3 (${tag}): the root is the strongest thing on the screen — a card of its own, the largest text`, !!look && look.rootCard && look.rootPx > look.maxOtherPx && look.branchPx > 0);
+    ok(`TM3 (${tag}): no line, arrow, trunk or picture ties a branch to the root — frames only around the root card, each branch and the step`,
+      !!look && look.svg === 0 && !look.arrows && look.oneSided === 0 && look.pseudo === 0 && look.framedAre === 'root,branch,branch,branch,step' && look.gap.drawn === 0 && look.gap.px > 0);
+    ok(`TM3 (${tag}): «Πώς μπήκες» a block of its own; the closing line larger than the step's words, without a frame`, !!look && look.knewBlock && look.closingCalm);
+    ok(`TM3 (${tag}): in the normal flow of the page (static only) — it cannot cover anything; not a chat bubble`, !!look && JSON.stringify(look.positions) === '["static"]' && !look.inBubble);
+    ok(`TM3 (${tag}): fits the phone — no horizontal scroll, nothing outside the screen`, !!look && look.overflow <= 0 && look.outside === 0);
+    await m.locator('[data-tm-root="1"]').scrollIntoViewIfNeeded().catch(() => {}); await s.page.evaluate(() => { const e = document.querySelector('[data-tm-root="1"]'); if (e) e.scrollIntoView({ block: 'start' }); });
+    await shot(s.page, 'TM-3a-top');
+    await m.locator('[data-tm-step="1"]').scrollIntoViewIfNeeded().catch(() => {});
+    await shot(s.page, 'TM-3b-bottom');
+    // the data paths
+    const nCalls = s.calls.length, nBubbles = await bubbles(s.page);
+    await s.page.waitForTimeout(1500);
+    ok(`TM3 (${tag}): the screen calls nothing and adds no chat message (API calls and bubbles the same 1.5 s later)`, s.calls.length === nCalls && await bubbles(s.page) === nBubbles);
+    const sent = JSON.stringify(s.calls);
+    ok(`TM3 (${tag}): no label of the screen ever goes to the API`, LABELS.every(l => !sent.includes(l)));
+    ok(`TM3 (${tag}): the console holds no branch, no root, no label (and no page error)`, [B1, B2, B3, ROOT, ...LABELS].every(t => s.cons.every(c => !c.includes(t))) && s.cons.every(c => !c.startsWith('pageerror')));
+    const d = await dump(s.page);
+    const stored = JSON.stringify(d);
+    ok(`TM3 (${tag}): nothing of the screen in localStorage, sessionStorage, IndexedDB, caches, cookies or a service worker`,
+      [B1, B2, B3, ...LABELS].every(t => !stored.includes(t)) && Object.keys(d.ss).length === 0 && d.idb.length === 0 && d.caches.length === 0 && d.cookie === '' && !d.sw);
+    let tel = []; try { tel = JSON.parse(d.ls.aura_telemetry_log || '[]'); } catch (e) { tel = ['unreadable']; }
+    ok(`TM3 (${tag}): rec=1 — the device log keeps counts only, and no event of the screen`, tel.length > 0 &&
+      tel.every(r => r && typeof r.ev === 'string' && Object.entries(r).every(([k, v]) => k === 'ev' || typeof v === 'number' || typeof v === 'boolean')) && !tel.some(r => /thought|map|branch/i.test(r.ev)));
+    let dl = { text: '' };
+    try { const [x] = await Promise.all([s.page.waitForEvent('download', { timeout: 8000 }), btn(s.page, T.download).click({ timeout: 4000 })]); dl = { text: fs.readFileSync(await x.path(), 'utf8') }; } catch (e) { dl = { text: '', error: String(e.message || e).slice(0, 60) }; }
+    await tap(s.page, T.copy);
+    const clip = await s.page.evaluate(() => navigator.clipboard.readText().catch(() => null)).catch(() => null);
+    ok(`TM3 (${tag}): the download and the copy carry the step card exactly as before — no branch, no label of the screen`,
+      dl.text.includes('«' + STEP + '»') && [B1, B2, B3, ...LABELS].every(t => !dl.text.includes(t)) && (clip === null || [B1, B2, B3, ...LABELS].every(t => !clip.includes(t))));
+    await s.browser.close();
+  }
+  // ── TM2: two branches ──
+  // UPDATED (John, 2/11/2026, the look): the first message typed with a small first letter — «Πώς μπήκες» starts with a capital ON THE
+  // SCREEN only; the card's own text (the download) keeps it exactly as typed
+  {
+    const s = await sess([Q[0], Q[1], Q[2], END]);
+    const F1small = 'θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει.';
+    await toEnd(s, [B1, B2], { entry: F1small });
+    const br = await MAP(s.page).locator('[data-tm-branch="1"]').allInnerTexts();
+    ok(`TM2 (${tag}): two answers → the heading and both, in order`, await mapOn(s.page) && await MAP(s.page).getByText(TM.branchesTitle, { exact: true }).count() === 1 &&
+      JSON.stringify(br) === JSON.stringify(['«' + B1 + '»', '«' + B2 + '»']));
+    const kn = await MAP(s.page).locator('[data-tm-knew="1"] > div').nth(1).innerText().catch(() => '');
+    let dl2 = '';
+    try { const [x] = await Promise.all([s.page.waitForEvent('download', { timeout: 8000 }), btn(s.page, T.download).click({ timeout: 4000 })]); dl2 = fs.readFileSync(await x.path(), 'utf8'); } catch (e) { dl2 = ''; }
+    ok(`TM2 (${tag}): «Πώς μπήκες» starts with a capital on the screen only — the card's download keeps the user's text as typed`,
+      kn.trim() === '«Θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει»' && dl2.includes('«θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει»') && !dl2.includes('Θέλω να αλλάξω'));
+    await s.page.evaluate(() => { const e = document.querySelector('[data-tm-root="1"]'); if (e) e.scrollIntoView({ block: 'start' }); });
+    await shot(s.page, 'TM-2');
+    await s.browser.close();
+  }
+  // ── TM0: no branch (a short answer only) ──
+  {
+    const s = await sess([Q[0], Q[1], END]);
+    await toEnd(s, ['Ναι, έτσι.']);
+    const t = await MAP(s.page).textContent().catch(() => '');
+    ok(`TM0 (${tag}): no branch → no heading, no section, no empty box or dash; the root, «Πώς μπήκες» and the step still there`,
+      await mapOn(s.page) && await MAP(s.page).locator('[data-tm-branches="1"], [data-tm-branch="1"]').count() === 0 && !t.includes(TM.branchesTitle) &&
+      !/»\s*[—–-]\s*|^\s*[—–-]|[—–-]\s*$/.test(t) && t.includes('«' + ROOT + '»') && t.includes(TM.knewTitle) && t.includes('«' + STEP + '»'));
+    await s.page.evaluate(() => { const e = document.querySelector('[data-tm-root="1"]'); if (e) e.scrollIntoView({ block: 'start' }); });
+    await shot(s.page, 'TM-0');
+    await s.browser.close();
+  }
+  // ── TMU: «Δεν ξέρω ακόμα» at the step ──
+  {
+    const s = await sess([Q[0], Q[1], Q[2], END]);
+    await toEnd(s, [B1, B2], { unknown: true });
+    ok(`TMU (${tag}): «Δεν ξέρω ακόμα» at the step → the screen without a step and without the closing line`,
+      await mapOn(s.page) && await MAP(s.page).locator('[data-tm-step="1"], [data-tm-closing="1"]').count() === 0 && (await MAP(s.page).locator('[data-tm-branch="1"]').count()) === 2);
+    await s.browser.close();
+  }
+  // ── TMC: a crisis at the word — no screen; the crisis line there and in view, not covered ──
+  {
+    const s = await sess([Q[0], Q[1], Q[2], SUP, SUP]);
+    await toEnd(s, [B1, B2], { word: CRISIS });
+    await settle(s.page);
+    const box = s.page.getByText(/1018/).last();
+    let seen = false, onTop = false;
+    if (await box.count()) {
+      await box.scrollIntoViewIfNeeded().catch(() => {});
+      seen = await box.isVisible().catch(() => false);
+      onTop = await box.evaluate(el => { const r = el.getBoundingClientRect(); const x = r.left + Math.min(r.width / 2, 20), yy = r.top + r.height / 2;
+        const top = document.elementFromPoint(x, yy); return !!top && (top === el || el.contains(top) || top.contains(el)) && r.right <= window.innerWidth + 1 && r.left >= -1; }).catch(() => false);
+    }
+    ok(`TMC (${tag}): a crisis typed at the word → no Thought Map`, !(await mapOn(s.page)));
+    ok(`TMC (${tag}): … and the crisis line (1018) is on the screen, in view, not covered by anything`, seen && onTop);
+    await shot(s.page, 'TM-C');
+    await s.browser.close();
+  }
+  // ── TMD: DISTRESS before the root — the risk end of «Ναι», no step, so no screen ──
+  {
+    const s = await sess([Q[0], Q[1], Q[2], END]);
+    await say(s.page, F1); await say(s.page, DISTRESS); await say(s.page, B1);
+    await tap(s.page, T.button); await say(s.page, ROOT); await tap(s.page, T.yes);
+    const noStep = (await s.page.getByText(T.stepQ, { exact: true }).count()) === 0;
+    await tap(s.page, '7'); await say(s.page, WORD); await settle(s.page);
+    ok(`TMD (${tag}): DISTRESS before the root → no step, and no Thought Map at the end`, noStep && !(await mapOn(s.page)));
+    await s.browser.close();
+  }
+  // ── TMO: danger from another person — no root card at all, no screen; the danger line (15900) there and in view ──
+  {
+    const s = await sess([Q[0], Q[1], Q[2], END]);
+    await say(s.page, F1); await say(s.page, DANGER); await say(s.page, B1);
+    const box = s.page.getByText(/15900/).last();
+    let seen = false;
+    if (await box.count()) { await box.scrollIntoViewIfNeeded().catch(() => {}); seen = await box.isVisible().catch(() => false); }
+    ok(`TMO (${tag}): danger from another person → no root button, no Thought Map; the danger line (15900) is there and in view`,
+      (await btn(s.page, T.button).count()) === 0 && !(await mapOn(s.page)) && seen);
+    await s.browser.close();
+  }
+}
 const systemText = b => (b.system || []).map(x => x.text).join('');
 
 
@@ -698,6 +957,7 @@ async function runMock() {
   await runMockMC();
   await runMockMH();
   await runMockPV();
+  await runMockTM(); // 2/11 (Thought Map, phase 2)
   await runMockIM();
   await runMockOF();
   await runMockFT();
@@ -5835,7 +6095,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

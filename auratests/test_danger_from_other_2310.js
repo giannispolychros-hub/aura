@@ -325,8 +325,10 @@ assert('(Ι) a failed call: the danger line from code too, not marked as shown (
 }
 assert('(Ι) Stage A only: the notes, the stop moment and the closing decision read the latch with the switch open',
   (GEN.match(/stageAActive\.current && dangerFromOther\.current/g) || []).length === 6);
-assert('(Ι) every Stage A door gets the latch: the button, the leaving door ×2, the model\'s close, the method line, door 2/3 ×3, armed',
-  (CODE.match(/dangerFromOther: dangerFromOther\.current/g) || []).length === 5 && (CODE.match(/!stageASafetyHold\(riskSignalKind\.current, dangerFromOther\.current\)/g) || []).length === 4);
+// UPDATED (2/11/2026, Thought Map phase 2, ADR «2 Νοεμβρίου (β)»): a sixth pure Stage A reader — the Thought Map screen (thoughtMapView),
+// which reads the latch only to HIDE itself (any danger → no screen) and checks the switch first, like the others
+assert('(Ι) every Stage A door gets the latch: the button, the leaving door ×2, the model\'s close, the method line, door 2/3 ×3, armed — and the Thought Map screen',
+  (CODE.match(/dangerFromOther: dangerFromOther\.current/g) || []).length === 6 && (CODE.match(/!stageASafetyHold\(riskSignalKind\.current, dangerFromOther\.current\)/g) || []).length === 4);
 // UPDATED (31/10/2026, ADR «31 Οκτωβρίου (δ)»): a third reader — the goodbye after a dismissal at the leaving door (stageADismiss).
 assert('(Ι) the pre-model goodbye after the line, the post-reply one, and the goodbye after a dismissal, all know the line was shown',
   (CODE.match(/dangerLine: dangerLineShown\.current\.length > 0/g) || []).length === 3);
@@ -338,15 +340,17 @@ assert('(Ι) the step stops on danger too, and the word is never taken from such
   // inside an `if (stageAActive.current …)`; plus the one place that sets it and the one that clears it. A new read must be classified here.
   const all = [...CODE.matchAll(/dangerFromOther\.current/g)].length;
   const gated = (CODE.match(/stageAActive\.current && dangerFromOther\.current/g) || []).length;           // 7: the notes, the stop moment ×2, the decision ×2, the word
-  const passed_ = (CODE.match(/dangerFromOther: dangerFromOther\.current/g) || []).length;                  // 5: pure Stage A functions (`active` checked inside)
+  // UPDATED (2/11/2026, Thought Map phase 2): 6 — thoughtMapView joined (it hides the screen on danger; `active` checked first)
+  const passed_ = (CODE.match(/dangerFromOther: dangerFromOther\.current/g) || []).length;                  // 6: pure Stage A functions (`active` checked inside)
   const holds = (CODE.match(/!stageASafetyHold\(riskSignalKind\.current, dangerFromOther\.current\)/g) || []).length; // 4: inside `if (stageAActive.current …)`
   const setClear = (CODE.match(/dangerFromOther\.current = (?:true|false)/g) || []).length;                  // 2
   const holdLines = CODE.split('\n').filter(l => l.includes('!stageASafetyHold(riskSignalKind.current, dangerFromOther.current)'));
   assert(`(Ι) old flow (?stageA=0): every read of the latch is gated by the switch — ${all} = ${gated} gated + ${passed_} passed + ${holds} holds + ${setClear} set/clear`,
-    all === gated + passed_ + holds + setClear && gated === 7 && passed_ === 5 && holds === 4 && setClear === 2 &&
+    all === gated + passed_ + holds + setClear && gated === 7 && passed_ === 6 && holds === 4 && setClear === 2 &&
     holdLines.filter(l => /stageAActive\.current/.test(l) || /const _saArmed = stageARootArmed\.current/.test(l) || /^\s*!coreReadinessConfirmed\.current/.test(l)).length === 4);
   assert('(Ι) … the pure functions it is passed to all check the switch first',
-    ['stageARootButtonVisible', 'stageALeavingDoorOpens', 'stageAModelClosesBeforeRoot', 'stageAMethodLineDue'].every(n => /\.active === true/.test(fnSrc(n))));
+    ['stageARootButtonVisible', 'stageALeavingDoorOpens', 'stageAModelClosesBeforeRoot', 'stageAMethodLineDue'].every(n => /\.active === true/.test(fnSrc(n))) &&
+    /if \(x\.active !== true \|\| x\.phase !== "done" \|\| x\.loading === true\) return null;/.test(fnSrc('thoughtMapView'))); // UPDATED (2/11): + thoughtMapView, the switch first
 }
 
 // ── (Κ) unchanged ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -363,7 +367,9 @@ assert('(Κ) UNCHANGED: the Stage A texts (no new text: the goodbye is the exist
   // once while the send lock holds) and is left out, like this file itself
   // UPDATED (2/11, Thought Map phase 1, ADR «2 Νοεμβρίου»): test_pick_branches.js holds danger and crisis messages on purpose (a session
   // with one must give NO branches at all) and is left out the same way; that test checks itself that its danger messages are CAUGHT
-  const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && f !== path.basename(__filename) && f !== 'test_fc4_locked_line_3110.js' && f !== 'test_pick_branches.js').map(f => path.join(__dirname, f))
+  // UPDATED (2/11, Thought Map phase 2): test_thought_map_screen.js too — it holds danger and crisis messages on purpose (the screen must not
+  // show at all in such a session)
+  const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && f !== path.basename(__filename) && f !== 'test_fc4_locked_line_3110.js' && f !== 'test_pick_branches.js' && f !== 'test_thought_map_screen.js').map(f => path.join(__dirname, f))
     .concat(['e2e_stress_lib.cjs', 'e2e_stage_a.cjs', 'e2e_stage_a_lib.cjs'].map(f => path.join(ROOT, 'scripts', f)).filter(f => fs.existsSync(f)));
   const STR = /'((?:[^'\\\n]|\\.){3,600})'|"((?:[^"\\\n]|\\.){3,600})"|`((?:[^`\\]|\\.){3,600})`/g;
   const seen = new Set();
@@ -381,7 +387,9 @@ assert('(Κ) UNCHANGED: the Stage A texts (no new text: the goodbye is the exist
   // message on purpose too, and is left out the same way
   // UPDATED (31/10, ADR «31 Οκτωβρίου (β)»): the channel section (runMockCH — no channel but a call for a help line) holds one danger
   // message on purpose too, and is left out the same way
-  const withoutO5 = t => without('runMockCH')(without('runMockFL')(without('runMockNT')(without('runMockMF')(without('runMockFC')(without('runMockPZ')(without('runMockO5')(t)))))));
+  // UPDATED (2/11/2026, Thought Map phase 2): the Thought Map section (runMockTM) holds one danger and one crisis message on purpose — the
+  // screen must not show in such a session and the box must stay in view — and is left out the same way
+  const withoutO5 = t => without('runMockTM')(without('runMockCH')(without('runMockFL')(without('runMockNT')(without('runMockMF')(without('runMockFC')(without('runMockPZ')(without('runMockO5')(t))))))));
   // UPDATED (24/10, Π3 step 2, the stress tool brought onto this branch): the stress tool's two danger-from-another sessions — 125
   // (risk: 'violence') and 126 (risk: 'child') — are meant to hold danger messages too, like runMockO5: left out, and checked below to
   // be CAUGHT; no other persona is left out

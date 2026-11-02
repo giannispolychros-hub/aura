@@ -26,7 +26,7 @@ const CONSTS = ['HELPLINES', 'KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_DISMISSALS', 'BRA
 const FNS = ['lookBehind', 'detectSafetySignal', 'classifyCrisisTier', 'detectsDangerFromOther', 'detectsMentalHealthReferral', 'mergeRiskKind',
   'stageASafetyHold', 'rootAnswerIsDismissal', 'rootAnswerIsUnsure', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord',
   'substanceOfSentence', 'splitSentences', 'pickKnewSnippet', 'branchSentenceSpans', 'branchAuraEndsWithQuestion', 'branchWords',
-  'branchJaccard', 'pickBranches'];
+  'branchJaccard', 'branchSessionSafe', 'pickBranches']; // UPDATED (2/11, phase 2): the session's safety check moved, unchanged, into branchSessionSafe
 let F = {};
 try {
   F = new Function([...CONSTS.map(n => constSrc(n) || `const ${n} = undefined;`),
@@ -201,11 +201,28 @@ const S = t => call('branchSentenceSpans', t);
 // ── (Ζ) phase 1 changed nothing else ────────────────────────────────────────────────────────────────────────────────────────────────
 {
   const block = (() => { const a = raw.indexOf('// THOUGHT MAP, phase 1'); const b = raw.indexOf("// A root typed into the flow (door 1's answer"); return a < 0 || b < a ? '' : raw.slice(a, b); })();
-  assert('(Ζ) phase 1: pickBranches and its helpers are defined once, inside the block, and used nowhere else in the app',
+  // UPDATED (2/11, phase 2): the block now also holds the screen's view (thoughtMapView), the one caller of pickBranches
+  assert('(Ζ) pickBranches and its helpers are defined once, inside the block, and used nowhere else in the app (thoughtMapView, inside it, is the one caller)',
     (block.match(/\nfunction pickBranches\(/g) || []).length === 1 && !/pickBranches|branchSentenceSpans|branchAuraEndsWithQuestion|branchJaccard|branchWords|BRANCH_/.test(raw.replace(block, '')));
   assert('(Ζ) no storage, log, network or telemetry inside the new functions', !!block && !/localStorage|sessionStorage|indexedDB|console\.|fetch\(|recordTelemetry|XMLHttpRequest|sendBeacon|navigator\./.test(block));
-  assert('(Ζ) the rest of src/App.jsx is byte-identical to main 24aab8e (phase 1 only adds the block)',
-    sha(raw.replace(block, '')) === '3a5cca6638432536ff9d93cb24a591f2e915449bfdd07c113841e90d9eb67d07');
+  // UPDATED (2/11, phase 2, ADR «2 Νοεμβρίου (β)»): the screen added a few pieces outside the block (the screen itself, one number,
+  // the view on render); without them — and without the block — the file is still byte-identical to main
+  const stripThoughtMap = t => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); const j = i < 0 ? -1 : s.indexOf(b, i); return i < 0 || j < 0 ? s : s.slice(0, i) + s.slice(j); };
+    let s = cut(t, '// THOUGHT MAP, phase 1', "// A root typed into the flow (door 1's answer");
+    s = cut(s, '              {/* THOUGHT MAP (John, 2/11/2026', '              {/* ADR «17 Οκτωβρίου (δ)», (ε): not while');
+    for (const line of ['  // THOUGHT MAP (John, 2/11/2026, ADR «2 Νοεμβρίου (β)»): how many messages there were when the root card opened — a number only, page\n' +
+        '  // memory only; the screen reads `messages` up to it. Never stored, sent or logged.\n  const rootCardMsgCount = useRef(0);\n',
+      '    if (stageARef.current.phase === "card") rootCardMsgCount.current = (msgsNow || []).length; // Thought Map (2/11): a number only\n',
+      '    rootCardMsgCount.current = 0; // Thought Map (2/11)\n',
+      '  // THOUGHT MAP (2/11): computed on every render from what the page already holds; nothing is kept\n' +
+        '  const thoughtMap = thoughtMapView({ active: stageAActive.current, phase: stageAPhase, loading, stage: stageAView,\n' +
+        '    messagesAtCard: messages.slice(0, rootCardMsgCount.current), allMessages: messages, riskKind: riskSignalKind.current,\n' +
+        '    dangerFromOther: dangerFromOther.current, safetyMode, crisisFallback });\n']) s = s.split(line).join('');
+    return s;
+  };
+  assert('(Ζ) the rest of src/App.jsx is byte-identical to main 24aab8e (the block and the phase-2 pieces aside)',
+    sha(stripThoughtMap(raw)) === '3a5cca6638432536ff9d93cb24a591f2e915449bfdd07c113841e90d9eb67d07');
   const fp = fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8').match(/core: \{ length: \d+, sha256: "([0-9a-f]{16})/);
   assert('(Ζ) api/aura.js carries the prompt fingerprint b5f303cc9405aa21', !!fp && fp[1] === 'b5f303cc9405aa21');
   const ci = raw.indexOf('const AURA_CORE_PERSONALITY'), cs = raw.indexOf('`', ci) + 1, ce = raw.indexOf('`;', cs);

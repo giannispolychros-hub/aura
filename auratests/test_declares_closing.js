@@ -246,7 +246,7 @@ assert('the pair is still pushed when the message is a real answer — the guard
 // stageAAfterCrisisText — the SAME two detectors (`isExplicitClosure(u) || declaresClosing(u)`) on the whole message, and again on
 // each of its sentences, to tell a goodbye after the crisis line from a message that still talks about the difficulty. Stage A
 // only (switch closed: null). Additive, replaces nothing; the detector itself is unchanged (test_after_crisis_1910.js pins it).
-// UPDATED (2/11/2026, Thought Map phase 1, ADR «2 Νοεμβρίου»): pickBranches (a pure function nothing calls yet) reads the SAME detector,
+// UPDATED (2/11/2026, Thought Map phase 1, ADR «2 Νοεμβρίου»; phase 2: called only by the Thought Map screen, thoughtMapView): pickBranches reads the SAME detector,
 // unchanged, only to LEAVE a closing message out of «Τα λόγια σου στη διαδρομή». The count of the flow's call sites is the same 15, now
 // read outside that block; the block's own use is pinned apart (exactly one).
 const _tm = (() => { const a = raw.indexOf('// THOUGHT MAP, phase 1'); const b = raw.indexOf("// A root typed into the flow (door 1's answer"); return a < 0 || b < a ? '' : raw.slice(a, b); })();
