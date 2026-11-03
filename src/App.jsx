@@ -1788,6 +1788,14 @@ function detectsDangerFromOther(text) {
     kidKicks: S(" (?:απο|με) (?:τισ )?κλωτσιεσ (?:του|τησ|των) (?=(?:μικρου|μικρησ|μικρων|παιδιου|παιδιων|γιου|κορησ)(?: μου| μασ)? " +
       "(?:$|(?:στο|στη|στην|στον|στα|στισ|στουσ|σε|μετα|οταν|ενω|καθωσ|παιζοντασ|χθεσ|χτεσ|σημερα) ))"),
     kidSport: S(" (?:ποδοσφαιρο|ποδοσφαιρου|μπασκετ|βολει|τενισ|χαντμπολ|πολο|γυμναστηριο|γυμναστηριου|γηπεδο|γηπεδου|παιδικη χαρα|παιδικησ χαρασ) "),
+    // 3/11/2026 (John, a safety fix (α); ADR «3 Νοεμβρίου», finding 130): a sport or event word does NOT excuse a blow when the same
+    // sentence names an adult partner or relative from this closed list, with «μου / μας» — «… μπουνιές του άντρα μου μετά το ματς»,
+    // «Με δέρνει ο άντρας μου … στο ματς». The sport lists do not change, nor does a child's kicks (2/11). A game at a table or on a screen
+    // (τάβλι, σκάκι, χαρτιά …) still excuses «με δέρνει / με έδειρε»: «ο άντρας μου με δέρνει στο τάβλι» is the everyday sense.
+    kin: S(" (?:αντρασ|αντρα|ανδρασ|ανδρα|συζυγοσ|συζυγο|συζυγου|γυναικα|γυναικασ|συντροφοσ|συντροφο|συντροφου|συντροφισσα|συντροφισσασ|" +
+      "φιλοσ|φιλο|φιλου|φιλη|φιλησ|πρωην|πατερασ|πατερα|μητερα|μητερασ|αδερφοσ|αδερφο|αδερφου|αδελφοσ|αδελφο|αδελφου|αδερφη|αδερφησ|αδελφη|" +
+      "αδελφησ) (?:μου|μασ) "),
+    tableGame: S(" (?:ταβλι|σκακι|χαρτια|πρεφα|ποκερ|μπιριμπα|φιφα|πλαυστατιον|πλειστεισιον) "),
     raisedHand: S(" (?:σηκωσε|σηκωνει|σηκωνε) (?:το )?χερι (?:πανω μου |σε μενα )?" + TAIL),            // «Σήμερα πάλι σήκωσε χέρι.»
     throwThings: S(" (?:με|μου) (?:πεταει|πεταξε|πεταγε|πετουσε|εριξε|ριχνει) (?:πραγματα|πιατα|ποτηρια|καρεκλεσ) " + TAIL),
     childBare: S("^ (?:χτυπαει|χτυπησε|χτυπουσε|δερνει|εδειρε) " + CHILD + " " + TAIL),                 // «Χτυπάει το παιδί.»
@@ -1801,23 +1809,25 @@ function detectsDangerFromOther(text) {
   const read = s => {
     const person = R.who.test(s), why = person || R.onlyPerson.test(s);
     const notThing = after => !R.thingAfter.test(after), yes = before => !R.notMe.test(before);
+    // 3/11 (finding 130): with an adult partner or relative named, a sport or event word excuses nothing (a table game still does)
+    const kin = R.kin.test(s), sportExcuses = R.sport.test(s) && !kin, gameExcuses = R.game.test(s) && (!kin || R.tableGame.test(s));
     const self =
       any(R.hit, s, (b, a) => yes(b) && why && notThing(a) && !R.hitIdiom.test(a)) ||
       any(R.kick, s, (b, a) => yes(b) && why && notThing(a) && !R.asleep.test(s)) ||
-      any(R.beat, s, (b, a) => yes(b) && !R.game.test(s) && notThing(a) && (why || !R.subject.test(s))) ||
+      any(R.beat, s, (b, a) => yes(b) && !gameExcuses && notThing(a) && (why || !R.subject.test(s))) ||
       any(R.slap, s, b => yes(b) && !R.figurative.test(s)) ||
       any(R.abuse, s, yes) || any(R.rape, s, yes) || R.force.test(s) ||
       any(R.strangle, s, b => yes(b) && R.neck.test(s)) || R.grabNeck.test(s) ||
       any(R.push, s, b => yes(b) && (why || !R.subject.test(s))) || R.hairBy.test(s) || (R.hair.test(s) && why) || R.weapon.test(s) ||
-      (R.blows.test(s) && !R.figurative.test(s) && !R.game.test(s)) ||
-      (R.wood.test(s) && !R.game.test(s) && (why || R.home.test(s))) ||
+      (R.blows.test(s) && !R.figurative.test(s) && !gameExcuses) ||
+      (R.wood.test(s) && !gameExcuses && (why || R.home.test(s))) ||
       (R.threat.test(s) && !R.harmChild.test(s)) || R.threatArmed.test(s) ||
       (R.partnerKill.test(s) && R.partner.test(s)) ||
       // 31/10/2026 (ADR «31 Οκτωβρίου (ζ)»): the new narrow rules — none of them where «δεν / μη» comes right before
       [R.hitBare, R.hitWitness, R.threatBare, R.scareHome, R.pushBare, R.lockIn, R.rapeBare, R.brokeBody].some(re => any(re, s, b => yes(b) && !R.artBefore.test(b))) ||
       any(R.noLeave, s, () => true) || any(R.killIf, s, yes) || R.hairAny.test(s) ||
       // 2/11: a child's kicks with a sport or play-place word are taken out first; any other «από τις … του / της» still reads
-      (R.bruises.test(R.kidSport.test(s) ? s.replace(new RegExp(R.kidKicks.source, "g"), " ") : s) && !R.sport.test(s)) ||
+      (R.bruises.test(R.kidSport.test(s) ? s.replace(new RegExp(R.kidKicks.source, "g"), " ") : s) && !sportExcuses) ||
       [R.raisedHand, R.throwThings].some(re => any(re, s, b => yes(b) && (person || !R.subject.test(s))));
     const child = (R.childHit.test(s) && person) || R.childBeat.test(s) || (R.threat.test(s) && R.harmChild.test(s)) ||
       R.childBare.test(s) || (R.childHit.test(s) && R.onlyPerson.test(s));                   // 31/10: «Χτυπάει το παιδί.», «… όταν θυμώνει.»

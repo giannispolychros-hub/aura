@@ -377,7 +377,10 @@ assert('(Κ) UNCHANGED: the Stage A texts (no new text: the goodbye is the exist
   // UPDATED (2/11, ADR «2 Νοεμβρίου (δ)», a safety fix (α)): test_bruises_sport_0211.js holds danger messages on purpose (an adult's kicks
   // with a sport word, which must still be caught) and is left out the same way
   // MERGED (2/11, ADR «2 Νοεμβρίου (δ)», branch candidate-tm, John): both lists kept — the new safety-detectors test is left out too
-  const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && f !== path.basename(__filename) && f !== 'test_fc4_locked_line_3110.js' && f !== 'test_safety_detectors_3110.js' && f !== 'test_pick_branches.js' && f !== 'test_thought_map_screen.js' && f !== 'test_bruises_sport_0211.js').map(f => path.join(__dirname, f))
+  // UPDATED (3/11, ADR «3 Νοεμβρίου», a safety fix (α)): test_kin_sport_0311.js holds danger messages on purpose (a partner's or relative's
+  // blows with a sport word, which must now be caught) and is left out the same way
+  // MERGED (3/11, ADR «3 Νοεμβρίου», branch candidate-tm, John): both lists kept — the 3/11 test is left out too
+  const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && f !== path.basename(__filename) && f !== 'test_fc4_locked_line_3110.js' && f !== 'test_safety_detectors_3110.js' && f !== 'test_pick_branches.js' && f !== 'test_thought_map_screen.js' && f !== 'test_bruises_sport_0211.js' && f !== 'test_kin_sport_0311.js').map(f => path.join(__dirname, f))
     .concat(['e2e_stress_lib.cjs', 'e2e_stage_a.cjs', 'e2e_stage_a_lib.cjs'].map(f => path.join(ROOT, 'scripts', f)).filter(f => fs.existsSync(f)));
   const STR = /'((?:[^'\\\n]|\\.){3,600})'|"((?:[^"\\\n]|\\.){3,600})"|`((?:[^`\\]|\\.){3,600})`/g;
   const seen = new Set();
