@@ -713,6 +713,7 @@ async function runMock() {
   await runMockFL(); // 31/10: FC4 option Γ — the line at once while the send lock holds
   await runMockCH(); // 31/10 (β): no channel but a call for a help line on the safety path
   await runMockDS(); // 31/10 (δ): a dismissal answer to the root question is never a card
+  await runMockCL(); // 4/11 (A4): one call at a time, also during a retry
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -3247,6 +3248,163 @@ async function runMockFL() {
       await s.browser.close();
     }
   }
+}
+
+// ── CL: ONE CALL AT A TIME, ALSO DURING A RETRY (A4, ADR «4 Νοεμβρίου», branch hardening-2026-11). A fake model that answers late: the
+// first try gets 529 after 10 s, the app retries after 0.6 s, the retry answers after 25 s — so the 30 s loading guard frees the box while
+// the retry still runs, and the person acts in that window. CL1 the send button (handleSubmit's own lock); CL2 door 2's «Δεν το βρήκα
+// ακόμα, συνέχισε», which calls the model outside handleSubmit — before A4 a second request ran in parallel and the two replies came out
+// in the wrong order; CL3 the root buttons («Νομίζω βρήκα…», the card) while the retry runs; CL4 both tries fail — the text back in the
+// box, the next send works; CL5 a timeout — the same; CL6 a crisis message sent while the lock holds still gets the line from code.
+// Each scenario checks: at most one request in flight, the order on screen, the order of the history the next request sends, no
+// permanent lock. The six run side by side (each its own browser). Alone: --only CL.
+async function runMockCL() {
+  const T = APP.texts;
+  const BACK = 'Δεν το βρήκα ακόμα, συνέχισε';
+  const sess = async (plan, query) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }) });
+    // «in flight» = requests the PAGE still has open (a request the page aborted at its own timeout counts as closed at once)
+    const reqs = []; const open = new Set(); let maxInflight = 0;
+    const close = rq => open.delete(rq);
+    page.on('requestfinished', close); page.on('requestfailed', close);
+    await page.route('**/api/aura', async route => {
+      const rq = route.request();
+      let b = {}; try { b = JSON.parse(rq.postData() || '{}'); } catch (e) {}
+      const msgs = Array.isArray(b.messages) ? b.messages : [];
+      const r = { n: reqs.length + 1, roles: msgs.map(m => m.role === 'user' ? 'u' : 'a').join(''), last: (msgs.filter(m => m.role === 'user').pop() || {}).content || '' };
+      reqs.push(r); open.add(rq); maxInflight = Math.max(maxInflight, open.size);
+      const p = plan(r.n, r) || {};
+      try {
+        await new Promise(x => setTimeout(x, p.delay || 0));
+        if (p.hang) { await new Promise(x => setTimeout(x, p.hang)); return await route.abort('timedout').catch(() => {}); }
+        if (p.status && p.status !== 200) return await route.fulfill({ status: p.status, contentType: 'application/json', body: JSON.stringify({ error: { type: 'overloaded_error' } }) });
+        return await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: p.text || 'Και τι θα σήμαινε αυτό για σένα;' }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+      } catch (e) { /* the page went away */ }
+    });
+    const inflight = () => open.size;
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    return { browser, page, reqs, max: () => maxInflight, inflight };
+  };
+  const type = async (page, t) => { await page.locator('textarea.textarea').fill(t); await page.getByRole('button', { name: 'Go' }).click(); };
+  const feed = page => page.$$eval('.turn', els => els.map(e => (e.classList.contains('turn-user') ? 'U:' : 'A:') + e.innerText.replace(/\s+/g, ' ').trim()));
+  const boxText = page => page.locator('textarea.textarea').inputValue().catch(() => '');
+  const errText = async page => (await page.locator('.err').allInnerTexts()).join(' ');
+  const until = async (fn, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await fn()) return true; await new Promise(x => setTimeout(x, 250)); } return false; };
+  const alternates = roles => !/uu|aa/.test(roles.replace(/^a+/, ''));   // the app's own fixed bubbles aside, the history alternates
+  const LATE = { status: 529, delay: 10000 }, SLOW = { delay: 25000 };
+  const R1 = 'Ακούω ότι σε βαραίνει η δουλειά. Τι σε κρατάει εκεί;';
+  const R2 = 'Νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+  const out = [];
+  const say = (label, cond) => out.push([label, cond]);
+
+  const CL1 = async () => {   // the send button
+    const s = await sess(n => (n === 1 ? LATE : n === 2 ? { ...SLOW, text: 'ΑΠΑΝΤΗΣΗ-Α;' } : { text: 'ΑΠΑΝΤΗΣΗ-Β;' }), '/?stageA=1');
+    await type(s.page, 'Μήνυμα Α: δεν ξέρω αν πρέπει να αλλάξω δουλειά, το σκέφτομαι μήνες.');
+    await s.page.waitForTimeout(31500);
+    await type(s.page, 'Μήνυμα Β: και κάθε βράδυ σκέφτομαι τα λεφτά.');
+    const heldBack = s.reqs.length === 2;
+    await until(async () => (await feed(s.page)).some(x => x.includes('ΑΠΑΝΤΗΣΗ-Α')), 12000);
+    if (await boxText(s.page)) await type(s.page, await boxText(s.page));
+    await until(async () => (await feed(s.page)).some(x => x.includes('ΑΠΑΝΤΗΣΗ-Β')), 8000);
+    const f = await feed(s.page);
+    const at = t => f.findIndex(x => x.includes(t)), once = t => f.filter(x => x.includes(t)).length === 1;
+    const last = s.reqs[s.reqs.length - 1] || { roles: '', last: '' };
+    say('CL1 (send button, retry running): the second message is not sent while the retry runs; never two requests at once', heldBack && s.max() === 1);
+    say('CL1: on screen A, its reply, B, its reply — each once, in that order', ['Μήνυμα Α', 'ΑΠΑΝΤΗΣΗ-Α', 'Μήνυμα Β', 'ΑΠΑΝΤΗΣΗ-Β'].every(once) &&
+      at('Μήνυμα Α') < at('ΑΠΑΝΤΗΣΗ-Α') && at('ΑΠΑΝΤΗΣΗ-Α') < at('Μήνυμα Β') && at('Μήνυμα Β') < at('ΑΠΑΝΤΗΣΗ-Β'));
+    say('CL1: the history the next request sends is in order (alternates, ends with B)', alternates(last.roles) && last.last.startsWith('Μήνυμα Β'));
+    await s.browser.close();
+  };
+  const CL2 = async () => {   // door 2's «Δεν το βρήκα ακόμα, συνέχισε»
+    const s = await sess(n => (n === 1 ? { text: R1 } : n === 2 ? { text: R2 } : n === 3 ? LATE : n === 4 ? { ...SLOW, text: 'ΑΠΑΝΤΗΣΗ-ΠΙΣΩ;' } : { text: 'ΑΠΑΝΤΗΣΗ-Β;' }), '/?stageA=1');
+    await send(s.page, 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.');
+    await send(s.page, 'Η σταθερότητα, αλλά νιώθω ότι κάτι άλλο παίζει.');
+    await send(s.page, 'Ναι');
+    await send(s.page, 'Ότι δεν θέλω να παραδεχτώ ότι διάλεξα λάθος σπουδές.');
+    const card = await s.page.getByRole('button', { name: BACK }).count() === 1;
+    await s.page.getByRole('button', { name: BACK }).click();
+    await s.page.waitForTimeout(31500);
+    await type(s.page, 'Μήνυμα Β: και κάθε βράδυ σκέφτομαι τα λεφτά.');
+    await s.page.waitForTimeout(1500);
+    const refusedNow = s.reqs.length === 4 && (await boxText(s.page)).startsWith('Μήνυμα Β') && /Κάτι δεν λειτούργησε/.test(await errText(s.page));
+    await until(async () => (await feed(s.page)).some(x => x.includes('ΑΠΑΝΤΗΣΗ-ΠΙΣΩ')), 12000);
+    if (await boxText(s.page)) await type(s.page, await boxText(s.page));
+    await until(async () => (await feed(s.page)).some(x => x.includes('ΑΠΑΝΤΗΣΗ-Β')), 8000);
+    const f = await feed(s.page);
+    const iCap = f.findIndex(x => x.includes('λάθος σπουδές')), iBack = f.findIndex(x => x.includes('ΑΠΑΝΤΗΣΗ-ΠΙΣΩ')), iB = f.findIndex(x => x.includes('Μήνυμα Β')), iRB = f.findIndex(x => x.includes('ΑΠΑΝΤΗΣΗ-Β'));
+    const last = s.reqs[s.reqs.length - 1] || { roles: '', last: '' };
+    say('CL2 (door 2, «' + BACK + '», retry running): never two requests at once', card && s.max() === 1);
+    say('CL2: the message sent during the retry is refused with the app\'s words and goes back to the box — nothing sent', refusedNow);
+    say('CL2: on screen the captured message, its reply, then B and its reply — in that order', iCap >= 0 && iCap < iBack && iBack < iB && iB < iRB);
+    say('CL2: the history the next request sends keeps that order (… reply to the captured message, B)', last.last.startsWith('Μήνυμα Β') && /au$/.test(last.roles) && !/uu/.test(last.roles));
+    await s.browser.close();
+  };
+  const CL3 = async () => {   // the root buttons while the retry runs
+    const s = await sess(n => (n === 1 ? { text: R1 } : n === 2 ? LATE : n === 3 ? { ...SLOW, text: 'Τι σε κρατάει εκεί;' } : { text: 'Τι άλλο;' }), '/?stageA=1');
+    await send(s.page, 'Δεν ξέρω αν πρέπει να αλλάξω δουλειά, το σκέφτομαι μήνες.');   // one reply first: the root button needs one
+    await type(s.page, 'Η σταθερότητα με κρατάει, αλλά κάτι άλλο παίζει.');
+    await s.page.waitForTimeout(31500);
+    const press = s.page.getByRole('button', { name: T.button, exact: true });
+    if (await press.count()) await press.click();
+    await s.page.waitForTimeout(800);
+    await type(s.page, 'Ότι φοβάμαι να ξεκινήσω από την αρχή.');
+    await until(async () => s.reqs.length >= 3 && s.inflight() === 0, 12000);
+    await s.page.waitForTimeout(800);
+    if ((await boxText(s.page)).startsWith('Ότι φοβάμαι')) await type(s.page, 'Ότι φοβάμαι να ξεκινήσω από την αρχή.');
+    await s.page.waitForTimeout(1200);
+    const yes = s.page.getByRole('button', { name: T.yes, exact: true });
+    const cardOpen = await yes.count() === 1;
+    const before = s.reqs.length;
+    if (cardOpen) await yes.click();
+    await s.page.waitForTimeout(1200);
+    const b = await s.page.locator('body').innerText();
+    say('CL3 (root buttons while the retry runs): never two requests at once; the root buttons send nothing to the model', s.max() === 1 && s.reqs.length === before);
+    say('CL3: after the retry the root flow works — the card with the person\'s words, «' + T.yes + '», then the step question', cardOpen && b.includes(T.stepQ));
+    await s.browser.close();
+  };
+  const CL4 = async () => {   // both tries fail
+    const s = await sess(n => (n <= 2 ? { status: 529, delay: 300 } : { text: 'ΑΠΑΝΤΗΣΗ-Α;' }), '/?stageA=1');
+    await type(s.page, 'Μήνυμα Α: δεν ξέρω αν πρέπει να αλλάξω δουλειά.');
+    await until(async () => (await errText(s.page)).length > 0, 10000);
+    await s.page.waitForTimeout(600);
+    const back = (await boxText(s.page)).startsWith('Μήνυμα Α') && !(await feed(s.page)).some(x => x.startsWith('A:'));
+    await type(s.page, await boxText(s.page));
+    const got = await until(async () => (await feed(s.page)).some(x => x.includes('ΑΠΑΝΤΗΣΗ-Α')), 8000);
+    const last = s.reqs[s.reqs.length - 1] || { roles: '' };
+    say('CL4 (both tries fail): two requests, then the text is back in the box and no reply is shown', s.reqs.length >= 2 && back && s.max() === 1);
+    say('CL4: the next send works (not locked) and the history has one copy of the message', got && last.roles === 'u');
+    await s.browser.close();
+  };
+  const CL5 = async () => {   // a timeout
+    const s = await sess(n => (n === 1 ? { hang: 30000 } : { text: 'ΑΠΑΝΤΗΣΗ-Α;' }), '/?stageA=1');
+    await type(s.page, 'Μήνυμα Α: δεν ξέρω αν πρέπει να αλλάξω δουλειά.');
+    const timedOut = await until(async () => /Η σύνδεση έληξε|Διακοπή σύνδεσης/.test(await errText(s.page)) && (await boxText(s.page)).startsWith('Μήνυμα Α'), 33000);
+    await s.page.waitForTimeout(500);
+    await type(s.page, await boxText(s.page));
+    const got = await until(async () => (await feed(s.page)).some(x => x.includes('ΑΠΑΝΤΗΣΗ-Α')), 8000);
+    say('CL5 (timeout): the text goes back to the box; the next send works and gets its reply (not locked)', timedOut && got && s.max() === 1);
+    await s.browser.close();
+  };
+  const CL6 = async () => {   // a crisis message while the lock holds
+    const s = await sess(n => (n === 1 ? { text: R1 } : n === 2 ? { text: R2 } : n === 3 ? LATE : n === 4 ? { ...SLOW, text: 'ΑΠΑΝΤΗΣΗ-ΠΙΣΩ;' } : { text: 'Είμαι εδώ.' }), '/?stageA=1');
+    await send(s.page, 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.');
+    await send(s.page, 'Η σταθερότητα, αλλά νιώθω ότι κάτι άλλο παίζει.');
+    await send(s.page, 'Ναι');
+    await send(s.page, 'Ότι δεν θέλω να παραδεχτώ ότι διάλεξα λάθος σπουδές.');
+    await s.page.getByRole('button', { name: BACK }).click();
+    await s.page.waitForTimeout(31500);
+    await type(s.page, 'Θέλω να πεθάνω.');
+    await s.page.waitForTimeout(2000);
+    const b = await s.page.locator('body').innerText();
+    say('CL6 (a crisis message while the lock holds): the 1018 / 112 line shows at once, from code, and never two requests at once', /1018/.test(b) && /\b112\b/.test(b) && s.max() === 1);
+    await s.browser.close();
+  };
+  await Promise.all([CL1, CL2, CL3, CL4, CL5, CL6].map(f => f().catch(e => say('CL: a scenario crashed — ' + (e && e.message || e).toString().slice(0, 120), false))));
+  out.sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [label, cond] of out) ok(label, cond);
 }
 
 // ── CH: SAFETY (John, 31/10/2026, a safety fix (α), Constitution §0.1; real-model run 57, session 125). On the safety path or under
@@ -5835,7 +5993,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

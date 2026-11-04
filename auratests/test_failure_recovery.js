@@ -181,8 +181,33 @@ assert('C: it maps that body to a reason code',
   /apiErrorReasonCode\(/.test(NOTOK));
 assert('C: and records it through the counts-only telemetry recorder',
   /recordTelemetry\(\s*["']api_error["']/.test(NOTOK));
-assert('C: reading the body never replaces the retry path for 429 / 5xx',
-  /retries > 0[\s\S]{0,200}return callAura\(/.test(NOTOK));
+// UPDATED (4/11/2026, ADR «4 Νοεμβρίου», branch hardening-2026-11): this used to be a regex on the source,
+// /retries > 0[\s\S]{0,200}return callAura\(/, which A4 (`return await callAura(…)`, the lock kept for the whole retry) no longer
+// matches although the retry is unchanged. It now checks the BEHAVIOUR it stood for: callAura from App.jsx with a fake fetch — a 429
+// or a 5xx is retried once and the person gets the second reply; when the retry fails too, the body of that last failure is read and
+// recorded as a reason code (api_error), once. A 4xx is not retried. The other wiring checks above stay as they were.
+const RETRY_CHECK = (async () => {
+  const fnOf = n => { let a = CODE.indexOf('\nasync function ' + n + '('); if (a < 0) a = CODE.indexOf('\nfunction ' + n + '('); return a < 0 ? '' : CODE.slice(a + 1, CODE.indexOf('\n}', a + 1) + 2); };
+  const src = ['let _activeCall = false;', 'const AURA_CORE_PERSONALITY = "CORE";', 'const __ev = [];', 'function recordTelemetry(e, f) { __ev.push([e, f]); }',
+    ...['apiErrorReasonCode', 'friendlyApiError', 'isEmptyModelResponse', 'capMessageHistory', 'callAura'].map(fnOf), 'return { callAura, ev: __ev };'].join('\n');
+  const run = async statuses => {
+    let n = 0;
+    const fetchImpl = async () => { const s = statuses[Math.min(n++, statuses.length - 1)];
+      return s === 200 ? { ok: true, status: 200, json: async () => ({ content: [{ type: 'text', text: 'reply ' + n }], usage: {} }) }
+                       : { ok: false, status: s, json: async () => ({ error: { type: 'overloaded_error', message: 'x' } }) }; };
+    const env = { fetch: fetchImpl, Blob: require('buffer').Blob, AbortController, setTimeout: (f, ms) => (ms < 1000 ? setImmediate(f) : 0), clearTimeout: () => {}, window: {}, console: { log() {} } };
+    const M = new Function(...Object.keys(env), src)(...Object.values(env));
+    const r = await M.callAura([{ role: 'user', content: 'a' }], 'CORE x').then(t => 'ok:' + t, e => 'err');
+    return { r, n, apiErrors: M.ev.filter(e => e[0] === 'api_error').length };
+  };
+  try {
+    const a = await run([429, 200]), b = await run([503, 200]), c = await run([529, 529]), d = await run([400]);
+    assert('C: reading the body never replaces the retry path for 429 / 5xx — a 429 or a 503 is retried once and the second reply is returned',
+      a.r === 'ok:reply 2' && a.n === 2 && a.apiErrors === 0 && b.r === 'ok:reply 2' && b.n === 2 && b.apiErrors === 0);
+    assert('C: … when the retry fails too, the last failure\'s body is read and recorded once (api_error); a 4xx is not retried',
+      c.r === 'err' && c.n === 2 && c.apiErrors === 1 && d.r === 'err' && d.n === 1 && d.apiErrors === 1);
+  } catch (e) { console.log('FAIL — C: the retry check crashed: ' + (e && e.message)); failed++; }
+})();
 assert('C: only integers are handed to it — no message, no body, no text',
   (() => {
     const i = CODE.indexOf('recordTelemetry("api_error"');
@@ -215,5 +240,7 @@ assert('A: the person still sees the error — the rollback does not hide it',
 assert('PASSIVE: none of this is wired into the prompt — cached prefix untouched',
   !/rollbackFailedTurn|isEmptyModelResponse|apiErrorReasonCode/.test(PROMPT));
 
-console.log('\n' + passed + ' passed, ' + failed + ' failed');
-process.exit(failed > 0 ? 1 : 0);
+RETRY_CHECK.then(() => {
+  console.log('\n' + passed + ' passed, ' + failed + ' failed');
+  process.exit(failed > 0 ? 1 : 0);
+});

@@ -6528,7 +6528,8 @@ async function callAura(messages, systemPrompt, retries = 1, onChunk = null) {
     if (!res.ok) {
       if (retries > 0 && (res.status === 429 || res.status >= 500)) {
         await new Promise(r => setTimeout(r, 600));
-        return callAura(messages, systemPrompt, retries - 1, onChunk);
+        // A4 (ADR «4 Νοεμβρίου»): `await` keeps this try open until the retry ends, so the finally below frees _activeCall only then.
+        return await callAura(messages, systemPrompt, retries - 1, onChunk);
       }
       // Read the body before discarding it — see apiErrorReasonCode. The person still sees the
       // same friendly wording; only a status number and a reason code are recorded.
