@@ -715,6 +715,7 @@ async function runMock() {
   await runMockDS(); // 31/10 (δ): a dismissal answer to the root question is never a card
   await runMockCL(); // 4/11 (A4): one call at a time, also during a retry
   await runMockFK(); // 6/11 (round 3): the final check — A2, A5, A6, A6β, A7 and the failures a browser can show
+  await runMockLM(); // 6/11 (round 3, (iii)): the error screen and no lost message
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -1675,7 +1676,9 @@ async function runMockPZ() {
   const handler = (await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'))).default;
   const L1018 = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
   const SELF = 'Σε άμεσο κίνδυνο, 112. Για βία στο σπίτι, 15900, γραμμή SOS για τη βία κατά των γυναικών.';
-  const ERR = 'Σφάλμα: Κάτι δεν λειτούργησε. Δοκίμασε ξανά σε λίγο.';
+  // UPDATED (6/11/2026, ADR «6 Νοεμβρίου (β)», John's decision (α), round 3): a failed call shows John's text, without «Σφάλμα:» — here
+  // with «…πάλι στο κουτί…», because the message IS back in the box (the same check below). Was «Σφάλμα: Κάτι δεν λειτούργησε. Δοκίμασε ξανά σε λίγο.»
+  const ERR = 'Κάτι δεν λειτούργησε από τη μεριά της εφαρμογής, όχι από τη δική σου. Το μήνυμά σου είναι πάλι στο κουτί· στείλ\' το ξανά όταν θέλεις.';
   const REPLY = 'Σε ακούω. Τι σε κρατάει εκεί;';
   let upstream = 0;
   const viaApi = async (body, paused) => {
@@ -3231,8 +3234,11 @@ async function runMockFL() {
       // the earlier call ends (≈33 s after it was sent): its late reply, or its failure
       while (Date.now() - s.t0 < 39000) await s.page.waitForTimeout(250);
       const ended = retry.text ? (await lastAura(s.page)).includes(LATE) : true;
+      // UPDATED (6/11/2026, ADR «6 Νοεμβρίου (β)», John's decision «διατήρηση και των δύο κειμένων», round 3): when the earlier call FAILS,
+      // its own message (SLOW) is no longer lost — the box holds it first, a blank line, then the text typed meanwhile (msg). The late-reply
+      // case (FL1) is unchanged: no failure, nothing goes back. Everything else here is checked as before (the line once, nothing sent).
       ok(`${tag} (${flow}): the earlier call ${retry.text ? 'ends with its late reply' : 'fails'} — the line stays, once; the text is not lost; nothing is sent by itself`,
-        ended && await fallback(s.page) === line && await times(s.page, num) === 1 && await input(s.page) === msg && s.calls() === s.at);
+        ended && await fallback(s.page) === line && await times(s.page, num) === 1 && await input(s.page) === (retry.text ? msg : SLOW + '\n\n' + msg) && s.calls() === s.at);
       if (tag !== 'FL3') {
         await go(s.page); await s.page.waitForTimeout(1000);
         ok(`${tag} (${flow}): «Go» once the lock is open sends the message (one request); its reply carries the line and the separate line goes — on screen once`,
@@ -3568,6 +3574,102 @@ async function runMockFK() {
     await s.browser.close();
   };
   await Promise.all([A2, A5, A6('stageA'), A6('old'), A6b, A7, F3, F4, F6].map(f => f().catch(e => say('FK: a scenario crashed — ' + String(e && e.message || e).slice(0, 140), false))));
+  out.sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [label, cond] of out) ok(label, cond);
+}
+
+// ── LM: THE ERROR SCREEN AND NO LOST MESSAGE (John, 6/11/2026, round 3, commit (iii), ADR «6 Νοεμβρίου (β)»). A failed call shows John's
+// text (α) — «…Το μήνυμά σου είναι πάλι στο κουτί…» only when it is — and no text of the user's is ever lost. LM1 the case found in the
+// code on 4/11: the first message is on its way, the call and its retry are slow and both fail, and while it waits (the box is free again
+// after 30 s) the user types a new text and taps «Go» (nothing is sent while the call runs): after the failure the box holds BOTH texts,
+// the first one first, each as it was typed, and the next «Go» sends them once. LM2 the same without a new text: the first message alone
+// back in the box. LM3 a quick failure: John's text, without «Σφάλμα:». LM4 (γ1-Β) the old flow: a crisis line (10306), then the closing,
+// then the end screen — the line is there, under «Επίστρεψε όταν…». Fake model, cost $0. Side by side. Alone: --only LM.
+async function runMockLM() {
+  const A = 'Μήνυμα Α: δεν ξέρω αν πρέπει να αλλάξω δουλειά.', B = 'Μήνυμα Β: και κάθε βράδυ σκέφτομαι τα λεφτά.';
+  const BOX = 'Κάτι δεν λειτούργησε από τη μεριά της εφαρμογής, όχι από τη δική σου. Το μήνυμά σου είναι πάλι στο κουτί· στείλ\' το ξανά όταν θέλεις.';
+  const out = [];
+  const say = (label, cond) => out.push([label, !!cond]);
+  const sess = async (query, replies) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true });
+    const reqs = [];
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      let b = {}; try { b = JSON.parse(route.request().postData() || '{}'); } catch (e) {}
+      reqs.push(b);
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      const o = typeof r === 'string' ? { text: r } : r;
+      if (o.delay) await new Promise(res => setTimeout(res, o.delay));
+      if (o.status) return route.fulfill({ status: o.status, contentType: 'application/json', body: JSON.stringify({ error: 'x' }) }).catch(() => {});
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: o.text }], usage: { input_tokens: 10, output_tokens: 10 } }) }).catch(() => {});
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    return { browser, page, reqs };
+  };
+  const box = page => page.locator('textarea.textarea').inputValue().catch(() => null);
+  const err = async page => { const e = page.locator('.err'); return (await e.count()) ? (await e.first().innerText()).trim() : ''; };
+  const userBubbles = page => page.locator('.turn-user').allInnerTexts();
+  const lastUser = b => { const m = (b && b.messages || []).filter(x => x.role === 'user'); return m.length ? m[m.length - 1].content : ''; };
+  const tapGo = async page => { await page.getByRole('button', { name: 'Go' }).click().catch(() => {}); await page.waitForTimeout(500); };
+  // LM1 — slow failure of the call AND its retry, a new text typed while it waits
+  const LM1 = async () => {
+    const s = await sess('?stageA=1', [{ status: 500, delay: 20000 }, { status: 500, delay: 14000 }, 'Τι σε κρατάει εκεί;']);
+    await s.page.locator('textarea.textarea').fill(A); await tapGo(s.page);
+    await s.page.waitForTimeout(31500);                                   // the 30-second guard frees the box; the call still runs
+    const free = (await box(s.page)) === '' && !(await s.page.locator('textarea.textarea').isDisabled());
+    await s.page.locator('textarea.textarea').fill(B); await tapGo(s.page); // «Go» while the call runs: nothing is sent
+    const whileWaiting = s.reqs.length;
+    await s.page.waitForTimeout(4500);                                    // the retry fails (≈ 34.6 s)
+    const after = await box(s.page), e = await err(s.page), bubbles = await userBubbles(s.page);
+    say('LM1: the way there — the call and its retry both on their way, the box free after 30 s, a new text typed and «Go» tapped', free && whileWaiting === 2);
+    say('LM1: «Go» while the call runs sent nothing — two requests in all (the call and its retry), both for the first message only',
+      s.reqs.length === 2 && s.reqs.every(b => lastUser(b) === A));
+    say('LM1: after both fail, the box holds BOTH texts — the first one first, a blank line, then the new one — each exactly as typed', after === A + '\n\n' + B);
+    say('LM1: … the failed message is not left in the conversation, and the screen says John\'s text (the message IS in the box)', !bubbles.some(t => t.includes('Μήνυμα Α')) && e === BOX);
+    await tapGo(s.page); await s.page.waitForTimeout(1200);
+    const bubbles2 = await userBubbles(s.page);
+    say('LM1: the next «Go» sends them ONCE — one request, the two texts as one message, one bubble, no double send',
+      s.reqs.length === 3 && lastUser(s.reqs[2]) === A + '\n\n' + B && bubbles2.filter(t => t.includes('Μήνυμα Α')).length === 1 && bubbles2.filter(t => t.includes('Μήνυμα Β')).length === 1);
+    await s.browser.close();
+  };
+  // LM2 — the same slow failure, no new text: the first message alone back in the box
+  const LM2 = async () => {
+    const s = await sess('?stageA=1', [{ status: 500, delay: 20000 }, { status: 500, delay: 14000 }]);
+    await s.page.locator('textarea.textarea').fill(A); await tapGo(s.page);
+    await s.page.waitForTimeout(36000);
+    say('LM2 (no new text): the first message alone is back in the box, John\'s text on screen', (await box(s.page)) === A && (await err(s.page)) === BOX && s.reqs.length === 2);
+    await s.browser.close();
+  };
+  // LM3 — a quick failure: John's text (α), without «Σφάλμα:»
+  const LM3 = async () => {
+    const s = await sess('?stageA=1', [{ status: 503 }, { status: 503 }]);
+    await s.page.locator('textarea.textarea').fill(A); await tapGo(s.page);
+    await s.page.waitForTimeout(2000);
+    const e = await err(s.page);
+    say('LM3 (a quick failure): John\'s text, word for word, without «Σφάλμα:» — and the message back in the box', e === BOX && !/Σφάλμα/.test(e) && (await box(s.page)) === A);
+    await s.browser.close();
+  };
+  // LM4 — γ1-Β: the old flow, crisis B (10306 shown), the closing, the end screen: the line is there
+  const LM4 = async () => {
+    const s = await sess('?stageA=0', ['Τι σε κρατάει εκεί;', 'Είμαι εδώ. Θέλεις να μου πεις λίγο περισσότερο;', 'Τι θα σήμαινε αυτό για σένα;', 'Εντάξει.',
+      'Πριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.', 'Η σκέψη σου μένει δική σου.']);
+    await send(s.page, 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.');
+    if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.');
+    await send(s.page, 'Απελπισία. Δεν βλέπω νόημα σε τίποτα πια.');
+    await send(s.page, 'Η σταθερότητα κυρίως.');
+    await send(s.page, 'Ευχαριστώ.');
+    const b = s.page.getByRole('button', { name: 'Δείξε μου', exact: true }); if (await b.count()) { await b.first().click(); await s.page.waitForTimeout(1500); }
+    await send(s.page, 'αλλαγή'); await s.page.waitForTimeout(1500);
+    const end = s.page.locator('.end-wrap');
+    const endText = (await end.count()) ? ((await end.first().textContent()) || '') : ''; // textContent: the CSS writes the end screen in capitals
+    say('LM4 (γ1-Β, old flow, crisis B, then the closing): the end screen is there, and under «Επίστρεψε όταν…» the line of the session — 10306, from the table',
+      /η συνομιλία σταμάτησε εδώ/.test(endText) && endText.includes('Υπάρχει η Γραμμή Ψυχοκοινωνικής Υποστήριξης, 10306.'));
+    await s.browser.close();
+  };
+  await Promise.all([LM1, LM2, LM3, LM4].map(f => f().catch(e => say('LM: a scenario crashed — ' + String(e && e.message || e).slice(0, 140), false))));
   out.sort((a, b) => a[0].localeCompare(b[0]));
   for (const [label, cond] of out) ok(label, cond);
 }
@@ -6158,7 +6260,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

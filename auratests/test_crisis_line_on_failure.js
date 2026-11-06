@@ -90,7 +90,9 @@ assert('FIXTURES: the two sentences are crisis A and crisis B by the app\'s own 
     !/let displayText = text;\s*setCrisisFallback\(null\);/.test(GEN) && GEN.includes('setCrisisFallback(prev => crisisFallbackAfterReply(prev, displayText));') && /setCrisisFallback\(null\);/.test(fullFnSrc('resetSession') || CODE.slice(CODE.indexOf('const resetSession = () =>'), CODE.indexOf('\n  };', CODE.indexOf('const resetSession = () =>')) + 4) /* UPDATED (23/10, Ο5): resetSession has one line more (the danger latch) — read to its end, not 4000 characters */));
   assert('STATE: one string or null', /const \[crisisFallback, setCrisisFallback\] = useState\(null\);/.test(CODE));
   assert('SCREEN: drawn as its own readable line (role alert), not inside the 10px error text, right above the error',
-    /\{crisisFallback && <div role="alert" className="crisis-fallback"[^>]*>\{crisisFallback\}<\/div>\}\s*\{error && <div className="err">Σφάλμα: \{error\}<\/div>\}/.test(CODE) &&
+    // UPDATED (6/11/2026, ADR «6 Νοεμβρίου (β)», John's decision (α), round 3): the error line shows John's texts without «Σφάλμα:» in front;
+    // any other error as before. The line box is still its own line, right above it.
+    /\{crisisFallback && <div role="alert" className="crisis-fallback"[^>]*>\{crisisFallback\}<\/div>\}\s*\{error && <div className="err">\{isSafeFailText\(error\) \? error : "Σφάλμα: " \+ error\}<\/div>\}/.test(CODE) &&
     /\.crisis-fallback\{[^}]*font-size:13px/.test(CODE));
   assert('UNCHANGED: the reply path still adds the line to the model\'s text exactly as before',
     /const _crisisLine = buildCrisisLine\(classifyCrisisTier\(lastUserMsg\), text, supportLineShown\.current\);/.test(GEN) &&

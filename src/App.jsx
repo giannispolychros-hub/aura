@@ -2175,6 +2175,7 @@ function finishReply(text, ctx) {
     const lastUser = typeof o.lastUserText === "string" ? o.lastUserText : "";
     let t = typeof text === "string" ? text : "";
     if (kind !== "afterCrisis") t = filterModelPart(t, danger, safetyPath);
+    else t = afterCrisisShown(t); // (β) β2
     const lines = [];
     const add = l => { if (!l) return; lines.push(l); t = t.trim() ? t.replace(/\s+$/, "") + "\n\n" + l : l; };
     let supportShown = keep.supportShown, dangerShown = keep.dangerShown;
@@ -2241,6 +2242,34 @@ function fkFixedTexts() {
 function fkShownOk(visible) {
   fkFixedTexts();
   return FK_PASSED.has(fkStamp(typeof visible === "string" ? visible : ""));
+}
+// ── THE ERROR SCREEN (John, 6/11/2026, round 3, commit (iii), ADR «6 Νοεμβρίου (β)») ──
+// John's texts of the decision (α) are shown without «Σφάλμα:» in front of them (it read as if the user had done something wrong).
+// The text of a call that timed out (callAura), kept as it is on the error line: true whoever's side the delay was on.
+const CALL_TIMEOUT_TEXT = "Η σύνδεση έληξε. Έλεγξε το δίκτυό σου και δοκίμασε ξανά.";
+function isSafeFailText(t) {
+  return t === SAFE_FAIL_TEXTS.box || t === SAFE_FAIL_TEXTS.noBox || t === SAFE_FAIL_TEXTS.last;
+}
+// NO LOST MESSAGE: a failed call puts its message back in the box — and if the user typed something new there while the call ran (the box
+// is free again after the 30-second guard), the box keeps BOTH: the failed message first, a blank line, then the new text, each exactly
+// as typed. The same text typed again (or typed again and added to) is not doubled. Nothing is sent: the next «Go» sends what the box holds.
+function keepBothTexts(restored, cur) {
+  const r = typeof restored === "string" ? restored : "";
+  const c = typeof cur === "string" ? cur : "";
+  if (!r.trim()) return c;
+  if (!c.trim()) return r;
+  if (c.includes(r.trim())) return c;
+  return r + "\n\n" + c;
+}
+// (β) β2: the short goodbye after a crisis (STAGE_A_TEXTS.afterCrisisNoNumbers), word for word — with the line 1018 / 112 under it
+// (no number was shown in the session). The whole phrase stays alone («και τίποτα άλλο», ADR «19 Οκτωβρίου (β)»).
+function afterCrisisShown(text) {
+  return text === STAGE_A_TEXTS.afterCrisisNoNumbers ? text + "\n\n" + latchLine({ tier: "A" }) : text;
+}
+// (γ1) Β, (γ3) Α: the line of the session's latch — crisis A (riskKind 1) → 1018 / 112, crisis B (2) → 10306, danger from another person in
+// the messages → 112 + 15900 / 1056. DISTRESS (3) and no signal: nothing. If it cannot be built: SAFE_FAIL_TEXTS.last.
+function sessionLatchLine(riskKind, danger) {
+  try { return latchLine({ tier: riskKind === 1 ? "A" : riskKind === 2 ? "B" : null, danger: danger || null }); } catch (e) { return SAFE_FAIL_TEXTS.last; }
 }
 // A later edit of a message already shown (stripPrematureFarewell, when the closing begins): allowed only when every safety line the
 // shown text carried is still in the new one; then the new text is recorded with the same lines. Otherwise the message stays as it was.
@@ -7224,7 +7253,7 @@ export default function AURAv2() {
   // At any other root question: «Δεν το βρήκα ακόμα», as «Δεν ξέρω» today; returns false and the message goes on to the model.
   const stageADismiss = useCallback((userText, phase) => {
     if (phase === "ask" && stageARef.current.leaving) {
-      const _bye = stageADismissalGoodbye({ messages, fallbackLine: crisisFallback, dangerLine: dangerLineShown.current.length > 0, riskKind: riskSignalKind.current });
+      const _bye = fkPassApp(afterCrisisShown(stageADismissalGoodbye({ messages, fallbackLine: crisisFallback, dangerLine: dangerLineShown.current.length > 0, riskKind: riskSignalKind.current }))); // (β) β2; recorded
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: STAGE_A_TEXTS.askLeaving, msgMode: "STAGE_A" }, { id: nextMsgId(), role: "user", content: userText }, { id: nextMsgId(), role: "assistant", content: _bye, msgMode: "STAGE_A" }]);
       stageADispatch({ type: "back" });
       return true;
@@ -8759,7 +8788,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // setting the rolled-back array directly keeps one source of truth.
       const _rb = rollbackFailedTurn(msgs);
       setMessages(_rb.messages);
-      if (_rb.restored) setInput(cur => cur || _rb.restored);
+      if (_rb.restored) setInput(cur => keepBothTexts(_rb.restored, cur)); // NO LOST MESSAGE (6/11/2026): a new text typed meanwhile stays too
+      // THE ERROR SCREEN (6/11/2026, John's decision (α)): «…πάλι στο κουτί…» only when the message really went back there. A timeout keeps
+      // its own text: it may be the user's network, so «από τη μεριά της εφαρμογής, όχι από τη δική σου» is not known to be true there.
+      setError(e && e.message === CALL_TIMEOUT_TEXT ? e.message : _rb.restored ? SAFE_FAIL_TEXTS.box : SAFE_FAIL_TEXTS.noBox);
     } finally {
       clearTimeout(_loadingGuard);
       setLoading(false); // guaranteed cleanup — without this, callAura throw left loading=true permanently
@@ -8923,6 +8955,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       const sentences = lookBehind({ after: /[.!;]/, match: /\s+/ }).split(shownText).map(s => s.trim()).filter(Boolean);
       if (sentences.length > 0) setFinalDistillation(sentences[sentences.length - 1]);
     } catch {
+      const _closeLine = sessionLatchLine(riskSignalKind.current, dangerInMessages(msgs)); if (_closeLine) setCrisisFallback(_closeLine); // (γ3) Α
       const fallback = fkPassApp("Η σκέψη σου παραμένει δική σου.", { isTermination: true }); // the app's own text, recorded (final check)
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: fallback, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
@@ -9042,6 +9075,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       if (_fkPart1.linesText) appendClosingMessage(_fkPart1.linesText);
       setAwaitingRememberedWord(true);
     } catch {
+      const _closeLine = sessionLatchLine(riskSignalKind.current, dangerInMessages(msgs)); if (_closeLine) setCrisisFallback(_closeLine); // (γ3) Α
       const fallback = fkPassApp("Πριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις. Όχι για εδώ. Για σένα, όταν ξαναβρεθείς σε αυτή τη σκέψη.", { isTermination: true }); // recorded (final check)
       // The offline path asks the same question, so it arms the same flag — otherwise a
       // session that fell back here would leave Part 2 free to ask it a second time.
@@ -9089,7 +9123,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       dangerLineShown.current = _fkMis.dangerShown;
       { const text = _fkMis.content; // the text as it passed the exit
       if (text.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "AUDIT" }]); }
-    } catch(e) { setError(e.message); }
+    } catch(e) { setError(SAFE_FAIL_TEXTS.noBox); } // the error screen (α): the correction is not put back in a box
     finally { setLoading(false); }
     setMisfireType(null);
   }, [messages, memory, misfireType]);
@@ -9165,7 +9199,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           setMemory(updatedMem);
           if (memory.storageEnabled) saveMemory(updatedMem);
         }
-      } catch(e) { setError(e.message); }
+      } catch(e) { setError(SAFE_FAIL_TEXTS.noBox); } // the error screen (α): a compression asked by a button puts nothing back in a box
       finally { setLoading(false); }
     } else {
       await generateResponse(messages, mode);
@@ -9498,7 +9532,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           setMemory(updated);
           saveMemory(updated);
         }
-      } catch(e) { setError(e.message); const _fd = dangerInMessages(initMsgs); const _fdl = _fd ? buildDangerLine(_fd, "", dangerLineShown.current).line : ""; if (_fdl) setCrisisFallback(_fdl); } // Ο5: not marked as shown (the retry carries it)
+      } catch(e) { setError(e.message); const _fd = dangerInMessages(initMsgs); const _fdl = _fd ? buildDangerLine(_fd, "", dangerLineShown.current).line : ""; if (_fdl) setCrisisFallback(_fdl); setError(SAFE_FAIL_TEXTS.noBox); } // Ο5: not marked as shown (the retry carries it)
       finally { setLoading(false); }
       return;
     }
@@ -9507,7 +9541,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     // and nothing else — no model call, no leaving door, no root question. A message with a safety signal took its path above.
     const _afterCrisis = stageAAfterCrisisText({ active: stageAActive.current, messages, fallbackLine: crisisFallback, lastUserText: userText, dangerLine: dangerLineShown.current.length > 0 });
     if (_afterCrisis) {
-      setMessages(prev => [...prev, { id: nextMsgId(), role: "user", content: userText }, { id: nextMsgId(), role: "assistant", content: _afterCrisis, msgMode: "STAGE_A" }]);
+      setMessages(prev => { const _ac = fkPassApp(afterCrisisShown(_afterCrisis)); // (β) β2: the short phrase gets the line under it; recorded (final check)
+        return [...prev, { id: nextMsgId(), role: "user", content: userText }, { id: nextMsgId(), role: "assistant", content: _ac, msgMode: "STAGE_A" }]; });
       return;
     }
     // STAGE A — «Πριν φύγεις:» BEFORE the model (ADR «8 Οκτωβρίου»): the FIRST explicit closing before the root no
@@ -9807,6 +9842,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
   // Return session: user has open anchor — show it as first thing
   const returnAnchor = isFirst && openAnchors.length > 0 ? openAnchors[0] : null;
   const lastClosedAnchor = isFirst && !returnAnchor ? getMostRecentWordAnchor(memory) : null;
+  // (γ1) Β (John, 6/11/2026): on the end screen, a session with a crisis or danger from another person keeps its line in view
+  const _endLine = sessionEnded ? sessionLatchLine(riskSignalKind.current, dangerInMessages(messages)) : "";
 
   // ─────────────────────────────────────────────
   // RENDER
@@ -10698,6 +10735,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
             <div className="end-wrap">
               <div className="end-label">η συνομιλία σταμάτησε εδώ</div>
               <div className="end-note">Επίστρεψε όταν υπάρχει κάτι νέο να δούμε.</div>
+              {_endLine && <div role="alert" className="crisis-fallback" data-end-line="1">{_endLine}</div>}
               {(!finalDistillation || valueUnlocked || stageAActive.current || riskSignalKind.current !== 0) && <button className="new-btn" onClick={resetSession}>Νέα συνεδρία</button>}
               {recMode.current && (
                 <div style={{marginTop:"14px"}}>
@@ -10823,7 +10861,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               <div className="turn-counter">{turnCount.current} {turnCount.current===1 ? "ανταλλαγή" : "ανταλλαγές"}</div>
             )}
             {crisisFallback && <div role="alert" className="crisis-fallback">{crisisFallback}</div>}
-            {error && <div className="err">Σφάλμα: {error}</div>}
+            {error && <div className="err">{isSafeFailText(error) ? error : "Σφάλμα: " + error}</div>}
           </div>
         )}
 

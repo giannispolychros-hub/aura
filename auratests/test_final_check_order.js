@@ -87,7 +87,7 @@ const SITES = [
   ['Stage A, the root question in the history (fixed texts)', 'content: stageARef.current.leaving ? STAGE_A_TEXTS.askLeaving : STAGE_A_TEXTS.ask, msgMode:', 'fixed'],
   ['First-WHY\'s question', '{ id: nextMsgId(), role: "assistant", content: "Γιατί έχει σημασία αυτό για σένα τώρα;" },', 'fkPassApp("Γιατί έχει σημασία αυτό για σένα τώρα;");'],
   ['the First-WHY reply', 'content: _firstWhyShown, msgMode: "ANSWER" }', '{ const _firstWhyShown = _firstFk.content;'],
-  ['the goodbye after a crisis (fixed texts)', 'content: _afterCrisis, msgMode: "STAGE_A" }', 'fixed'],
+  ['the goodbye after a crisis (a fixed text; since (iii), β2: the short one with the line under it, recorded)', 'content: _ac, msgMode: "STAGE_A" }', 'const _ac = fkPassApp(afterCrisisShown(_afterCrisis));'],
   ['Stage A, the step after «Ναι»', 'addUiBubble(buildRootStepLines(_found).join("\\n"), messages.length, { role: "assistant", stageAEnd: true })', 'fkPassApp(buildRootStepLines(_found).join("\\n"));'],
   ['Stage A, the end lines', 'content: buildRootEndLines(stageARef.current.found, _riskOffer).join("\\n"), msgMode: "STAGE_A", stageAEnd: true }', 'fkPassApp(buildRootEndLines(stageARef.current.found, _riskOffer).join("\\n"));'],
 ];
