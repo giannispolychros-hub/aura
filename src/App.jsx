@@ -7012,6 +7012,7 @@ export default function AURAv2() {
   // SCOPE FIX (AST analysis): misfireInput and setMisfireInput are used in the misfire-recovery
   // panel but were never declared anywhere — that panel threw ReferenceError the moment it rendered.
   const [misfireInput, setMisfireInput] = useState("");
+  const [misfireFail, setMisfireFail] = useState(null); // FINDING 142 (7/11/2026): the failure text shown in the card «διόρθωση»
   // philosophyShown removed — its screen («Γνώθι σαυτόν») was deleted and nothing set it
   const [introShown, setIntroShown] = useState(() => {
     // Returning users skip intro — only show once per install
@@ -9093,6 +9094,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
   // sent by the normal path (handleSubmit, through the effect below it). A correction with no such signal is unchanged.
   const misfireToSubmit = useRef(null);
   const handleMisfireResponse = useCallback(async (userCorrection) => {
+    setMisfireFail(null); // FINDING 142: a new try clears the card's failure text
     const _mt = typeof userCorrection === "string" ? userCorrection.trim() : "";
     if (_mt && (detectSafetySignal(_mt) === "CRISIS" || detectsDangerFromOther(_mt))) {
       setMisfirePending(false); setMisfireType(null);
@@ -9113,6 +9115,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     ];
     const recoveryPrompt = getLensPrompt(activeLensRef.current) + buildStageAMarker(stageAActive.current) + `\n\nMISFIRE RECOVERY: The user has indicated your previous observation was inaccurate or incomplete. Your response must begin with: "Understood. My interpretation appears incomplete." Then ask: "What am I missing that changes the picture?" Do not repeat the original observation.`;
     setLoading(true);
+    let _reopen = false;
     try {
       const text = stripAraDeclarative(cleanLabels(await callAura(correctionMsgs, recoveryPrompt)));
       // THE FINAL CHECK (6/11/2026, ADR «6 Νοεμβρίου»; audit A7): this reply had two filters only — now the one exit, the last step
@@ -9123,9 +9126,17 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       dangerLineShown.current = _fkMis.dangerShown;
       { const text = _fkMis.content; // the text as it passed the exit
       if (text.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "AUDIT" }]); }
-    } catch(e) { setError(SAFE_FAIL_TEXTS.noBox); } // the error screen (α): the correction is not put back in a box
+    } catch(e) {
+      // FINDING 142 (John, 7/11/2026, round 4, ADR «7 Νοεμβρίου»): a correction that was written is not lost when its reply fails — the
+      // card «διόρθωση» opens again with it in its own box (with anything already there: keepBothTexts), and the card says so in John's
+      // words (α), true there; a timeout keeps its own text, as on the main path. The main box is not touched. «Συνέχισε» (nothing
+      // written): as before — the second text, nothing to put back.
+      const _back = typeof userCorrection === "string" && userCorrection.trim() ? userCorrection : "";
+      if (_back) { _reopen = true; setMisfireInput(cur => keepBothTexts(_back, cur)); setMisfirePending(true); setMisfireFail(e && e.message === CALL_TIMEOUT_TEXT ? e.message : SAFE_FAIL_TEXTS.box); }
+      else setError(SAFE_FAIL_TEXTS.noBox);
+    }
     finally { setLoading(false); }
-    setMisfireType(null);
+    if (!_reopen) setMisfireType(null);
   }, [messages, memory, misfireType]);
 
   // ── Layer gate ──
@@ -9735,6 +9746,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setMemoryPromptPending(false);
     setWarningPending(false);
     setMisfirePending(false);
+    setMisfireInput(""); setMisfireFail(null); // FINDING 142: nothing of a correction crosses into a new session
     setCurrentDomain("άλλο");
     setFirstWhyPending(false);
     setFirstWhyMessage("");
@@ -10407,6 +10419,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                 <button className="choice-btn" onClick={() => { handleMisfireResponse(""); setMisfireInput(""); }}>Συνέχισε</button>
                 <button className="choice-btn prim" onClick={() => { handleMisfireResponse(misfireInput); setMisfireInput(""); }} disabled={!misfireInput.trim()}>Αποστολή</button>
               </div>
+              {misfireFail && <div className="err" data-misfire-fail="1">{isSafeFailText(misfireFail) ? misfireFail : "Σφάλμα: " + misfireFail}</div>}
             </div>
           )}
 

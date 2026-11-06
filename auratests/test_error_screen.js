@@ -60,9 +60,12 @@ assert('NO LOST: no failed message → the box as it is', call('keepBothTexts', 
   const TO = (raw.match(/const CALL_TIMEOUT_TEXT = "([^"]+)";/) || [])[1] || '';
   assert('(α) a timeout keeps its own true text «' + TO + '» — the very text callAura throws — not John\'s «από τη μεριά της εφαρμογής»',
     TO === 'Η σύνδεση έληξε. Έλεγξε το δίκτυό σου και δοκίμασε ξανά.' && raw.includes('throw new Error("' + TO + '")') && call('isSafeFailText', TO) === false); }
-assert('(α) the other replies whose message is not put back (First-WHY, «αυτό δεν ισχύει →», the compression): the second text',
+// UPDATED (7/11/2026, ADR «7 Νοεμβρίου», John's approval of finding 142, round 4): a written correction («αυτό δεν ισχύει →») now goes
+// back to its card's box, so it left this list — checked, more strictly, in test_misfire_keep_142.js; «Συνέχισε» (nothing written) keeps
+// the second text, checked here as before.
+assert('(α) the other replies whose message is not put back (First-WHY, «Συνέχισε» of «αυτό δεν ισχύει →» with nothing written, the compression): the second text',
   /if \(_fdl\) setCrisisFallback\(_fdl\); setError\(SAFE_FAIL_TEXTS\.noBox\); \}/.test(raw) &&
-  /\} catch\(e\) \{ setError\(SAFE_FAIL_TEXTS\.noBox\); \}/.test(blockFrom('const handleMisfireResponse = useCallback(')) &&
+  /\n      else setError\(SAFE_FAIL_TEXTS\.noBox\);\n    \}/.test(blockFrom('const handleMisfireResponse = useCallback(')) &&
   /setError\(SAFE_FAIL_TEXTS\.noBox\);/.test(blockFrom('const handlePivotChoice = useCallback(')));
 assert('(α) the error line: John\'s texts without «Σφάλμα:»; any other error as before', /\{error && <div className="err">\{isSafeFailText\(error\) \? error : "Σφάλμα: " \+ error\}<\/div>\}/.test(raw) &&
   call('isSafeFailText', BOX) === true && call('isSafeFailText', NOBOX) === true && call('isSafeFailText', 'Η συσκευή σου δεν έχει άλλο χώρο') === false);
