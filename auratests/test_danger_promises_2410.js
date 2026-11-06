@@ -153,8 +153,10 @@ assert('(Δ) not a string, or empty → given back as it came', strip('', DANGER
   // UPDATED (25/10, Ε2 v2): stripLineClaims runs first, inside this check, on the same messages
   const MAIN = 'cleanLabels(stripDangerPromises(stripLineClaims(rawText.replace(/\\s*\\[\\[EXIT:(yes|no)\\]\\]\\s*$/i, ""), dangerInMessages(msgs), _safetyPath), dangerInMessages(msgs)))';
   const FIRST = 'cleanLabels(stripDangerPromises(stripLineClaims(await callAura(initMsgs, prompt), dangerInMessages(initMsgs), riskSignalKind.current === 1 || riskSignalKind.current === 2), dangerInMessages(initMsgs)))';
-  assert('(Ζ) exactly two calls: the main reply and the First-WHY reply — the two paths that write the danger line',
-    (CODE.match(/stripDangerPromises\(/g) || []).length === 3 && CODE.split(MAIN).length === 2 && CODE.split(FIRST).length === 2);
+// UPDATED (6/11/2026, ADR «6 Νοεμβρίου», John's approval of the final check, round 3): one call more — in safetyFilters, the one exit's
+  // filter step (finishReply, its second pass, and the closing's reply). The two calls of Ε2 stay where they were, checked as before (MAIN, FIRST).
+  assert('(Ζ) exactly two calls: the main reply and the First-WHY reply — the two paths that write the danger line — and the exit\'s one',
+    (CODE.match(/stripDangerPromises\(/g) || []).length === 4 && (CODE.match(/return stripDangerPromises\(stripLineClaims\(text, danger \|\| null, safetyPath === true\), danger \|\| null\);/g) || []).length === 1 && CODE.split(MAIN).length === 2 && CODE.split(FIRST).length === 2);
   const at = GEN.indexOf(MAIN);
   assert('(Ζ) main path: inside the one cleaning line, before the crisis line, the danger line and the AI-identity line are added',
     at > 0 && at < GEN.indexOf('let displayText = text;') && at < GEN.indexOf('buildCrisisLine(classifyCrisisTier(lastUserMsg), text, supportLineShown.current)') &&

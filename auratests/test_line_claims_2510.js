@@ -155,8 +155,10 @@ assert('(Ζ) a statement about a line OFF the path stays («Η γραμμή το
   const GEN = CODE.slice(CODE.indexOf('const generateResponse = useCallback('), CODE.indexOf('const handleSubmit = useCallback('));
   const MAIN = 'cleanLabels(stripDangerPromises(stripLineClaims(rawText.replace(/\\s*\\[\\[EXIT:(yes|no)\\]\\]\\s*$/i, ""), dangerInMessages(msgs), _safetyPath), dangerInMessages(msgs)))';
   const FIRST = 'cleanLabels(stripDangerPromises(stripLineClaims(await callAura(initMsgs, prompt), dangerInMessages(initMsgs), riskSignalKind.current === 1 || riskSignalKind.current === 2), dangerInMessages(initMsgs)))';
-  assert('(Η) exactly two calls, first in the cleaning of the main reply and of the First-WHY reply (the two paths of Ε2)',
-    (CODE.match(/stripLineClaims\(/g) || []).length === 3 && CODE.split(MAIN).length === 2 && CODE.split(FIRST).length === 2);
+// UPDATED (6/11/2026, ADR «6 Νοεμβρίου», John's approval of the final check, round 3): one call more — in safetyFilters, the one exit's
+  // filter step (finishReply, its second pass, and the closing's reply). The two calls of Ε2 stay where they were, checked as before (MAIN, FIRST).
+  assert('(Η) exactly two calls, first in the cleaning of the main reply and of the First-WHY reply (the two paths of Ε2) — and the exit\'s one',
+    (CODE.match(/stripLineClaims\(/g) || []).length === 4 && (CODE.match(/stripLineClaims\(text, danger \|\| null, safetyPath === true\)/g) || []).length === 1 && CODE.split(MAIN).length === 2 && CODE.split(FIRST).length === 2);
   assert('(Η) main path: the safety path is the one the per-turn notes use (perTurnSafety), set before the reply in the same function',
     GEN.includes('const _crisisTurn = _turnSafety.crisisTurn, _safetyPath = _turnSafety.safetyPath;') && GEN.indexOf('_safetyPath = _turnSafety.safetyPath') < GEN.indexOf(MAIN) && GEN.indexOf(MAIN) > 0);
   assert('(Η) main path: before the crisis line, the danger line and the AI-identity line are added', GEN.indexOf(MAIN) < GEN.indexOf('let displayText = text;') &&

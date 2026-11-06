@@ -3563,7 +3563,8 @@ async function runMockFK() {
     const s = await sess('?stageA=1', ['Τι σε κρατάει εκεί;'], () => { try { window.Blob = undefined; } catch (e) {} });
     await send(s.page, F1); await s.page.waitForTimeout(1500);
     const a = await auraTexts(s.page), b = await body(s.page);
-    say('FK-F6 (the history cap fails): the request still goes and the reply is shown; no technical text', s.calls() === 1 && a.includes('Τι σε κρατάει εκεί;') && !/Blob|not defined|constructor/.test(b));
+    // (the first reply of a Stage A session carries the app's method line above it: the bubble ENDS with the reply)
+    say('FK-F6 (the history cap fails): the request still goes and the reply is shown; no technical text', s.calls() === 1 && a.some(t => t.endsWith('Τι σε κρατάει εκεί;')) && !/Blob|not defined|constructor/.test(b));
     await s.browser.close();
   };
   await Promise.all([A2, A5, A6('stageA'), A6('old'), A6b, A7, F3, F4, F6].map(f => f().catch(e => say('FK: a scenario crashed — ' + String(e && e.message || e).slice(0, 140), false))));

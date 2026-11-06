@@ -103,8 +103,10 @@ assert('(Δ) stripLineClaims ends with the channel rule on both of its outcomes 
 assert('(Δ) the channel rule has the gate of stripLineClaims (the safety path or danger from another person)',
   /if \(\(!danger && safetyPath !== true\) \|\| typeof text !== "string" \|\| !text\) return text;/.test(fnSrc('stripLineChannels')));
 assert('(Δ) read only there (no other call)', (CODE.split('stripLineChannels(').length - 1) === 3);
-assert('(Δ) the call chain in generateResponse and the first reply is unchanged (stripLineClaims is still called the same way)',
-  (CODE.match(/stripLineClaims\(/g) || []).length === 3);
+// UPDATED (6/11/2026, ADR «6 Νοεμβρίου», John's approval of the final check, round 3): one call more — in safetyFilters, the one exit's
+// filter step. The call chain of generateResponse and of the first reply is unchanged (test_line_claims_2510.js (Η) checks both).
+assert('(Δ) the call chain in generateResponse and the first reply is unchanged (stripLineClaims is still called the same way) — plus the exit\'s one',
+  (CODE.match(/stripLineClaims\(/g) || []).length === 4 && (CODE.match(/stripLineClaims\(text, danger \|\| null, safetyPath === true\)/g) || []).length === 1);
 assert('(Δ) no lookbehind in it (old iPhones)', fnSrc('stripLineChannels').length > 0 && !/\(\?<[=!]/.test(fnSrc('stripLineChannels')));
 
 // ── (Ε) the rest ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────

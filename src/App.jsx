@@ -2011,6 +2011,245 @@ function buildAiIdentityLine(userText, modelText) {
   const said = typeof modelText === "string" ? modelText.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
   return /τεχνητη\s+νοημοσυνη/.test(said) ? "" : "Είμαι τεχνητή νοημοσύνη, όχι άνθρωπος.";
 }
+// ─────────────────────────────────────────────
+// THE FINAL CHECK (John, 6/11/2026, round 3 of the branch hardening-2026-11, ADR «6 Νοεμβρίου»; the audit of 4/11, A2, A5, A6, A6β, A7).
+// Every text of AURA goes through ONE exit before it is shown: finishReply for a reply of the model, fkPassApp for the app's own
+// fixed texts. finishReply runs after every change a path makes — the scale question, the emptying of a closing before the
+// root, the fixed goodbyes, the misfire and compression replies — so none of them can take a safety line with it:
+//   1. the safety filters (claims about a line, promises under danger), again: idempotent, and the closing and misfire paths never had them
+//      — on the model's words only (filterModelPart): the app's own lines a path has already put at the end stay exactly as written
+//   2. the app's safety lines, LAST: the crisis line of the tier on a crisis turn, the second line of defence when the reply asks about
+//      self-harm, the danger line, the «Είμαι τεχνητή νοημοσύνη» line — the same builders and the same rules as before, on the final text
+//   3. the check, on the text AS IT WILL BE SHOWN (shownTextOf: the very changes the message bubble makes — the road map, the lines of
+//      quotation marks, the bare goodbye, «Πες μου»): not empty, not over FINAL_MAX_CHARS, no hidden tag, and a second pass of the
+//      filters finds nothing to cut
+// If the check fails, or anything in it throws, the reply is not shown: the caller treats it as a failed call (the message back in the
+// box, the fixed text of SAFE_FAIL_TEXTS, the line of the latch from HELPLINES). A text that passed is recorded, as it is shown (FK_PASSED:
+// a short hash of the shown text, with the safety lines it carries); the app's own fixed texts are recorded the same way (fkPassApp). The
+// message bubble shows a message of AURA only when what it is about to show is in that record — a message changed after its check (or
+// made without it) is shown as SAFE_FAIL_TEXTS.noBox — and an edit of a message already shown (fkPassEdit) must keep its lines. The code
+// that was there stays as it was (its lines, its order): this exit comes after it, as the last step. This is a net for the app's normal
+// flow — the model's mistakes and our own (a new path that forgets a filter). It is NOT a protection against a third party: it runs on
+// the user's device, and whoever changes the code in their own browser goes around it. auratests/test_final_check.js,
+// test_final_check_order.js; browser: section FK.
+// John's texts (decision (α), 6/11/2026): «Το μήνυμά σου είναι πάλι στο κουτί» only when it is true; otherwise the second text.
+const SAFE_FAIL_TEXTS = {
+  box: "Κάτι δεν λειτούργησε από τη μεριά της εφαρμογής, όχι από τη δική σου. Το μήνυμά σου είναι πάλι στο κουτί· στείλ' το ξανά όταν θέλεις.",
+  noBox: "Δεν μπορώ να εμφανίσω απάντηση αυτή τη στιγμή. Δοκίμασε ξανά όταν θέλεις.",
+  // when even the fixed text cannot be built (no HELPLINES): written out here, nothing read from elsewhere
+  last: "Κάτι δεν λειτούργησε. Σε άμεσο κίνδυνο, 112.",
+};
+const FINAL_MAX_CHARS = 6000; // a reply of max_tokens 1000 is at most ~4,000 characters; the longest reply of the stress tests was well under
+// The line of a latch, name and number from HELPLINES only — no description, no hours, no promise of an answer (John, 6/11/2026).
+// tier "A" or "unknown" (a detector failed: the most protective) → 1018 and 112; "B" → 10306; danger from another person → 112 and
+// 15900 / 1056. Throws when a number is not in the table (safeFailFor then gives SAFE_FAIL_TEXTS.last).
+function latchLine(latch, helplines = HELPLINES) {
+  const o = latch || {};
+  const name = n => { const h = (Array.isArray(helplines) ? helplines : []).find(x => x && x.number === n); if (!h) throw new Error("no line " + n); return h.name; };
+  const parts = [];
+  const tierA = o.tier === "A" || o.tier === "unknown";
+  if (tierA) parts.push("Υπάρχει η " + name("1018") + ", 1018. Σε " + name("112") + ", 112.");
+  else if (o.tier === "B") parts.push("Υπάρχει η " + name("10306") + ", 10306.");
+  const d = o.danger || {};
+  if (d.self === true || d.child === true) {
+    const dl = [];
+    if (!tierA) dl.push("Σε " + name("112") + ", 112.");
+    if (d.self === true) dl.push("Για βία στο σπίτι, 15900, " + name("15900") + ".");
+    if (d.child === true) dl.push("Για παιδί, 1056, " + name("1056") + ".");
+    parts.push(dl.join(" "));
+  }
+  return parts.join("\n\n");
+}
+// What the user sees when a reply cannot be shown: the fixed text (with «το μήνυμά σου είναι πάλι στο κουτί» only when inBox is true)
+// and, for the line box, the line of the latch. If building them fails: SAFE_FAIL_TEXTS.last and no line.
+function safeFailFor(o, helplines = HELPLINES) {
+  try {
+    const x = o || {};
+    return { error: x.inBox === true ? SAFE_FAIL_TEXTS.box : SAFE_FAIL_TEXTS.noBox, line: latchLine(x.latch, helplines) };
+  } catch (e) {
+    return { error: SAFE_FAIL_TEXTS.last, line: "" };
+  }
+}
+// The detectors of the send handler, asked once and safely: { ok: true, signal, tier, danger } — or { ok: false } if one throws (the
+// handler then sends nothing and shows safeFailFor with the latch unknown). `detectors` replaces them in tests only.
+function safetyProbe(text, detectors) {
+  const d = Object.assign({ detectSafetySignal, classifyCrisisTier, detectsDangerFromOther }, detectors || {});
+  try {
+    return { ok: true, signal: d.detectSafetySignal(text), tier: d.classifyCrisisTier(text), danger: d.detectsDangerFromOther(text) };
+  } catch (e) {
+    return { ok: false };
+  }
+}
+// A short hash of a text (FNV-1a, 32 bits) — for the app's own record of what passed the check, not a security measure.
+function fkStamp(text) {
+  const t = typeof text === "string" ? text : "";
+  let h = 0x811c9dc5;
+  for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return "fk" + h.toString(16);
+}
+// The text of a message EXACTLY as the message bubble shows it — the same changes, moved here from the bubble so the check and the
+// screen read one thing: a road map is drawn as a map (its lines out of the prose), a line made only of quotation marks is not drawn,
+// a bare goodbye becomes the app's, «Πέστε μου» becomes «Πες μου», the method line comes first, «**» marks bold in a closing.
+// `hidden`: the bubble draws nothing (as before, a message made only of quotation marks).
+function shownTextOf(msg) {
+  const m = msg || {};
+  const isUser = m.role === "user";
+  const content = typeof m.content === "string" ? m.content : "";
+  const roadMap = !isUser ? parseRoadMap(content) : null;
+  // the SAME expressions as the message bubble's (auratests/test_final_check_order.js keeps them in lockstep)
+  const displayed = dropQuoteOnlyLines(roadMap
+    ? content
+        .replace(/^[^\S\n]*\**ΔΡΟΜΟΣ(?![Α-Ωα-ωά-ώ])[^\n]*\n\s*\**ΚΕΡΔΙΖΕΙΣ[^\S\n]*:[^\n]+\n\s*\**ΚΟΣΤΙΖΕΙ[^\S\n]*:[^\n]+/gm, '')
+        .replace(/^[^\S\n]*\**ΑΓΝΩΣΤΟ[^\S\n]*:[^\n]+/gm, '')
+        .trim()
+    : (isUser ? content : replaceBareGoodbye(content)));
+  const shown = isUser ? displayed : singularTellMe(displayed);
+  return { roadMap, visible: visibleText(m, roadMap, displayed, shown), hidden: !roadMap && !displayed && content.trim() !== "" };
+}
+// What a bubble shows of a reply, put together from what it computed: the road map's names and lines, then the prose (in a closing,
+// «**…**» drawn as bold). Used by shownTextOf and by the message bubble itself, so the two cannot differ. (The method line above a first
+// reply is a fixed label of the app in an element of its own, not a part of the reply: it is not in here.)
+function visibleText(msg, roadMap, displayContent, shownContent) {
+  const m = msg || {};
+  const mapText = roadMap ? roadMap.roads.map(r => r.name + "\nκερδίζεις · " + r.gain + "\nκοστίζει · " + r.cost)
+    .concat(roadMap.unknown ? ["άγνωστο · " + roadMap.unknown] : []).join("\n") : "";
+  const prose = !displayContent ? "" : m.isTermination ? String(shownContent || "").replace(/\*\*([^*]+)\*\*/g, "$1") : String(shownContent || "");
+  return mapText && prose ? mapText + "\n" + prose : mapText || prose;
+}
+// The check on the text as it will be shown. `req.appLines`: the app's own lines in it, set aside before the second pass (a filter
+// never judges the app's own words). App texts (kind "app") are fixed: only the shape is checked.
+function finalReplyCheck(visible, req) {
+  const v = typeof visible === "string" ? visible : "";
+  const r = req || {};
+  if (!v.trim()) return { ok: false, why: "empty" };
+  if (v.length > FINAL_MAX_CHARS) return { ok: false, why: "long" };
+  if (/\[\[[A-Z_]+(?::[^\]]*)?\]\]/.test(v)) return { ok: false, why: "tag" };
+  if (r.kind === "app") return { ok: true };
+  let rest = v;
+  for (const l of Array.isArray(r.appLines) ? r.appLines : []) if (l) rest = rest.split(l).join("\n");
+  if (safetyFilters(rest, r.danger || null, r.safetyPath === true) !== rest) return { ok: false, why: "filter" };
+  return { ok: true };
+}
+// The app's own lines, exactly as its builders write them (the crisis line of each tier, the danger line in every form, the AI-identity
+// line, the lines that replace a promise or a dose, the latch lines, the fixed goodbyes). A filter is for the model's words: it never
+// judges these — «…10306 — δωρεάν και ανώνυμη.» is the app's line, not a claim of the model's.
+function appOwnLines() {
+  const own = new Set([buildCrisisLine("A", "", false).line, buildCrisisLine("B", "", false).line, buildAiIdentityLine("Είσαι άνθρωπος;", ""),
+    DANGER_PROMISE_LINE, DOSE_LINE, STAGE_A_TEXTS.afterCrisis, STAGE_A_TEXTS.afterCrisisNoNumbers, BARE_GOODBYE_TEXT,
+    latchLine({ tier: "A" }), latchLine({ tier: "B" })]);
+  for (const d of [{ self: true }, { child: true }, { self: true, child: true }]) for (const shown of [[], ["112"]]) {
+    const l = buildDangerLine(d, "", shown).line;
+    if (l) own.add(l);
+  }
+  own.delete("");
+  return own;
+}
+// The filter step of the exit: the safety filters on the model's part of the text only — the app's own lines that a path has already put
+// at the end (the crisis line, the danger line, the AI-identity line: always added at the end, after a blank line) stay exactly as they are.
+function filterModelPart(text, danger, safetyPath) {
+  const own = appOwnLines();
+  const parts = String(typeof text === "string" ? text : "").split("\n\n");
+  let k = parts.length;
+  while (k > 0 && own.has(parts[k - 1].trim())) k--;
+  const head = parts.slice(0, k).join("\n\n");
+  const filtered = head.trim() ? safetyFilters(head, danger, safetyPath) : head;
+  return [filtered, ...parts.slice(k)].filter((p, i) => i > 0 || p !== "").join("\n\n");
+}
+// The two safety filters of a reply, in the order the main path runs them (stripLineClaims first, so a number of the table is never
+// lost, then stripDangerPromises) — for the exit, its second pass, and the closing's reply.
+function safetyFilters(text, danger, safetyPath) {
+  return stripDangerPromises(stripLineClaims(text, danger || null, safetyPath === true), danger || null);
+}
+// THE ONE EXIT for a reply of the model (and for the fixed goodbye after a crisis, kind "afterCrisis", which gets no line of its own —
+// ADR «19 Οκτωβρίου (β)»: «και τίποτα άλλο»). ctx: { kind: "model" | "closing" | "afterCrisis", mode, lastUserText, modelText (the
+// model's reply before the path changed it), safetyPath, danger, supportShown, dangerShown, isTermination }.
+// → { content, failed, why, supportShown, dangerShown, lines, hidden }. Never throws: anything that goes wrong is { failed: true }.
+function finishReply(text, ctx) {
+  const o = ctx || {};
+  const keep = { supportShown: o.supportShown === true, dangerShown: Array.isArray(o.dangerShown) ? o.dangerShown : [] };
+  try {
+    const kind = o.kind || "model";
+    const mode = o.mode;
+    const danger = o.danger || null;
+    const safetyPath = o.safetyPath === true;
+    const lastUser = typeof o.lastUserText === "string" ? o.lastUserText : "";
+    let t = typeof text === "string" ? text : "";
+    if (kind !== "afterCrisis") t = filterModelPart(t, danger, safetyPath);
+    const lines = [];
+    const add = l => { if (!l) return; lines.push(l); t = t.trim() ? t.replace(/\s+$/, "") + "\n\n" + l : l; };
+    let supportShown = keep.supportShown, dangerShown = keep.dangerShown;
+    if (kind !== "afterCrisis") {
+      if (mode === "SUPPORTIVE") {
+        const tier = classifyCrisisTier(lastUser);
+        const cl = buildCrisisLine(tier, t, supportShown);
+        add(cl.line);
+        if (tier === "B" && /(?:^|\D)10306(?!\d)/.test(t)) supportShown = true;
+      } else if (detectsRiskClarification(typeof o.modelText === "string" && o.modelText ? o.modelText : t, true)) {
+        add(buildCrisisLine("A", t, supportShown).line);
+      }
+    }
+    if (danger) { const d = buildDangerLine(danger, t, dangerShown); add(d.line); dangerShown = d.shown; }
+    add(buildAiIdentityLine(lastUser, t));
+    const shown = shownTextOf({ role: "assistant", content: t, isTermination: o.isTermination === true });
+    if (shown.hidden && !lines.length) return { content: t, failed: false, hidden: true, lines, supportShown, dangerShown };
+    // A reply its path took away ON PURPOSE (Stage A, ADR «11 Οκτωβρίου (β)»: the model's closing summary before the root is not shown —
+    // door 1's question opens instead) writes nothing, as before: the path came here with no text, the model HAD written one, and no safety
+    // line is due. An empty reply of the model itself (modelText empty) is still a failure (iv).
+    if (!String(typeof text === "string" ? text : "").trim() && !t.trim() && !lines.length && typeof o.modelText === "string" && o.modelText.trim()) return { content: "", failed: false, empty: true, lines, supportShown, dangerShown };
+    const ck = finalReplyCheck(shown.visible, { kind, danger, safetyPath, appLines: [...lines, ...appOwnLines()] });
+    if (!ck.ok) return { content: "", failed: true, why: ck.why, lines: [], ...keep };
+    fkPass(t, { isTermination: o.isTermination === true }, lines);
+    return { content: t, failed: false, lines, supportShown, dangerShown };
+  } catch (e) {
+    return { content: "", failed: true, why: "threw", lines: [], ...keep };
+  }
+}
+// A reply that did not pass is handled by its path as a failed call: this is the error it throws — the fixed text, with «…πάλι στο
+// κουτί…» only when the failed turn's message really goes back to the box (rollbackFailedTurn restores it; inBox false: a path that
+// does not put it back).
+function finalCheckError(msgs, inBox) {
+  const e = new Error(inBox !== false && rollbackFailedTurn(msgs).restored ? SAFE_FAIL_TEXTS.box : SAFE_FAIL_TEXTS.noBox);
+  e.finalCheckFailed = true;
+  return e;
+}
+// THE RECORD of what passed: the hash of the shown text → the safety lines it carries.
+const FK_PASSED = new Map();
+function fkStampOf(content, meta) {
+  return fkStamp(shownTextOf(Object.assign({ role: "assistant" }, meta || {}, { content: typeof content === "string" ? content : "" })).visible);
+}
+function fkPass(content, meta, lines) {
+  const st = fkStampOf(content, meta);
+  FK_PASSED.set(st, Array.isArray(lines) ? lines : []);
+  return st;
+}
+// The app's own texts (cards, questions, fixed goodbyes, the closing's fallback lines): fixed, written in this file — only their shape is
+// checked, then they are recorded. Returns the text, unchanged.
+function fkPassApp(content, meta) {
+  const t = typeof content === "string" ? content : "";
+  if (finalReplyCheck(shownTextOf(Object.assign({ role: "assistant" }, meta || {}, { content: t })).visible, { kind: "app" }).ok) fkPass(t, meta, []);
+  return t;
+}
+// The fixed texts every session may show, recorded once (on the first look of a bubble, when every constant of the file is there).
+let FK_FIXED_DONE = false;
+function fkFixedTexts() {
+  if (FK_FIXED_DONE) return;
+  FK_FIXED_DONE = true;
+  for (const v of Object.values(STAGE_A_TEXTS)) if (typeof v === "string" && v) fkPassApp(v);
+  fkPassApp(BARE_GOODBYE_TEXT);
+}
+// Did this shown text pass? (the message bubble asks before it draws a message of AURA)
+function fkShownOk(visible) {
+  fkFixedTexts();
+  return FK_PASSED.has(fkStamp(typeof visible === "string" ? visible : ""));
+}
+// A later edit of a message already shown (stripPrematureFarewell, when the closing begins): allowed only when every safety line the
+// shown text carried is still in the new one; then the new text is recorded with the same lines. Otherwise the message stays as it was.
+function fkPassEdit(oldContent, newContent, meta) {
+  const lines = FK_PASSED.get(fkStampOf(oldContent, meta));
+  if (typeof newContent !== "string" || !Array.isArray(lines) || !lines.every(l => newContent.includes(l))) return false;
+  fkPass(newContent, meta, lines);
+  return true;
+}
 
 // ─────────────────────────────────────────────
 // STAGE A SWITCHES — SPEC_FREE_END.md §8 step 0.1, ADR «6 Οκτωβρίου (β)».
@@ -6425,7 +6664,10 @@ function capMessageHistory(messages, systemPrompt = "", maxChars = 20000, minKee
   // correct regardless of where the ceiling sits.
   const BACKEND_LIMIT = 1000000; // must match the guard in api/aura.js
   const SAFETY_MARGIN = 20000; // JSON escaping, headers, the current message itself
-  const promptBytes = new Blob([systemPrompt || ""]).size;
+  // FAILURE (vi) of the final check (6/11/2026): an old phone without Blob — the bytes counted by hand instead (UTF-8), so the cap never
+  // fails and the message still goes
+  const promptBytes = typeof Blob === "function" ? new Blob([systemPrompt || ""]).size
+    : [...String(systemPrompt || "")].reduce((n, ch) => { const c = ch.codePointAt(0); return n + (c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4); }, 0);
   const availableBytes = Math.max(BACKEND_LIMIT - promptBytes - SAFETY_MARGIN, 4000);
   const budgetChars = Math.min(maxChars, Math.floor(availableBytes / 2)); // Greek ≈ 2 bytes/char
   maxChars = budgetChars;
@@ -6566,7 +6808,10 @@ async function callAura(messages, systemPrompt, retries = 1, onChunk = null) {
       }
       return full;
     }
-    const data = await res.json();
+    // FAILURE (iii) of the final check (6/11/2026): a body that is not JSON, or a reply of an unexpected shape, is a failed call in the
+    // app's own words — never a technical error on the screen («… is not a function» reached it before).
+    const data = await res.json().catch(() => null);
+    if (!data || !Array.isArray(data.content)) throw new Error(friendlyApiError(0));
     // COST INSTRUMENTATION — counts only, strictly passive, same principle as the collision logger.
     // The API already returns token usage on every response and the proxy passes it through
     // untouched; the client simply threw it away. That left the three questions the cost audit
@@ -6639,6 +6884,17 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
     : (isUser ? msg.content : replaceBareGoodbye(msg.content)));
   if (!roadMap && !displayContent && typeof msg.content === "string" && msg.content.trim()) return null;
   const shownContent = isUser ? displayContent : singularTellMe(displayContent); // ADR «19 Οκτωβρίου (θ)»: «Πέστε μου» → «Πες μου», screen only
+  // FINAL CHECK (6/11/2026, ADR «6 Νοεμβρίου»): a message of AURA is drawn only when what it is about to show — exactly this, put
+  // together by visibleText from the values above — passed the check (finishReply; fkPassApp for the app's own texts). Otherwise the
+  // app's fixed text. Nothing above changes.
+  if (!isUser && !fkShownOk(visibleText(msg, roadMap, displayContent, shownContent))) {
+    return (
+      <div className="turn turn-aura" data-final-check="failed">
+        <div className="msg-label">aura</div>
+        <div className="msg-aura">{SAFE_FAIL_TEXTS.noBox}</div>
+      </div>
+    );
+  }
 
   return (
     <div className={`turn ${isUser ? "turn-user" : "turn-aura"}`} data-stage-a-end={msg.stageAEnd ? "1" : undefined}>
@@ -6715,6 +6971,9 @@ export default function AURAv2() {
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState(null);
   const [crisisFallback, setCrisisFallback] = useState(null); // ADR «10 Οκτωβρίου (γ)»: the crisis line after a failed call
+  // FINAL CHECK (6/11/2026, audit A5): the line in the box, readable on the reply's path (its callback does not see the newest state)
+  const crisisFallbackNow = useRef(null);
+  useEffect(() => { crisisFallbackNow.current = crisisFallback; }, [crisisFallback]);
   const [mode, setMode]                 = useState("ANSWER");
   const [sessionStarted, setSessionStarted] = useState(false);
   // Intro choice gate: before anything, the user picks "start directly" (primary — for someone
@@ -8032,6 +8291,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // The line depends on the TIER of the message that triggered this turn: 1018 + 112 for suicidal thoughts (every
       // time), 10306 once per session for general despair. See buildCrisisLine / auratests/test_crisis_tiers.js.
       let displayText = text;
+      const _supportBefore = supportLineShown.current; // FINAL CHECK (6/11/2026): finishReply judges the line on the final text, as of before this turn
       if (currentMode === "SUPPORTIVE") {
         const _crisisLine = buildCrisisLine(classifyCrisisTier(lastUserMsg), text, supportLineShown.current);
         if (_crisisLine.line) displayText = text + "\n\n" + _crisisLine.line;
@@ -8155,8 +8415,16 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       });
       if (_saModelClose) displayText = "";
       // ADR «19 Οκτωβρίου (β)»: after the crisis line, a bare goodbye from the model (or a goodbye of the user's) → John's phrase instead.
-      const _afterCrisis = stageAAfterCrisisText({ active: stageAActive.current, messages: msgs, lastUserText: lastUserMsg, reply: displayText, dangerLine: dangerLineShown.current.length > 0 });
+      // FINAL CHECK (6/11/2026; audit A5): the line in the box (a failed crisis call) counts too, as on the user's own goodbye.
+      const _afterCrisis = stageAAfterCrisisText({ active: stageAActive.current, messages: msgs, fallbackLine: crisisFallbackNow.current, lastUserText: lastUserMsg, reply: displayText, dangerLine: dangerLineShown.current.length > 0 });
       if (_afterCrisis) displayText = _afterCrisis;
+      // THE FINAL CHECK (6/11/2026, ADR «6 Νοεμβρίου»; audit A6, A6β): finishReply is the last step before the reply is written, after every
+      // change above and the lines below (the scale question, the emptying of a closing before the root, the goodbye after a crisis): the
+      // safety filters again, any safety line a change took with it added back, the check on the text as it will be shown. A reply that
+      // does not pass is not shown — it goes the way of a failed call (the catch below), with the fixed text.
+      const _finCtx = { kind: _afterCrisis ? "afterCrisis" : "model", mode: currentMode, lastUserText: lastUserMsg, modelText: text, safetyPath: _safetyPath,
+        danger: dangerInMessages(msgs), supportShown: _supportBefore,
+        get dangerShown() { return dangerLineShown.current; } }; // read when the check runs, after the danger line below
       // Ο5 (John, 23/10/2026): danger from another person in this session's messages → the app writes its line under the reply, each
       // sentence once per session (buildDangerLine), in both flows. After every rewrite above, so none of them can drop it.
       const _danger = dangerInMessages(msgs);
@@ -8173,6 +8441,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       setCrisisFallback(prev => crisisFallbackAfterReply(prev, displayText));
       // ADR «17 Οκτωβρίου»: the first reply of a Stage A session carries the app's method line (display only, never on the safety path).
       const _methodLine = stageAMethodLineDue({ active: stageAActive.current, auraBefore: msgs.some(m => m && m.role === "assistant"), supportive: currentMode === "SUPPORTIVE", riskKind: riskSignalKind.current, dangerFromOther: dangerFromOther.current, safetyMode, lastUserText: lastUserMsg });
+      const _fk = finishReply(displayText, _finCtx); if (_fk.failed) throw finalCheckError(msgs); displayText = _fk.content;
       if (displayText.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode, ...(_methodLine ? { methodLine: true } : {}) }]);
       // PASSIVE MEASUREMENT ONLY — fires after display, never blocks or alters anything. See
       // detectsPossibleAraPatternViolation's comment for full context (Measurement Before
@@ -8407,6 +8676,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         if (_rqComplete || _rqEarlyExit) {
           const _rqArtifact = buildRoadArtifact(_rq, !_rqComplete);
           if (_rqArtifact) {
+            fkPassApp(_rqArtifact);
             setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: _rqArtifact, msgMode: currentMode }]);
           }
           // KEPT FOR THE SHEET before the state goes. These answers are the most structured
@@ -8527,6 +8797,25 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
   // answer is finally known — the closing sequence is running, so that goodbye was
   // premature. Stops at the first assistant turn found, and never touches a turn
   // that is itself part of the closing sequence.
+  // FINAL CHECK (6/11/2026, ADR «6 Νοεμβρίου»; audit A2): the closing's replies get the safety filters at once, on the model's text
+  // (closingSafe), and then the exit (closingFinish) as the last step: the check on the text as shown, the app's lines when due — in a
+  // message of their own under the closing, so the closing itself is the text it was. The safety path is the session's (perTurnSafety:
+  // a crisis line already given, or danger from another person in the messages).
+  const closingSafe = useCallback((raw, msgs) => safetyFilters(raw, dangerInMessages(msgs), perTurnSafety("TERMINATION", riskSignalKind.current, !!dangerInMessages(msgs)).safetyPath), []);
+  const closingFinish = useCallback((text, msgs) => {
+    const r = finishReply(text, { kind: "closing", mode: "TERMINATION", isTermination: true, modelText: text,
+      lastUserText: String(([...(Array.isArray(msgs) ? msgs : [])].reverse().find(m => m && m.role === "user") || {}).content || ""),
+      safetyPath: perTurnSafety("TERMINATION", riskSignalKind.current, !!dangerInMessages(msgs)).safetyPath, danger: dangerInMessages(msgs),
+      supportShown: supportLineShown.current, dangerShown: dangerLineShown.current });
+    if (r.failed) return { failed: true };
+    const linesText = r.lines.join("\n\n");
+    const base = linesText && r.content.endsWith("\n\n" + linesText) ? r.content.slice(0, -(linesText.length + 2)) : linesText && r.content === linesText ? "" : r.content;
+    if (base !== text) return { failed: true }; // the closing itself must be the text that passed
+    fkPass(base, { isTermination: true }, []);
+    if (linesText) fkPass(linesText, { isTermination: true }, r.lines);
+    dangerLineShown.current = r.dangerShown;
+    return { failed: false, linesText };
+  }, []);
   const appendClosingMessage = useCallback((content) => {
     if (!String(content || "").trim()) return; // a closing reply left empty (e.g. only a label) is not shown
     setMessages(prev => {
@@ -8535,7 +8824,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         if (next[i].role !== "assistant") continue;
         if (next[i].isTermination) break;
         const cleaned = stripPrematureFarewell(next[i].content);
-        if (cleaned !== next[i].content) next[i] = { ...next[i], content: cleaned };
+        // FINAL CHECK: an edit of a message already shown keeps every safety line it carried (fkPassEdit), or the message stays as it was
+        if (cleaned !== next[i].content && fkPassEdit(next[i].content, cleaned, next[i])) next[i] = { ...next[i], content: cleaned };
         break;
       }
       next.push({ id: nextMsgId(), role: "assistant", content, msgMode: "TERMINATION", isTermination: true });
@@ -8554,7 +8844,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         role: "user",
         content: `[Deliver Part 2 now: Perceptual Closure Layer, then Full Silence. No Ownership Statement, no Delayed Insight paragraph — those were removed as boilerplate that failed the 'does this change cognitive movement' test. Do not repeat the Reflection Summary or the word-question.${echoNote}]`
       }];
-      const rawText = await callAura(finalMsgs, SYSTEM_TERMINATION);
+      const rawText = closingSafe(await callAura(finalMsgs, SYSTEM_TERMINATION), msgs); // FINAL CHECK: the safety filters, at once (audit A2)
       const text = stripRepeatedThreeBeat(stripAraDeclarative(cleanLabels(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""))), msgs);
       // THE FILTER RUNS HERE, before anything is rendered — the trigger message above
       // already forbids repeating the word-question and the model did it anyway, which
@@ -8564,7 +8854,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // app's own existing closing line is used rather than an empty message; it is the
       // same sentence the offline path already falls back to, not new content.
       const shownText = stripped.trim() ? stripped : "Η σκέψη σου παραμένει δική σου.";
+      const _fkClose = closingFinish(shownText, msgs); // THE FINAL CHECK, the last step (ADR «6 Νοεμβρίου»)
+      if (_fkClose.failed) throw new Error("final check"); // → the catch below: the app's own closing line, as for a failed call
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: shownText, msgMode: "TERMINATION", isTermination: true }]);
+      if (_fkClose.linesText) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: _fkClose.linesText, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
       // Κ4 — arm the recognition gate. Only when a real pattern exists AND the person has not
       // already refused it in a previous session: re-asking after someone answered reads as not
@@ -8630,7 +8923,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       const sentences = lookBehind({ after: /[.!;]/, match: /\s+/ }).split(shownText).map(s => s.trim()).filter(Boolean);
       if (sentences.length > 0) setFinalDistillation(sentences[sentences.length - 1]);
     } catch {
-      const fallback = "Η σκέψη σου παραμένει δική σου.";
+      const fallback = fkPassApp("Η σκέψη σου παραμένει δική σου.", { isTermination: true }); // the app's own text, recorded (final check)
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: fallback, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
       // Κ4 — arm the recognition gate. Only when a real pattern exists AND the person has not
@@ -8711,12 +9004,15 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           role: "user",
           content: `[Deliver Part 1 now. DO NOT write a reflection summary: the three-beat shift has already told this session's story once, and a second prose retelling of the same material is what this replaces. The user has ALSO already given their word/phrase to keep — do NOT ask for it again, do not repeat a word-question. So this reply is at most ONE short line handing the moment over, referencing what they already chose only if it fits naturally: "${capturedWord}". Do not continue to Ownership Statement.]`
         }];
-        const rawText = await callAura(termMsgsEarly, SYSTEM_TERMINATION);
+        const rawText = closingSafe(await callAura(termMsgsEarly, SYSTEM_TERMINATION), msgs); // FINAL CHECK: the safety filters, at once (audit A2)
         const text = stripRepeatedThreeBeat(stripAraDeclarative(cleanLabels(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""))), msgs);
         // The word was already asked and answered earlier in this session, so Part 2
         // must not produce one either — this branch arms the same flag as Part 1.
         wordQuestionDelivered.current = true;
+        const _fkEarly = closingFinish(text, msgs); // THE FINAL CHECK, the last step (ADR «6 Νοεμβρίου»)
+        if (_fkEarly.failed) throw new Error("final check"); // → the catch below: the app's own word question, as for a failed call
         appendClosingMessage(text);
+        if (_fkEarly.linesText) appendClosingMessage(_fkEarly.linesText);
         const priorEchoCount = countPriorWordEchoes(memory, capturedWord);
         const beforeText = extractBeforeMessage(msgs);
         const shiftText = extractShiftSentence(msgs);
@@ -8737,13 +9033,16 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         role: "user",
         content: `[Deliver Part 1 now. DO NOT write a reflection summary: the three-beat shift has already told this session's story once, and a second prose retelling of the same material is what this replaces. This reply is the word-to-remember question and essentially nothing else — at most one short line before it if something genuinely needs handing over, never a recap of what was said.${wordContextNote} Then STOP. Do not continue to Ownership Statement — wait for the user's word.]`
       }];
-      const rawText = await callAura(termMsgs, SYSTEM_TERMINATION);
+      const rawText = closingSafe(await callAura(termMsgs, SYSTEM_TERMINATION), msgs); // FINAL CHECK: the safety filters, at once (audit A2)
       const text = stripRepeatedThreeBeat(stripAraDeclarative(cleanLabels(rawText.replace(/\s*\[\[EXIT:(yes|no)\]\]\s*$/i, ""))), msgs);
       wordQuestionDelivered.current = true;
+      const _fkPart1 = closingFinish(text, msgs); // THE FINAL CHECK, the last step (ADR «6 Νοεμβρίου»)
+      if (_fkPart1.failed) throw new Error("final check"); // → the catch below: the app's own word question, as for a failed call
       appendClosingMessage(text);
+      if (_fkPart1.linesText) appendClosingMessage(_fkPart1.linesText);
       setAwaitingRememberedWord(true);
     } catch {
-      const fallback = "Πριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις. Όχι για εδώ. Για σένα, όταν ξαναβρεθείς σε αυτή τη σκέψη.";
+      const fallback = fkPassApp("Πριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις. Όχι για εδώ. Για σένα, όταν ξαναβρεθείς σε αυτή τη σκέψη.", { isTermination: true }); // recorded (final check)
       // The offline path asks the same question, so it arms the same flag — otherwise a
       // session that fell back here would leave Part 2 free to ask it a second time.
       wordQuestionDelivered.current = true;
@@ -8782,7 +9081,14 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setLoading(true);
     try {
       const text = stripAraDeclarative(cleanLabels(await callAura(correctionMsgs, recoveryPrompt)));
-      if (text.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "AUDIT" }]);
+      // THE FINAL CHECK (6/11/2026, ADR «6 Νοεμβρίου»; audit A7): this reply had two filters only — now the one exit, the last step
+      const _fkMis = finishReply(text, { kind: "model", mode: "AUDIT", lastUserText: typeof userCorrection === "string" ? userCorrection : "", modelText: text,
+        safetyPath: perTurnSafety("AUDIT", riskSignalKind.current, !!dangerInMessages(correctionMsgs)).safetyPath, danger: dangerInMessages(correctionMsgs),
+        supportShown: supportLineShown.current, dangerShown: dangerLineShown.current });
+      if (_fkMis.failed) throw finalCheckError(correctionMsgs, false);
+      dangerLineShown.current = _fkMis.dangerShown;
+      { const text = _fkMis.content; // the text as it passed the exit
+      if (text.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "AUDIT" }]); }
     } catch(e) { setError(e.message); }
     finally { setLoading(false); }
     setMisfireType(null);
@@ -8822,7 +9128,15 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       setLoading(true);
       try {
         const text = stripAraDeclarative(cleanLabels(await callAura(pivotMsgs, SYSTEM_COMPRESSION)));
-        if (text.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "COMPRESSION", isInsight: true }]);
+        // THE FINAL CHECK (6/11/2026, ADR «6 Νοεμβρίου»): the one exit, the last step (it answers a signal of the app, not a message of the
+        // user's, so no «Είσαι άνθρωπος;» is read here)
+        const _fkPivot = finishReply(text, { kind: "model", mode: "COMPRESSION", lastUserText: "", modelText: text,
+          safetyPath: perTurnSafety("COMPRESSION", riskSignalKind.current, !!dangerInMessages(messages)).safetyPath, danger: dangerInMessages(messages),
+          supportShown: supportLineShown.current, dangerShown: dangerLineShown.current });
+        if (_fkPivot.failed) throw finalCheckError(messages, false);
+        dangerLineShown.current = _fkPivot.dangerShown;
+        { const text = _fkPivot.content; // the text as it passed the exit
+        if (text.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: text, msgMode: "COMPRESSION", isInsight: true }]); }
         // BUG 7: compressionCount incremented in generateResponse only — removed duplicate here
         // Visual: compression acceptance is a clarity moment
         triggerClaritySurge();
@@ -8927,6 +9241,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     if (stepJustTaken.current !== null && stepJustTaken.current === userText) return; // ADR «17 Οκτωβρίου (δ)»: the same tap twice
     setInput("");
     setError(null);
+    // FAILURE (i) of the final check (6/11/2026): the detectors first, safely. If one throws, nothing is sent: the message goes back to
+    // the box, the fixed text, and the line of tier A (the latch is unknown, so the most protective one).
+    const _probe = safetyProbe(userText);
+    if (!_probe.ok) { setInput(userText); const _sf = safeFailFor({ inBox: true, latch: { tier: "unknown" } }); setError(_sf.error); if (_sf.line) setCrisisFallback(_sf.line); return; }
     // STAGE A §4 — the session's risk latch sees EVERY submitted message, before any branch below. Updated with the
     // switch closed too (ADR «7 Οκτωβρίου (β)», 3): passive — read only by Stage A and by the 6€ paywall below.
     riskSignalKind.current = mergeRiskKind(riskSignalKind.current, detectSafetySignal(userText), classifyCrisisTier(userText));
@@ -9086,6 +9404,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       const inferred = inferLensFallback(firstWhyMessage, firstWhyRefusal ? firstWhyMessage : userText);
       activeLensRef.current = inferred; lensSwitches.current += 1;
       setActiveLens(inferred);
+      fkPassApp("Γιατί έχει σημασία αυτό για σένα τώρα;"); // FINAL CHECK: the app's own question, recorded
       const initMsgs = [
         { id: nextMsgId(), role: "user", content: firstWhyMessage },
         { id: nextMsgId(), role: "assistant", content: "Γιατί έχει σημασία αυτό για σένα τώρα;" },
@@ -9160,12 +9479,19 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         // Ο5 (John, 23/10/2026): the danger line on the entry turn too — this branch writes its own reply. The same rule as the main path:
         // every user message of the turn (opening + why-answer), each sentence once per session, before the AI-identity line.
         const _firstDanger = dangerInMessages(initMsgs);
+        // THE FINAL CHECK (6/11/2026, ADR «6 Νοεμβρίου»): finishReply is the last step of this branch too (below; it does not put the
+        // message back in the box)
+        const _firstFkCtx = { kind: "model", mode: "ANSWER", modelText: text, lastUserText: initMsgs.filter(m => m && m.role === "user").map(m => String(m.content || "")).join("\n"),
+          danger: _firstDanger, safetyPath: riskSignalKind.current === 1 || riskSignalKind.current === 2 || !!_firstDanger, supportShown: supportLineShown.current,
+          get dangerShown() { return dangerLineShown.current; } };
         const _firstDangerLine = _firstDanger ? buildDangerLine(_firstDanger, text, dangerLineShown.current) : { line: "", shown: dangerLineShown.current };
         dangerLineShown.current = _firstDangerLine.shown;
         const _firstText = _firstDangerLine.line ? (String(text || "").trim() ? text + "\n\n" + _firstDangerLine.line : _firstDangerLine.line) : text;
         const _firstAiLine = buildAiIdentityLine(initMsgs.filter(m => m && m.role === "user").map(m => String(m.content || "")).join("\n"), _firstText);
         const _firstWhyShown = _firstAiLine ? _firstText + "\n\n" + _firstAiLine : _firstText;
-        if (_firstWhyShown.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: _firstWhyShown, msgMode: "ANSWER" }]);
+        const _firstFk = finishReply(_firstWhyShown, _firstFkCtx); if (_firstFk.failed) throw finalCheckError(initMsgs, false);
+        { const _firstWhyShown = _firstFk.content; // the text as it passed the exit
+        if (_firstWhyShown.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: _firstWhyShown, msgMode: "ANSWER" }]); }
         // U1: Start trajectory for this category
         if (memory.storageEnabled) {
           const updated = recordTrajectory({ ...memory }, currentDomain, 2, null);
@@ -9325,6 +9651,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     const _found = stageARef.current.found;
     // ADR «17 Οκτωβρίου (δ)», (α): outside the risk paths the step's question comes here, as a UI-only bubble, so nothing of the step
     // ever reaches `messages` (the closing request, the detectors, memory). The old end text, with the €6, behind STAGE_A_COACH_OFFER.
+    fkPassApp(buildRootStepLines(_found).join("\n")); fkPassApp(buildRootEndLines(stageARef.current.found, _riskOffer).join("\n"));
     if (!STAGE_A_COACH_OFFER && !_riskOffer) addUiBubble(buildRootStepLines(_found).join("\n"), messages.length, { role: "assistant", stageAEnd: true });
     else setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: buildRootEndLines(stageARef.current.found, _riskOffer).join("\n"), msgMode: "STAGE_A", stageAEnd: true }]);
     stageADispatch({ type: "yes", riskKind: riskSignalKind.current, step: !STAGE_A_COACH_OFFER });
@@ -9451,6 +9778,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setIntroChoice(null);
     setError(null);
     setCrisisFallback(null);
+    crisisFallbackNow.current = null; // FINAL CHECK (6/11/2026): its mirror, at once (the effect would follow on the next render)
     setTesterCopy(null);
     stepJustTaken.current = null; // ADR «17 Οκτωβρίου (δ)»
     misfireToSubmit.current = null; // audit 26/10, Α2

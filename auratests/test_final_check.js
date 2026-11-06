@@ -16,10 +16,10 @@
 //  A7  the reply after «αυτό δεν ισχύει →» goes through the same exit (a claim is cut; «Είσαι άνθρωπος;» gets the app's line)
 //  F1  a detector that throws: no call to the model, the fixed text, the line of tier A (the latch is unknown)
 //  F2  the check itself throws: the fixed text, never the model's text
-//  F3  a reply of an unexpected shape: an error with the app's own words, not a technical one
+//  F3  a reply of an unexpected shape, or a body that is not JSON: an error with the app's own words, not a technical one (callAura)
 //  F4  an empty reply, a reply far too long, a hidden tag: the check does not pass them
 //  F5  the fallback fails too: the built-in «Κάτι δεν λειτούργησε. Σε άμεσο κίνδυνο, 112.»
-//  F6  the history cap fails: a plain cap instead (the last 10 messages, 4,000 characters each, the first one the user's)
+//  F6  the history cap fails on an old phone (no Blob): it counts the bytes by hand — the same cap, never a failure (capMessageHistory)
 const fs = require('fs');
 const path = require('path');
 
@@ -36,7 +36,7 @@ function load(names) {
   const top = code.slice(0, end < 0 ? code.length : end);
   const re = /^(?:async )?function ([A-Za-z_$][\w$]*)\(|^const ([A-Za-z_$][\w$]*) =/gm;
   const starts = []; let m; while ((m = re.exec(top))) starts.push({ name: m[1] || m[2], at: m.index });
-  const blocks = {};
+  const blocks = Object.create(null); // no inherited names («toString», «constructor») mistaken for a block of App.jsx
   for (let i = 0; i < starts.length; i++) {
     const s = starts[i];
     const body = top.slice(s.at, i + 1 < starts.length ? starts[i + 1].at : top.length).replace(/(\n\/\/[^\n]*)+\s*$/, '\n');
@@ -53,7 +53,7 @@ function load(names) {
   catch (e) { console.log('LOAD ERROR — ' + e.message); return {}; }
 }
 const F = load(['finishReply', 'shownTextOf', 'finalReplyCheck', 'latchLine', 'safeFailFor', 'safetyProbe', 'replyTextOf', 'capHistorySafely',
-  'SAFE_FAIL_TEXTS', 'HELPLINES', 'buildCrisisLine', 'detectSafetySignal', 'detectsDangerFromOther', 'classifyCrisisTier', 'friendlyApiError']);
+  'SAFE_FAIL_TEXTS', 'HELPLINES', 'buildCrisisLine', 'detectSafetySignal', 'detectsDangerFromOther', 'classifyCrisisTier']);
 const call = (n, ...a) => { try { return typeof F[n] === 'function' ? F[n](...a) : undefined; } catch (e) { return { threw: e && e.message }; } }; // a missing function fails, never crashes
 const contentOf = r => (r && typeof r.content === 'string') ? r.content : '';
 
@@ -77,6 +77,29 @@ assert('(0) the lines of a latch are the app\'s own, from HELPLINES only: tier A
   call('latchLine', { tier: 'A' }) === L1018 && call('latchLine', { tier: 'unknown' }) === L1018 && call('latchLine', { tier: 'B' }) === L10306 &&
   call('latchLine', { danger: { self: true } }) === 'Σε άμεσο κίνδυνο, 112. Για βία στο σπίτι, 15900, γραμμή SOS για τη βία κατά των γυναικών.' &&
   call('latchLine', { danger: { child: true } }) === 'Σε άμεσο κίνδυνο, 112. Για παιδί, 1056, Χαμόγελο του Παιδιού.' && call('latchLine', {}) === '');
+
+// ── the app's own lines are never changed by the exit (found in the browser on 6/11, before commit (ii) was final) ───────────────────
+{ const B_LINE = 'Υπάρχει η Γραμμή Ψυχοκοινωνικής Υποστήριξης, 10306 — δωρεάν και ανώνυμη.';
+  const inB = 'Είμαι εδώ. Θέλεις να μου πεις λίγο περισσότερο;\n\n' + B_LINE;
+  const r = call('finishReply', inB, ctx({ mode: 'SUPPORTIVE', lastUserText: 'Απελπισία. Δεν βλέπω νόημα σε τίποτα πια.', modelText: 'Είμαι εδώ. Θέλεις να μου πεις λίγο περισσότερο;', safetyPath: true }));
+  assert('(0) the app\'s own 10306 line, already under a crisis reply, comes out word for word — a filter never judges the app\'s words', !!r && r.failed === false && contentOf(r) === inB);
+  const SELF = 'Σε άμεσο κίνδυνο, 112. Για βία στο σπίτι, 15900, γραμμή SOS για τη βία κατά των γυναικών.';
+  const inD = 'Σε ακούω. Τι γίνεται τώρα;\n\n' + SELF + '\n\n' + IDENTITY;
+  const d = call('finishReply', inD, ctx({ lastUserText: 'Είσαι άνθρωπος;', danger: { self: true }, dangerShown: ['self', '112'], safetyPath: true }));
+  assert('(0) … and so do the danger line and the AI-identity line', !!d && d.failed === false && contentOf(d) === inD); }
+
+// ── a reply its path took away on purpose is not a failure (found in the browser on 6/11, section MC, before commit (ii) was final) ──
+{ const SUMMARY = 'ΗΡΘΕΣ ΜΕ: έναν τσακωμό που δεν τελειώνει.\n\nΒΡΗΚΕΣ: κάτι δικό σου.\n\nΦΕΥΓΕΙΣ ΜΕ: μια φράση.';
+  const r = call('finishReply', '', ctx({ mode: 'ANSWER', lastUserText: 'Ναι, άλλαξε.', modelText: SUMMARY }));
+  assert('(0) Stage A, the model\'s closing before the root (emptied by its path, ADR «11 Οκτωβρίου (β)»): nothing is written and it is NOT a failure — door 1\'s question opens as before',
+    !!r && r.failed === false && contentOf(r) === '');
+  const e = call('finishReply', '', ctx({ mode: 'ANSWER', lastUserText: 'Ναι, άλλαξε.', modelText: '' }));
+  const w = call('finishReply', '   ', ctx({ mode: 'ANSWER', lastUserText: 'Ναι, άλλαξε.', modelText: '  ' }));
+  assert('(0) … but an empty reply of the model itself is still a failure (iv)', !!e && e.failed === true && !!w && w.failed === true);
+  const SAFE = 'Θα είσαι ασφαλής εκεί.';
+  const c = call('finishReply', SAFE, ctx({ mode: 'ANSWER', lastUserText: 'Δεν ξέρω.', modelText: SAFE, safetyPath: true, danger: { self: true }, dangerShown: ['self', '112'] }));
+  assert('(0) … and a reply that came in WITH text is never dropped in silence: a promise of a safe outcome under danger (the line already shown) is shown as John\'s sentence, not as nothing',
+    !!c && c.failed === false && contentOf(c) === 'Δεν μπορώ να σου υποσχεθώ τι θα γίνει. Για το πώς κρατιέται κάτι κρυφό, ρώτα απευθείας τη γραμμή. Οι αριθμοί που σου έδωσα είναι εκεί.'); }
 
 // ── A2 — the closing ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 { const r = call('finishReply', 'Η σκέψη σου μένει δική σου. ' + CLAIM, ctx({ kind: 'closing', mode: 'TERMINATION', safetyPath: true, lastUserText: 'αλλαγή' }));
@@ -114,6 +137,8 @@ assert('A7: the misfire path, the compression path and the closings call finishR
   assert('F1: safetyProbe — a detector that throws gives { ok: false }; a working one gives its answer', !!p && p.ok === false && !!ok && ok.ok === true && ok.signal === 'CRISIS' && ok.tier === 'A');
   const f = call('safeFailFor', { inBox: true, latch: { tier: 'unknown' } });
   assert('F1: what the user sees then — the fixed text with the message in the box, and the line of tier A (the latch is unknown)', !!f && f.error === BOX && f.line === L1018);
+  const g = call('safeFailFor', { inBox: false, latch: {} });
+  assert('(α) «…πάλι στο κουτί…» only when it is true: a path that does not put the message back gets the second text, and no latch → no line', !!g && g.error === NOBOX && g.line === '');
   assert('F1: the send handler asks safetyProbe first, before any other detector, and stops there when it fails (no call to the model)',
     /const _probe = safetyProbe\(userText\);\s*\n\s*if \(!_probe\.ok\)/.test(raw)); }
 
@@ -123,11 +148,29 @@ assert('A7: the misfire path, the compression path and the closings call finishR
   assert('F2: finishReply throws inside → { failed: true }, and nothing of the model\'s text is in what it returns', !!r && r.failed === true && !contentOf(r).includes('μοντέλου')); }
 
 // ── F3 — a reply of an unexpected shape ──────────────────────────────────────────────────────────────────────────────────────────
-{ const ok = call('replyTextOf', { content: [{ type: 'text', text: 'Τι σε ' }, { type: 'text', text: 'κρατάει;' }] });
-  const bad = [{ content: {} }, { content: 'x' }, null, { content: [{ type: 'image' }] }].map(d => call('replyTextOf', d));
-  assert('F3: replyTextOf joins the text of a normal reply', ok === 'Τι σε κρατάει;');
-  assert('F3: a reply of an unexpected shape → an error in the app\'s own words, never a technical one',
-    bad.every(b => !!b && typeof b.threw === 'string' && /^Κάτι δεν λειτούργησε/.test(b.threw) && !/function|undefined|null|map/.test(b.threw))); }
+// CHANGED IN COMMIT (ii), the way, not the rule: commit (i) named a helper, replyTextOf. The fix went inline in callAura instead, so that
+// two older tests that pin callAura's lines byte for byte (test_api_cost.js, test_api_prompt_guard.js) and the tests that run callAura on
+// its own (test_call_lock_retry.js, test_failure_recovery.js) stay as they are. The same rule is checked here on callAura itself: it is
+// run from App.jsx with a fake fetch, as test_call_lock_retry.js runs it.
+const fnText = n => { const a = raw.indexOf('\nfunction ' + n + '(') >= 0 ? raw.indexOf('\nfunction ' + n + '(') + 1 : raw.indexOf('\nasync function ' + n + '(') + 1; if (a <= 0) return '';
+  let d = 0; for (let j = raw.indexOf('{', a); j < raw.length; j++) { if (raw[j] === '{') d++; else if (raw[j] === '}') { d--; if (!d) return raw.slice(a, j + 1); } } return ''; };
+const runCall = async (reply) => {
+  const env = { fetch: async () => reply, setTimeout: (f) => { f(); return 0; }, clearTimeout: () => {}, AbortController: class { constructor() { this.signal = {}; } abort() {} },
+    recordTelemetry: () => {}, window: {}, console: { log() {}, warn() {} }, AURA_CORE_PERSONALITY: 'CORE', Blob };
+  const src = ['let _activeCall = false;', ...['apiErrorReasonCode', 'friendlyApiError', 'isEmptyModelResponse', 'capMessageHistory', 'callAura'].map(fnText), 'return { callAura };'].join('\n');
+  try { const M = new Function(...Object.keys(env), src)(...Object.values(env)); return await M.callAura([{ role: 'user', content: 'Γεια.' }], 'CORE x').then(t => ({ text: t }), e => ({ threw: e && e.message })); }
+  catch (e) { return { threw: 'load: ' + e.message }; }
+};
+const okReply = body => ({ ok: true, status: 200, json: async () => body });
+const asyncChecks = [];
+asyncChecks.push((async () => {
+  const good = await runCall(okReply({ content: [{ type: 'text', text: 'Τι σε ' }, { type: 'text', text: 'κρατάει;' }] }));
+  assert('F3: callAura joins the text of a normal reply', good.text === 'Τι σε κρατάει;');
+  const bad = await Promise.all([okReply({ content: {} }), okReply({ content: 'x' }), okReply(null), okReply({ content: [{ type: 'image' }] }),
+    { ok: true, status: 200, json: async () => { throw new SyntaxError('Unexpected token < in JSON'); } }].map(runCall));
+  assert('F3: a reply of an unexpected shape, or a body that is not JSON → an error in the app\'s own words, never a technical one',
+    bad.every(b => typeof b.threw === 'string' && /^Κάτι δεν λειτούργησε/.test(b.threw) && !/function|undefined|null|map|JSON|token/.test(b.threw)));
+})());
 
 // ── F4 — empty, far too long, a hidden tag ───────────────────────────────────────────────────────────────────────────────────────
 { const chk = t => call('finalReplyCheck', t, {});
@@ -141,12 +184,19 @@ assert('A7: the misfire path, the compression path and the closings call finishR
   assert('F5: when the fixed text cannot be built (no HELPLINES) → the built-in «' + LAST + '», nothing else', !!f && f.error === LAST && f.line === ''); }
 
 // ── F6 — the history cap fails ───────────────────────────────────────────────────────────────────────────────────────────────────
-{ const msgs = Array.from({ length: 30 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: (i % 2 ? 'α' : 'χ').repeat(i === 25 ? 9000 : 50) }));
-  const r = call('capHistorySafely', msgs, 'prompt', () => { throw new Error('Blob is not defined'); });
-  assert('F6: the cap throws → the plain cap: at most the last 10 messages, each at most 4,000 characters, the first one the user\'s, the newest kept',
-    Array.isArray(r) && r.length >= 1 && r.length <= 10 && r[0].role === 'user' && r.every(m => m.content.length <= 4000) && r[r.length - 1].content === msgs[29].content);
-  const n = call('capHistorySafely', msgs.slice(0, 4), 'prompt');
-  assert('F6: when the cap works, it is the same cap as before (capMessageHistory)', Array.isArray(n) && n.length === 4); }
+// CHANGED IN COMMIT (ii), the way, not the rule: commit (i) named a wrapper, capHistorySafely, with a plain cap. The one call in the cap
+// that fails on an old phone is Blob; capMessageHistory now counts the bytes by hand when there is no Blob — so it never fails and it is
+// the SAME cap (a stricter rule than a plain one). callAura's line that calls it stays byte for byte (test_api_prompt_guard.js pins it).
+{ const capWith = blob => { try { return new Function('Blob', fnText('capMessageHistory') + '\nreturn capMessageHistory;')(blob); } catch (e) { return null; } };
+  const withBlob = capWith(Blob), noBlob = capWith(undefined);
+  const prompt = 'Ελληνικό prompt με τόνους — ά έ ή ί ό ύ ώ 😀 '.repeat(4000);
+  const msgs = Array.from({ length: 30 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: (i % 2 ? 'α' : 'χ').repeat(i === 25 ? 9000 : 700) }));
+  let a = null, b = null; try { a = withBlob(msgs, prompt); b = noBlob(msgs, prompt); } catch (e) { b = { threw: e.message }; }
+  assert('F6: without Blob (an old phone) the cap does not fail — the message still goes', Array.isArray(b) && b.length > 0 && b[b.length - 1].content === msgs[29].content && b.every(m => m.content.length <= 4000));
+  assert('F6: … and it is the same cap as with Blob (the bytes counted by hand are the bytes Blob counts)', Array.isArray(a) && Array.isArray(b) && JSON.stringify(a) === JSON.stringify(b));
+  assert('F6: callAura still calls capMessageHistory, the same line as before', raw.includes('messages: capMessageHistory(messages, systemPrompt).map(m => ({ role: m.role, content: m.content })),')); }
 
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed ? 1 : 0);
+Promise.all(asyncChecks).then(() => {
+  console.log(`\n${passed} passed, ${failed} failed`);
+  process.exit(failed ? 1 : 0);
+});

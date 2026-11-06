@@ -61,8 +61,10 @@ assert('CRISIS: the app\'s crisis lines themselves are untouched', S(L_A) === L_
   assert('WIRING: the bubble shows AURA\'s text through it, the user\'s text untouched',
     /const shownContent = isUser \? displayContent : singularTellMe\(displayContent\);/.test(mb) && /\{shownContent\.split\("\\n"\)\.map\(\(line, j, arr\) => \(/.test(mb) &&
     !/\{displayContent\.split\("\\n"\)/.test(mb));
-  assert('WIRING: called in ONE place only — not in the reply pipeline, so the history sent to the model keeps what the model wrote',
-    (CODE.match(/singularTellMe\(/g) || []).length === 2);
+  // UPDATED (6/11/2026, ADR «6 Νοεμβρίου», John's approval of the final check, round 3): one call more — in shownTextOf, the check's copy
+  // of what the bubble shows (the check reads the text AS SHOWN). Still on the screen side only: not in the reply pipeline, not in the history.
+  assert('WIRING: called in ONE place only — not in the reply pipeline, so the history sent to the model keeps what the model wrote — and in the check\'s copy of the screen',
+    (CODE.match(/singularTellMe\(/g) || []).length === 3 && (CODE.match(/const shown = isUser \? displayed : singularTellMe\(displayed\);/g) || []).length === 1);
   assert('WIRING: the display expression the old tests evaluate is unchanged',
     CODE.includes(': (isUser ? msg.content : replaceBareGoodbye(msg.content)));') && CODE.includes('const displayContent = dropQuoteOnlyLines(roadMap'));
 }
