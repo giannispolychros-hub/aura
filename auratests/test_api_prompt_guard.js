@@ -7,6 +7,10 @@
 //   2  size limits just above what the app really sends (measured: 950 requests of the browser e2e; capMessageHistory) → 413.
 //   3  the per-IP limit stays.
 // Nothing the user sees changes.
+// UPDATED (4/11/2026, ADR «4 Νοεμβρίου (β)», branch hardening-2026-11, John's approval): stricter request validation — the closing prompt
+// exactly, nothing after it; after the core prompt (and one of the five per-mode texts) or after the crisis prompt, only blocks that begin
+// the way the app's own per-turn notes begin (the list is written by the build, like the fingerprints). The per-turn part of the crisis
+// prompt has a limit of its own (8,000). This checks the shape of the app's requests; it is not user authentication.
 
 const fs = require('fs');
 const path = require('path');
@@ -89,7 +93,9 @@ assert('BUILD: «npm run build» (Vercel\'s build command) runs the generator be
 // ── 2. Every real call of the app passes ──────────────────────────────────────────────────────────────────────────────────────
 for (const [name, sp] of [['a lens + per-turn notes (the main path)', CORE + suffix('SYSTEM_LENS_SIMPLIFY') + CTX], ['each other lens', null],
   ['compression (pivot)', CORE + suffix('SYSTEM_COMPRESSION')], ['misfire recovery', CORE + suffix('SYSTEM_LENS_PERSPECTIVE') + CTX + '\n\nMISFIRE RECOVERY: …'],
-  ['First-WHY', [CORE + suffix('SYSTEM_LENS_EXPLORE'), '[MEMORY CONTEXT …]', CTX].join('\n')], ['the crisis prompt + its suffix', SUP + '\n[CODE-VERIFIED: …]'],
+  // UPDATED (4/11): the First-WHY case carries the app's REAL memory note (buildMemoryContext's text), not a placeholder — the check now reads
+  // how each block begins, and «[MEMORY CONTEXT …]» was never a text the app sends.
+  ['First-WHY', [CORE + suffix('SYSTEM_LENS_EXPLORE'), '\n\n[MEMORY CONTEXT — do not reveal to user, use to inform tone and questions only]\nUser has returned to this category 3 times.', CTX].join('\n')], ['the crisis prompt + its suffix', SUP + '\n[CODE-VERIFIED: …]'],
   ['the crisis prompt alone', SUP], ['the closing prompt', TERM]]) {
   if (sp === null) { assert('PASSES: ' + name, ['SYSTEM_LENS_CHALLENGE', 'SYSTEM_LENS_PERSPECTIVE', 'SYSTEM_LENS_EXPLORE'].every(n => status(body(CORE + suffix(n) + CTX)) === 200)); continue; }
   assert('PASSES: ' + name, status(body(sp)) === 200);
@@ -100,7 +106,13 @@ for (const [name, sp] of [['a lens + per-turn notes (the main path)', CORE + suf
   const tenFull = Array.from({ length: 10 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: 'α'.repeat(4000) }));
   assert('PASSES: the largest history capMessageHistory can send (the last 10 messages, 4,000 characters each)', status(body(CORE + CTX, tenFull)) === 200);
   assert('PASSES: as many messages as the app ever sends', status(body(CORE + CTX, atLimit)) === 200);
-  assert('PASSES: a per-turn part as large as the limit', status(body(CORE + 'x'.repeat(L.rest))) === 200 && status(body(SUP + 'x'.repeat(L.rest))) === 200);
+  // UPDATED (4/11/2026, ADR «4 Νοεμβρίου (β)»): was «a per-turn part as large as the limit», built of 24,000 «x». A part that size passes
+  // only when it is made of the app's own notes; the same size of anything else is refused (403). The crisis prompt has its own limit.
+  const notesUpTo = n => { let t = ''; while ((t + CTX).length <= n) t += CTX; return t; };
+  assert('PASSES: a per-turn part of the app\'s own notes as large as the limit (after the core prompt, and after the crisis prompt)',
+    status(body(CORE + notesUpTo(L.rest))) === 200 && status(body(SUP + notesUpTo(L.restSupportive))) === 200 && notesUpTo(L.rest).length > L.rest - CTX.length);
+  assert('403 (UPDATED): a per-turn part that is not made of the app\'s own notes, after the core or the crisis prompt',
+    status(body(CORE + 'x'.repeat(L.rest))) === 403 && status(body(SUP + 'x'.repeat(L.restSupportive))) === 403);
 }
 
 // ── 3. A foreign prompt is refused (403) ──────────────────────────────────────────────────────────────────────────────────────
@@ -121,8 +133,13 @@ assert('403: the foreign text before the crisis prompt, or a block that is not t
   const L = G.REQUEST_LIMITS || {};
   assert('LIMITS: just above what the app really sends — per-turn part 24,000 (measured max 7,134), 220 messages (the app caps at 200), 4,400 per message (the app cuts at 4,000), 44,000 in all (the app: at most 40,000)',
     L.rest === 24000 && L.messages === 220 && L.messageChars === 4400 && L.totalChars === 44000);
-  assert('413: a per-turn part over the limit (after the core, or after the crisis or closing prompt)',
-    status(body(CORE + 'x'.repeat(L.rest + 1))) === 413 && status(body(SUP + 'x'.repeat(L.rest + 1))) === 413 && status(body(TERM + 'x'.repeat(L.rest + 1))) === 413);
+  // UPDATED (4/11/2026): the closing prompt now takes nothing after it — any addition is 403, not 413; the crisis prompt's part has its
+  // own limit (restSupportive).
+  assert('413: a per-turn part over the limit (after the core, or after the crisis prompt)',
+    status(body(CORE + 'x'.repeat(L.rest + 1))) === 413 && status(body(SUP + 'x'.repeat(L.restSupportive + 1))) === 413);
+  assert('LIMITS (UPDATED): the crisis prompt\'s per-turn part has a limit of its own, 8,000 (measured at most 1,516)', L.restSupportive === 8000);
+  assert('403 (UPDATED): the closing prompt takes nothing after it — not even a block of the app\'s notes',
+    status(body(TERM + 'x'.repeat(10))) === 403 && status(body(TERM + CTX)) === 403);
   assert('413: too many messages', status(body(CORE + CTX, Array.from({ length: L.messages + 1 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: 'x' })))) === 413);
   assert('413: one message over the limit', status(body(CORE + CTX, [{ role: 'user', content: 'α'.repeat(L.messageChars + 1) }])) === 413);
   assert('413: too much in all', status(body(CORE + CTX, Array.from({ length: 11 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: 'α'.repeat(L.messageChars) })))) === 413);

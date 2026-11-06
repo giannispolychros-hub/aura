@@ -83,7 +83,9 @@ const BLOCK_END = '    return res.status(503).json({ error: "' + MESSAGE + '" })
     end < src.indexOf('if (req.method !== "POST")'));
   assert('(Γ) it reads only AURA_PAUSED, and only the exact value "1"', at > 0 && /if \(process\.env\.AURA_PAUSED === "1"\) \{/.test(src.slice(at, end)) && (src.match(/AURA_PAUSED/g) || []).length === 2);
   const without = at > 0 && end > at ? src.slice(0, at) + src.slice(end + BLOCK_END.length) : '';
-  assert('(Γ) without the switch, api/aura.js is a409a47\'s, byte for byte (guard, fingerprints, limits, model)', h(without) === 'b11fad3a5d793717');
+  // UPDATED (6/11/2026, ADR «4 Νοεμβρίου (β)», John's approval, round 3): api/aura.js now also holds the stricter request check (A1, step 1);
+  // without the switch it is that approved file byte for byte. Only the expected value changed; the check is as strict as before.
+  assert('(Γ) without the switch, api/aura.js is a409a47\'s, byte for byte (guard, fingerprints, limits, model) — UPDATED 6/11: plus the stricter request check', h(without) === 'fa3d5a34c29b2814');
 
   // ── (Δ) open pages are not refused ──────────────────────────────────────────────────────────────────────────────────────────────
   let gen = ''; try { gen = cp.execSync('node ' + JSON.stringify(path.join(ROOT, 'scripts', 'gen_prompt_fingerprints.cjs')) + ' --check').toString(); } catch (e) { gen = String(e.stdout || ''); }

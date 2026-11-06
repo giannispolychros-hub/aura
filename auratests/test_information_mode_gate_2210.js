@@ -105,7 +105,8 @@ assert('3: the crisis prompt, the closing prompt and the honest-uncertainty rule
   const at = api.indexOf('  // PAUSE SWITCH (John, 25/10/2026'), endMark = '    return res.status(503).json({ error: "Η AURA είναι σε παύση για λίγο. Δοκίμασε ξανά αργότερα." });\n  }\n';
   const end = api.indexOf(endMark);
   const without = at > 0 && end > at ? api.slice(0, at) + api.slice(end + endMark.length) : api;
-  assert('3: api/aura.js is a409a47\'s, byte for byte — guard and fingerprints (UPDATED 25/10: apart from the pause switch)', at > 0 && h(without) === 'b11fad3a5d793717');
+  // UPDATED (6/11/2026, ADR «4 Νοεμβρίου (β)», John's approval, round 3): plus the stricter request check (A1, step 1) — only the expected value changed
+  assert('3: api/aura.js is a409a47\'s, byte for byte — guard and fingerprints (UPDATED 25/10: apart from the pause switch; UPDATED 6/11: plus the stricter request check)', at > 0 && h(without) === 'fa3d5a34c29b2814');
 }
 assert('3: the helper is in the file once, outside the prompt, right after perTurnSafety',
   raw.split(HELPER).length === 2 && raw.indexOf(HELPER) > raw.indexOf(fnSrc('perTurnSafety')) && raw.indexOf(HELPER) - (raw.indexOf(fnSrc('perTurnSafety')) + fnSrc('perTurnSafety').length) === 1 &&

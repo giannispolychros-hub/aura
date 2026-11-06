@@ -13,18 +13,67 @@ import { createHash } from "node:crypto";
 // AURA_CORE_PERSONALITY exactly (the lenses, compression, misfire, pivot and First-WHY prompts are CORE + a per-turn part, sent as a
 // second block), or a single block that starts with SYSTEM_SUPPORTIVE (crisis) or SYSTEM_TERMINATION (closing). Anything else → 403.
 // The fingerprints below are length + SHA-256 only, never the text; «npm run build» rewrites them from src/App.jsx.
+// STRICTER (ADR «4 Νοεμβρίου (β)», branch hardening-2026-11, John's approval): the closing prompt exactly, nothing after it; after the
+// core prompt (and, when there is one, one of the five per-mode texts) or after the crisis prompt, only blocks that begin the way the
+// app's own per-turn notes begin — the list («openings») is written by the build, next to the fingerprints. This checks the shape of
+// the app's requests. It is not user authentication and is not presented as such.
 // BEGIN PROMPT FINGERPRINTS — written by scripts/gen_prompt_fingerprints.cjs from src/App.jsx («npm run build»). Do not edit by hand.
 const PROMPT_FINGERPRINTS = {
   core: { length: 311822, sha256: "b5f303cc9405aa216e92e481f24507b03f6d878c2475733063c42733074c5b01" },
   supportive: { length: 851, sha256: "c7815b96d83ebae85ab1dd6856ae343c7ba114f0e8ba20362d26ce853266b298" },
   termination: { length: 20032, sha256: "d5a77ca926f9490b1d1a38c7164474c6935747964cac778a0f60754eef8e279a" },
+  // the per-mode texts that may follow the core prompt (SYSTEM_LENS_SIMPLIFY, SYSTEM_LENS_CHALLENGE, SYSTEM_LENS_PERSPECTIVE, SYSTEM_LENS_EXPLORE, SYSTEM_COMPRESSION)
+  modes: [
+    { length: 1004, sha256: "5daccb02dfcea96d3501cd255fe9740673ec4ba37bd7d29423bd28335284e3ce" },
+    { length: 931, sha256: "010b992227f558d976789e62daf2dcb1b1bf27bce098dbc2fb8e3c9962ebf50a" },
+    { length: 865, sha256: "9f60117893e214c3458f39b562ae12c6cac7e62e171dfc386e3e3ad65e317af6" },
+    { length: 1011, sha256: "5117d2a8dc97b72dac02e2ac084da1f62d95eca9e842964967a668eebcbbb2f9" },
+    { length: 1137, sha256: "e2c9883ce005ce7bca746e1432b02e5c0407c631cd09993ad34baab035e8227b" },
+  ],
+  // how the app's own per-turn notes begin
+  openings: [
+    "MISFIRE RECOVERY:",
+    "[AUTO-KILL — CODE-V",
+    "[CODE-VERIFIED KNOW",
+    "[CODE-VERIFIED: ",
+    "[CODE-VERIFIED: a s",
+    "[CODE-VERIFIED: a Δ",
+    "[CODE-VERIFIED: the",
+    "[CODE-VERIFIED: thi",
+    "[Deliver Part 1 now",
+    "[Deliver Part 2 now",
+    "[ESCALATION LEVEL 1",
+    "[ESCALATION LEVEL 2",
+    "[ESCALATION LEVEL 3",
+    "[EXPLICIT PAUSE AVA",
+    "[FIRST REPLY FLOOR ",
+    "[FIRST REPLY OF THI",
+    "[FREE PART: ENDS AT",
+    "[Final compression ",
+    "[GATES DUE CHECK — ",
+    "[INFORMATION MODE A",
+    "[MASTER PRIORITY RU",
+    "[MEMORY CONTEXT — d",
+    "[ROAD QUESTION — on",
+    "[SESSION COVERAGE —",
+    "[SILENT PROFILE USA",
+    "[SILENT PROFILE — i",
+    "[STAGE A, FIRST REP",
+    "[STRUCTURAL EVIDENC",
+    "[SYSTEM CONTEXT REF",
+    "[The user has now u",
+    "[The user just answ",
+    "[The user just conf",
+    "[User indicated the",
+  ],
 };
 // END PROMPT FINGERPRINTS
 
 // Size limits just above what the app really sends → 413. Measured 17/10/2026 over the 950 requests of the browser e2e: the per-turn
 // part after the fixed prompt at most 7,134 characters; capMessageHistory (src/App.jsx) sends at most 200 messages, each cut at
-// 4,000 characters, at most 40,000 in all.
-const REQUEST_LIMITS = { rest: 24000, messages: 220, messageChars: 4400, totalChars: 44000 };
+// 4,000 characters, at most 40,000 in all. The per-turn part after the crisis prompt has a limit of its own (4/11/2026: measured at most
+// 1,516 over the 263 crisis requests of the browser e2e).
+const REQUEST_LIMITS = { rest: 24000, restSupportive: 8000, messages: 220, messageChars: 4400, totalChars: 44000 };
 
 function sha256Hex(text) {
   return createHash("sha256").update(text, "utf8").digest("hex");
@@ -37,14 +86,26 @@ function checkAuraRequest(body, fp, limits, sha) {
   if (!Array.isArray(sys) || sys.length < 1 || sys.length > 2) return forbidden;
   if (!sys.every(x => x && x.type === "text" && typeof x.text === "string")) return forbidden;
   const first = sys[0].text;
+  const exact = k => !!fp[k] && first.length === fp[k].length && sha(first) === fp[k].sha256;
   const startsWith = k => !!fp[k] && first.length >= fp[k].length && sha(first.slice(0, fp[k].length)) === fp[k].sha256;
-  let rest;
-  if (fp.core && first.length === fp.core.length && sha(first) === fp.core.sha256) rest = sys.length === 2 ? sys[1].text : "";
-  else if (sys.length === 1 && startsWith("supportive")) rest = first.slice(fp.supportive.length);
-  else if (sys.length === 1 && startsWith("termination")) rest = first.slice(fp.termination.length);
-  else return forbidden;
+  let rest, cap;
+  if (exact("core")) {
+    rest = sys.length === 2 ? sys[1].text : "";
+    const mode = (Array.isArray(fp.modes) ? fp.modes : []).find(m => rest.length >= m.length && sha(rest.slice(0, m.length)) === m.sha256);
+    if (mode) rest = rest.slice(mode.length);
+    cap = limits.rest;
+  } else if (sys.length === 1 && exact("termination")) {
+    rest = "";
+    cap = 0;
+  } else if (sys.length === 1 && startsWith("supportive")) {
+    rest = first.slice(fp.supportive.length);
+    cap = typeof limits.restSupportive === "number" ? limits.restSupportive : limits.rest;
+  } else return forbidden;
   const tooLarge = { status: 413, error: "Payload too large" };
-  if (rest.length > limits.rest) return tooLarge;
+  if (rest.length > cap) return tooLarge;
+  const openings = Array.isArray(fp.openings) ? fp.openings : [];
+  const blocks = rest.split(/\n(?=\[)/).map(p => p.replace(/^\s+/, "")).filter(Boolean);
+  if (!blocks.every(p => openings.some(o => p.startsWith(o)))) return forbidden;
   const msgs = b.messages;
   if (!Array.isArray(msgs) || msgs.length < 1 || !msgs.every(m => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")) {
     return { status: 400, error: "Bad request" };
