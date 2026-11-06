@@ -714,6 +714,7 @@ async function runMock() {
   await runMockCH(); // 31/10 (β): no channel but a call for a help line on the safety path
   await runMockDS(); // 31/10 (δ): a dismissal answer to the root question is never a card
   await runMockCL(); // 4/11 (A4): one call at a time, also during a retry
+  await runMockFK(); // 6/11 (round 3): the final check — A2, A5, A6, A6β, A7 and the failures a browser can show
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -3407,6 +3408,169 @@ async function runMockCL() {
   for (const [label, cond] of out) ok(label, cond);
 }
 
+// ── FK: THE FINAL CHECK (John, 6/11/2026, round 3 of hardening-2026-11, ADR «6 Νοεμβρίου»). One test per case of the audit of 4/11:
+// FK-A2 the closing showed a reply without the safety filters; FK-A5 on the model's path the goodbye after a crisis did not know of the
+// line in the box; FK-A6 the scale question replaced the reply AFTER the crisis line (Stage A and the old flow); FK-A6β the empty reply
+// of a model that closes before the root took the second line of defence with it; FK-A7 the reply after «αυτό δεν ισχύει →» went
+// through two filters only. And three of the six failures that a browser can show: FK-F3 a reply of an unexpected shape, FK-F4 an empty
+// reply and a reply far too long, FK-F6 the history cap failing (no Blob, as on an old phone). The other three (a detector, the check
+// itself, the fallback failing) and the rules underneath: auratests/test_final_check.js. The check is a net for the app's normal flow,
+// not a protection against a third party. Fake model, cost $0. Every scenario its own browser, side by side. Alone: --only FK.
+async function runMockFK() {
+  const F1 = 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.', WHY = 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.';
+  const L1018 = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
+  const AFTER = 'Είμαι εδώ όταν χρειαστεί να συνεχίσουμε. Κι αν βαρύνει, οι αριθμοί που σου έδωσα είναι εκεί.';
+  const BOX = 'Κάτι δεν λειτούργησε από τη μεριά της εφαρμογής, όχι από τη δική σου. Το μήνυμά σου είναι πάλι στο κουτί· στείλ\' το ξανά όταν θέλεις.';
+  const IDENTITY = 'Είμαι τεχνητή νοημοσύνη, όχι άνθρωπος.';
+  const THREE = 'ΗΡΘΕΣ ΜΕ: κούραση\nΒΡΗΚΕΣ: φόβο\nΦΕΥΓΕΙΣ ΜΕ: ένα βήμα';
+  const out = [];
+  const say = (label, cond) => out.push([label, !!cond]);
+  // a reply is a string (200), { status } (that error), { raw } (200 with that body as it is), each optionally { delay } (ms)
+  const sess = async (query, replies, init) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true });
+    const bodies = [];
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      try { bodies.push(JSON.parse(route.request().postData() || '{}')); } catch (e) { bodies.push({}); }
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      const o = typeof r === 'string' ? { text: r } : r;
+      if (o.delay) await new Promise(res => setTimeout(res, o.delay));
+      if (o.status) return route.fulfill({ status: o.status, contentType: 'application/json', body: JSON.stringify({ error: 'x' }) }).catch(() => {});
+      const body = o.raw !== undefined ? o.raw : JSON.stringify({ content: [{ type: 'text', text: o.text }], usage: { input_tokens: 10, output_tokens: 10 } });
+      return route.fulfill({ status: 200, contentType: 'application/json', body }).catch(() => {});
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    if (init) await page.addInitScript(init);
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    return { browser, page, bodies, calls: () => n };
+  };
+  const tap = async (page, name) => { const b = page.getByRole('button', { name, exact: true }); if (await b.count()) { await b.first().click({ timeout: 4000 }); await page.waitForTimeout(900); return true; } return false; };
+  const body = page => page.locator('body').innerText();
+  const auraTexts = async page => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+  const box = page => page.locator('textarea.textarea').inputValue().catch(() => null);
+  const oldFirst = async s => { await send(s.page, F1); if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, WHY); };
+
+  // FK-A2 — the old flow: crisis B (10306 shown), then the closing; both closing replies carry a claim about the line
+  const A2 = async () => {
+    const CLAIM1 = 'Η γραμμή 10306 είναι δωρεάν, ανοιχτή 24 ώρες, και θα σε ακούσουν σίγουρα.';
+    const CLAIM2 = 'Η γραμμή 10306 είναι ανοιχτή όλο το 24ωρο και θα σου απαντήσει σίγουρα.';
+    const s = await sess('?stageA=0', ['Τι σε κρατάει εκεί;', 'Είμαι εδώ. Θέλεις να μου πεις λίγο περισσότερο;', 'Τι θα σήμαινε αυτό για σένα;', 'Εντάξει.',
+      CLAIM1 + '\n\nΠριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.', 'Η σκέψη σου μένει δική σου. ' + CLAIM2]);
+    await oldFirst(s);
+    await send(s.page, 'Απελπισία. Δεν βλέπω νόημα σε τίποτα πια.');
+    const lineShown = /10306/.test(await body(s.page));
+    await send(s.page, 'Η σταθερότητα κυρίως.');
+    await send(s.page, 'Ευχαριστώ.');
+    const card = await tap(s.page, 'Δείξε μου');
+    await s.page.waitForTimeout(800);
+    const b1 = await body(s.page);
+    await send(s.page, 'αλλαγή');
+    await s.page.waitForTimeout(1200);
+    const b2 = await body(s.page);
+    say('FK-A2 (old flow, crisis B, then the closing): the way there — the 10306 line on screen, the closing card, Part 1 asked for the word', lineShown && card && /μία λέξη/.test(b1));
+    say('FK-A2: the claim in the closing\'s Part 1 («…θα σε ακούσουν σίγουρα») does NOT reach the screen', !/θα σε ακούσουν σίγουρα/.test(b1));
+    say('FK-A2: the claim in the closing\'s Part 2 («…θα σου απαντήσει σίγουρα») does NOT reach the screen; the rest of the closing does',
+      !/θα σου απαντήσει σίγουρα/.test(b2) && /Η σκέψη σου μένει δική σου\./.test(b2));
+    await s.browser.close();
+  };
+  // FK-A5 — Stage A: a crisis message whose call fails twice (the box shows the line), then a message that is not a goodbye, answered
+  // by the model with a bare goodbye → John's phrase of 19/10, from the app
+  const A5 = async () => {
+    const s = await sess('?stageA=1', ['Τι σε κρατάει εκεί;', { status: 500 }, { status: 500 }, 'Καλή συνέχεια.']);
+    await send(s.page, F1);
+    await send(s.page, 'Απελπισία. Δεν βλέπω νόημα σε τίποτα πια.');
+    await s.page.waitForTimeout(1500);
+    const inBox = /10306/.test(await body(s.page));
+    await send(s.page, 'Δεν ξέρω τι να πω.');
+    await s.page.waitForTimeout(1200);
+    const a = await auraTexts(s.page);
+    say('FK-A5 (Stage A): the failed crisis call left its line in the box', inBox);
+    say('FK-A5: the model\'s bare goodbye after it becomes John\'s phrase, word for word — «' + AFTER.slice(0, 40) + '…»', a.length > 0 && a[a.length - 1] === AFTER);
+    await s.browser.close();
+  };
+  // FK-A6 — a concrete step, then a crisis message answered with a three-beat: the scale question comes instead of it, and the line
+  // 1018 / 112 must still be on screen (Stage A and the old flow)
+  const A6 = flow => async () => {
+    const s = await sess(flow === 'old' ? '?stageA=0' : '?stageA=1', ['Τι σε κρατάει εκεί;', 'Τι σημαίνει αυτό για σένα;', THREE]);
+    if (flow === 'old') await oldFirst(s); else await send(s.page, F1);
+    await send(s.page, 'Θα το πω στον πατέρα μου αύριο.');
+    await send(s.page, 'Θέλω να πεθάνω.');
+    await s.page.waitForTimeout(1200);
+    const b = await body(s.page);
+    say(`FK-A6 (${flow === 'old' ? 'old flow' : 'Stage A'}): the scale question came in place of the reply`, /από το 1 έως το 10/.test(b));
+    say(`FK-A6 (${flow === 'old' ? 'old flow' : 'Stage A'}): after «Θέλω να πεθάνω.» the line 1018 / 112 is on screen`, b.includes(L1018));
+    await s.browser.close();
+  };
+  // FK-A6β — Stage A, no signal from the user: the model closes before the root (a three-beat, emptied by the app) AND asks about
+  // self-harm — the app's second line of defence (1018 / 112) must not be emptied with it
+  const A6b = async () => {
+    const s = await sess('?stageA=1', ['Τι σε κρατάει εκεί;', THREE + '\n\nΣκέφτεσαι να κάνεις κακό στον εαυτό σου;']);
+    await send(s.page, F1);
+    await send(s.page, 'Δεν ξέρω τι θέλω τελικά.');
+    await s.page.waitForTimeout(1200);
+    const b = await body(s.page);
+    say('FK-A6β (Stage A): the model\'s closing before the root is not shown (as decided on 11/10)', !/ΗΡΘΕΣ ΜΕ/.test(b));
+    say('FK-A6β: its question about self-harm still gets the app\'s line 1018 / 112 on screen', b.includes(L1018));
+    await s.browser.close();
+  };
+  // FK-A7 — the old flow: «Ένα ακόμα πέρασμα» → the compressed reply → «αυτό δεν ισχύει →» → a correction that asks if AURA is human:
+  // the reply must carry the app's line «Είμαι τεχνητή νοημοσύνη, όχι άνθρωπος.» like every other reply
+  const A7 = async () => {
+    const s = await sess('?stageA=0', ['Τι σε κρατάει εκεί;', 'Η απόφαση είναι δική σου. Τι από τα δύο βαραίνει περισσότερο;',
+      'Ας το δούμε αλλιώς: τι μένει, αν βγάλεις τον φόβο από τη μέση;', 'Κατάλαβα. Τι λείπει από την εικόνα;']);
+    await oldFirst(s);
+    await send(s.page, 'Ο μισθός και ο φόβος.'); await s.page.waitForTimeout(600);
+    await tap(s.page, 'Ένα ακόμα πέρασμα'); await s.page.waitForTimeout(800);
+    const mis = s.page.getByRole('button', { name: 'αυτό δεν ισχύει →' });
+    const hasMis = (await mis.count()) > 0;
+    if (hasMis) { await mis.last().click({ timeout: 4000 }); await s.page.waitForTimeout(400); }
+    const hasBox = (await s.page.locator('.choice-card textarea').count()) > 0;
+    if (hasBox) { await s.page.locator('.choice-card textarea').fill('Είσαι άνθρωπος; Δεν είναι ο φόβος.'); await tap(s.page, 'Αποστολή'); await s.page.waitForTimeout(1200); }
+    const a = await auraTexts(s.page);
+    say('FK-A7 (old flow): the way to the correction box exists', hasMis && hasBox);
+    say('FK-A7: the reply to the correction carries the app\'s line «' + IDENTITY + '»', a.length > 0 && a[a.length - 1].includes('Τι λείπει από την εικόνα;') && a[a.length - 1].includes(IDENTITY));
+    await s.browser.close();
+  };
+  // FK-F3 — a reply of an unexpected shape: no technical text on screen, the app's own failure text, the message back in the box
+  const F3 = async () => {
+    const s = await sess('?stageA=1', [{ raw: JSON.stringify({ content: {} }) }]);
+    await send(s.page, F1);
+    await s.page.waitForTimeout(1200);
+    const b = await body(s.page);
+    say('FK-F3 (a reply of an unexpected shape): no technical text on screen', !/is not a function|undefined|TypeError|JSON/.test(b));
+    say('FK-F3: the app\'s failure text «' + BOX.slice(0, 40) + '…», and the message is back in the box', b.includes(BOX) && (await box(s.page)) === F1);
+    await s.browser.close();
+  };
+  // FK-F4 — an empty reply, and a reply far too long
+  const F4 = async () => {
+    { const s = await sess('?stageA=1', ['   ']);
+      await send(s.page, F1); await s.page.waitForTimeout(1500);
+      const b = await body(s.page);
+      say('FK-F4 (an empty reply): the app\'s failure text, the message back in the box', b.includes(BOX) && (await box(s.page)) === F1);
+      await s.browser.close(); }
+    { const LONG = ('Αυτό είναι ένα πολύ μεγάλο κείμενο που δεν τελειώνει. ').repeat(140);
+      const s = await sess('?stageA=1', [LONG]);
+      await send(s.page, F1); await s.page.waitForTimeout(1500);
+      const b = await body(s.page);
+      say('FK-F4 (a reply of ' + LONG.length + ' characters): it is not shown; the app\'s failure text, the message back in the box',
+        !b.includes(LONG.slice(0, 200).trim()) && b.includes(BOX) && (await box(s.page)) === F1);
+      await s.browser.close(); }
+  };
+  // FK-F6 — the history cap fails (no Blob, as on an old phone): the message still goes and its reply is shown
+  const F6 = async () => {
+    const s = await sess('?stageA=1', ['Τι σε κρατάει εκεί;'], () => { try { window.Blob = undefined; } catch (e) {} });
+    await send(s.page, F1); await s.page.waitForTimeout(1500);
+    const a = await auraTexts(s.page), b = await body(s.page);
+    say('FK-F6 (the history cap fails): the request still goes and the reply is shown; no technical text', s.calls() === 1 && a.includes('Τι σε κρατάει εκεί;') && !/Blob|not defined|constructor/.test(b));
+    await s.browser.close();
+  };
+  await Promise.all([A2, A5, A6('stageA'), A6('old'), A6b, A7, F3, F4, F6].map(f => f().catch(e => say('FK: a scenario crashed — ' + String(e && e.message || e).slice(0, 140), false))));
+  out.sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [label, cond] of out) ok(label, cond);
+}
+
 // ── CH: SAFETY (John, 31/10/2026, a safety fix (α), Constitution §0.1; real-model run 57, session 125). On the safety path or under
 // danger from another person, no channel but a call for a help line: «Ένα μόνο: μπορείς να στείλεις SMS στο 15900 …;», «Μπορείς να τους
 // στείλεις SMS τώρα, χωρίς να μιλήσεις;», «Ένα SMS, τώρα.» do not reach the screen, and 15900 is never lost. CH1 danger, CH2 crisis
@@ -5993,7 +6157,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
