@@ -49,7 +49,7 @@ assert('143: a message the app wrote in the user\'s place is recognised — «Έ
   call('isAppWrittenMessage', FINAL) === true && call('isAppWrittenMessage', MISF) === true && call('isAppWrittenMessage', SIGNAL) === true);
 assert('143: … and nothing the user writes is taken for one — ordinary texts, brackets of the user\'s own, a head in the middle',
   ['Δεν ξέρω αν πρέπει να φύγω.', '[κάτι δικό μου] και μετά τα υπόλοιπα', 'Μου είπε «Final compression pass» στα αγγλικά.', '  ', '', null, 'Signal: δεν ξέρω',
-   '[Δεν είναι ο φόβος]', 'Θέλω να πεθάνω.'].every(t => call('isAppWrittenMessage', t) === false));
+   '[Δεν είναι ο φόβος]', 'Θέλω να πεθάνω.', '«Signal: δεν ξέρω» μου είπε', '"Final compression pass" λέει το βιβλίο'].every(t => call('isAppWrittenMessage', t) === false));
 { const H = blockFrom('const generateResponse = useCallback(');
   const CATCH = (() => { const a = H.lastIndexOf('} catch(e) {'); const b = H.indexOf('} finally {', a); return a > 0 && b > a ? H.slice(a, b) : ''; })();
   assert('143: the main path puts back in the box only a message of the user\'s — never one the app wrote; the rollback itself as before',
