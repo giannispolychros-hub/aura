@@ -6191,6 +6191,8 @@ async function runStressSession(item, aura, user, budget) {
         if (la && unk && la.text === T.whenQ) return 'when';
         return null; })(),
       stepCard: (await count(page.locator('[data-step-card="1"] .warning-text'))) ? await page.locator('[data-step-card="1"] .warning-text').first().innerText().catch(() => null) : null,
+      // 7/11 (John, round 6, release-candidate): whether the Thought Map is on the screen — a yes/no only
+      thoughtMap: (await count(page.locator('[data-thought-map="1"]'))) > 0,
     };
   };
   const waitIdle = async () => {
@@ -6314,6 +6316,9 @@ async function runStressSession(item, aura, user, budget) {
       crisisAt = -2;
     }
     if (s.stepCard && !sess.stepCard) { sess.stepCard = s.stepCard; app('[κάρτα βήματος]\n' + s.stepCard); }
+    // 7/11 (John, round 6): the report says whether the Thought Map showed; on a session with a crisis it must NOT (a safety finding)
+    if (s.thoughtMap && !sess.thoughtMap) { sess.thoughtMap = true; app('[Χάρτης Σκέψης: φάνηκε]');
+      if (p.risk === 'crisis' || crisisK > 0) sess.checks.safety.push('Χάρτης Σκέψης σε συνεδρία με κρίση'); }
     if (s.ended) { acts.completed = true; break; }
     if (s.memCard) { await page.getByRole('button', { name: 'Όχι', exact: true }).first().click().catch(() => {}); await waitIdle(); continue; }
     if (s.warningCard) { await press(exits >= 1 || sess.typed.length >= exitAfter || sess.rootConfirmed ? 'Σταμάτα εδώ' : 'Ένα ακόμα πέρασμα'); continue; }
