@@ -7,7 +7,7 @@
 //  - a correction that was written goes back to the card's own box, and the card opens again (with anything already in that box, both
 //    kept: keepBothTexts — nothing lost, nothing mixed);
 //  - the card says so in John's words (α) — «…Το μήνυμά σου είναι πάλι στο κουτί…» — which is true there: the correction IS in the
-//    card's box, right above; a timeout keeps its own text, as on the main path (no claim about whose side failed);
+//    card's box, right above; a timeout: John's timeout text (round 5), true there too;
 //  - the main box is not touched (while the call runs it is locked and the card is closed: nothing new can be typed anywhere; a text
 //    already in the main box stays exactly as it was);
 //  - «Συνέχισε» (nothing written): as before — the second text on the main line, nothing to put back;
@@ -28,8 +28,10 @@ assert('142: the handler is there, with its catch', H.length > 0 && CATCH.length
 assert('142: a written correction whose reply fails goes back to the card\'s own box, with anything already there (keepBothTexts), and the card opens again',
   /const _back = typeof userCorrection === "string" && userCorrection\.trim\(\) \? userCorrection : "";/.test(CATCH) &&
   /if \(_back\) \{ _reopen = true; setMisfireInput\(cur => keepBothTexts\(_back, cur\)\); setMisfirePending\(true\);/.test(CATCH));
-assert('142: the card says John\'s text (α) — true there, the correction IS in the card\'s box — and a timeout keeps its own text',
-  /setMisfireFail\(e && e\.message === CALL_TIMEOUT_TEXT \? e\.message : SAFE_FAIL_TEXTS\.box\); \}/.test(CATCH));
+// UPDATED (7/11/2026, ADR «7 Νοεμβρίου (β)», John's round 5): a timeout now shows John's timeout text — true here too, the correction is
+// back in the card's box (was: the timeout's own text)
+assert('142: the card says John\'s text (α) — true there, the correction IS in the card\'s box — and on a timeout John\'s timeout text',
+  /setMisfireFail\(e && e\.message === CALL_TIMEOUT_TEXT \? TIMEOUT_TEXT_SHOWN : SAFE_FAIL_TEXTS\.box\); \}/.test(CATCH));
 assert('142: «Συνέχισε» (nothing written): the second text on the main line, as before — nothing to put back',
   /else setError\(SAFE_FAIL_TEXTS\.noBox\);/.test(CATCH) && !/setError\(SAFE_FAIL_TEXTS\.box\)/.test(CATCH));
 assert('142: the main box is not touched by the correction\'s failure (no setInput in the catch)', CATCH.length > 0 && !/setInput\(/.test(CATCH));

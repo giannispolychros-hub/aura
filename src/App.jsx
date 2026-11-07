@@ -2245,10 +2245,22 @@ function fkShownOk(visible) {
 }
 // ── THE ERROR SCREEN (John, 6/11/2026, round 3, commit (iii), ADR «6 Νοεμβρίου (β)») ──
 // John's texts of the decision (α) are shown without «Σφάλμα:» in front of them (it read as if the user had done something wrong).
-// The text of a call that timed out (callAura), kept as it is on the error line: true whoever's side the delay was on.
+// The text callAura throws when a call times out — how the app knows it was a timeout. It is not shown (round 5): see TIMEOUT_TEXT_SHOWN.
 const CALL_TIMEOUT_TEXT = "Η σύνδεση έληξε. Έλεγξε το δίκτυό σου και δοκίμασε ξανά.";
+// THE TIMEOUT (John, round 5, ADR «7 Νοεμβρίου (β)»): shown ONLY where the user's message really is in a box — the main path when the
+// user's own message went back to the box, the card «διόρθωση» when the correction did. Elsewhere: SAFE_FAIL_TEXTS.noBox.
+const TIMEOUT_TEXT_SHOWN = "Η απάντηση άργησε και η προσπάθεια έληξε. Το μήνυμά σου παραμένει στο κουτί· μπορείς να δοκιμάσεις ξανά όταν θέλεις.";
 function isSafeFailText(t) {
-  return t === SAFE_FAIL_TEXTS.box || t === SAFE_FAIL_TEXTS.noBox || t === SAFE_FAIL_TEXTS.last;
+  return t === SAFE_FAIL_TEXTS.box || t === SAFE_FAIL_TEXTS.noBox || t === SAFE_FAIL_TEXTS.last || t === TIMEOUT_TEXT_SHOWN;
+}
+// FINDING 143 (John, round 5, ADR «7 Νοεμβρίου (β)»): a message the app wrote in the user's place — bracketed, opening with one of the
+// app's own heads (INTERNAL_LABEL_HEADS: «[Final compression pass. …]» of «Ένα ακόμα πέρασμα», «[User indicated …]», «[Signal: …]») —
+// is never put back in the user's box when its call fails: the user did not write it.
+function isAppWrittenMessage(text) {
+  const t = typeof text === "string" ? text.trim() : "";
+  if (!t.startsWith("[")) return false;
+  const rest = t.slice(1).trimStart();
+  return INTERNAL_LABEL_HEADS.some(h => rest.startsWith(h));
 }
 // NO LOST MESSAGE: a failed call puts its message back in the box — and if the user typed something new there while the call ran (the box
 // is free again after the 30-second guard), the box keeps BOTH: the failed message first, a blank line, then the new text, each exactly
@@ -8789,10 +8801,12 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // setting the rolled-back array directly keeps one source of truth.
       const _rb = rollbackFailedTurn(msgs);
       setMessages(_rb.messages);
-      if (_rb.restored) setInput(cur => keepBothTexts(_rb.restored, cur)); // NO LOST MESSAGE (6/11/2026): a new text typed meanwhile stays too
-      // THE ERROR SCREEN (6/11/2026, John's decision (α)): «…πάλι στο κουτί…» only when the message really went back there. A timeout keeps
-      // its own text: it may be the user's network, so «από τη μεριά της εφαρμογής, όχι από τη δική σου» is not known to be true there.
-      setError(e && e.message === CALL_TIMEOUT_TEXT ? e.message : _rb.restored ? SAFE_FAIL_TEXTS.box : SAFE_FAIL_TEXTS.noBox);
+      // FINDING 143 (round 5): only a message the USER wrote goes back to the box — never one the app wrote in the user's place
+      const _mine = _rb.restored && !isAppWrittenMessage(_rb.restored) ? _rb.restored : null;
+      if (_mine) setInput(cur => keepBothTexts(_mine, cur)); // NO LOST MESSAGE (6/11/2026): a new text typed meanwhile stays too
+      // THE ERROR SCREEN (John's decision (α), 6/11/2026; the timeout, round 5): «…πάλι στο κουτί…» or «…παραμένει στο κουτί…» only when the
+      // user's message really went back there; otherwise the second text of (α).
+      setError(_mine ? (e && e.message === CALL_TIMEOUT_TEXT ? TIMEOUT_TEXT_SHOWN : SAFE_FAIL_TEXTS.box) : SAFE_FAIL_TEXTS.noBox);
     } finally {
       clearTimeout(_loadingGuard);
       setLoading(false); // guaranteed cleanup — without this, callAura throw left loading=true permanently
@@ -9129,10 +9143,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     } catch(e) {
       // FINDING 142 (John, 7/11/2026, round 4, ADR «7 Νοεμβρίου»): a correction that was written is not lost when its reply fails — the
       // card «διόρθωση» opens again with it in its own box (with anything already there: keepBothTexts), and the card says so in John's
-      // words (α), true there; a timeout keeps its own text, as on the main path. The main box is not touched. «Συνέχισε» (nothing
+      // words (α), true there; a timeout: John's timeout text (round 5), true there too. The main box is not touched. «Συνέχισε» (nothing
       // written): as before — the second text, nothing to put back.
       const _back = typeof userCorrection === "string" && userCorrection.trim() ? userCorrection : "";
-      if (_back) { _reopen = true; setMisfireInput(cur => keepBothTexts(_back, cur)); setMisfirePending(true); setMisfireFail(e && e.message === CALL_TIMEOUT_TEXT ? e.message : SAFE_FAIL_TEXTS.box); }
+      if (_back) { _reopen = true; setMisfireInput(cur => keepBothTexts(_back, cur)); setMisfirePending(true); setMisfireFail(e && e.message === CALL_TIMEOUT_TEXT ? TIMEOUT_TEXT_SHOWN : SAFE_FAIL_TEXTS.box); }
       else setError(SAFE_FAIL_TEXTS.noBox);
     }
     finally { setLoading(false); }

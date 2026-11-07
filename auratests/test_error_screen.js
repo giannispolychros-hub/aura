@@ -51,14 +51,19 @@ assert('NO LOST: the box already holding the failed message and more (it was typ
 assert('NO LOST: no failed message → the box as it is', call('keepBothTexts', null, B) === B && call('keepBothTexts', '', B) === B);
 { const G = blockFrom('const generateResponse = useCallback(');
   const c = G.indexOf('} catch(e) {\n      setError(e.message);'), f = G.indexOf('} finally {', c), CATCH = c > 0 && f > c ? G.slice(c, f) : '';
+  // UPDATED (7/11/2026, ADR «7 Νοεμβρίου (β)», John's round 5, finding 143): what goes back is the user's own message (_mine) — never one
+  // the app wrote in the user's place; still through keepBothTexts, still never «cur || restored»
   assert('NO LOST (wiring): the failed turn\'s message goes back to the box through keepBothTexts — never «cur || restored» again',
-    /if \(_rb\.restored\) setInput\(cur => keepBothTexts\(_rb\.restored, cur\)\);/.test(CATCH) && !/setInput\(cur => cur \|\| _rb\.restored\)/.test(raw));
+    /if \(_mine\) setInput\(cur => keepBothTexts\(_mine, cur\)\);/.test(CATCH) && !/setInput\(cur => cur \|\| _rb\.restored\)/.test(raw));
   // ── (α) the error screen ──────────────────────────────────────────────────────────────────────────────────────────────────────
+  // UPDATED (7/11/2026, ADR «7 Νοεμβρίου (β)», John's round 5): «…πάλι στο κουτί…» exactly when the USER'S message went back there
+  // (_mine, finding 143); on a timeout John's timeout text, under the same condition (checked in test_timeout_143.js)
   assert('(α) the main path\'s failed call: John\'s text, with «…πάλι στο κουτί…» exactly when the message went back there',
-    /setError\(e && e\.message === CALL_TIMEOUT_TEXT \? e\.message : _rb\.restored \? SAFE_FAIL_TEXTS\.box : SAFE_FAIL_TEXTS\.noBox\);/.test(CATCH) && CATCH.indexOf('setError(e && e.message === CALL_TIMEOUT_TEXT') > CATCH.indexOf('const _rb = rollbackFailedTurn(msgs);'));
-  // a timeout keeps its own text (it may be the user's network: «από τη μεριά της εφαρμογής» would not be known to be true)
+    /setError\(_mine \? \(e && e\.message === CALL_TIMEOUT_TEXT \? TIMEOUT_TEXT_SHOWN : SAFE_FAIL_TEXTS\.box\) : SAFE_FAIL_TEXTS\.noBox\);/.test(CATCH) && CATCH.indexOf('setError(_mine ?') > CATCH.indexOf('const _rb = rollbackFailedTurn(msgs);'));
+  // UPDATED (7/11/2026, round 5): callAura's own timeout text is now only the app's signal that it was a timeout — it is not shown, so it
+  // is not one of John's texts (John's timeout text is shown instead, where true: test_timeout_143.js)
   const TO = (raw.match(/const CALL_TIMEOUT_TEXT = "([^"]+)";/) || [])[1] || '';
-  assert('(α) a timeout keeps its own true text «' + TO + '» — the very text callAura throws — not John\'s «από τη μεριά της εφαρμογής»',
+  assert('(α) callAura\'s own timeout text «' + TO + '» — the very text it throws — is the app\'s signal of a timeout, not a text of John\'s',
     TO === 'Η σύνδεση έληξε. Έλεγξε το δίκτυό σου και δοκίμασε ξανά.' && raw.includes('throw new Error("' + TO + '")') && call('isSafeFailText', TO) === false); }
 // UPDATED (7/11/2026, ADR «7 Νοεμβρίου», John's approval of finding 142, round 4): a written correction («αυτό δεν ισχύει →») now goes
 // back to its card's box, so it left this list — checked, more strictly, in test_misfire_keep_142.js; «Συνέχισε» (nothing written) keeps
