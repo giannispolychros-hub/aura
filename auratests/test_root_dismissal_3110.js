@@ -122,8 +122,14 @@ assert('(Δ) … then «Δεν το βρήκα ακόμα» (event «back»: no 
   /stageADispatch\(\{ type: "back" \}\);\s*return true;/.test(lv) && !/generateResponse|callAura|stageAOpen\(|recordTelemetry|setSessionEnded/.test(DS));
 assert('(Δ) at any other root question → «back» and false: the message goes on as «Δεν ξέρω» does today',
   /\}\s*stageADispatch\(\{ type: "back" \}\);\s*return false;\s*$/.test(DS));
+// UPDATED (2/11/2026, Thought Map phase 1, ADR «2 Νοεμβρίου»; phase 2: called only by the Thought Map screen, thoughtMapView): pickBranches reads the SAME check,
+// unchanged, only to LEAVE a dismissal out of «Τα λόγια σου στη διαδρομή» (the message and its phrase). In the flow it is still read at
+// one place only — counted outside that block; the block's two uses are pinned apart.
+const _tm = (() => { const a = CODE.indexOf('// THOUGHT MAP, phase 1'); const b = CODE.indexOf("// A root typed into the flow (door 1's answer"); return a < 0 || b < a ? '' : CODE.slice(a, b); })();
 assert('(Δ) the check is read at one place only, the goodbye chooser and the helper too',
-  (CODE.split('rootAnswerIsDismissal(').length - 1) === 2 && (CODE.split('stageADismissalGoodbye(').length - 1) === 2 && (CODE.split('stageADismiss(').length - 1) === 1);
+  (CODE.replace(_tm, '').split('rootAnswerIsDismissal(').length - 1) === 2 && (CODE.split('stageADismissalGoodbye(').length - 1) === 2 && (CODE.split('stageADismiss(').length - 1) === 1);
+assert('(Δ) the Thought Map block (phase 1) reads it twice, only to leave a dismissal out, and never the goodbye or stageADismiss',
+  (_tm.split('rootAnswerIsDismissal(').length - 1) === 2 && !/stageADismissalGoodbye|stageADismiss\(/.test(_tm));
 assert('(Δ) the door-3 path and the step answers are not touched', !/rootAnswerIsDismissal|stageADismiss/.test(CODE.slice(CODE.indexOf('// STAGE A — door 2 (§1.4, §1.5).'), CODE.indexOf('// STAGE A — door 2 (§1.4, §1.5).') + 1500)) &&
   !/rootAnswerIsDismissal|stageADismiss/.test(HS.slice(HS.indexOf('if (stageAActive.current && (_saPhase === "step"'), HS.indexOf('if (stageAActive.current && (_saPhase === "ask"'))));
 
@@ -148,7 +154,7 @@ assert('(Ζ) the prompt (AURA_CORE_PERSONALITY) is unchanged', h(lit('AURA_CORE_
 let gen = ''; try { gen = cp.execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'gen_prompt_fingerprints.cjs'), '--check'], { encoding: 'utf8' }); } catch (e) { gen = String(e.stdout || ''); }
 assert('(Ζ) the prompt fingerprints in api/aura.js are up to date', /up to date/.test(gen));
 const PINS = { rootAnswerIsUnsure: '2c6461315a960668', rootTextHasSubstance: '11d0cb226862ec80', stageAAfterCrisisText: 'e19c2a413a9ad99c',
-  stageACaptureAllowed: 'f8a46ebc62fe4ecd', stageAStep: '67bb9bcb504396e8', detectSafetySignal: '9af2fd60393b0760', detectsDangerFromOther: 'e456cb8d14847cd4',
+  stageACaptureAllowed: 'f8a46ebc62fe4ecd', stageAStep: '67bb9bcb504396e8', detectSafetySignal: '1f7c3cb8fe568f31' /* UPDATED (31/10, ADR «31 Οκτωβρίου (ζ)», a safety fix (α), John): + one narrow, closed line for the passive-ideation gaps (S5–S9 and «θα ήταν πιο απλό να μην υπάρχω καθόλου») — auratests/test_safety_detectors_3110.js */, detectsDangerFromOther: '7fa664b7741f3c46' /* UPDATED (3/11, ADR «3 Νοεμβρίου», a safety fix (α), John): with an adult partner or relative named, a sport word no longer excuses a blow (finding 130) — auratests/test_kin_sport_0311.js */ /* UPDATED (2/11, ADR «2 Νοεμβρίου (δ)», a safety fix (α), John): a child's kicks with a sport or play-place word are not read as danger (narrow; an adult still is) — auratests/test_bruises_sport_0211.js */ /* UPDATED (31/10, ADR «31 Οκτωβρίου (ζ)», a safety fix (α), John): + narrow, closed rules for danger from another person with no person named (item 117) — auratests/test_safety_detectors_3110.js */,
   stageALeavingDoorOpens: 'a319ffa8afded157', replaceBareGoodbye: 'e6351d2cb8e28ab5' };
 for (const [n, v] of Object.entries(PINS)) assert('(Ζ) unchanged: ' + n, h(fnSrc(n)) === v);
 assert('(Ζ) unchanged: the Stage A texts and the goodbye text', h(textsSrc) === '9f64812e26b48d3d' && constLine('BARE_GOODBYE_TEXT') === 'const BARE_GOODBYE_TEXT = "Ευχαριστώ που το μοιράστηκες. Να είσαι καλά.";');

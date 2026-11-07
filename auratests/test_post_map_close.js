@@ -185,8 +185,13 @@ assert('A durable session flag exists — roadQuestionState is nulled and cannot
   /roadMapDelivered\s*=\s*useRef\(false\)/.test(CODE));
 assert('The flag is set where a map is actually parsed, not guessed',
   /parseRoadMap\(text\)[\s\S]{0,400}roadMapDelivered\.current\s*=\s*true/.test(CODE));
+// UPDATED (John, 7/11/2026, round 6, ADR «7 Νοεμβρίου (γ)», branch release-candidate): both merged branches added lines to resetSession, so
+// the flag's reset now sits past a fixed 4,000-character window (at character 4,049). The check now reads resetSession itself, brace to
+// brace — stricter: the reset must be INSIDE resetSession, wherever it sits in it.
 assert('The flag is cleared by resetSession',
-  /const resetSession[\s\S]{0,4000}?roadMapDelivered\.current\s*=\s*false/.test(CODE));
+  (() => { const a = CODE.indexOf('const resetSession = () => {'); if (a < 0) return false; let d = 0, st = false, k = CODE.indexOf('{', a);
+    for (; k < CODE.length; k++) { if (CODE[k] === '{') { d++; st = true; } else if (CODE[k] === '}') { d--; if (st && !d) break; } }
+    return /roadMapDelivered\.current\s*=\s*false/.test(CODE.slice(a, k + 1)); })());
 // REAL DEFECT, caught by test_ref_reset_integrity on the first full run of this work: the
 // deliverOnce budget was not reset, so its two emissions were spent in session one and the
 // reminder could never fire again for the life of the tab. Asserted here too, next to the
