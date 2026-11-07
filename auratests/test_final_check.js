@@ -101,6 +101,15 @@ assert('(0) the lines of a latch are the app\'s own, from HELPLINES only: tier A
   assert('(0) … and a reply that came in WITH text is never dropped in silence: a promise of a safe outcome under danger (the line already shown) is shown as John\'s sentence, not as nothing',
     !!c && c.failed === false && contentOf(c) === 'Δεν μπορώ να σου υποσχεθώ τι θα γίνει. Για το πώς κρατιέται κάτι κρυφό, ρώτα απευθείας τη γραμμή. Οι αριθμοί που σου έδωσα είναι εκεί.'); }
 
+// ── a reply the exit's OWN filter empties is a failure, never «emptied on purpose» (round 7, John's check of the mutation K27) ────
+// On the safety path, a reply that is only a claim about a help line with no number is dropped whole by the filter. The reply of
+// «αυτό δεν ισχύει →» reaches the exit unfiltered, so the exit is where this happens: it must fail (the correction back in its box, the
+// failure text) — never show nothing in silence. Found in round 7: the clause «the path came here with no text» is what decides it.
+{ const T = 'Η γραμμή είναι δωρεάν και ανώνυμη.';
+  const r = call('finishReply', T, ctx({ mode: 'AUDIT', lastUserText: 'Δεν είναι αυτό.', modelText: T, safetyPath: true }));
+  assert('(0) a reply that came in WITH text and that the exit\'s own filter empties (a numberless claim about a line, safety path) is a failure — never silently nothing',
+    !!r && r.failed === true && r.why === 'empty' && r.empty !== true); }
+
 // ── A2 — the closing ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 { const r = call('finishReply', 'Η σκέψη σου μένει δική σου. ' + CLAIM, ctx({ kind: 'closing', mode: 'TERMINATION', safetyPath: true, lastUserText: 'αλλαγή' }));
   assert('A2: the closing\'s reply on the safety path — the claim about the line is cut, the rest of the closing stays',
