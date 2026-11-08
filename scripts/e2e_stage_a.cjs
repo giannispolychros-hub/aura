@@ -13,7 +13,7 @@
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
-// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only MAIN | ST | W | X | Y | Z | … | R4 | TX | VO | AP | CX | O5 | PI | SN | GL | FC | MF (μόνο μία ενότητα· MAIN = A–V)
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only MAIN | ST | W | X | Y | Z | … | R4 | TX | VO | AP | CX | O5 | PI | SN | GL | FC | MF | CT (μόνο μία ενότητα· MAIN = A–V)
 //   --viewport 390x844 | 360x640 (17/10 (δ): όλος ο έλεγχος σε αυτό το μέγεθος κινητού· οι ενότητες με δικά τους μεγέθη τα κρατούν)
 // ΣΤΡΕΣ ΤΕΣΤ (Μέρος Β, 10/10): --stress (ψεύτικα, κόστος 0) · --stress --real --dry (σχέδιο + εκτίμηση) · --stress --real --yes (ΠΡΑΓΜΑΤΙΚΟ,
 //   όριο --budget έως $25, προεπιλογή $25) · --sessions 14,15,1 (μόνο αυτοί) · --minutes 75 (καμία νέα συνεδρία μετά). Τρέχει και από το
@@ -292,6 +292,10 @@ async function runMockTM() {
       tel.every(r => r && typeof r.ev === 'string' && Object.entries(r).every(([k, v]) => k === 'ev' || typeof v === 'number' || typeof v === 'boolean')) &&
       tmRecs.length === 1 && JSON.stringify(Object.keys(tmRecs[0]).sort()) === '["branchCount","ev","t"]' && tmRecs[0].branchCount === 3 &&
       !tel.some(r => r.ev !== 'thought_map' && (/thought|branch/i.test(r.ev) || 'branchCount' in r)));
+    // ITEM 144 (John, 8/11/2026, round 9, ADR «8 Νοεμβρίου»): the map shows as the session ends — its record is written BEFORE the session's own
+    const iTm = tel.findIndex(r => r && r.ev === 'thought_map'), iSc = tel.findIndex(r => r && r.ev === 'session_completed');
+    ok(`TM3 (${tag}): item 144 — the map's record is written when the map shows, before the session's own record (session_completed), not after it`,
+      iTm >= 0 && iSc >= 0 && iTm < iSc);
     // the tester's own export («Στείλε τα στοιχεία της δοκιμής», at the end of the session): the map's record is the integer only
     let tx = null;
     try { const [x] = await Promise.all([s.page.waitForEvent('download', { timeout: 8000 }), s.page.getByRole('button', { name: 'Στείλε τα στοιχεία της δοκιμής' }).click({ timeout: 4000 })]);
@@ -300,6 +304,9 @@ async function runMockTM() {
     ok(`TM3 (${tag}): the tester export shows the map as its name, its time and the integer — no text of the session`,
       txTm.length === 1 && JSON.stringify(Object.keys(txTm[0]).sort()) === '["branchCount","ev","t"]' && txTm[0].branchCount === 3 &&
       [B1, B2, B3, ROOT, STEP, WHEN, WORD, ...LABELS].every(t => !JSON.stringify(tx.events).includes(t)));
+    // ROUND 9 (John, 8/11/2026, ADR «8 Νοεμβρίου»): the export's two counters — a session where nothing failed: both 0
+    ok(`TM3 (${tag}): the export's two counters on a session where nothing failed — finalCheckReplaced 0, apiFailed 0`,
+      !!tx && !!tx.counters && tx.counters.finalCheckReplaced === 0 && tx.counters.apiFailed === 0);
     let dl = { text: '' };
     try { const [x] = await Promise.all([s.page.waitForEvent('download', { timeout: 8000 }), btn(s.page, T.download).click({ timeout: 4000 })]); dl = { text: fs.readFileSync(await x.path(), 'utf8') }; } catch (e) { dl = { text: '', error: String(e.message || e).slice(0, 60) }; }
     await tap(s.page, T.copy);
@@ -1005,6 +1012,7 @@ async function runMock() {
   await runMockLM(); // 6/11 (round 3, (iii)): the error screen and no lost message
   await runMockMK(); // 7/11 (round 4): finding 142 — a correction is not lost when its reply fails
   await runMockTO(); // 7/11 (round 5): the timeout text and finding 143
+  await runMockCT(); // 8/11 (round 9): the two counters in the tester export
   await runMockSD(); // 31/10 (ζ): the safety detectors' gaps (item 117, S5–S9) — the existing line on the screen
 }
 
@@ -4258,6 +4266,96 @@ async function runMockTO() {
   for (const [label, cond] of out) ok(label, cond);
 }
 
+// ── CT: THE TWO COUNTERS (John, 8/11/2026, round 9, ADR «8 Νοεμβρίου», branch release-candidate) — in the tester export, ?rec=1 only.
+// CT1 (Stage A, ?rec=1): a 500 and its retry fail (two failed requests), then a reply the final check refuses (8,000 characters), then a
+// reply shown: the device log holds exactly 2 api_failed and 1 final_check_replaced, each only its name and its time; the page is opened
+// again and «Στείλε τα στοιχεία της δοκιμής» gives a file with counters { finalCheckReplaced: 1, apiFailed: 2 } and nothing the person
+// typed. CT2 no network: one api_failed, not retried. CT3 the API refuses (403): one, not retried. CT4 without ?rec=1: nothing kept on the
+// device (no device log, no button) — the records live in the page's memory only, and go with it. Fake model, cost $0. Alone: --only CT.
+async function runMockCT() {
+  const F1 = 'Μήνυμα Α: δεν ξέρω αν πρέπει να αλλάξω δουλειά.';
+  const LONG = ('Αυτό είναι ένα πολύ μεγάλο κείμενο που δεν τελειώνει. ').repeat(150);
+  const NEXT = 'Τι σε κρατάει εκεί;';
+  const out = [];
+  const say = (label, cond) => out.push([label, !!cond]);
+  const sess = async (query, replies) => {
+    const browser = await launch();
+    const ctx = await browser.newContext({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true, acceptDownloads: true });
+    const page = await ctx.newPage();
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      const r = replies[Math.min(n, replies.length - 1)]; n++;
+      const o = typeof r === 'string' ? { text: r } : r;
+      if (o.offline) return route.abort('failed').catch(() => {});
+      if (o.status) return route.fulfill({ status: o.status, contentType: 'application/json', body: JSON.stringify({ error: 'x' }) }).catch(() => {});
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: o.text }], usage: { input_tokens: 10, output_tokens: 10 } }) }).catch(() => {});
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    return { browser, page, calls: () => n };
+  };
+  const tapGo = async page => { await page.getByRole('button', { name: 'Go' }).click().catch(() => {}); await page.waitForTimeout(1800); };
+  const devLog = page => page.evaluate(() => { try { const v = localStorage.getItem('aura_telemetry_log'); return v === null ? null : JSON.parse(v); } catch (e) { return ['unreadable']; } });
+  const memLog = page => page.evaluate(() => (window.__auraTelemetry || []).map(r => Object.assign({}, r)));
+  const count = (log, ev) => (Array.isArray(log) ? log : []).filter(r => r && r.ev === ev).length;
+  const bare = (log, ev) => (Array.isArray(log) ? log : []).filter(r => r && r.ev === ev).every(r => JSON.stringify(Object.keys(r).sort()) === '["ev","t"]');
+  const auraTexts = async page => (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim());
+  const CT1 = async () => {
+    const s = await sess('?stageA=1&rec=1', [{ status: 500 }, { status: 500 }, LONG, NEXT]);
+    await s.page.locator('.input-area textarea').fill(F1); await tapGo(s.page);
+    const l1 = await devLog(s.page);
+    say('CT1 (?rec=1): a 500 and its retry — two requests failed: the device log holds 2 api_failed, each its name and its time only',
+      s.calls() === 2 && count(l1, 'api_failed') === 2 && bare(l1, 'api_failed') && count(l1, 'final_check_replaced') === 0);
+    await tapGo(s.page);
+    const l2 = await devLog(s.page), t2 = await auraTexts(s.page);
+    say('CT1: a reply the final check refuses (' + LONG.length + ' characters) — not shown, and 1 final_check_replaced; the API answered, so api_failed stays 2',
+      s.calls() === 3 && !t2.some(t => t.includes('πολύ μεγάλο κείμενο')) && count(l2, 'final_check_replaced') === 1 && bare(l2, 'final_check_replaced') && count(l2, 'api_failed') === 2);
+    await tapGo(s.page);
+    const l3 = await devLog(s.page), t3 = await auraTexts(s.page);
+    say('CT1: the next reply is shown — the two counters do not move (2 and 1)', t3.some(t => t.endsWith(NEXT)) && count(l3, 'api_failed') === 2 && count(l3, 'final_check_replaced') === 1);
+    say('CT1: the device log holds no word of the session — numbers and yes/no only', Array.isArray(l3) && !JSON.stringify(l3).includes('Μήνυμα') && !/[Α-Ωα-ωά-ώ]/.test(JSON.stringify(l3)) &&
+      l3.every(r => r && Object.entries(r).every(([k, v]) => k === 'ev' || typeof v === 'number' || typeof v === 'boolean')));
+    await s.page.reload(); await s.page.waitForTimeout(800);
+    let tx = null;
+    try { const [d] = await Promise.all([s.page.waitForEvent('download', { timeout: 8000 }), s.page.getByRole('button', { name: 'Στείλε τα στοιχεία της δοκιμής' }).click({ timeout: 4000 })]);
+      tx = JSON.parse(fs.readFileSync(await d.path(), 'utf8')); } catch (e) { tx = null; }
+    say('CT1: the tester export carries the two counters — finalCheckReplaced 1, apiFailed 2 — two integers and nothing else',
+      !!tx && !!tx.counters && JSON.stringify(Object.keys(tx.counters).sort()) === '["apiFailed","finalCheckReplaced"]' && tx.counters.finalCheckReplaced === 1 && tx.counters.apiFailed === 2);
+    say('CT1: … and the export holds nothing the person typed, nothing the model wrote (no Greek letter in the whole file)',
+      !!tx && !JSON.stringify(tx).includes('Μήνυμα') && !/[Α-Ωα-ωά-ώ]/.test(JSON.stringify(tx)) && Array.isArray(tx.events) && count(tx.events, 'api_failed') === 2);
+    await s.browser.close();
+  };
+  const CT2 = async () => {
+    const s = await sess('?stageA=1&rec=1', [{ offline: true }, NEXT]);
+    await s.page.locator('.input-area textarea').fill(F1); await tapGo(s.page);
+    const l = await devLog(s.page);
+    say('CT2 (?rec=1, no network): one api_failed, the request not retried', s.calls() === 1 && count(l, 'api_failed') === 1 && bare(l, 'api_failed'));
+    await s.browser.close();
+  };
+  const CT3 = async () => {
+    const s = await sess('?stageA=1&rec=1', [{ status: 403 }, NEXT]);
+    await s.page.locator('.input-area textarea').fill(F1); await tapGo(s.page);
+    const l = await devLog(s.page);
+    say('CT3 (?rec=1, the API refuses: 403): one api_failed, not retried', s.calls() === 1 && count(l, 'api_failed') === 1);
+    await s.browser.close();
+  };
+  const CT4 = async () => {
+    const s = await sess('?stageA=1', [{ status: 500 }, { status: 500 }, NEXT]);
+    await s.page.locator('.input-area textarea').fill(F1); await tapGo(s.page);
+    const dev = await devLog(s.page), mem = await memLog(s.page);
+    say('CT4 (without ?rec=1): nothing is kept on the device — no device log at all', dev === null);
+    say('CT4: … the records exist only in the page\'s memory (2 api_failed), and go when the page closes', count(mem, 'api_failed') === 2 && bare(mem, 'api_failed'));
+    await s.page.reload(); await s.page.waitForTimeout(800);
+    const after = await memLog(s.page), btn = await s.page.getByRole('button', { name: 'Στείλε τα στοιχεία της δοκιμής' }).count();
+    say('CT4: opened again — the page\'s memory starts empty, and there is no export button', count(after, 'api_failed') === 0 && btn === 0);
+    await s.browser.close();
+  };
+  await Promise.all([CT1, CT2, CT3, CT4].map(f => f().catch(e => say('CT: a scenario crashed — ' + String(e && e.message || e).slice(0, 140), false))));
+  out.sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [label, cond] of out) ok(label, cond);
+}
+
 // ── CH: SAFETY (John, 31/10/2026, a safety fix (α), Constitution §0.1; real-model run 57, session 125). On the safety path or under
 // danger from another person, no channel but a call for a help line: «Ένα μόνο: μπορείς να στείλεις SMS στο 15900 …;», «Μπορείς να τους
 // στείλεις SMS τώρα, χωρίς να μιλήσεις;», «Ένα SMS, τώρα.» do not reach the screen, and 15900 is never lost. CH1 danger, CH2 crisis
@@ -6849,7 +6947,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
