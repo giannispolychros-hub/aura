@@ -4271,7 +4271,8 @@ async function runMockTO() {
 // reply shown: the device log holds exactly 2 api_failed and 1 final_check_replaced, each only its name and its time; the page is opened
 // again and «Στείλε τα στοιχεία της δοκιμής» gives a file with counters { finalCheckReplaced: 1, apiFailed: 2 } and nothing the person
 // typed. CT2 no network: one api_failed, not retried. CT3 the API refuses (403): one, not retried. CT4 without ?rec=1: nothing kept on the
-// device (no device log, no button) — the records live in the page's memory only, and go with it. Fake model, cost $0. Alone: --only CT.
+// device (no device log, no button) — the records live in the page's memory only, and go with it. CT5 the old flow's closing refused by the
+// final check: exactly one final_check_replaced. Fake model, cost $0. Alone: --only CT.
 async function runMockCT() {
   const F1 = 'Μήνυμα Α: δεν ξέρω αν πρέπει να αλλάξω δουλειά.';
   const LONG = ('Αυτό είναι ένα πολύ μεγάλο κείμενο που δεν τελειώνει. ').repeat(150);
@@ -4282,10 +4283,11 @@ async function runMockCT() {
     const browser = await launch();
     const ctx = await browser.newContext({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true, acceptDownloads: true });
     const page = await ctx.newPage();
-    let n = 0;
+    let n = 0; const served = [];
     await page.route('**/api/aura', async route => {
       const r = replies[Math.min(n, replies.length - 1)]; n++;
       const o = typeof r === 'string' ? { text: r } : r;
+      served.push(o.text === LONG ? 'LONG' : o.status ? 'status' : o.offline ? 'offline' : 'text');
       if (o.offline) return route.abort('failed').catch(() => {});
       if (o.status) return route.fulfill({ status: o.status, contentType: 'application/json', body: JSON.stringify({ error: 'x' }) }).catch(() => {});
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: o.text }], usage: { input_tokens: 10, output_tokens: 10 } }) }).catch(() => {});
@@ -4293,7 +4295,7 @@ async function runMockCT() {
     await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
     await page.goto(BASE + '/' + query);
     await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
-    return { browser, page, calls: () => n };
+    return { browser, page, calls: () => n, served };
   };
   const tapGo = async page => { await page.getByRole('button', { name: 'Go' }).click().catch(() => {}); await page.waitForTimeout(1800); };
   const devLog = page => page.evaluate(() => { try { const v = localStorage.getItem('aura_telemetry_log'); return v === null ? null : JSON.parse(v); } catch (e) { return ['unreadable']; } });
@@ -4351,7 +4353,31 @@ async function runMockCT() {
     say('CT4: opened again — the page\'s memory starts empty, and there is no export button', count(after, 'api_failed') === 0 && btn === 0);
     await s.browser.close();
   };
-  await Promise.all([CT1, CT2, CT3, CT4].map(f => f().catch(e => say('CT: a scenario crashed — ' + String(e && e.message || e).slice(0, 140), false))));
+  // CT5 (added with the code commit, to catch on the screen a closing counted twice): the old flow's closing, its replies refused by the
+  // final check (the model answers «Ευχαριστώ.», then the closing's Part 1 and Part 2 get the long reply) — the app's own lines instead,
+  // and exactly ONE final_check_replaced for each reply refused, never two
+  const CT5 = async () => {
+    const WHY = 'Γιατί κάθε μέρα νιώθω πιο άδειος εκεί μέσα.';
+    const s = await sess('?stageA=0&rec=1', ['Τι σε κρατάει εκεί;', 'Τι θα σήμαινε αυτό για σένα;', 'Τι σου λείπει πιο πολύ;',
+      'Εντάξει.\n\nΠριν φύγεις — μία λέξη, ή μια σύντομη φράση που θέλεις να κρατήσεις.', LONG]);
+    await send(s.page, 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.');
+    if (await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, WHY);
+    await send(s.page, 'Ο μισθός και ο φόβος.');
+    await send(s.page, 'Η σταθερότητα κυρίως.');
+    await send(s.page, 'Ευχαριστώ.');
+    const b = s.page.getByRole('button', { name: 'Δείξε μου', exact: true });
+    const card = (await b.count()) > 0; if (card) { await b.first().click({ timeout: 4000 }); await s.page.waitForTimeout(1500); }
+    const asked = /μία λέξη/.test(await s.page.locator('body').innerText());
+    await send(s.page, 'αλλαγή'); await s.page.waitForTimeout(1500);
+    const shown = await auraTexts(s.page), l = await devLog(s.page);
+    say('CT5 (old flow, ?rec=1): the way there — the closing card, Part 1 asked for the word', card && asked);
+    const refused = s.served.filter(x => x === 'LONG').length;
+    say('CT5: the closing\'s replies refused by the final check (' + refused + ') — none shown; the app\'s own closing line instead; exactly ONE final_check_replaced for each (never two)',
+      refused >= 1 && !shown.some(t => t.includes('πολύ μεγάλο κείμενο')) && shown.some(t => t.includes('Η σκέψη σου παραμένει δική σου.')) &&
+      count(l, 'final_check_replaced') === refused && count(l, 'api_failed') === 0);
+    await s.browser.close();
+  };
+  await Promise.all([CT1, CT2, CT3, CT4, CT5].map(f => f().catch(e => say('CT: a scenario crashed — ' + String(e && e.message || e).slice(0, 140), false))));
   out.sort((a, b) => a[0].localeCompare(b[0]));
   for (const [label, cond] of out) ok(label, cond);
 }

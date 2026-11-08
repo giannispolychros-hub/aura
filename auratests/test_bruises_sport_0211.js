@@ -111,7 +111,10 @@ const cut = (s, n) => { const a0 = s.indexOf('\nfunction ' + n + '('); return a0
 // RE-BASED (John, 7/11/2026, round 6, ADR «7 Νοεμβρίου (γ)», branch release-candidate): the same cut, the same check — the reference is now
   // release-candidate (candidate-tm 1f42762 + hardening-2026-11-a1-local 3a323ec, merged as approved). Proved first: the merged src/App.jsx
   // is exactly the hardening branch's plus candidate-tm's own changes, byte for byte — so outside the cut only the hardening branch moved.
-assert('(Ζ) src/App.jsx outside detectsDangerFromOther is byte-identical to release-candidate (before:  candidate-tm 9c800af (469e194 + the Thought Map)', h(cut(raw, 'detectsDangerFromOther')) === 'b8aeeda13a002933');
+  // RE-BASED (John, 8/11/2026, round 9, ADR «8 Νοεμβρίου», branch release-candidate): the same cut, the same check — the reference is now
+  // release-candidate after round 9 (the two counters and item 144). Proved first (test_counters_144.js (Ε3)–(Ε4)): with the round's 15
+  // changes taken out, src/App.jsx is byte for byte 52f85dc, the reference before — so outside the cut only those changes moved.
+assert('(Ζ) src/App.jsx outside detectsDangerFromOther is byte-identical to release-candidate (before:  candidate-tm 9c800af (469e194 + the Thought Map)', h(cut(raw, 'detectsDangerFromOther')) === 'f8184fbbc2572281');
 const coreS = raw.indexOf('`', raw.indexOf('const AURA_CORE_PERSONALITY')) + 1;
 assert('(Ζ) the prompt is unchanged (b5f303cc9405aa21)', h(raw.slice(coreS, raw.indexOf('`;', coreS))) === 'b5f303cc9405aa21');
 assert('(Ζ) no lookbehind in detectsDangerFromOther (old iPhones)', !/\(\?<[=!]/.test(extract('detectsDangerFromOther')));

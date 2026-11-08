@@ -129,7 +129,10 @@ const cut = (s, n) => { const a = s.indexOf('\nfunction ' + n + '('); const e = 
 // RE-BASED (John, 7/11/2026, round 6, ADR «7 Νοεμβρίου (γ)», branch release-candidate): the same cut, the same check — the reference is now
   // release-candidate (candidate-tm 1f42762 + hardening-2026-11-a1-local 3a323ec, merged as approved). Proved first: the merged src/App.jsx
   // is exactly the hardening branch's plus candidate-tm's own changes, byte for byte — so outside the cut only the hardening branch moved.
-assert('(Ε) src/App.jsx outside the two detectors is byte-identical to release-candidate (before: thought-map bf93c7c (main 24aab8e + the Thought Map)', h(cut(cut(raw, 'detectSafetySignal'), 'detectsDangerFromOther')) === '4ac30d984641fa46');
+  // RE-BASED (John, 8/11/2026, round 9, ADR «8 Νοεμβρίου», branch release-candidate): the same cut, the same check — the reference is now
+  // release-candidate after round 9 (the two counters and item 144). Proved first (test_counters_144.js (Ε3)–(Ε4)): with the round's 15
+  // changes taken out, src/App.jsx is byte for byte 52f85dc, the reference before — so outside the cut only those changes moved.
+assert('(Ε) src/App.jsx outside the two detectors is byte-identical to release-candidate (before: thought-map bf93c7c (main 24aab8e + the Thought Map)', h(cut(cut(raw, 'detectSafetySignal'), 'detectsDangerFromOther')) === '8c14ef984b6ebcae');
 // RE-BASED (John, 7/11/2026, round 6, ADR «7 Νοεμβρίου (γ)», branch release-candidate): api/aura.js is now the hardening branch's
   // (A1, ADR «4 Νοεμβρίου (β)»), byte for byte — candidate-tm never changed it. Same check, the reference moves.
 assert('(Ε) api/aura.js is byte-identical to the hardening branch (A1) — before: main 24aab8e', h(fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8')) === 'e791b19471f08132');

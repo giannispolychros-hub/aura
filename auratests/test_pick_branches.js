@@ -223,11 +223,17 @@ const S = t => call('branchSentenceSpans', t);
       '  // THOUGHT MAP (John, 2/11/2026): the map\'s one record (branchCount, ?rec=1 only) is written once per session — reset with the session\n' +
         '  const thoughtMapLogged = useRef(false);\n',
       '    thoughtMapLogged.current = false; // Thought Map (2/11): the map\'s one record, once per session\n',
+      // UPDATED (John, 8/11/2026, round 9, item 144, ADR «8 Νοεμβρίου»): the map's one record is now written by one helper (once per session,
+      // the same latch) — from the map's effect, or from the session's end before its own record. The same pieces, as they now are.
       '  // THOUGHT MAP (John, 2/11/2026): when the map first shows in a session and ?rec=1 is on — ONE integer, branchCount (0, 2 or 3).\n' +
         '  // Nothing without ?rec=1; nothing else ever (thoughtMapRecFields builds the only fields; recordTelemetry drops anything else).\n' +
-        '  const thoughtMapShown = thoughtMap !== null;\n  useEffect(() => {\n    if (!thoughtMapShown || thoughtMapLogged.current) return;\n' +
-        '    thoughtMapLogged.current = true;\n    const f = thoughtMapRecFields(thoughtMap, recMode.current);\n' +
-        '    if (f) recordTelemetry("thought_map", f);\n  }, [thoughtMapShown]); // eslint-disable-line react-hooks/exhaustive-deps\n',
+        '  const thoughtMapShown = thoughtMap !== null;\n' +
+        '  useEffect(() => { if (thoughtMapShown) logThoughtMapOnce(thoughtMap); }, [thoughtMapShown]); // eslint-disable-line react-hooks/exhaustive-deps\n',
+      '  // THOUGHT MAP, item 144 (John, 8/11/2026, ADR «8 Νοεμβρίου»): the map\'s one record, once per session (the latch), in the moment the map\n' +
+        '  // shows — written by the map\'s effect, or, when the map shows as the session ends, by the session\'s end BEFORE its own record.\n' +
+        '  const logThoughtMapOnce = thoughtMap => {\n    if (!thoughtMap || thoughtMapLogged.current) return;\n    thoughtMapLogged.current = true;\n' +
+        '    const f = thoughtMapRecFields(thoughtMap, recMode.current);\n    if (f) recordTelemetry("thought_map", f);\n  };\n',
+      '      logThoughtMapOnce(thoughtMap); // item 144: a map shown now is recorded before the session\'s own record, not after it\n',
       '  // THOUGHT MAP (2/11): computed on every render from what the page already holds; nothing is kept\n' +
         '  const thoughtMap = thoughtMapView({ active: stageAActive.current, phase: stageAPhase, loading, stage: stageAView,\n' +
         '    messagesAtCard: messages.slice(0, rootCardMsgCount.current), allMessages: messages, riskKind: riskSignalKind.current,\n' +
@@ -243,8 +249,13 @@ const S = t => call('branchSentenceSpans', t);
   // RE-BASED (John, 7/11/2026, round 6, ADR «7 Νοεμβρίου (γ)», branch release-candidate): the same cut, the same check — the reference is now
   // release-candidate (candidate-tm 1f42762 + hardening-2026-11-a1-local 3a323ec, merged as approved). Proved first: the merged src/App.jsx
   // is exactly the hardening branch's plus candidate-tm's own changes, byte for byte — so outside the cut only the hardening branch moved.
+  // RE-BASED (John, 8/11/2026, round 9, ADR «8 Νοεμβρίου», branch release-candidate): the same cut, the same check — the reference is now
+  // release-candidate after round 9 (the two counters and item 144). Proved first (test_counters_144.js (Ε3)–(Ε4)): with the round's 15
+  // changes taken out, src/App.jsx is byte for byte 52f85dc, the reference before — so outside the cut only those changes moved.
+  // And with the new map pieces cut as they now are and the 12 changes of the counters taken out, this check gives the reference
+  // before, dbe9bc32… — so outside the Thought Map only the counters moved.
   assert('(Ζ) the rest of src/App.jsx is byte-identical to release-candidate (before: the base ca18f58 (main 24aab8e + safety-detectors with the fixes of 2/11 and 3/11) (the block and the phase-2 pieces aside)',
-    sha(stripThoughtMap(raw)) === 'dbe9bc32623e334a3bfc2d77976bf9f5e784ef66c7620ea244b7322fee457dd9');
+    sha(stripThoughtMap(raw)) === 'aa9a5a196eea960d67e3fb6b8e4e2df2088eaec9082275f711889b1810712dc8');
   const fp = fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8').match(/core: \{ length: \d+, sha256: "([0-9a-f]{16})/);
   assert('(Ζ) api/aura.js carries the prompt fingerprint b5f303cc9405aa21', !!fp && fp[1] === 'b5f303cc9405aa21');
   const ci = raw.indexOf('const AURA_CORE_PERSONALITY'), cs = raw.indexOf('`', ci) + 1, ce = raw.indexOf('`;', cs);

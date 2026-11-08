@@ -2219,6 +2219,8 @@ function safetyFilters(text, danger, safetyPath) {
 // ADR «19 Οκτωβρίου (β)»: «και τίποτα άλλο»). ctx: { kind: "model" | "closing" | "afterCrisis", mode, lastUserText, modelText (the
 // model's reply before the path changed it), safetyPath, danger, supportShown, dangerShown, isTermination }.
 // → { content, failed, why, supportShown, dangerShown, lines, hidden }. Never throws: anything that goes wrong is { failed: true }.
+// THE COUNTER (John, 8/11/2026, ADR «8 Νοεμβρίου»): each time the exit says no — the reply is replaced by the app's fixed text — one
+// record, final_check_replaced, with no field at all.
 function finishReply(text, ctx) {
   const o = ctx || {};
   const keep = { supportShown: o.supportShown === true, dangerShown: Array.isArray(o.dangerShown) ? o.dangerShown : [] };
@@ -2253,10 +2255,11 @@ function finishReply(text, ctx) {
     // line is due. An empty reply of the model itself (modelText empty) is still a failure (iv).
     if (!String(typeof text === "string" ? text : "").trim() && !t.trim() && !lines.length && typeof o.modelText === "string" && o.modelText.trim()) return { content: "", failed: false, empty: true, lines, supportShown, dangerShown };
     const ck = finalReplyCheck(shown.visible, { kind, danger, safetyPath, appLines: [...lines, ...appOwnLines()] });
-    if (!ck.ok) return { content: "", failed: true, why: ck.why, lines: [], ...keep };
+    if (!ck.ok) { recordTelemetry("final_check_replaced"); return { content: "", failed: true, why: ck.why, lines: [], ...keep }; }
     fkPass(t, { isTermination: o.isTermination === true }, lines);
     return { content: t, failed: false, lines, supportShown, dangerShown };
   } catch (e) {
+    recordTelemetry("final_check_replaced");
     return { content: "", failed: true, why: "threw", lines: [], ...keep };
   }
 }
@@ -2297,6 +2300,15 @@ function fkFixedTexts() {
 function fkShownOk(visible) {
   fkFixedTexts();
   return FK_PASSED.has(fkStamp(typeof visible === "string" ? visible : ""));
+}
+// THE COUNTER (John, 8/11/2026, ADR «8 Νοεμβρίου»): a message the bubble guard replaced with the fixed text — counted once per message
+// (a bubble is drawn many times), with no field at all.
+const FK_GUARD_COUNTED = new Set();
+function countGuardReplaced(msg) {
+  const key = msg && msg.id != null ? msg.id : msg;
+  if (FK_GUARD_COUNTED.has(key)) return;
+  FK_GUARD_COUNTED.add(key);
+  recordTelemetry("final_check_replaced");
 }
 // ── THE ERROR SCREEN (John, 6/11/2026, round 3, commit (iii), ADR «6 Νοεμβρίου (β)») ──
 // John's texts of the decision (α) are shown without «Σφάλμα:» in front of them (it read as if the user had done something wrong).
@@ -5175,7 +5187,10 @@ function buildTesterExport(rows, exportedAt) {
     }
     return o;
   }).filter(Boolean);
-  return { exportedAt: String(exportedAt || ""), note: "AURA tester log — counts and flags only, never anything a person typed.", records: events.length, events };
+  // THE TWO COUNTERS (John, 8/11/2026, ADR «8 Νοεμβρίου»): how many times the final check replaced a reply with the fixed text, and how
+  // many requests the API refused or that failed — two numbers, counted from the records above; nothing else.
+  const counters = { finalCheckReplaced: events.filter(e => e.ev === "final_check_replaced").length, apiFailed: events.filter(e => e.ev === "api_failed").length };
+  return { exportedAt: String(exportedAt || ""), note: "AURA tester log — counts and flags only, never anything a person typed.", records: events.length, counters, events };
 }
 // How many records the device log holds (the start screen shows the button only when there is something to send).
 function storedTelemetryCount() {
@@ -7059,6 +7074,10 @@ async function callAura(messages, systemPrompt, retries = 1, onChunk = null) {
       throw new Error("Κάτι δεν λειτούργησε. Δοκίμασε ξανά.");
     }
   }
+  // THE COUNTER (John, 8/11/2026, ADR «8 Νοεμβρίου»): a request the API refused or that failed — an error status, a reply of the wrong
+  // shape or empty, a timeout, no network — one record, api_failed, with no field at all; once per request (a retry is a request of its own).
+  let _apiFailedCounted = false;
+  const apiFailed = () => { if (!_apiFailedCounted) { _apiFailedCounted = true; recordTelemetry("api_failed"); } };
   // FIX 1: AbortController — 30s timeout for mobile network stalls
   const controller = new AbortController();
   const timeoutId  = setTimeout(() => controller.abort(), 26000);
@@ -7077,6 +7096,7 @@ async function callAura(messages, systemPrompt, retries = 1, onChunk = null) {
       }),
     });
     if (!res.ok) {
+      apiFailed();
       if (retries > 0 && (res.status === 429 || res.status >= 500)) {
         await new Promise(r => setTimeout(r, 600));
         // A4 (ADR «4 Νοεμβρίου»): `await` keeps this try open until the retry ends, so the finally below frees _activeCall only then.
@@ -7120,7 +7140,7 @@ async function callAura(messages, systemPrompt, retries = 1, onChunk = null) {
     // FAILURE (iii) of the final check (6/11/2026): a body that is not JSON, or a reply of an unexpected shape, is a failed call in the
     // app's own words — never a technical error on the screen («… is not a function» reached it before).
     const data = await res.json().catch(() => null);
-    if (!data || !Array.isArray(data.content)) throw new Error(friendlyApiError(0));
+    if (!data || !Array.isArray(data.content)) { apiFailed(); throw new Error(friendlyApiError(0)); }
     // COST INSTRUMENTATION — counts only, strictly passive, same principle as the collision logger.
     // The API already returns token usage on every response and the proxy passes it through
     // untouched; the client simply threw it away. That left the three questions the cost audit
@@ -7149,10 +7169,12 @@ async function callAura(messages, systemPrompt, retries = 1, onChunk = null) {
       // Never hand an empty reply back: every one of the eleven append sites would put it in
       // history, and from then on the API rejects every request this session makes.
       recordTelemetry("api_error", { status: 0, reason: 2 });
+      apiFailed();
       throw new Error(friendlyApiError(0));
     }
     return _reply;
   } catch (err) {
+    if (err && (err.name === "AbortError" || err.name === "TypeError")) apiFailed(); // a timeout, or no network (fetch's own error)
     if (err.name === "AbortError") {
       throw new Error("Η σύνδεση έληξε. Έλεγξε το δίκτυό σου και δοκίμασε ξανά.");
     }
@@ -7197,6 +7219,7 @@ const MessageBubble = memo(function MessageBubble({ msg, onMisfire, onContinueTo
   // together by visibleText from the values above — passed the check (finishReply; fkPassApp for the app's own texts). Otherwise the
   // app's fixed text. Nothing above changes.
   if (!isUser && !fkShownOk(visibleText(msg, roadMap, displayContent, shownContent))) {
+    countGuardReplaced(msg);
     return (
       <div className="turn turn-aura" data-final-check="failed">
         <div className="msg-label">aura</div>
@@ -7492,6 +7515,14 @@ export default function AURAv2() {
   const rootCardMsgCount = useRef(0);
   // THOUGHT MAP (John, 2/11/2026): the map's one record (branchCount, ?rec=1 only) is written once per session — reset with the session
   const thoughtMapLogged = useRef(false);
+  // THOUGHT MAP, item 144 (John, 8/11/2026, ADR «8 Νοεμβρίου»): the map's one record, once per session (the latch), in the moment the map
+  // shows — written by the map's effect, or, when the map shows as the session ends, by the session's end BEFORE its own record.
+  const logThoughtMapOnce = thoughtMap => {
+    if (!thoughtMap || thoughtMapLogged.current) return;
+    thoughtMapLogged.current = true;
+    const f = thoughtMapRecFields(thoughtMap, recMode.current);
+    if (f) recordTelemetry("thought_map", f);
+  };
   const stageADispatch = useCallback((ev) => {
     const _prev = stageARef.current;
     stageARef.current = stageAStep(_prev, ev);
@@ -7737,6 +7768,7 @@ export default function AURAv2() {
       // road. Computed here from `messages` like roadMap — no ref, no consumer, never shown to the model. (β) reads
       // the app's EXISTING records (concreteStepStated, and the COMMITMENT capture's committed entry, read only).
       const _intentNoRoads = !_roadMap && detectsIntentWithoutRoads(messages, concreteStepStated.current || !!(commitmentPair.current && commitmentPair.current.committed));
+      logThoughtMapOnce(thoughtMap); // item 144: a map shown now is recorded before the session's own record, not after it
       recordTelemetry("session_completed", {
         turns: turnCount.current || 0,
         roadMap: _roadMap,
@@ -9131,7 +9163,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     if (r.failed) return { failed: true };
     const linesText = r.lines.join("\n\n");
     const base = linesText && r.content.endsWith("\n\n" + linesText) ? r.content.slice(0, -(linesText.length + 2)) : linesText && r.content === linesText ? "" : r.content;
-    if (base !== text) return { failed: true }; // the closing itself must be the text that passed
+    if (base !== text) { recordTelemetry("final_check_replaced"); return { failed: true }; } // the closing itself must be the text that passed
     fkPass(base, { isTermination: true }, []);
     if (linesText) fkPass(linesText, { isTermination: true }, r.lines);
     dangerLineShown.current = r.dangerShown;
@@ -10015,12 +10047,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
   // THOUGHT MAP (John, 2/11/2026): when the map first shows in a session and ?rec=1 is on — ONE integer, branchCount (0, 2 or 3).
   // Nothing without ?rec=1; nothing else ever (thoughtMapRecFields builds the only fields; recordTelemetry drops anything else).
   const thoughtMapShown = thoughtMap !== null;
-  useEffect(() => {
-    if (!thoughtMapShown || thoughtMapLogged.current) return;
-    thoughtMapLogged.current = true;
-    const f = thoughtMapRecFields(thoughtMap, recMode.current);
-    if (f) recordTelemetry("thought_map", f);
-  }, [thoughtMapShown]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (thoughtMapShown) logThoughtMapOnce(thoughtMap); }, [thoughtMapShown]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleKey = (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }

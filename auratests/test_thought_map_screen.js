@@ -184,10 +184,16 @@ const VIEW = fnSrc('thoughtMapView') + fnSrc('branchSessionSafe') + fnSrc('pickB
   // CHANGED (John, 2/11/2026, branchCount): besides the screen, the view is read by the map's ONE record (the effect below) — and nowhere else
   const uses = (raw.match(/\bthoughtMap\b/g) || []).length, defs = raw.indexOf('const thoughtMap = thoughtMapView(');
   const outside = raw.replace(JSX, '').split('\n').filter(l => /\bthoughtMap\b/.test(l)).map(l => l.trim());
+  // UPDATED (John, 8/11/2026, round 9, item 144, ADR «8 Νοεμβρίου»): the one record is now written by one helper, logThoughtMapOnce —
+  // called by the map's effect and, before session_completed, by the session's end; still the one record, read nowhere else
   assert('(Δ) the view is read only by the screen block and by the one record (computed on render, used nowhere else)',
     defs > 0 && (raw.match(/thoughtMapView\(/g) || []).length === 2 && uses > 3 && JSON.stringify(outside) === JSON.stringify([
+      'const logThoughtMapOnce = thoughtMap => {', 'if (!thoughtMap || thoughtMapLogged.current) return;',
+      'const f = thoughtMapRecFields(thoughtMap, recMode.current);',
+      'logThoughtMapOnce(thoughtMap); // item 144: a map shown now is recorded before the session\'s own record, not after it',
       'const thoughtMap = thoughtMapView({ active: stageAActive.current, phase: stageAPhase, loading, stage: stageAView,',
-      'const thoughtMapShown = thoughtMap !== null;', 'const f = thoughtMapRecFields(thoughtMap, recMode.current);']));
+      'const thoughtMapShown = thoughtMap !== null;',
+      'useEffect(() => { if (thoughtMapShown) logThoughtMapOnce(thoughtMap); }, [thoughtMapShown]); // eslint-disable-line react-hooks/exhaustive-deps']));
   assert('(Δ) the number kept for the screen: set only when the card opens, reset with the session, read only to cut `messages`',
     (raw.match(/rootCardMsgCount\.current = /g) || []).length === 2 && /if \(stageARef\.current\.phase === "card"\) rootCardMsgCount\.current = \(msgsNow \|\| \[\]\)\.length;/.test(raw) &&
     /rootCardMsgCount\.current = 0;/.test(raw) && (raw.match(/rootCardMsgCount\.current\b/g) || []).length === 3 && /messages\.slice\(0, rootCardMsgCount\.current\)/.test(raw));
@@ -195,13 +201,16 @@ const VIEW = fnSrc('thoughtMapView') + fnSrc('branchSessionSafe') + fnSrc('pickB
     h16(fnSrc('buildStageAShareText')) === '9a8af7bdebab8fae' && h16(fnSrc('buildStepCardText')) === 'a2a9b53459dff368' && !/thoughtMap/.test(fnSrc('buildStageAShareText')));
   // CHANGED (John, 2/11/2026): the map may record ONE integer, branchCount, with ?rec=1 only — recordTelemetry and the tester export
   // themselves stay byte-identical (they are what drops anything else); the map has exactly one record call, fed only by thoughtMapRecFields
+  // UPDATED (John, 8/11/2026, round 9, ADR «8 Νοεμβρίου»): the tester export now also carries two numbers, counters { finalCheckReplaced,
+  // apiFailed }, counted from the records it already filtered — each record is filtered exactly as before (test_counters_144.js (Γ))
   assert('(Δ) telemetry and the tester export unchanged (counts only; rec=1 keeps no text); the map\'s only record is branchCount',
-    h16(fnSrc('recordTelemetry')) === 'bc79a4b2654cf306' && h16(fnSrc('buildTesterExport')) === 'd73e0a9179c9a751' && h16(fnSrc('exportTesterData')) === 'd3ee9ebe10c78f7a' &&
+    h16(fnSrc('recordTelemetry')) === 'bc79a4b2654cf306' && h16(fnSrc('buildTesterExport')) === '33dde012fd3a3c4e' && h16(fnSrc('exportTesterData')) === 'd3ee9ebe10c78f7a' &&
     (raw.match(/recordTelemetry\("thought/g) || []).length === 1 && /const f = thoughtMapRecFields\(thoughtMap, recMode\.current\);\s*if \(f\) recordTelemetry\("thought_map", f\);/.test(raw) &&
     !/recordTelemetry/.test(JSX) && !/recordTelemetry/.test(VIEW) &&
     /const recMode = useRef\(typeof window !== 'undefined' && new URLSearchParams\(window\.location\.search\)\.get\('rec'\) === '1'\);/.test(raw));
+  // UPDATED (John, 8/11/2026, round 9, item 144): the latch is in the helper now — set the first time the map shows, by whichever writes first
   assert('(Δ) … once per session: a latch set on the first showing, reset with the session',
-    /if \(!thoughtMapShown \|\| thoughtMapLogged\.current\) return;\s*thoughtMapLogged\.current = true;/.test(raw) &&
+    /if \(!thoughtMap \|\| thoughtMapLogged\.current\) return;\s*thoughtMapLogged\.current = true;/.test(raw) &&
     (raw.match(/thoughtMapLogged\.current = /g) || []).length === 2 && /thoughtMapLogged\.current = false; \/\/ Thought Map/.test(raw) && /\}, \[thoughtMapShown\]\);/.test(raw));
   assert('(Δ) memory and its consent unchanged (aura_v2_memory, the consent toggle): the screen never reaches them',
     h16(fnSrc('saveMemory')) === 'd609850541386c09' && h16(fnSrc('_writeMemoryNow')) === 'c141fc2423719aea' && h16(fnSrc('loadMemory')) === '5b173dba223a13d5' && h16(fnSrc('exportMemory')) === '6e4e47cfab7f0f4d');
@@ -238,11 +247,17 @@ const stripThoughtMap = t => {
       '  // THOUGHT MAP (John, 2/11/2026): the map\'s one record (branchCount, ?rec=1 only) is written once per session — reset with the session\n' +
         '  const thoughtMapLogged = useRef(false);\n',
       '    thoughtMapLogged.current = false; // Thought Map (2/11): the map\'s one record, once per session\n',
+      // UPDATED (John, 8/11/2026, round 9, item 144, ADR «8 Νοεμβρίου»): the map's one record is now written by one helper (once per session,
+      // the same latch) — from the map's effect, or from the session's end before its own record. The same pieces, as they now are.
       '  // THOUGHT MAP (John, 2/11/2026): when the map first shows in a session and ?rec=1 is on — ONE integer, branchCount (0, 2 or 3).\n' +
         '  // Nothing without ?rec=1; nothing else ever (thoughtMapRecFields builds the only fields; recordTelemetry drops anything else).\n' +
-        '  const thoughtMapShown = thoughtMap !== null;\n  useEffect(() => {\n    if (!thoughtMapShown || thoughtMapLogged.current) return;\n' +
-        '    thoughtMapLogged.current = true;\n    const f = thoughtMapRecFields(thoughtMap, recMode.current);\n' +
-        '    if (f) recordTelemetry("thought_map", f);\n  }, [thoughtMapShown]); // eslint-disable-line react-hooks/exhaustive-deps\n',
+        '  const thoughtMapShown = thoughtMap !== null;\n' +
+        '  useEffect(() => { if (thoughtMapShown) logThoughtMapOnce(thoughtMap); }, [thoughtMapShown]); // eslint-disable-line react-hooks/exhaustive-deps\n',
+      '  // THOUGHT MAP, item 144 (John, 8/11/2026, ADR «8 Νοεμβρίου»): the map\'s one record, once per session (the latch), in the moment the map\n' +
+        '  // shows — written by the map\'s effect, or, when the map shows as the session ends, by the session\'s end BEFORE its own record.\n' +
+        '  const logThoughtMapOnce = thoughtMap => {\n    if (!thoughtMap || thoughtMapLogged.current) return;\n    thoughtMapLogged.current = true;\n' +
+        '    const f = thoughtMapRecFields(thoughtMap, recMode.current);\n    if (f) recordTelemetry("thought_map", f);\n  };\n',
+      '      logThoughtMapOnce(thoughtMap); // item 144: a map shown now is recorded before the session\'s own record, not after it\n',
       '  // THOUGHT MAP (2/11): computed on every render from what the page already holds; nothing is kept\n' +
         '  const thoughtMap = thoughtMapView({ active: stageAActive.current, phase: stageAPhase, loading, stage: stageAView,\n' +
         '    messagesAtCard: messages.slice(0, rootCardMsgCount.current), allMessages: messages, riskKind: riskSignalKind.current,\n' +
@@ -258,8 +273,13 @@ const stripThoughtMap = t => {
   // RE-BASED (John, 7/11/2026, round 6, ADR «7 Νοεμβρίου (γ)», branch release-candidate): the same cut, the same check — the reference is now
   // release-candidate (candidate-tm 1f42762 + hardening-2026-11-a1-local 3a323ec, merged as approved). Proved first: the merged src/App.jsx
   // is exactly the hardening branch's plus candidate-tm's own changes, byte for byte — so outside the cut only the hardening branch moved.
+  // RE-BASED (John, 8/11/2026, round 9, ADR «8 Νοεμβρίου», branch release-candidate): the same cut, the same check — the reference is now
+  // release-candidate after round 9 (the two counters and item 144). Proved first (test_counters_144.js (Ε3)–(Ε4)): with the round's 15
+  // changes taken out, src/App.jsx is byte for byte 52f85dc, the reference before — so outside the cut only those changes moved.
+  // And with the new map pieces cut as they now are and the 12 changes of the counters taken out, this check gives the reference
+  // before, dbe9bc32… — so outside the Thought Map only the counters moved.
   assert('(Ε) without the Thought Map pieces (the block of functions, the screen, the one number, the view) src/App.jsx is byte-identical to release-candidate (before: the base ca18f58 (main 24aab8e + safety-detectors with the fixes of 2/11 and 3/11)',
-    sha(stripThoughtMap(raw)) === 'dbe9bc32623e334a3bfc2d77976bf9f5e784ef66c7620ea244b7322fee457dd9');
+    sha(stripThoughtMap(raw)) === 'aa9a5a196eea960d67e3fb6b8e4e2df2088eaec9082275f711889b1810712dc8');
   // RE-BASED (John, 7/11/2026, round 6, ADR «7 Νοεμβρίου (γ)», branch release-candidate): api/aura.js is now the hardening branch's
   // (A1, ADR «4 Νοεμβρίου (β)»), byte for byte — candidate-tm never changed it. Same check, the reference moves.
   assert('(Ε) api/aura.js is byte-identical to the hardening branch (A1) (e791b19471f08132; before: main c2ce3892c094224d)', h16(fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8')) === 'e791b19471f08132');
