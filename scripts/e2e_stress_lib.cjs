@@ -15,6 +15,7 @@ const PRICES = {
   user: { input: 0.10, output: 0.50, cacheWrite: 0.125, cacheRead: 0.10 },
 };
 const BUDGET_CAP = 25;
+const BENCH_PRICES = (() => { const B = require('./e2e_bench_lib.cjs'); return { sim: B.PRICES_SIM, eval: B.PRICES_EVAL }; })();
 // Το χειρότερο που μπορεί να κοστίσει ΜΙΑ κλήση — δεσμεύεται πριν από κάθε κλήση, ώστε το σύνολο να μην περάσει ποτέ το όριο.
 // AURA: εγγραφή ολόκληρου του prompt στην cache (~80K) + 12K χωρίς cache + 1.000 tokens εξόδου (το api/aura.js κόβει στα 1.000).
 // Χρήστης/κριτής: 30K εισόδου + 4.000 εξόδου (το max_tokens των κλήσεων Haiku).
@@ -87,7 +88,8 @@ const PRICES_USER_LONG = { input: 0.50, output: 2.50, cacheWrite: 0.625, cacheRe
 function costOf(u, who) {
   const x = u || {};
   const promptTokens = (x.input_tokens || 0) + (x.cache_creation_input_tokens || 0) + (x.cache_read_input_tokens || 0);
-  const p = who === 'user' ? (promptTokens > 100000 ? PRICES_USER_LONG : PRICES.user) : PRICES.aura;
+  // 31/10 (the benchmark, ADR «31 Οκτωβρίου (η)»): the simulator (Haiku 4.5) and the evaluator (Opus 5.5) are counted apart
+  const p = who === 'sim' ? BENCH_PRICES.sim : who === 'eval' ? BENCH_PRICES.eval : who === 'user' ? (promptTokens > 100000 ? PRICES_USER_LONG : PRICES.user) : PRICES.aura;
   return ((x.input_tokens || 0) * p.input + (x.output_tokens || 0) * p.output +
     (x.cache_creation_input_tokens || 0) * p.cacheWrite + (x.cache_read_input_tokens || 0) * p.cacheRead) / 1e6;
 }
@@ -95,7 +97,7 @@ function costOf(u, who) {
 function makeStressBudget(limit) {
   const cap = Math.min(Number(limit) || 0, BUDGET_CAP);
   let spent = 0, reserved = 0, inflight = 0;
-  const by = { aura: 0, user: 0 };
+  const by = { aura: 0, user: 0, sim: 0, eval: 0 };
   return {
     cap,
     canSpend(who) { return spent + reserved + WORST_CALL[who === 'user' ? 'user' : 'aura'] <= cap; },
@@ -104,9 +106,9 @@ function makeStressBudget(limit) {
     reserve(amount) { if (spent + reserved + amount > cap) return false; reserved += amount; inflight += 1; return true; },
     release(amount) { reserved = Math.max(0, reserved - amount); inflight = Math.max(0, inflight - 1); },
     inflight() { return inflight; },
-    add(u, who) { const c = costOf(u, who); spent += c; by[who === 'user' ? 'user' : 'aura'] += c; return c; },
+    add(u, who) { const c = costOf(u, who); spent += c; by[who === 'user' || who === 'sim' || who === 'eval' ? who : 'aura'] += c; return c; },
     spent() { return spent; },
-    by() { return { aura: by.aura, user: by.user }; },
+    by() { return { aura: by.aura, user: by.user, sim: by.sim, eval: by.eval }; }, // 31/10: sim and eval apart — never counted as AURA
   };
 }
 
