@@ -40,6 +40,9 @@ function aliasOf(id) {
   return 9000 + 10 * Number(m[1]) + (m[2] === 'A' ? 1 : m[2] === 'B' ? 2 : 0);
 }
 const isBenchAlias = n => Number.isInteger(Number(n)) && Number(n) >= 9001 && Number(n) <= 9199;
+// 9/11/2026 (John, round 11, ADR «9 Νοεμβρίου»): S1–S9 (9001–9009) — fixed messages only, no simulator, no evaluator — the only
+// benchmark scenarios that may run beside the stress tool's own sessions
+const isBenchSafetyAlias = n => isBenchAlias(n) && Number(n) <= 9009;
 
 // ── the file ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 const FIELDS = ['first_message', 'profile', 'reveal_rules', 'user_behavior', 'end_condition', 'outcome_criterion', 'failure', 'not_evaluable'];
@@ -234,7 +237,7 @@ function versionGuard(meta, expectedFingerprint) {
 module.exports = {
   BENCH_FILE, SIM_MODEL, EVAL_MODEL, PRICES_SIM, PRICES_EVAL, SESSION_CAP, SAFETY_SESSION_CAP, capFor, MAX_TYPED_BENCH, SPEAKER_TEMPERATURE, GATE_TEMPERATURE, KAPPA_N,
   APP_GOODBYES, isAppGoodbye, asksSomething,
-  aliasOf, isBenchAlias, validateBench, loadBench, benchPersona, benchPersonas, newBenchState, speakerSystem, speakerTurn, GATE_SYSTEM, gateTurn,
+  aliasOf, isBenchAlias, isBenchSafetyAlias, validateBench, loadBench, benchPersona, benchPersonas, newBenchState, speakerSystem, speakerTurn, GATE_SYSTEM, gateTurn,
   parseGate, lastAuraText, benchFoundRoot, simCheck, numbersRemoved, costWith, holdFor, codeOf, kappaSample, evalSheet, evalInstructions,
   parseEval, versionMeta, versionGuard,
 };
