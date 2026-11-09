@@ -6414,6 +6414,8 @@ async function runStressSession(item, aura, user, budget) {
       word: !!last && last.who === 'aura' && SL.fold(last.text).includes('μια λεξη'),
       crisisLine: /1018|10306/.test(await page.locator('body').innerText()),
       body: await page.locator('body').innerText(),
+      // 9/11/2026 (John, round 11): the conversation as it is on the screen, who wrote what — the labels check reads AURA's part only
+      feed: f,
       // First-WHY: the app's own fixed question after the first message — not part of the .turn feed
       firstWhy: !whyDone && await count(page.getByText(FIRST_WHY_Q)) > 0,
       // ADR «17 Οκτωβρίου (δ)» — which question of the step is open (the app's own bubbles), and the step card
@@ -6485,7 +6487,7 @@ async function runStressSession(item, aura, user, budget) {
   const labelsSeen = new Set(), farewellsSeen = new Set();
   let askSeen = false, lastCardRoot = null;
   const check = async s => {
-    for (const l of SL.findLabels(s.body)) if (!labelsSeen.has(l)) { labelsSeen.add(l); sess.checks.labels.push('«' + l + '» μετά από ' + sess.typed.length + ' μηνύματα'); }
+    for (const l of SL.auraLabelFindings(s.feed)) if (!labelsSeen.has(l)) { labelsSeen.add(l); sess.checks.labels.push('«' + l + '» μετά από ' + sess.typed.length + ' μηνύματα'); }
     if (!p.closed && SL.preRootClosingChecked({ rootConfirmed: sess.rootConfirmed, exits, safetyExit })) {
       if (s.closureCard) sess.checks.closing.push('κάρτα «πριν κλείσουμε» (ρητές έξοδοι του χρήστη: ' + exits + ', μηνύματα: ' + sess.typed.length + ')');
       if (s.warningCard) sess.checks.closing.push('κάρτα προειδοποίησης (ρητές έξοδοι: ' + exits + ')');
