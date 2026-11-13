@@ -1015,6 +1015,139 @@ async function runMock() {
   await runMockCT(); // 8/11 (round 9): the two counters in the tester export
   await runMockBX(); // 9/11 (round 11): S1–S9 beside the tool's sessions, the two danger sessions, the labels fix
   await runMockSD(); // 31/10 (ζ): the safety detectors' gaps (item 117, S5–S9) — the existing line on the screen
+  await runMockQD(); // 13/11 (quality-diagnostics): the root card's silent arming and the escalation ladder, as they are
+}
+
+// ── QD: QUALITY DIAGNOSTICS (John, 13/11/2026, branch quality-diagnostics — NOT a fix, the app is unchanged). Fake model, SYNTHETIC
+// messages only (no real session's words). Every check pins the behaviour AS IT IS today, so a later change shows up here.
+//  QD1 — the root card's SILENT arming (finding 161, ADR «13 Νοεμβρίου»): the readiness question (the prompt's canonical wording) is
+//        answered NOT with a plain «Ναι» (a «ναι» with more in it goes to the model, ADR «12 Οκτωβρίου (γ)»); LATER a plain «Ναι» (≤6
+//        words of the closed list) to some OTHER question arms door 2 without any sign on the screen; the NEXT message is not sent to the
+//        model and becomes «Τι βρήκες» on the card. Short and long (28 messages) sessions, a session shaped like a long real one (the
+//        question at reply 15, the late «Ναι…» at 29 — synthetic words), and two controls: a late «ναι» with more in it (no arming), and
+//        the readiness question with a line break inside it (the app never registers it, so nothing arms).
+//  QD2 — the escalation ladder (src/App.jsx computeEscalationLevel / describeEscalationCtx, called before each reply): which of the three
+//        stuck signals each request carries in 34-message sessions — user stagnation, AURA's self-repetition, the clarity pivot — and the
+//        level. With the switch open and before a root the level stops at 3 (never AUTO-KILL); any turn without a signal resets it to 0;
+//        a user who keeps saying, in NEW words, that they are not understood lights NOTHING.
+// Alone: --only QD.
+async function runMockQD() {
+  const RQ = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+  const card = async page => (await page.getByRole('button', { name: 'Ναι, αυτό είναι', exact: true }).count()) > 0;
+  const run = async (script, msgs) => {
+    const s = await session('?stageA=1', script);
+    const perMsg = [];
+    for (let i = 0; i < msgs.length; i++) {
+      const before = s.calls.length;
+      await send(s.page, msgs[i]);
+      if (i === 0 && await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, 'Γιατί με βαραίνει κάθε μέρα.');
+      perMsg.push({ calls: s.calls.length - before, card: await card(s.page) });
+      if (perMsg[i].card) break;
+    }
+    const foundShown = async t => (await s.page.getByText('«' + t + '»', { exact: false }).count()) > 0;
+    return { s, perMsg, foundShown };
+  };
+  const U = ['Σκέφτομαι να αλλάξω δουλειά αλλά κάτι με κρατάει.', 'Η σταθερότητα του μισθού, αλλά νιώθω ότι κάτι άλλο παίζει.',
+    'Ναι, νομίζω ότι φοβάμαι να το πω στον πατέρα μου.', 'Θα απογοητευόταν, έτσι νομίζω τουλάχιστον.', 'Ναι, σωστά.', 'Όχι καλά, θύμωσε πολύ τότε.', 'Δεν ξέρω τι άλλο να πω.'];
+  const R = ['Τι σε κρατάει περισσότερο;', RQ, 'Τι θα γινόταν αν του το έλεγες;', 'Του έχεις μιλήσει ποτέ για τη δουλειά σου;', 'Και πώς αντέδρασε τότε;', 'Τι σου έμεινε από εκείνη τη στιγμή;', 'Πες μου κι άλλο.'];
+  { // QD1a — short
+    const { s, perMsg, foundShown } = await run(R, U);
+    ok('QD1a: «ναι» WITH more in it, to the readiness question → goes to the model (1 call), no card', perMsg[2] && perMsg[2].calls === 1 && !perMsg[2].card);
+    ok('QD1a: a later plain «Ναι» to ANOTHER question → goes to the model (1 call), still no card on the screen (armed silently)', perMsg[4] && perMsg[4].calls === 1 && !perMsg[4].card);
+    ok('QD1a: the NEXT message → NOT sent to the model (0 calls) and the root card opens', perMsg[5] && perMsg[5].calls === 0 && perMsg[5].card);
+    ok('QD1a: «Τι βρήκες» on the card is that short answer, whole', await foundShown(U[5]));
+    await s.browser.close();
+  }
+  { // QD1b — long: the plain «Ναι» at message 27, the answer at 28
+    const filler = [], fr = [];
+    for (let k = 0; k < 22; k++) { filler.push('Σκέφτομαι ακόμα το θέμα με τη δουλειά, για τη μέρα ' + (k + 1) + '.'); fr.push('Τι άλλαξε από χθες στη μέρα ' + (k + 1) + ';'); }
+    const { s, perMsg, foundShown } = await run([...R.slice(0, 4), ...fr, ...R.slice(4)], [...U.slice(0, 4), ...filler, ...U.slice(4)]);
+    ok('QD1b (28 messages): every message up to 27 goes to the model, the 28th does not and opens the card with it',
+      perMsg.length === 28 && perMsg.slice(0, 27).every(x => x.calls === 1 && !x.card) && perMsg[27].calls === 0 && perMsg[27].card && await foundShown(U[5]));
+    await s.browser.close();
+  }
+  { // QD1c — shaped like a long real session, synthetic words: the question at reply 15, «ναι» + a «how» question at 16, choice answers,
+    // «Δεν ξέρω», a request for advice at 10 and 28, a late plain «Ναι…» (U+2026) at 29, a short answer at 30
+    const M = [], A = [];
+    for (let k = 1; k <= 31; k++) { M.push('Σκέφτομαι το θέμα της δουλειάς ξανά, κομμάτι ' + k + '.'); A.push('Τι αλλάζει όταν το σκέφτεσαι, στο κομμάτι ' + k + ';'); }
+    M[9] = 'Δεν ξέρω πώς να το αλλάξω. Εσύ τι λες;'; A[9] = 'Θα το ψάξουμε μαζί. Τι έχεις δοκιμάσει ως τώρα;';
+    A[14] = 'Ακούω. ' + RQ;
+    M[15] = 'Ναι, νομίζω πως είναι το ωράριο. Πώς το διορθώνω;'; M[17] = 'Το πρώτο νομίζω'; M[19] = 'Μάλλον το πρώτο'; M[24] = 'Όχι'; M[25] = 'Δεν ξέρω';
+    M[27] = 'Δεν είμαι σίγουρος. Εσύ τι θα έκανες;'; A[27] = 'Τι από αυτά ισχύει για σένα;';
+    M[28] = 'Ναι… σωστά'; A[28] = 'Πότε το πρόσεξες τελευταία φορά;';
+    M[29] = 'Όχι, το ωράριο είναι το ίδιο κάθε εβδομάδα.';
+    const { s, perMsg, foundShown } = await run(A, M.slice(0, 31));
+    ok('QD1c (shaped like a long session): 29 messages go to the model; the 30th does not and opens the card with it — the code arms here too',
+      perMsg.length === 30 && perMsg.slice(0, 29).every(x => x.calls === 1 && !x.card) && perMsg[29].calls === 0 && perMsg[29].card && await foundShown(M[29]));
+    await s.browser.close();
+  }
+  { // QD1d — control: the late «ναι» has more in it → no arming, the next message goes to the model
+    const U2 = [...U]; U2[4] = 'Ναι, του έχω μιλήσει μία φορά πέρυσι.';
+    const { s, perMsg } = await run(R, U2);
+    ok('QD1d (control): a late «ναι» WITH more in it does not arm — the next message goes to the model (1 call), no card',
+      perMsg.length === 7 && perMsg.every(x => x.calls === 1 && !x.card));
+    await s.browser.close();
+  }
+  { // QD1e — control: the readiness question with a line break inside it → the app never registers it → the late plain «Ναι» arms nothing
+    const R2 = [...R]; R2[1] = RQ.replace('αρχίσει να ', 'αρχίσει\nνα ');
+    const { s, perMsg } = await run(R2, U);
+    ok('QD1e (control): the readiness question broken by a line break is not registered — the late plain «Ναι» arms nothing, no card',
+      perMsg.length === 7 && perMsg.every(x => x.calls === 1 && !x.card));
+    await s.browser.close();
+  }
+  // ── QD2 — the escalation ladder: the notes each request carried (the same strings the app builds)
+  const NOTE = { S: 'introduced almost no new material', R1: 'your own last 2 replies were structurally similar', R3: 'SAME CLOSING QUESTION', P: 'matches CLARITY PIVOT',
+    L1: '[ESCALATION LEVEL 1', L2: '[ESCALATION LEVEL 2', L3: '[ESCALATION LEVEL 3', K: '[AUTO-KILL' };
+  const ladder = async (script, msgs) => {
+    const s = await session('?stageA=1', script);
+    for (const m of msgs) await send(s.page, m);
+    const rows = s.calls.map(b => { const t = (b.system || []).map(x => x.text || '').join('\n'); return Object.fromEntries(Object.entries(NOTE).map(([k, v]) => [k, t.includes(v)])); });
+    await s.browser.close();
+    const level = r => r.K ? 4 : r.L3 ? 3 : r.L2 ? 2 : r.L1 ? 1 : 0;
+    return { rows, levels: rows.map(level), any: rows.map(r => r.S || r.R1 || r.R3 || r.P) };
+  };
+  const Q = k => ['Τι συμβαίνει τα πρωινά', 'Πώς το ζεις μέσα σου', 'Ποιος άλλος το ξέρει', 'Πότε ξεκίνησε όλο αυτό', 'Τι θα ήθελες να γίνει', 'Πού το νιώθεις πιο έντονα',
+    'Τι λένε οι φίλοι σου', 'Με ποιον το συζητάς', 'Τι σε κουράζει στο σπίτι', 'Τι άλλαξε φέτος'][k % 10] + ' — ' + ['πρώτα', 'τώρα', 'μετά', 'συνήθως', 'σήμερα'][k % 5] + ';';
+  const varied = n => Array.from({ length: n }, (_, k) => Q(k));
+  const OPEN = ['Με πιέζει πολύ η δουλειά τελευταία και δεν ξέρω τι να κάνω.', 'Ο προϊστάμενος ζητάει συνέχεια περισσότερα πράγματα.', 'Μένω μέχρι αργά σχεδόν κάθε μέρα.', 'Δεν το έχω πει σε κανέναν ακόμα.'];
+  const longest3 = lv => { let best = 0, cur = 0; for (const l of lv) { cur = l === 3 ? cur + 1 : 0; best = Math.max(best, cur); } return best; };
+  { const NON = ['Δεν ξέρω', 'Όχι', 'Ίσως', 'Δεν ξέρω'];
+    const r = await ladder(varied(40), [...OPEN, ...Array.from({ length: 30 }, (_, k) => NON[k % 4])]);
+    ok('QD2 non-answers (34 messages): user stagnation lights from message 6 and the level climbs 1 → 2 → 3', r.rows.length === 34 && r.rows[5].S && r.levels[5] === 1 && r.levels[6] === 2 && r.levels[7] === 3);
+    ok('QD2 non-answers: level 3 holds for 27 requests in a row (messages 8–34), never AUTO-KILL before the root', longest3(r.levels) === 27 && !r.rows.some(x => x.K));
+    ok('QD2 non-answers: the clarity pivot lights once every 4 messages at most (one-shot)', r.rows.filter(x => x.P).length === 7);
+  }
+  { const SAME = 'Με πιέζει πολύ η δουλειά και ο προϊστάμενος ζητάει συνέχεια περισσότερα πράγματα';
+    const r = await ladder(varied(40), [...OPEN, ...Array.from({ length: 30 }, (_, k) => SAME + (k % 2 ? '.' : ' ξανά.'))]);
+    ok('QD2 the same long complaint 30 times: user stagnation never lights (the messages do not get shorter)', r.rows.length === 34 && !r.rows.some(x => x.S));
+    ok('QD2 the same long complaint: only the clarity pivot, every 4th message — the level never passes 1 and is back to 0 the next turn',
+      Math.max(...r.levels) === 1 && r.levels.filter(l => l === 1).length === r.rows.filter(x => x.P).length && r.rows.filter(x => x.P).length === 7);
+  }
+  { const NEWW = ['κήπο', 'αυτοκίνητο', 'γείτονα', 'ταξίδι', 'αδερφή', 'γυμναστήριο', 'λογαριασμό', 'βιβλίο', 'καφετέρια', 'σχολείο'];
+    const r = await ladder(Array.from({ length: 40 }, () => 'Ακούω. Τι είναι αυτό που σε κρατάει πραγματικά;'),
+      [...OPEN, ...Array.from({ length: 30 }, (_, k) => 'Σήμερα σκεφτόμουν το ' + NEWW[k % 10] + ' και τη μέρα ' + (k + 1) + ' που πέρασε.')]);
+    ok('QD2 AURA repeats the same question: self-repetition from the 3rd request, «the SAME CLOSING QUESTION» from the 4th, level 3 from the 5th to the end',
+      r.rows.length === 34 && r.rows[2].R1 && r.rows[3].R3 && r.levels.slice(4).every(l => l === 3) && !r.rows.some(x => x.K));
+  }
+  { const NU = ['Δεν με καταλαβαίνεις, μιλάω για την πίεση στο γραφείο το πρωί.', 'Το λέω από την ώρα που ξεκινήσαμε, ο προϊστάμενος φωνάζει μπροστά σε όλους.',
+      'Σου το λέω από την αρχή, κουράστηκα με το ωράριο του Σαββάτου.', 'Νομίζω ότι δεν ακούς τι λέω για τα παιδιά και το απόγευμα.',
+      'Από την αρχή το ίδιο σου λέω, θέλω να ηρεμήσω πριν φύγω για το λεωφορείο.', 'Πάλι δεν κατάλαβες, το θέμα είναι η κούραση το βράδυ στον καναπέ.'];
+    const r = await ladder(varied(40), [...OPEN, ...Array.from({ length: 30 }, (_, k) => NU[k % 6])]);
+    ok('QD2 «you do not understand me», 30 times in NEW words (none of the app\'s 7 fixed «I said it already» phrases): none of the three signals lights in any of the 34 requests, the level stays 0',
+      r.rows.length === 34 && !r.any.some(Boolean) && r.levels.every(l => l === 0));
+  }
+  { const KNOWN = ['Σου το ξαναείπα, μιλάω για την πίεση στο γραφείο το πρωί.', 'Όπως είπα και πριν, ο προϊστάμενος φωνάζει μπροστά σε όλους.',
+      'Για άλλη μια φορά, κουράστηκα με το ωράριο του Σαββάτου.', 'Πάλι το ίδιο σου λέω, θέλω να ηρεμήσω πριν φύγω για το λεωφορείο.'];
+    const r = await ladder(varied(40), [...OPEN, ...Array.from({ length: 30 }, (_, k) => KNOWN[k % 4])]);
+    ok('QD2 the same, with phrases FROM the app\'s fixed list («σου το ξαναείπα», «όπως είπα πριν»…): only the clarity pivot, once every 4 messages (8 times: messages 5, 9 … 33) — level 1, then back to 0',
+      r.rows.length === 34 && !r.rows.some(x => x.S) && r.rows.filter(x => x.P).length === 8 && r.rows[4].P && r.rows[32].P && Math.max(...r.levels) === 1);
+  }
+  { const ALT = ['Δεν ξέρω', 'Όχι', 'Τελικά νομίζω ότι με νοιάζει πολύ η γνώμη της μητέρας μου για όλα αυτά.', 'Δεν ξέρω', 'Όχι', 'Ίσως',
+      'Η αδερφή μου πάντα έλεγε ότι εγώ φορτώνομαι τα πάντα στη δουλειά και στο σπίτι.'];
+    const r = await ladder(varied(40), [...OPEN, ...Array.from({ length: 30 }, (_, k) => ALT[k % 7])]);
+    ok('QD2 stuck turns between new ones: every turn without a signal resets the level to 0 — it never passes 2',
+      r.rows.length === 34 && Math.max(...r.levels) === 2 && r.levels.filter(l => l === 0).length >= 15);
+  }
 }
 
 // ── SD: ADR «31 Οκτωβρίου (ζ)» (John, a safety fix (α)) — the gaps of the two safety detectors, on the screen. Stage A (?stageA=1&rec=1),
@@ -7219,7 +7352,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
+      if (opt('--only', '') === 'QD') await runMockQD(); else if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
