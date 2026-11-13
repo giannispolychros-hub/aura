@@ -273,8 +273,9 @@ const raw = fs.readFileSync(findFile(['/../src/App.jsx']), 'utf8');
     /--stress --real --yes --sessions 14,15,16,1\.1 --budget 3 /.test(ST) && /--stress --real --yes --budget 25 /.test(ST));
   assert('STRESS: 90 minutes for the job; the test itself stops starting sessions earlier, so the report is written', /timeout-minutes: 90/.test(ST) && /--budget 3 --minutes 7\d /.test(ST) && /--budget 25 --minutes 7\d /.test(ST));
   const keyLines = code(ST).split('\n').filter(l => /secrets\./.test(l));
-  assert('KEY: read from the ANTHROPIC_API_KEY secret only, and only into env (once to test that it exists, once for the run)',
-    keyLines.length === 2 && /HAS_KEY: \$\{\{ secrets\.ANTHROPIC_API_KEY != '' \}\}/.test(ST) && /ANTHROPIC_API_KEY: \$\{\{ secrets\.ANTHROPIC_API_KEY \}\}/.test(ST));
+  // 13/11 (John): the ANTHROPIC_API_KEY2 secret first, else ANTHROPIC_API_KEY; the variable inside the job keeps the name ANTHROPIC_API_KEY
+  assert('KEY: read from the ANTHROPIC_API_KEY2 secret, else ANTHROPIC_API_KEY, only into env (once to test that it exists, once for the run)',
+    keyLines.length === 2 && /HAS_KEY: \$\{\{ \(secrets\.ANTHROPIC_API_KEY2 \|\| secrets\.ANTHROPIC_API_KEY\) != '' \}\}/.test(ST) && /ANTHROPIC_API_KEY: \$\{\{ secrets\.ANTHROPIC_API_KEY2 \|\| secrets\.ANTHROPIC_API_KEY \}\}/.test(ST));
   // the shell never touches the value: only node reads it from the environment (the NAME may appear in a message)
   assert('KEY: never echoed, never written to a file — no shell line uses its value at all', ST.length > 500 && !/\$\{?ANTHROPIC_API_KEY/.test(code(ST)) && !/(echo|printf|tee|cat)[^\n]*secrets\./.test(code(ST)));
   assert('KEY: missing → a clear message and a stop, before anything is installed or run', /Λείπει το secret ANTHROPIC_API_KEY|Δεν υπάρχει το secret ANTHROPIC_API_KEY/.test(ST) && /exit 1/.test(ST) &&

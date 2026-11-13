@@ -56,7 +56,7 @@ jobs:
       - name: Υπάρχει το κλειδί; (ελέγχεται χωρίς να διαβαστεί)
         if: inputs.mode != 'dry'
         env:
-          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+          HAS_KEY: ${{ (secrets.ANTHROPIC_API_KEY2 || secrets.ANTHROPIC_API_KEY) != '' }}
         run: |
           if [ "$HAS_KEY" != "true" ]; then
             echo "::error title=Λείπει το κλειδί::Δεν υπάρχει το secret ANTHROPIC_API_KEY. Settings → Secrets and variables → Actions → New repository secret."
@@ -87,7 +87,7 @@ jobs:
       - name: Στρες τεστ
         timeout-minutes: 85
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY2 || secrets.ANTHROPIC_API_KEY }}
           MODE: ${{ inputs.mode }}
           SESSIONS: ${{ inputs.sessions }}
           BUDGET: ${{ inputs.budget }}

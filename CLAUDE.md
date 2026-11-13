@@ -132,6 +132,7 @@ auratests\RUN_ALL.bat
 - GitHub → Actions → «AURA stress test (real model)» → Run workflow → **μικρό** (όριο $3).
 - Διαβάζω την αναφορά από το branch `stress-reports`, φάκελος `runs/<αριθμός εκτέλεσης>`.
 - Στην αναφορά προς τον John γράφω πόσο κόστισε.
+- Τα κλειδιά API του Console λήγουν σε 30 ημέρες· ανανέωση πριν τη λήξη· το GitHub secret `ANTHROPIC_API_KEY2` έχει προτεραιότητα.
 
 Δεν ισχύει για αλλαγές μόνο σε έγγραφα ή tests.
 
