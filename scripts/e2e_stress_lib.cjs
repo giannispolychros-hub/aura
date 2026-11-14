@@ -2390,6 +2390,7 @@ function buildStressReport(sessions, meta) {
   const S = sessions || [];
   const L = [];
   L.push('# AURA — στρες τεστ του Σταδίου Α (' + (m.mode || '') + ')', '');
+  if (m.ab) L.push(AB_REPORT_NOTE, ''); // 14/11 (A/B): read the blind file first
   L.push('Κόστος: $' + (m.spent || 0).toFixed(2) + ' από όριο $' + (m.budget || 0).toFixed(2) + (m.by ? ' (AURA $' + m.by.aura.toFixed(2) + ', χρήστες/κριτής $' + m.by.user.toFixed(2) + ')' : '') + '.');
   const tl = callTally(S);
   if (tl.calls) L.push('', 'Κλήσεις AURA: ' + tl.calls + ' · κωδικοί: ' + Object.keys(tl.codes).sort().map(k => k + ' ×' + tl.codes[k]).join(', ') +
@@ -2518,6 +2519,92 @@ function qualityReport(sessions) {
   return L;
 }
 
+// ── A/B: Stage A (the default) against the old flow (?stageA=0) of the SAME app (John, 14/11/2026, branch quality-diagnostics) ──────────
+// A TOOL FOR COMPARISON ONLY — ?stageA=0 is NEVER for real users. Two ordinary users of the mechanism set (146, 152: no risk, and not one
+// of their fixed messages lights a safety detector of the app — auratests/test_ab_compare.js), their first AB_MESSAGES fixed messages,
+// then the tool's own EXIT_TEXT, once in Stage A and once in the old flow: 4 sessions, 201–204. Which number of a pair is the old flow is
+// drawn at random each run and written ONLY to the key (ab-key.json); a name says nothing of the flow. In the blind file (ab-blind.md)
+// AURA's replies to the same user message stand side by side as A and B, drawn again for every pair; the closing is apart, with labels
+// of its own (Γ / Δ), because the old flow closes with roads and Stage A with its root question — not a fair pair with the conversation.
+const AB_BASES = [146, 152], AB_MESSAGES = 8, AB_IDS = { 146: [201, 202], 152: [203, 204] };
+const AB_REPORT_NOTE = '> **Σύγκριση A/B:** διάβασε ΠΡΩΤΑ μόνο το `ab-blind.md`. Το `ab-key.json` και τα υπόλοιπα αυτής της αναφοράς μπορεί να δείχνουν ποια ροή είναι ποια — άνοιξέ τα μόνο αφού γράψεις τη γνώμη σου.';
+const AB_FLOW_NAMES = { stageA: 'Στάδιο Α (προεπιλογή)', old: 'παλιά ροή (?stageA=0)' };
+const isAbId = x => Object.values(AB_IDS).some(ids => ids.includes(Number(String(x).trim())));
+function abPersonas(rng) {
+  const r = typeof rng === 'function' ? rng : Math.random;
+  const personas = [], flowOf = {};
+  for (const baseId of AB_BASES) {
+    const base = MECHANISM_PERSONAS.find(p => p.id === baseId);
+    const msgs = base.fixed.slice(0, AB_MESSAGES).map(x => ({ say: x.say })).concat([{ say: EXIT_TEXT }]);
+    const oldFirst = r() < 0.5;
+    AB_IDS[baseId].forEach((id, k) => {
+      const closed = k === 0 ? oldFirst : !oldFirst;
+      flowOf[id] = closed ? 'old' : 'stageA';
+      personas.push({ id, key: 'ab_' + baseId + '_' + (k + 1), name: 'AB · σενάριο ' + baseId + ' · συνεδρία ' + (k + 1), runs: 1, ab: baseId,
+        hiddenRoot: base.hiddenRoot, fixed: msgs.map(x => Object.assign({}, x)), maxTyped: msgs.length, exitAfter: 99, closed });
+    });
+  }
+  return { personas, flowOf };
+}
+// A session's screen, split: AURA's bubbles after each typed message (k = 1, 2, …) up to the tool's EXIT_TEXT, and everything after it
+// (the closing). `o.strip`: the app's own words taken out of a bubble (the method line); `o.appTexts`: a bubble that is only one of the
+// app's fixed texts is not a reply of the model and is left out of the pairs.
+function abTurns(sess, o) {
+  const opt = o || {}, strip = (opt.strip || []).filter(Boolean), app = new Set((opt.appTexts || []).map(x => String(x).trim()).filter(Boolean));
+  const conv = {}, closing = [];
+  let k = 0, exited = false;
+  for (const t of (sess && Array.isArray(sess.turns) ? sess.turns : [])) {
+    const text = String((t && t.text) || '');
+    if (t.who === 'user') { k += 1; if (text.trim() === EXIT_TEXT) exited = true; continue; }
+    if (exited) { if (text.trim()) closing.push(text.trim()); continue; }
+    if (t.who !== 'aura' || !k) continue;
+    let v = text; for (const x of strip) v = v.split(x).join('');
+    v = v.trim();
+    if (!v || app.has(v)) continue;
+    (conv[k] = conv[k] || []).push(v);
+  }
+  return { conv, closing };
+}
+const abQuote = t => String(t).split('\n').map(l => (l.trim() ? '> ' + l : '>')).join('\n');
+function abBlind(sessions, flowOf, rng, o) {
+  const r = typeof rng === 'function' ? rng : Math.random, F = flowOf || {};
+  const S = Array.isArray(sessions) ? sessions : [];
+  const L = ['# Σύγκριση A/B — τυφλή ανάγνωση', '',
+    'Διάβασε αυτό το αρχείο **πριν** από οτιδήποτε άλλο της εκτέλεσης. Το κλειδί (`ab-key.json`) άνοιξέ το **μόνο αφού** γράψεις τη γνώμη σου.', '',
+    'Σε κάθε ζεύγος: το ίδιο μήνυμα του χρήστη και δύο απαντήσεις της AURA, **A** και **B**. Ποια είναι η A κληρώνεται ξανά σε κάθε ζεύγος.',
+    'Για κάθε ζεύγος γράψε: ποια είναι πιο ουσιαστική — A, B ή «ίδιες».', '',
+    'Το κλείσιμο είναι χωριστά, στο τέλος, με άλλες ετικέτες (**Γ** / **Δ**). Δεν συγκρίνεται με τα ζεύγη.', ''];
+  const key = { note: 'ΜΗΝ το ανοίξεις πριν γράψεις τη γνώμη σου για το ab-blind.md.', sessions: {}, pairs: [], closing: [] };
+  for (const id of Object.keys(F).sort()) key.sessions[id] = AB_FLOW_NAMES[F[id]] || '?';
+  const closings = [];
+  for (const base of AB_BASES) {
+    const two = S.filter(s => s && s.persona && s.persona.ab === base);
+    const sA = two.find(s => F[s.persona.id] === 'stageA'), sO = two.find(s => F[s.persona.id] === 'old');
+    if (!sA || !sO) { L.push('### Σενάριο ' + base + ' — δεν συγκρίνεται: λείπει η μία από τις δύο συνεδρίες.', ''); continue; }
+    const a = abTurns(sA, o), b = abTurns(sO, o);
+    const typed = (sA.typed && sA.typed.length ? sA.typed : sO.typed) || [];
+    const ks = [...new Set(Object.keys(a.conv).concat(Object.keys(b.conv)).map(Number))].sort((x, y) => x - y);
+    let n = 0, single = 0;
+    L.push('## Σενάριο ' + base + ' — φάση συνομιλίας', '');
+    for (const k of ks) {
+      if (!a.conv[k] || !b.conv[k]) { single += 1; continue; }
+      n += 1;
+      const stageAisA = r() < 0.5;
+      const A = stageAisA ? a.conv[k] : b.conv[k], B = stageAisA ? b.conv[k] : a.conv[k];
+      key.pairs.push({ scenario: base, pair: n, message: k, A: stageAisA ? AB_FLOW_NAMES.stageA : AB_FLOW_NAMES.old, B: stageAisA ? AB_FLOW_NAMES.old : AB_FLOW_NAMES.stageA });
+      L.push('### Σενάριο ' + base + ' · ζεύγος ' + n + ' (μήνυμα ' + k + ' του χρήστη)', '', 'Ο χρήστης:', abQuote(typed[k - 1] || ''), '',
+        '**A**', abQuote(A.join('\n\n')), '', '**B**', abQuote(B.join('\n\n')), '');
+    }
+    if (single) L.push('Απαντήσεις που υπάρχουν μόνο στη μία από τις δύο συνεδρίες (δεν συγκρίνονται): ' + single + '.', '');
+    const gIsA = r() < 0.5;
+    closings.push({ base, G: gIsA ? a.closing : b.closing, D: gIsA ? b.closing : a.closing });
+    key.closing.push({ scenario: base, Γ: gIsA ? AB_FLOW_NAMES.stageA : AB_FLOW_NAMES.old, Δ: gIsA ? AB_FLOW_NAMES.old : AB_FLOW_NAMES.stageA });
+  }
+  L.push('## Κλείσιμο (χωριστά, ετικέτες Γ / Δ)', '', 'Μετά το «' + EXIT_TEXT + '» του χρήστη: ό,τι έδειξε η εφαρμογή.', '');
+  for (const c of closings) L.push('### Σενάριο ' + c.base, '', '**Γ**', abQuote(c.G.join('\n\n') || '(τίποτα)'), '', '**Δ**', abQuote(c.D.join('\n\n') || '(τίποτα)'), '');
+  return { md: L.join('\n'), key };
+}
+
 module.exports = {
   callTally,
   USER_MODEL, PRICES, BUDGET_CAP, WORST_CALL, CORE_TOKENS_PER_BYTE, PRICES_USER_LONG, GUARD_STATUSES, unbilledForSure, holdCheckOnRun, auraCallHold, userCallHold, planRows, shortNameMap, planReport, costOf, makeStressBudget, PERSONAS, HARD_PERSONAS, FOUNDER_PERSONAS, founderMetrics, BASE_POLICY, policyOf, planRuns, askedOrder, MAX_TYPED, EXIT_AFTER, EXIT_TEXT,
@@ -2528,4 +2615,5 @@ module.exports = {
   REHEARSAL_PERSONAS, REHEARSAL_REAL, TARGETED_PERSONAS, FINAL_PERSONAS, P3_PERSONAS, P3_BRAKE_IDS, P3_SIGNS, p3BrakeFindings, p3SignFindings, COMPOSITE_PERSONAS, DANGER_FIXED_PERSONAS, phraseRef, dangerLineExactFindings, benchSafetyFirst, DANGER_PROMISE_TEXT, screenAfter, feminineToManFindings, DOSE_SIGN, doseFindings, dangerLineFindings, compositeReport, PROMISE_SIGNS, promiseSentences, dangerReport, capsDictation, finalBrakeFindings, friendSafetyQuestion, crisisReplies, riskFoundByCode, sessionEstimate, finalReport, FINAL_HELPLINES, inventedNumbers, quoteFindings, genderWords, genderSuspicions, isRefusal, NUMBER_WORDS, rehearsalRow, rehearsalReport,
   LOOP_PERSONAS, MECHANISM_PERSONAS, noteLabels, STRATEGY_NOTES, SUPPRESSED_NOTES, mechanismRounds, mechanismCheck, mechanismMarks, MECH_JUDGE_SCHEMA, MECH_JUDGE_SYSTEM, mechanismJudgePrompt, mechanismReport, masterStage, loopRounds, stageOrderFindings, LOOP_JUDGE_SCHEMA, LOOP_JUDGE_SYSTEM, loopJudgePrompt, CRISIS_JUDGE_SCHEMA, CRISIS_JUDGE_SYSTEM, crisisJudgePrompt, politePlural, genericWhy, loopReport,
   qFold, questionsOf, qualityMetrics, qualityReport, Q_DECLARE, Q_LEADING, Q_NOT_UNDERSTOOD, Q_NON_ANSWER, Q_HONEST,
+  AB_BASES, AB_MESSAGES, AB_IDS, AB_FLOW_NAMES, AB_REPORT_NOTE, isAbId, abPersonas, abTurns, abBlind,
 };

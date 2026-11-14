@@ -6486,6 +6486,9 @@ function stressFakeAura(persona) {
   const claims = persona && (persona.id === 171 || persona.id === 172);
   return async (body, cls) => {
     let text = persona && persona.mechanism && cls.kind === 'main' ? MECH_FAKE_REPLIES[n++ % MECH_FAKE_REPLIES.length] : 'Τι είναι αυτό που σε κρατάει εκεί;';
+    // 14/11 (A/B): the FAKE model only — each reply differs and carries a token of the flow its request came from ([ψ:1] with the Stage A
+    // marker, [ψ:0] without), so scripts/ab_fake_check.cjs can check the blind file against the key. A real call never has it.
+    if (persona && persona.ab && cls.kind === 'main') text = MECH_FAKE_REPLIES[n++ % MECH_FAKE_REPLIES.length] + ' [ψ:' + (cls.marker ? 1 : 0) + ']';
     if (cls.kind === 'main' && promise && promise[++mains]) text = promise[mains];
     if (cls.kind === 'main' && persona && persona.id === 125 && mains === 2) text = FAKE_CLAIMS[125];
     if (cls.kind === 'main' && claims && crisisSeen) text = FAKE_CLAIMS.after;
@@ -6512,6 +6515,11 @@ function fakeAuraUsage(sessionCall) {
 }
 const fakeUserUsage = () => FAKE_COST === 'realistic' ? { input_tokens: 3000, output_tokens: 150 } : { input_tokens: 30000, output_tokens: 4000 };
 const FINAL_HALT = { reason: null };
+// 14/11/2026 (John): the A/B of Stage A against the old flow (?stageA=0) — a TOOL FOR COMPARISON ONLY, never for real users. AB_RUN holds
+// this run's four sessions and which of each pair is the old flow (drawn with crypto, written only to ab-key.json, never printed).
+const crypto = require('crypto');
+const AB_RNG = () => crypto.randomInt(0, 2147483647) / 2147483647;
+let AB_RUN = null;
 const HOLD_EXCEEDED = []; // 25/10: a call that cost more than it held (none expected) — written in the report
 const USER_CALLS = []; // 25/10: every Haiku call's cost and hold (numbers only), so the report can show that each cost ≤ its hold
 const PRICES_FOR_CHARGE = { aura: SL.PRICES.aura.output, user: SL.PRICES.user.output }; // a charged hold is written as output tokens (one price, no long-prompt tier)
@@ -6523,6 +6531,7 @@ async function runStressSession(item, aura, user, budget) {
     checks: { labels: [], closing: [], verbatim: [], safety: [], pressure: [], stacked: [], advice: [], telemetry: [], voice: [] },
     applies: { safety: !!p.risk && p.risk !== 'leak', verbatim: !p.closed && !p.short, telemetry: !p.short } };
   if (p.bench) sess.persona.bench = p.bench.id; // 31/10: the benchmark scenario
+  if (p.ab) sess.persona.ab = p.ab; // 14/11 (A/B): the scenario's number only — never the flow
   if (p.final) { sess.errorsSeen = []; sess.brake = []; sess.stuck = []; sess.riskHold = []; sess.riskSince = 0; sess.dangerAt = 0; sess.persona.final = true; sess.persona.composite = !!p.composite; sess.persona.gender = p.gender || null; sess.persona.steps = p.steps || null; sess.persona.third = !!p.third; sess.persona.caps = !!p.caps; }
   // risk: a signal known BEFORE the offer (14, 15) — the offer must not appear. 16 meets its crisis after the offer.
   const acts = { card: 0, yes: 0, correct: 0, back: 0, offerShown: false, want: false, notNow: false, help: null, clarity: null, completed: false, risk: p.offerRisk ? p.risk : null,
@@ -6775,6 +6784,7 @@ async function runStressSession(item, aura, user, budget) {
       else if (pol.onCard === 'notyetFirst' && !notYetDone) { notYetDone = true; verdict = 'notyet'; }
       else if (pol.onCard === 'notyetAlways') verdict = 'notyet'; // Ο3: never a root
       else if (corrections < 2) { const d = await ask('card', root, SL.CARD_SCHEMA); if (!d) break; verdict = d.verdict; }
+      if (p.ab) verdict = 'notyet'; // 14/11 (A/B): no root and no step — both flows talk to the last message, then the exit line
       if (verdict === 'correct' && corrections < 2) { corrections += 1; acts.correct += 1; pendingCorrect = true; await press(T.correct); continue; }
       if (verdict === 'notyet') { acts.back += 1; lastCardRoot = null; await press(T.back); continue; }
       acts.yes += 1; sess.rootConfirmed = true; sess.root = root; sess.yesAt = sess.typed.length;
@@ -6842,6 +6852,9 @@ async function runStressSession(item, aura, user, budget) {
       } else if (st && st.press) {
         if (s.button) { fixedIdx++; await press(T.button); continue; }
         sess.notes.push('το κουμπί της ρίζας δεν φαινόταν όταν χρειάστηκε'); break;
+      } else if (p.ab && s.ask && st && st.say !== undefined) {
+        // 14/11 (A/B): the root question gets «Δεν το βρήκα ακόμα, συνέχισε», as in a mechanism session — both flows talk to the last message
+        acts.back += 1; sess.notes.push('η ερώτηση της ρίζας άνοιξε πριν από το μήνυμα ' + (sess.typed.length + 1) + ' — «' + T.back + '»'); await press(T.back); continue;
       } else if (p.mechanism && s.ask && st && st.say !== undefined && !st.rootOk) {
         // 23/10 (Theme C): the root question opened where the scenario did not plan it — «Δεν το βρήκα ακόμα, συνέχισε», then the script goes on
         acts.back += 1; sess.notes.push('η ερώτηση της ρίζας άνοιξε πριν από το μήνυμα ' + (sess.typed.length + 1) + ' — «' + T.back + '»'); await press(T.back); continue;
@@ -7052,6 +7065,7 @@ async function runStressSession(item, aura, user, budget) {
 
 // ADR «17 Οκτωβρίου» — the second judge: five questions about each reply of the free part (an aid for the reader, never pass/fail)
 async function judgeVoice(s, user) {
+  if (s.persona && s.persona.ab) return; // 14/11 (A/B): read blind by John, no judge
   const R = s.voice || [];
   if (!R.length) return;
   const r = await user({ system: SL.VOICE_JUDGE_SYSTEM, prompt: SL.voiceJudgePrompt(s.turns, R), schema: SL.VOICE_JUDGE_SCHEMA });
@@ -7108,6 +7122,8 @@ async function crisisRiskSources(sess, user, riskQ) {
   }
 }
 async function judgeSession(s, user) {
+  // 14/11 (A/B): John reads these blind — no judge, no cheap-model call, no reply quoted (the loop, mechanism and crisis judges skip them already)
+  if (s.persona && s.persona.ab) return { introduced_causes: [], root_match: 'none', root_match_reason: 'σύγκριση A/B — χωρίς κριτή' };
   const until = s.yesAt !== null ? s.turns.findIndex(t => t.who === 'app' && /^\[κάρτα ρίζας/.test(t.text)) : -1;
   const turns = (until >= 0 ? s.turns.slice(0, until) : s.turns).filter(t => t.who !== 'app');
   if (!turns.some(t => t.who === 'aura')) return { introduced_causes: [], root_match: 'none', root_match_reason: 'καμία απάντηση της AURA' };
@@ -7145,6 +7161,8 @@ async function mainStress() {
   const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17), SL.FOUNDER_PERSONAS || [], SL.VOICE_PERSONAS || [], SL.LOOP_PERSONAS || [], SL.REHEARSAL_PERSONAS || [], SL.TARGETED_PERSONAS || [], SL.FINAL_PERSONAS || [], SL.MECHANISM_PERSONAS || [], SL.P3_PERSONAS || []) : SL.PERSONAS;
   if (only.length && !has('--hard')) PEOPLE.push(...(SL.COMPOSITE_PERSONAS || [])); // 24/10 (John): the composite session (171), tool only
   if (only.length && !has('--hard')) PEOPLE.splice(PEOPLE.length - (SL.COMPOSITE_PERSONAS || []).length, 0, ...(SL.DANGER_FIXED_PERSONAS || [])); // 9/11 (round 11): 173, 174, before 171–172
+  // 14/11/2026 (John): the A/B (201–204), made only when asked for; which of a pair is the old flow is drawn now and kept in AB_RUN
+  if (only.length && !has('--hard') && only.some(x => SL.isAbId(x))) { AB_RUN = SL.abPersonas(AB_RNG); PEOPLE.push(...AB_RUN.personas); }
   // 31/10 (John, ADR «31 Οκτωβρίου (ε)» / «(η)»): numbers 9001–9199 are the benchmark (benchmark/scenarios.json) — on their own, never mixed
   const BENCH = only.length > 0 && only.every(x => BL.isBenchAlias(x));
   // 9/11/2026 (John, round 11, ADR «9 Νοεμβρίου»): the benchmark's SAFETY scenarios S1–S9 (9001–9009: fixed messages only, no simulator,
@@ -7327,6 +7345,13 @@ async function mainStress() {
   if (BENCH_SAFETY_MIX) meta.benchSafety = { scenariosSha256: BENCH_DATA._sha256, safetySessionCap: BL.SAFETY_SESSION_CAP, sessions: sessions.filter(s => s.persona.bench).map(s => s.label),
     brakeNow: sessions.filter(s => s.benchBrake).map(s => ({ label: s.label, lost: s.benchBrake.lost, typed: s.benchBrake.typed })) }; // 9/11 (round 11)
   for (const s of sessions) { s.orgFlags = ORGF.flagsForSession(s, ORGF_FILTERS, ORGF_HELPLINES); s.filterChanges = ORGF.filterChangesForSession(s, ORGF_FILTERS); }
+  // 14/11 (A/B): the blind file and the key, apart. The app's method line and its fixed texts are not replies of the model.
+  if (AB_RUN) {
+    const ab = SL.abBlind(sessions, AB_RUN.flowOf, AB_RNG, { strip: [APP.texts && APP.texts.methodLine], appTexts: Object.values(APP.texts || {}).filter(v => typeof v === 'string' && v.length > 3) });
+    writeOut('ab-blind.md', ab.md);
+    writeOut('ab-key.json', JSON.stringify(ab.key, null, 2));
+    meta.ab = { blind: 'ab-blind.md', key: 'ab-key.json', pairs: ab.key.pairs.length };
+  }
   writeOut('stress-report.md', SL.buildStressReport(sessions, meta));
   writeSummary(SL.buildStressReport(sessions, meta));
   writeOut('stress-report.json', JSON.stringify({ meta, sessions }, null, 2));
