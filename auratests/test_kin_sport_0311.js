@@ -93,7 +93,7 @@ const LINES_2DBDA1B = [
 ];
 assert('(Δ) the sport list, the game list and the 2/11 play-place list are unchanged, word for word (2dbda1b)', LINES_2DBDA1B.every(l => raw.includes(l)));
 assert('(Δ) the 2/11 child\'s-kicks rule is unchanged (2dbda1b)', raw.includes('    kidKicks: S(" (?:απο|με) (?:τισ )?κλωτσιεσ (?:του|τησ|των) (?=(?:μικρου|μικρησ|μικρων|παιδιου|παιδιων|γιου|κορησ)(?: μου| μασ)? " +\n      "(?:$|(?:στο|στη|στην|στον|στα|στισ|στουσ|σε|μετα|οταν|ενω|καθωσ|παιζοντασ|χθεσ|χτεσ|σημερα) ))"),\n'));
-assert('(Δ) detectSafetySignal is byte-identical to 2dbda1b', h(extract('detectSafetySignal')) === '1f7c3cb8fe568f31');
+assert('(Δ) detectSafetySignal is byte-identical to 2dbda1b', h(extract('detectSafetySignal')) === '838fe96cf161fcae' /* UPDATED (14/11/2026, John, a safety package: white space at the detectors' input — proved first, auratests/test_detector_spaces_1411.js (Θ)) */);
 const cut = (s, n) => { const a0 = s.indexOf('\nfunction ' + n + '('); return a0 < 0 ? s : s.slice(0, a0) + s.slice(s.indexOf('\n}', a0 + 1) + 2); };
 // RE-BASED (John, 3/11/2026, branch candidate-tm): the same cut, the same fingerprint — the reference is now src/App.jsx of candidate-tm
 // 7c823c1 (2dbda1b + the Thought Map, exactly as approved), no longer of 2dbda1b
@@ -103,7 +103,7 @@ const cut = (s, n) => { const a0 = s.indexOf('\nfunction ' + n + '('); return a0
   // RE-BASED (John, 8/11/2026, round 9, ADR «8 Νοεμβρίου», branch release-candidate): the same cut, the same check — the reference is now
   // release-candidate after round 9 (the two counters and item 144). Proved first (test_counters_144.js (Ε3)–(Ε4)): with the round's 15
   // changes taken out, src/App.jsx is byte for byte 52f85dc, the reference before — so outside the cut only those changes moved.
-assert('(Δ) src/App.jsx outside detectsDangerFromOther is byte-identical to release-candidate (before:  candidate-tm 7c823c1 (2dbda1b + the Thought Map)', h(cut(raw, 'detectsDangerFromOther')) === 'f8184fbbc2572281');
+assert('(Δ) src/App.jsx outside detectsDangerFromOther is byte-identical to release-candidate (before:  candidate-tm 7c823c1 (2dbda1b + the Thought Map)', h(cut(raw, 'detectsDangerFromOther')) === '2534e6a6a7daa5f0' /* UPDATED (14/11/2026, John, a safety package: white space at the detectors' input — proved first, auratests/test_detector_spaces_1411.js (Θ)) */);
 const coreS = raw.indexOf('`', raw.indexOf('const AURA_CORE_PERSONALITY')) + 1;
 assert('(Δ) the prompt is unchanged (b5f303cc9405aa21)', h(raw.slice(coreS, raw.indexOf('`;', coreS))) === 'b5f303cc9405aa21');
 assert('(Δ) no lookbehind in detectsDangerFromOther (old iPhones)', !/\(\?<[=!]/.test(extract('detectsDangerFromOther')));

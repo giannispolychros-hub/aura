@@ -1598,8 +1598,13 @@ function detectSafetySignal(text, tierB) {
     .replace(/[\u{1f000}-\u{1faff}\u{2600}-\u{27bf}\u{2300}-\u{23ff}\u{2b00}-\u{2bff}]|\ufe0f|\u20e3/gu, " ")
     .replace(/(^|\s)(\p{L}(?:[ .]\p{L})+)\.?(?=\s|$)/gu, (m, b, w) => b + w.replace(/[ .]/g, ""))
     .replace(/(\p{L})[^\p{L}\p{M}\p{N}\s'’]+(?=\p{L})/gu, "$1 ").replace(/[^\S\n]+/g, " ");
+  // WHITE SPACE AT THE INPUT (John, 14/11/2026, a safety package): the message is ALSO tried with every run of white space (a line break,
+  // a tab, a non-breaking space, several spaces) as one plain space, as written and made plain. Only here, at the detector's input: what
+  // is shown, kept or sent to the model is not touched. It ADDS NO PHRASE: the forms tried before are still tried. See
+  // auratests/test_detector_spaces_1411.js.
+  const spaced = String(text).replace(/\s+/g, " ");
   // `tierB` comes only from classifyCrisisTier: its phrases are blanked in each form first, so what is left tells tier A from tier B.
-  const views = [...new Set([String(text), plain(String(text))])].map(v => (tierB ? fold(v).toLowerCase().replace(tierB, " ") : v));
+  const views = [...new Set([String(text), plain(String(text)), spaced, plain(spaced)])].map(v => (tierB ? fold(v).toLowerCase().replace(tierB, " ") : v));
   if (views.some(v => crisis.some(p => new RegExp(fold(p.source), "i").test(fold(v))))) return "CRISIS";
   // GREEKLISH AND SPELLING BY EAR (2026-10-22, ADR «22 Οκτωβρίου (β)», a safety fix John approved in advance): «thelo na pethano»,
   // «den antexo allo na zw» or «δεν θελο να ζο» matched nothing, because the phrases above are Greek, spelled right. ADDITIVE ONLY:
@@ -1835,8 +1840,13 @@ function detectsDangerFromOther(text) {
   };
   const plain = String(text).normalize("NFKC").replace(/[\u200b-\u200f\u2060\ufeff\u00ad]/g, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .toLowerCase().replace(/ς/g, "σ");
+  // WHITE SPACE AT THE INPUT (John, 14/11/2026, a safety package): the sentences are ALSO read with every run of white space (a line
+  // break, a tab, a non-breaking space, several spaces) as one plain space. Only here, at the detector's input: what is shown, kept or
+  // sent to the model is not touched. The sentences read before are still read. See auratests/test_detector_spaces_1411.js.
+  const parts = new Set(plain.split(/[.!;?\n…]+/));
+  for (const part of plain.replace(/\s+/g, " ").split(/[.!;?\n…]+/)) parts.add(part);
   let self = false, child = false;
-  for (const part of plain.split(/[.!;?\n…]+/)) {
+  for (const part of parts) {
     const words = part.split(/[^a-zα-ω0-9]+/).filter(Boolean);
     if (!words.length) continue;
     const latin = words.some(w => /[a-z]/.test(w));

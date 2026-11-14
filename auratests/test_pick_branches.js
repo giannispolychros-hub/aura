@@ -255,7 +255,7 @@ const S = t => call('branchSentenceSpans', t);
   // And with the new map pieces cut as they now are and the 12 changes of the counters taken out, this check gives the reference
   // before, dbe9bc32… — so outside the Thought Map only the counters moved.
   assert('(Ζ) the rest of src/App.jsx is byte-identical to release-candidate (before: the base ca18f58 (main 24aab8e + safety-detectors with the fixes of 2/11 and 3/11) (the block and the phase-2 pieces aside)',
-    sha(stripThoughtMap(raw)) === 'aa9a5a196eea960d67e3fb6b8e4e2df2088eaec9082275f711889b1810712dc8');
+    sha(stripThoughtMap(raw)) === 'f6605437723cffdd322598954bacfa1db8481bf2596dc1c73106bedc72a72927' /* UPDATED (14/11/2026, John, a safety package: white space at the detectors' input — proved first, auratests/test_detector_spaces_1411.js (Θ)) */);
   const fp = fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8').match(/core: \{ length: \d+, sha256: "([0-9a-f]{16})/);
   assert('(Ζ) api/aura.js carries the prompt fingerprint b5f303cc9405aa21', !!fp && fp[1] === 'b5f303cc9405aa21');
   const ci = raw.indexOf('const AURA_CORE_PERSONALITY'), cs = raw.indexOf('`', ci) + 1, ce = raw.indexOf('`;', cs);

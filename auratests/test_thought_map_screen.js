@@ -225,7 +225,7 @@ const VIEW = fnSrc('thoughtMapView') + fnSrc('branchSessionSafe') + fnSrc('pickB
   // moves, computed from 75a2aa9 itself; same list, same check, same purpose.
   // RE-BASED again (John, 3/11/2026, ADR «3 Νοεμβρίου»): safety-detectors moved to ca18f58 (finding 130). Only the reference moves,
   // computed from ca18f58 itself; same list, same check, same purpose.
-  const MAIN = { detectSafetySignal: '1f7c3cb8fe568f31', classifyCrisisTier: 'afa5cf7a370bb0d5', detectsDangerFromOther: '7fa664b7741f3c46',
+  const MAIN = { detectSafetySignal: '838fe96cf161fcae' /* UPDATED (14/11/2026, John, a safety package: white space at the detectors' input — proved first, auratests/test_detector_spaces_1411.js (Θ)) */, classifyCrisisTier: 'afa5cf7a370bb0d5', detectsDangerFromOther: '59e2f828fda103fa' /* UPDATED (14/11/2026, John, a safety package: white space at the detectors' input — proved first, auratests/test_detector_spaces_1411.js (Θ)) */,
     detectsMentalHealthReferral: 'd03b71d681025b79', mergeRiskKind: 'd3b56f5bad3ae14f', stageASafetyHold: 'f1fbe27ef7643815', stageACaptureAllowed: 'f8a46ebc62fe4ecd',
     initialStageAState: '514233db37b55461', stageAStep: '67bb9bcb504396e8', buildRootStepLines: 'a7f337a9d5e18db5', buildRootEndLines: 'd8486e581871a4fb',
     buildRootCopyText: 'df52b00bf523b132', stageAFlowTelemetry: '92646b9fff31a68f', stageAStepTelemetry: '4962b5c6625fbcd7', stageAHelpTelemetry: 'bb9ea23634eab049',
@@ -279,7 +279,7 @@ const stripThoughtMap = t => {
   // And with the new map pieces cut as they now are and the 12 changes of the counters taken out, this check gives the reference
   // before, dbe9bc32… — so outside the Thought Map only the counters moved.
   assert('(Ε) without the Thought Map pieces (the block of functions, the screen, the one number, the view) src/App.jsx is byte-identical to release-candidate (before: the base ca18f58 (main 24aab8e + safety-detectors with the fixes of 2/11 and 3/11)',
-    sha(stripThoughtMap(raw)) === 'aa9a5a196eea960d67e3fb6b8e4e2df2088eaec9082275f711889b1810712dc8');
+    sha(stripThoughtMap(raw)) === 'f6605437723cffdd322598954bacfa1db8481bf2596dc1c73106bedc72a72927' /* UPDATED (14/11/2026, John, a safety package: white space at the detectors' input — proved first, auratests/test_detector_spaces_1411.js (Θ)) */);
   // RE-BASED (John, 7/11/2026, round 6, ADR «7 Νοεμβρίου (γ)», branch release-candidate): api/aura.js is now the hardening branch's
   // (A1, ADR «4 Νοεμβρίου (β)»), byte for byte — candidate-tm never changed it. Same check, the reference moves.
   assert('(Ε) api/aura.js is byte-identical to the hardening branch (A1) (e791b19471f08132; before: main c2ce3892c094224d)', h16(fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8')) === 'e791b19471f08132');

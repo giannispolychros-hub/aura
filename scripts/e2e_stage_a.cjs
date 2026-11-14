@@ -1015,6 +1015,7 @@ async function runMock() {
   await runMockCT(); // 8/11 (round 9): the two counters in the tester export
   await runMockBX(); // 9/11 (round 11): S1–S9 beside the tool's sessions, the two danger sessions, the labels fix
   await runMockSD(); // 31/10 (ζ): the safety detectors' gaps (item 117, S5–S9) — the existing line on the screen
+  await runMockWS(); // 14/11: white space at the safety detectors' input — the same line, the text as typed
 }
 
 // ── SD: ADR «31 Οκτωβρίου (ζ)» (John, a safety fix (α)) — the gaps of the two safety detectors, on the screen. Stage A (?stageA=1&rec=1),
@@ -1090,6 +1091,70 @@ async function runMockSD() {
     ok('SD' + k + ' (no danger): «' + phrase + '» → the model\'s reply only — no line, not the safety path',
       sent && (await lastAura(s.page)).includes(REPLY) && !/1018|15900|1056|10306/.test(await body(s.page)) && s.bodies.length === 1 && !s.bodies[0].includes('STAGE: SAFETY'));
     await s.browser.close();
+  }
+}
+
+// ── WS: white space at the safety detectors' input (John, 14/11/2026, a safety package). Stage A (?stageA=1&rec=1), a fake model that
+// writes no number. NO CRISIS PHRASE IS WRITTEN HERE: the messages are the benchmark's safety scenarios S1–S9 (benchmark/scenarios.json),
+// read at run time and named by their code only; no label prints one. Each is typed in a fresh session twice — as written, and with
+// every space a line break — and both must end the same: the same reply bubble (the app's line, with its number, once), on the safety
+// path. The text with its line breaks is shown, sent and kept as typed: the user's bubble shows it, the request to the model carries it,
+// and neither the request's messages nor the device's storage carry the spaced form. Two more are typed key by key, Shift+Enter between
+// the words. Unit tests: auratests/test_detector_spaces_1411.js.
+async function runMockWS() {
+  const REPLY = 'Σε ακούω. Είμαι εδώ.';
+  const SAFE = {};
+  for (const sc of BL.loadBench().safety.scenarios) {
+    const p = BL.benchPersona(sc, 'safety'), at = sc.id === 'S2' ? '1' : Object.keys(p.forcedMarks || {})[0];
+    SAFE[sc.id] = at ? p.forced[at] : '';
+  }
+  const userTexts = m => (Array.isArray(m && m.messages) ? m.messages : []).filter(x => x && x.role === 'user')
+    .map(x => (typeof x.content === 'string' ? x.content : Array.isArray(x.content) ? x.content.map(b => (b && b.text) || '').join('') : ''));
+  const run = async (text, byKeys) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }) });
+    const bodies = [];
+    await page.route('**/api/aura', async route => {
+      bodies.push(route.request().postData() || '');
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: REPLY }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/?stageA=1&rec=1');
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await page.waitForTimeout(300);
+    const box = page.locator('textarea.textarea');
+    await box.waitFor({ state: 'visible', timeout: 3000 });
+    if (byKeys) {
+      await box.click();
+      const words = text.split('\n');
+      for (let i = 0; i < words.length; i++) { await page.keyboard.insertText(words[i]); if (i < words.length - 1) await page.keyboard.press('Shift+Enter'); }
+      const typed = await box.inputValue();
+      await page.getByRole('button', { name: 'Go' }).click();
+      await page.waitForTimeout(700);
+      text = typed === text ? text : null;                                  // what the box held is what was meant
+    } else await send(page, text);
+    await page.waitForTimeout(800);
+    const aura = (await page.locator('.turn-aura').allInnerTexts()).map(t => t.replace(/^\s*aura\s*\n/i, '').trim()).slice(-1)[0] || '';
+    const user = (await page.locator('.msg-user').allInnerTexts()).slice(-1)[0] || '';
+    const store = await page.evaluate(() => { const o = []; try { for (let i = 0; i < localStorage.length; i++) o.push(localStorage.getItem(localStorage.key(i)) || ''); } catch (e) {} return o; });
+    await browser.close();
+    let parsed = null; try { parsed = JSON.parse(bodies[0] || ''); } catch (e) {}
+    return { text, aura, user, store, bodies, sent: userTexts(parsed), safety: bodies.length === 1 && bodies[0].includes('STAGE: SAFETY') };
+  };
+  const num = /\d{3,5}/;
+  for (const id of ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S9']) {
+    const t = SAFE[id], v = t.replace(/ /g, '\n');
+    const a = await run(t), b = await run(v);
+    ok('WS ' + id + ': as written and with every space a line break → the same reply bubble (the app\'s line, with its number, once), both on the safety path',
+      !!t && num.test(a.aura) && a.aura.includes(REPLY) && b.aura === a.aura && a.safety && b.safety);
+    ok('WS ' + id + ': the line breaks are shown, sent and kept as typed — the user\'s bubble shows them, the request carries them, and the spaced form is in neither the request\'s messages nor the device\'s storage',
+      b.user.trim() === v && b.sent.some(x => x.includes(v)) && !b.sent.some(x => x.includes(t)) && !b.store.some(x => x.includes(t)) && a.user.trim() === t);
+  }
+  for (const id of ['S4', 'S2']) {
+    const t = SAFE[id], v = t.replace(/ /g, '\n');
+    const a = await run(t), k = await run(v, true);
+    ok('WS ' + id + ', typed key by key with Shift+Enter between the words: the box held it as typed, the same reply bubble as written, on the safety path, and the request carries it as typed',
+      k.text === v && num.test(k.aura) && k.aura === a.aura && k.safety && k.sent.some(x => x.includes(v)));
   }
 }
 
@@ -7219,7 +7284,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
