@@ -1,6 +1,7 @@
 // AURA — «συνομιλία v1» (John, 15/11/2026): four separate commits on the branch conversation-v1, from release-candidate e4b2ae6. Code only:
 // the fixed prompt (b5f303cc9405aa21), api/aura.js and the screen filter are not touched, and the safety path sends what it sent.
 //  (1) commit 1 — the stagnation note no longer sends the model to ROAD DISCOVERY in Stage A before the root (code 8397 ↔ prompt STAGE A (1)).
+//  (2) commit 2 — the two gates (Decision Space Anchors, Stakes Question) are not asked for in Stage A before the root.
 // The EXACT text each request carries is checked in the browser (scripts/e2e_stage_a.cjs, section NQ, «CV1»); here, the pure part and the wiring.
 
 const fs = require('fs');
@@ -56,6 +57,62 @@ assert('(1.8) the wiring: the note is still built under the same condition, and 
   /const _saNotesHeld = stageAPreRootNotesHeld\(stageAActive\.current, stageARef\.current\.stats\.rootConfirmed === 1, _safetyPath\);/.test(CODE));
 assert('(1.9) the detector and the ladder are untouched: detectUserStagnation as before, and «stuck» still combines the same three signals',
   /const stuckSignalFired = !!\(clarityPivotCtx \|\| selfRepetitionCtx \|\| userStagnationCtx\);/.test(CODE) && fnSrc('detectUserStagnation').includes('const NO_PROGRESS = /(δεν ξέρω|δεν έχω ιδέα|ό,?τι πεις|όπως θες|δεν ξέρω τι|άκυρο|δεν μπορώ να πω)/i;'));
+
+// ── (2) commit 2 — the two gates are not asked for in Stage A before the root ───────────────────────────────────────────────────────────────
+// [GATES DUE CHECK …] asks the model, from the 3rd user message on, to put Decision Space Anchors and the Stakes Question before «a closing move».
+// The Stage A paragraph of the prompt says nothing of them, and a closing is not the model's there. In the stored real-model runs the note was
+// in about 425 requests and the model followed it once (a stored-run count, not text). Nothing in the root flow reads the two flags: only this note,
+// the gatesDue/gatesIgnored counters and the declaration ledger (telemetry only). With the switch open, before a confirmed root, off the safety
+// path (the rule of 30/10, stageAPreRootNotesHeld) the note is not sent; everywhere else it is the note that was sent.
+const gb = (() => { const a = CODE.indexOf('const gatesCtx = (() => {'); return a < 0 ? '' : CODE.slice(a, CODE.indexOf('\n      })();', a) + '\n      })();'.length); })();
+const HOLD = /        \/\/ «συνομιλία v1», commit 2[\s\S]*?\n        if \(_saNotesHeld\) \{ gatesHeldInStageA = due\.length > 0; return ''; \}\n/;
+const iClear = gb.indexOf('gatesDueSnapshot.current = { anchors: false, stakes: false, scale: false };'), iStakes = gb.indexOf("if (!stakesAsked.current) due.push('Stakes Question"),
+  iHold = gb.indexOf('if (_saNotesHeld) { gatesHeldInStageA = due.length > 0; return \'\'; }'), iSnap = gb.indexOf('gatesDueSnapshot.current = {\n          anchors:');
+assert('(2.1) the hold is in the gates block, after the list of what is due is built and before the snapshot of it: in Stage A before the root, off the safety path, the block returns nothing',
+  iClear > 0 && iStakes > iClear && iHold > iStakes && iSnap > iHold && HOLD.test(gb));
+assert('(2.2) … so the snapshot (the gatesDue/gatesIgnored counters) stays all false for a gate that was never injected, and the flag gatesHeldInStageA says the note was due',
+  /\n      let gatesHeldInStageA = false;\n      const gatesCtx = \(\(\) => \{/.test(CODE) && iHold > iClear);
+assert('(2.3) with the hold taken out, the gates block is the block of e4b2ae6, byte for byte (sha256 c148adcf…): the text, the conditions and the three kinds of gate are as before',
+  gb.length > 0 && gb.includes('[GATES DUE CHECK') && sha(gb.replace(HOLD, '')) === 'c148adcfb5a9771cef2c50ed36727a16cf98b04d16d71bd5ec5b592c6c720936');
+const firedLit = (() => { const a = CODE.indexOf('const fired = Object.entries({'); return a < 0 ? '' : CODE.slice(a, CODE.indexOf('}).filter(([, v]) => v).map(([k]) => k);', a)); })();
+assert('(2.4) the family bookkeeping counts the held note as fired, as before — same keys, same order (sha256 of the list with that one entry spelled as before: e4b2ae6\'s). This is what keeps the later requests, the safety path\'s included, byte for byte',
+  firedLit.includes('postMapCloseCtx, gatesCtx: gatesCtx || gatesHeldInStageA, closingDriftCtx,') && sha(firedLit.replace('gatesCtx: gatesCtx || gatesHeldInStageA', 'gatesCtx')) === 'f948ebcae9fe9f4e6d41bb7a4ce9f95193c260875bf34e4db196818df9fce315');
+const cnt = s => CODE.split(s).length - 1;
+assert('(2.5) nothing new reads the two flags: anchorsInvited 6, stakesAsked 6, stakesCallbackDelivered 3, gatesDueSnapshot 4 uses — as in e4b2ae6',
+  cnt('anchorsInvited.current') === 6 && cnt('stakesAsked.current') === 6 && cnt('stakesCallbackDelivered.current') === 3 && cnt('gatesDueSnapshot.current') === 4);
+assert('(2.6) the latches still follow what the model asks, and the ledger still records it (telemetry): the detectors and the ledger rows are untouched',
+  CODE.includes('if (!stakesAsked.current && detectsStakesAsked(text)) {\n        stakesAsked.current = true;') && CODE.includes('if (!anchorsInvited.current && detectsAnchorsInvited(text)) {\n        anchorsInvited.current = true;') &&
+  CODE.includes("['stakes',             stakesAsked.current,               false],") && CODE.includes("['anchors',            anchorsInvited.current,            false],"));
+
+// (2.7) the block, evaluated: held in Stage A before the root, it returns nothing and leaves the snapshot all false; and the flag says "the note was due" for
+// exactly the inputs on which the block (not held) returns the note — over all the combinations below. (The closing detectors are stubs here: they are not under test.)
+{
+  const evalGates = o => new Function('ctx', `
+    const msgs = ctx.msgs, msgCount = ctx.msgCount, _safetyPath = ctx.safety, _saNotesHeld = ctx.held, roadQuestionState = { current: ctx.road ? { roads: ['Χ'] } : null };
+    const stageAActive = { current: true }, concreteStepStated = { current: false }, outcomeScaleAsked = { current: true }, anchorsInvited = { current: ctx.anchors }, stakesAsked = { current: ctx.stakes };
+    const gatesDueSnapshot = { current: { anchors: true, stakes: true, scale: true } }, _earlierUserTexts = [];
+    const isExplicitClosure = () => false, declaresClosing = () => false, isOpeningGreeting = () => false;
+    let gatesHeldInStageA = false;
+    ${gb}
+    return { text: gatesCtx, snap: gatesDueSnapshot.current, held: gatesHeldInStageA };`)(o);
+  const msgs = [{ role: 'user', content: 'Με φοβίζει ότι θα χάσω τη σταθερότητά μου.' }];
+  let cases = 0, flagDiffers = 0, heldSendsText = 0, heldSnapNotClear = 0, unheldFlag = 0, unheldSnapMissing = 0, errors = 0;
+  for (const msgCount of [1, 2, 3, 5, 12]) for (const road of [false, true]) for (const anchors of [false, true]) for (const stakes of [false, true]) for (const safety of [false, true]) {
+    try {
+      const base = { msgs, msgCount, road, anchors, stakes, safety }, free = evalGates({ ...base, held: false }), held = evalGates({ ...base, held: !safety });
+      cases++;
+      if (held.held !== (free.text !== '')) flagDiffers++;                                      // the flag = "the note would have been sent"
+      if (held.text !== '' && !safety) heldSendsText++;                                          // held → nothing is sent
+      if (!safety && (held.snap.anchors || held.snap.stakes || held.snap.scale)) heldSnapNotClear++; // held → the counters see nothing
+      if (free.held !== false) unheldFlag++;                                                     // not held → the flag stays false
+      if (free.text !== '' && !(free.snap.anchors === !anchors && free.snap.stakes === !stakes)) unheldSnapMissing++; // not held → the snapshot as before
+    } catch (e) { errors++; console.log('GRID ERROR ' + e.message); }
+  }
+  assert('(2.7) the block, evaluated over ' + cases + ' combinations (message count, road question pending, each gate asked or not, safety path): held, it sends nothing and the counters see nothing; the flag is true exactly when the unheld block sends the note; unheld, as before',
+    cases === 80 && errors === 0 && flagDiffers === 0 && heldSendsText === 0 && heldSnapNotClear === 0 && unheldFlag === 0 && unheldSnapMissing === 0);
+  const sample = evalGates({ msgs, msgCount: 5, road: false, anchors: false, stakes: false, safety: false, held: false });
+  assert('(2.7) … and the grid is not vacuous: the unheld block does send the gates note on the plain case (Anchors and Stakes due)', sample.text.includes('[GATES DUE CHECK') && sample.text.includes('Decision Space Anchors') && sample.text.includes('Stakes Question'));
+}
 
 // ── (Ω1) nothing else changed. Each change of the branch conversation-v1, new → old, exactly as written (between the BEGIN/END marks; each commit
 // adds its own, in auratests/conversation_v1_undo.json). With them taken out, src/App.jsx must be the file of release-candidate e4b2ae6, byte for byte — this is the proof behind the UPDATED

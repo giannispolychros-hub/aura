@@ -301,6 +301,11 @@ function gatesTextWhen({ msgCount, lastUserText, concrete = false, scaleAsked = 
   // UPDATED 22/10 (ADR «22 Οκτωβρίου (ε)»): one more input, `_earlierUserTexts` (the user's messages before the latest — a bare «γεια»
   // before any conversation is an opening, not an exit). Here the earlier messages are a real conversation: every assertion runs as before.
   const _earlierUserTexts  = msgs.filter(m => m.role === 'user').slice(0, -1).map(m => String(m.content || ''));
+  // UPDATED 15/11 («συνομιλία v1», commit 2): the block reads one more input, `_saNotesHeld` (Stage A before the root, off the safety path), and
+  // writes one more flag, `gatesHeldInStageA` — same lesson as `_safetyPath` above. Default false: every assertion below runs exactly as before.
+  // The hold itself is tested where the block is evaluated: auratests/test_conversation_v1.js (2.7).
+  const _saNotesHeld       = false;
+  let gatesHeldInStageA    = false;
   const _text = eval(gatesTemplate);
   gatesTextWhen.lastSnapshot = gatesDueSnapshot.current;
   return _text;

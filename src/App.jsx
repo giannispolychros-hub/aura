@@ -8265,6 +8265,13 @@ THIS SESSION STILL CLOSES THE WAY EVERY SESSION CLOSES, in the order the Sequenc
 IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: which road they took, which they rejected, what they named as the real obstacle. Never on the map's own ΚΕΡΔΙΖΕΙΣ/ΚΟΣΤΙΖΕΙ lines — those are AURA's formulation, their provenance is not guaranteed, and ΒΡΗΚΕΣ already carries a sourcing requirement that forbids exactly this.]\n`
           : '';
       })(), postMapCloseCtxDelivered, 2);
+      // «συνομιλία v1», commit 2 (John, 15/11/2026): in Stage A before a confirmed root, off the safety path, the two gates (Decision Space Anchors, Stakes
+      // Question) are not asked for. The note is advisory, and in the stored real-model runs the model followed it once in about 425 requests that carried it;
+      // nothing in the root flow reads the two flags — only the note, the gatesDue/gatesIgnored counters and the declaration ledger (telemetry only) do.
+      // gatesHeldInStageA is true when the note was due but held back: the family bookkeeping below counts it as fired, as before, so the families already
+      // used and the last fired family — state that later requests carry, the safety path's included — are exactly what they were. Stage A after the root,
+      // the old flow and the safety path: as before. auratests/test_conversation_v1.js (2); browser: section CV, and NQS (the safety path byte for byte).
+      let gatesHeldInStageA = false;
       const gatesCtx = (() => {
         // Cleared first, every turn: this block returns '' from several places, and a stale snapshot
         // would make the post-API comparison below judge a gate that was never injected.
@@ -8316,6 +8323,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         if (!stageAActive.current && concreteStepStated.current && !outcomeScaleAsked.current) due.push('Clarity + Ownership Scale ("τώρα, πόσο ξεκάθαρο είναι τι θέλεις να κάνεις... και πόσο αισθάνεσαι ότι είναι δική σου σκέψη ή επιλογή, 1-10;") — BUT ONLY AFTER the decision space itself has been made visible: if the user has just named genuinely distinct directions, ROAD DISCOVERY comes first and this scale waits for the turn after. Rating clarity before showing them what they actually have is backwards.');
         if (!anchorsInvited.current) due.push('Decision Space Anchors ("ποιες λέξεις ή σύντομες φράσεις...")');
         if (!stakesAsked.current) due.push('Stakes Question ("αν αυτή η απόφαση μείνει θολή για άλλον έναν χρόνο...")');
+        // «συνομιλία v1», commit 2: held HERE, after the list is built and before the snapshot — the snapshot stays all false, so the counters do not
+        // count a gate that was never injected (the reasons: above, at gatesHeldInStageA).
+        if (_saNotesHeld) { gatesHeldInStageA = due.length > 0; return ''; }
         // The snapshot is taken here, from the same three conditions the reminder is built from, so
         // "due" means exactly what the injected text claimed rather than a second derivation.
         gatesDueSnapshot.current = {
@@ -8443,7 +8453,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         const fired = Object.entries({
           memCtx, profileCtx, materialEvidenceCtx, goalObstacleStakesCtx, demoCtx, informationModeCtx, explicitPauseCtx,
           coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx,
-          clarityPivotCtx, selfRepetitionCtx, repeatedElementsCtx, stopMomentCtx, riskClarificationCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, roadQuestionCtx, postMapCloseCtx, gatesCtx, closingDriftCtx,
+          clarityPivotCtx, selfRepetitionCtx, repeatedElementsCtx, stopMomentCtx, riskClarificationCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, roadQuestionCtx, postMapCloseCtx, gatesCtx: gatesCtx || gatesHeldInStageA, closingDriftCtx,
           firstReplyFloorCtx, safetyPathCtx,
         }).filter(([, v]) => v).map(([k]) => k);
         // ACCUMULATED BEFORE THE >= 2 GATE, deliberately: a family that fired alone still

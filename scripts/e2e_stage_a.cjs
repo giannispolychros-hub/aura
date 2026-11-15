@@ -1255,7 +1255,10 @@ async function runMockNQ() {
     const RB = ['Τι σε τραβάει σε αυτό;', 'Πώς το άκουσες όταν σου το είπαν;', 'Τι σημαίνει αυτό για σένα;', 'Ποιοι είναι αυτοί για σένα;', 'Τι αλλάζει με αυτό;', 'Τι σκέφτεσαι τότε;', 'Τι λείπει για να αποφασίσεις;', 'Πώς το ζεις αυτό;'];
     const { s, perMsg } = await run('?stageA=1', RB, M);
     ok('NQβ: a Stage A session of 8 messages with the gates due — every message goes to the model', perMsg.length === 8 && perMsg.every(x => x.calls === 1));
-    ok('NQβ: … the gates note is there from the 3rd request (the situation that used to light the «switch family» note)', perMsg.slice(2).every(x => x.sys.includes('[GATES DUE CHECK')));
+    // UPDATED (15/11/2026, «συνομιλία v1», commit 2): the gates note itself is held back in Stage A before the root, so it is no longer "there"; the situation that used to
+    // light the «switch family» note is the same in the bookkeeping — the gates are due from the 3rd request and the coverage note lists them among the families used from the 4th.
+    ok('NQβ: … the gates are due from the 3rd request (the situation that used to light the «switch family» note): the note is held back (commit 2), the family bookkeeping still counts it',
+      perMsg.slice(2).every(x => !x.sys.includes('[GATES DUE CHECK')) && perMsg.slice(3).every(x => /Signal families already used this session:[^\]]*gatesCtx/.test(x.sys)));
     // (the SESSION COVERAGE note still lists code names — item (1β) of the plan, not approved, not touched)
     ok('NQβ: … and no request carries the «switch family» note (nor the name of the gates note it used to give)', perMsg.every(x => !x.sys.includes('has been the highest-attention signal') && !x.sys.includes('"gatesCtx"')));
     await s.browser.close();
@@ -1452,6 +1455,33 @@ async function runMockCV() {
         ok('CV1 (old flow, comparison tool only): the note is as before — it still points to ROAD DISCOVERY and carries no Stage A sentence',
           withNote.length >= 1 && withNote.every(x => x.sys.includes(POINT) && x.sys.includes(SHAPE) && !x.sys.includes(RULE)));
       }
+      await s.browser.close();
+    }
+  }
+  // ── CV2 — commit 2: the gates (Decision Space Anchors, Stakes Question) are not asked for in Stage A before the root; the old flow is as before
+  { const M = ['Σκέφτομαι να αλλάξω δουλειά αλλά κάτι με κρατάει εδώ και καιρό.', 'Η σταθερότητα του μισθού με κρατάει, και το ότι ξέρω τους ανθρώπους.',
+      'Ναι, κάτι τέτοιο, όλα αυτά μαζί μπερδεύονται στο μυαλό μου τελευταία.', 'Φοβάμαι ότι αν φύγω θα μετανιώσω, και αν μείνω επίσης.', 'Η οικογένειά μου θα ήθελε να μείνω.', 'Δεν έχω μιλήσει ακόμα με κανέναν γι' + "'" + 'αυτό.'];
+    const RR = ['Τι σε κρατάει περισσότερο;', 'Τι σημαίνει για σένα η σταθερότητα;', 'Τι από όλα αυτά βαραίνει πιο πολύ;', 'Τι θα άλλαζε αν έφευγες;', 'Πώς το βλέπει η οικογένειά σου;', 'Τι θα ήθελες να γίνει;'];
+    const GATE = '[GATES DUE CHECK', FAM = 'Signal families already used this session:';
+    for (const q of ['?stageA=1', '?stageA=0']) {
+      const { s, perMsg } = await run(q, RR, M);
+      const late = perMsg.filter((x, i) => i >= 3 && x.calls === 1);
+      if (q === '?stageA=1') {
+        ok('CV2 (Stage A, before the root): no request carries the gates note, from the 3rd message to the last (' + perMsg.length + ' messages)', perMsg.length >= 5 && perMsg.every(x => !x.sys.includes(GATE)));
+        ok('CV2 (Stage A, before the root): … and the family bookkeeping is as before — the coverage note still counts the due gates as a signal family used (this is what keeps the later requests, the safety path\'s included, byte for byte: NQS)',
+          late.length >= 2 && late.every(x => /Signal families already used this session:[^\]]*gatesCtx/.test(x.sys)));
+      } else {
+        ok('CV2 (old flow, comparison tool only): the gates note is sent from the 3rd message on, as before (' + perMsg.filter(x => x.sys.includes(GATE)).length + ' requests)',
+          perMsg.slice(2).every(x => x.sys.includes(GATE)) && !perMsg.slice(0, 2).some(x => x.sys.includes(GATE)));
+      }
+      await s.browser.close();
+    }
+    { // the root flow is not touched: readiness question → «Ναι» (no model call) → the root sentence opens the card (as NQστ case 1)
+      const RQ2 = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+      const { s, perMsg } = await run('?stageA=1', ['Τι σε κρατάει περισσότερο;', RQ2, 'Εντάξει.'],
+        ['Σκέφτομαι να αλλάξω δουλειά αλλά κάτι με κρατάει.', 'Η σταθερότητα του μισθού.', 'Ναι', 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.']);
+      ok('CV2 (Stage A): the root flow is as before with the gates held — two model calls, no call for the «Ναι», and the next message opens the card without a call',
+        perMsg.length === 4 && perMsg[0].calls === 1 && perMsg[1].calls === 1 && perMsg[2].calls === 0 && perMsg[3].calls === 0 && perMsg[3].card);
       await s.browser.close();
     }
   }
@@ -5950,8 +5980,9 @@ async function runMockDF() {
 // switch-closed flow are unchanged.
 // UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (β), John's condition 4): only request 4 moved: the «switch family» note is no longer in it — every other line byte for byte as before (line diff: the round's report)
 // UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (ε), John's condition 4): only the knowledge-state lines moved: the obstacle item no longer assumes there is one — every other line byte for byte as before (line diff: the round's report)
+// UPDATED (15/11/2026, «συνομιλία v1», commit 2, John): the gates note is no longer in the Stage A requests before the root — every other line byte for byte as before (line diff of the two snapshots: 13 lines removed, all of the gates note, none added; the closed switch unchanged).
 const SN_BASELINE = { closed: '9cc0489d84cd11e3 1ed725fa30d79952 bfeeb82e7221bab0 43dc2d82b3c50e6f 04bcd0fc50c1e879 04d947de9e723755',
-  open: '90e8f09e90339669 d845bfeb57be5ba2 d842b2bd5d398176 a62bb2468e8ca1e6 2248b504879d64e9' };
+  open: '90e8f09e90339669 d845bfeb57be5ba2 5c65205ee00564e2 fcf1d2c217b651c3 b7ef3e1537ef402c' };
 
 // ── MC: the MODEL's own closing summary before the root (ADR «11 Οκτωβρίου (β)», found by the stress test with the real model,
 // run 10, sessions 2.1 and 4.1). Switch open: the summary is not shown, door 1's question is; the card it opens is door 5 in
