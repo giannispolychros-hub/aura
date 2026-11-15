@@ -6772,11 +6772,14 @@ function detectsObstacleStated(text) {
 function detectsStakesStated(text) {
   return /(αν\s+δεν|θα\s+χ[άα]σω|προθεσμ[ίι]α|μ[έε]χρι\s+το|[έε]χω\s+[ήη]δη\s+δοκιμ[άα]σει|δεν\s+βο[ήη]θησε|δεν\s+λειτο[ύυ]ργησε|τελευτα[ίι]α\s+ευκαιρ[ίι]α|δεν\s+αντ[έε]χω\s+[άα]λλο|πι[έε]ζομαι|υπ[όο]\s+π[ίι]εση)/i.test(text || "");
 }
-function describeGoalObstacleStakesCtx(goalKnown, obstacleKnown, stakesKnown) {
+// ADR «15 Νοεμβρίου» (ε) (John): OFF the safety path the obstacle item no longer assumes that there is one (it asked «τι το εμποδίζει
+// συγκεκριμένα» of people who had named no obstacle — the voice rule (5) forbids exactly that). ONLY that item changes: the goal and the
+// stakes, and every other word, stay as they were. ON the safety path the note is exactly as before (finding ζ — John decides).
+function describeGoalObstacleStakesCtx(goalKnown, obstacleKnown, stakesKnown, offSafetyPath) {
   if (goalKnown && obstacleKnown && stakesKnown) return ''; // all three named — nothing to flag, avoid noise once complete
   const missing = [];
   if (!goalKnown) missing.push('GOAL (τι θέλει να πετύχει, να αποφασίσει, ή να καταλάβει)');
-  if (!obstacleKnown) missing.push('OBSTACLE (τι το εμποδίζει συγκεκριμένα)');
+  if (!obstacleKnown) missing.push(offSafetyPath === true ? 'OBSTACLE (αν υπάρχει κάτι που το εμποδίζει — δεν έχει πει ότι υπάρχει· μην το υποθέτεις)' : 'OBSTACLE (τι το εμποδίζει συγκεκριμένα)');
   if (!stakesKnown) missing.push('STAKES (τι κινδυνεύει, τι πίεση χρόνου ή ψυχολογική πίεση υπάρχει, τι έχει ήδη δοκιμαστεί και δεν βοήθησε)');
   return `\n[CODE-VERIFIED KNOWLEDGE STATE (observation only, never a checklist to interrogate): the user has not yet named, in their own words, the following — ${missing.join('; ')}. If the material already naturally covers one of these, recognise it as covered; this never forces a question just to fill a category, and it authorizes nothing and blocks nothing. Once all three are named this stops appearing.]\n`;
 }
@@ -8043,7 +8046,7 @@ A line missing above means only that one pattern was not matched — the absence
         const goalKnown = userMsgs.some(m => detectsGoalStated(m.content));
         const obstacleKnown = userMsgs.some(m => detectsObstacleStated(m.content));
         const stakesKnown = userMsgs.some(m => detectsStakesStated(m.content));
-        return describeGoalObstacleStakesCtx(goalKnown, obstacleKnown, stakesKnown);
+        return describeGoalObstacleStakesCtx(goalKnown, obstacleKnown, stakesKnown, !_safetyPath); // ADR «15 Νοεμβρίου» (ε)
       })();
 
       // MASTER PRIORITY RULE STAGE — same architecture as goalObstacleStakesCtx/materialEvidenceCtx

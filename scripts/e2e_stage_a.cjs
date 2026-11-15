@@ -1170,6 +1170,7 @@ async function runMockWS() {
 //  NQγ — level 3 of the escalation ladder: the new text on every level-3 request; the ladder as before (3 holds before the root, the old flow
 //        still reaches AUTO-KILL).
 //  NQδ — the NEW MATERIAL note, off the safety path, allows the choice question with the user's own words.
+//  NQε — the knowledge-state note no longer assumes an obstacle, off the safety path, in both flows; the stakes item as before.
 // Alone: --only NQ.
 async function runMockNQ() {
   const RQ = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
@@ -1286,6 +1287,18 @@ async function runMockNQ() {
     ok('NQδ: … and each time it allows the choice question with those words, without the closing\'s screen labels',
       withNote.every(x => x.sys.includes('a CHOICE QUESTION may offer these words as its options') && !/the one-time ΗΡΘΕΣ ΜΕ/.test(x.sys)));
     await s.browser.close();
+  }
+  // ── NQε — the knowledge-state note no longer assumes an obstacle, off the safety path, in both flows (on the safety path: NQS)
+  { const M = ['Σκέφτομαι να αρχίσω μαθήματα πιάνου.', 'Μου άρεσε πάντα η μουσική.', 'Έχω βρει μια δασκάλα κοντά στο σπίτι.'];
+    const RE = ['Τι σε τραβάει σε αυτό;', 'Τι σου έμεινε από τη μουσική;', 'Πώς τη βρήκες;'];
+    for (const q of ['?stageA=1', '?stageA=0']) {
+      const { s, perMsg } = await run(q, RE, M);
+      const ks = perMsg.filter(x => x.sys.includes('[CODE-VERIFIED KNOWLEDGE STATE'));
+      ok('NQε (' + q + '): with no obstacle named, the note says it without assuming one, and never «τι το εμποδίζει συγκεκριμένα» (' + ks.length + ' requests)',
+        ks.length === 3 && ks.every(x => x.sys.includes('OBSTACLE (αν υπάρχει κάτι που το εμποδίζει — δεν έχει πει ότι υπάρχει· μην το υποθέτεις)') && !x.sys.includes('τι το εμποδίζει συγκεκριμένα')));
+      ok('NQε (' + q + '): … the stakes item is there word for word as before', ks.every(x => x.sys.includes('STAKES (τι κινδυνεύει, τι πίεση χρόνου ή ψυχολογική πίεση υπάρχει, τι έχει ήδη δοκιμαστεί και δεν βοήθησε)')));
+      await s.browser.close();
+    }
   }
 }
 
@@ -5839,8 +5852,9 @@ async function runMockDF() {
 // still sends the old two, and its per-turn part minus that one line is, byte for byte, what this branch sends. Requests 1–3 and the
 // switch-closed flow are unchanged.
 // UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (β), John's condition 4): only request 4 moved: the «switch family» note is no longer in it — every other line byte for byte as before (line diff: the round's report)
-const SN_BASELINE = { closed: '9cc0489d84cd11e3 a4c883a93feb0f09 599d159dd7d6e616 8bcfd65b21f59829 1311a6c72dc7db4b 04d947de9e723755',
-  open: 'b7117c3a6d998739 319083b10b16b87e 6ebd5644c901c40e a562e9934d7447dd d86935d67c4667d1' };
+// UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (ε), John's condition 4): only the knowledge-state lines moved: the obstacle item no longer assumes there is one — every other line byte for byte as before (line diff: the round's report)
+const SN_BASELINE = { closed: '9cc0489d84cd11e3 1ed725fa30d79952 bfeeb82e7221bab0 43dc2d82b3c50e6f 04bcd0fc50c1e879 04d947de9e723755',
+  open: '90e8f09e90339669 d845bfeb57be5ba2 d842b2bd5d398176 a62bb2468e8ca1e6 2248b504879d64e9' };
 
 // ── MC: the MODEL's own closing summary before the root (ADR «11 Οκτωβρίου (β)», found by the stress test with the real model,
 // run 10, sessions 2.1 and 4.1). Switch open: the summary is not shown, door 1's question is; the card it opens is door 5 in
@@ -6166,8 +6180,9 @@ async function runMockIM() {
 // the per-turn part of each request of the two old-flow sessions of IM (iv), as a409a47 sent them (SHA-256, first 16 hex)
 // UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (β), John's condition 4): only request 4 moved: the «switch family» note is no longer in it — every other line byte for byte as before (line diff: the round's report)
 // UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (γ), John's condition 4): only request 4 of the «Πες μου τι να κάνω» session moved: its level-3 note has the new text — every other line byte for byte as before (line diff: the round's report)
-const IM_BASELINE = { oldFlow: '9cc0489d84cd11e3 dcce58fc3d30a888 0d3f7589c795f424 db004c3707d13336',
-  oldFlowNoQ: '9cc0489d84cd11e3 a4c883a93feb0f09 dde96cc9e936a39c 97d8e356804044cb' };
+// UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (ε), John's condition 4): only the knowledge-state lines moved: the obstacle item no longer assumes there is one — every other line byte for byte as before (line diff: the round's report)
+const IM_BASELINE = { oldFlow: '9cc0489d84cd11e3 ecac273320516bde dcbae6d7cea339c1 efe2725f2cf92837',
+  oldFlowNoQ: '9cc0489d84cd11e3 1ed725fa30d79952 3db8852bb7f5d1fe d2300d044926aa4b' };
 
 // ═══ ΤΑ 6 ΣΕΝΑΡΙΑ (ψεύτικο ή πραγματικό μοντέλο) ═════════════════════════════
 function fakeModel() {
