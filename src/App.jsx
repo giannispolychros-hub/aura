@@ -6115,16 +6115,26 @@ function detectsCoreReadinessAsked(text) {
   return /νιώθεις ότι.{0,40}ξεκαθαρίζει.{0,60}πραγματικά σε απασχολεί/i.test(text || "");
 }
 // ADR «15 Νοεμβρίου» (α) (John, finding 161 — the root card's silent arming): in Stage A a plain «Ναι» confirms readiness only when it
-// answers the readiness question asked RIGHT BEFORE it — the message just before the user's last one is AURA's own reply (not one of the
-// app's fixed STAGE_A texts) with that question. A «Ναι» to any other question later in the session no longer arms door 2, so the next
-// message is not taken as the root. Pure: it reads only the order of the messages; whether the answer is a plain «Ναι» stays the job of
-// detectsAffirmativeShort. auratests/test_notes_card_1511.js; browser: section NQ.
+// answers the readiness question, so a «Ναι» to any other question later in the session no longer arms door 2 (the next message is not
+// taken as the root). (στ) (John, 15/11/2026 — the false negative of (α)): «answers the readiness question» is now «the readiness question
+// is the most recent question AURA asked». Going back from the user's last message: a user message in between is passed over, and so is
+// an AURA reply with no question mark in it; the first AURA message that holds the readiness question → yes; the first one that holds any
+// other question mark (; ? or the Greek question mark) → no; a fixed text of the app (STAGE_A) → no. Nothing here knows about a change of
+// subject or phase (John: not added). The confirmation is spent by the session's one-way latch, coreReadinessConfirmed. Pure: it reads only
+// the order and the text of the messages; whether the answer is a plain «Ναι» stays the job of detectsAffirmativeShort.
+// auratests/test_notes_card_1511.js (α) (στ); browser: section NQ.
 function answersReadinessQuestion(msgs) {
   const list = Array.isArray(msgs) ? msgs : [];
   let u = list.length - 1;
   while (u >= 0 && !(list[u] && list[u].role === "user")) u--;
-  const prev = u > 0 ? list[u - 1] : null;
-  return !!prev && prev.role === "assistant" && prev.msgMode !== "STAGE_A" && typeof prev.content === "string" && detectsCoreReadinessAsked(prev.content);
+  for (let k = u - 1; k >= 0; k--) {
+    const m = list[k];
+    if (!m || m.role !== "assistant" || typeof m.content !== "string") continue;
+    if (m.msgMode === "STAGE_A") return false;
+    if (detectsCoreReadinessAsked(m.content)) return true;
+    if (/[;?\u037e]/.test(m.content)) return false;
+  }
+  return false;
 }
 // ADR «12 Οκτωβρίου (γ)» (John): the «Ναι» to a yes/no question counts only in a CLEAR form — the same start words as before,
 // and after them only words that keep it a plain yes. «Νιώθω χάλια», «Ναι αλλά φοβάμαι», «ναι μάλλον», «Νιώθω το ίδιο» are not a
@@ -8903,7 +8913,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           coreReadinessConfirmed.current = true;
         } else if (coreReadinessAsked.current && lastUserMsgForReadiness &&
             detectsAffirmativeShort(lastUserMsgForReadiness.content) &&
-            // ADR «15 Νοεμβρίου» (α): in Stage A only a «Ναι» to the readiness question asked right before it (the old flow as before)
+            // ADR «15 Νοεμβρίου» (α), (στ): in Stage A only a «Ναι» while the readiness question is AURA's most recent question (the old flow as before)
             (!stageAActive.current || answersReadinessQuestion(msgs))) {
           coreReadinessConfirmed.current = true;
         } else if (detectsCoreReadinessAsked(text)) {

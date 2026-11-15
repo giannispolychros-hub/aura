@@ -1171,6 +1171,8 @@ async function runMockWS() {
 //        still reaches AUTO-KILL).
 //  NQδ — the NEW MATERIAL note, off the safety path, allows the choice question with the user's own words.
 //  NQε — the knowledge-state note no longer assumes an obstacle, off the safety path, in both flows; the stakes item as before.
+//  NQστ — the card's rule «AURA's most recent question is the readiness question»: cases 1–4, several interjections, a repeated question, another
+//        question (in each shape), a change of subject, and the spent confirmation (after «πίσω» an old «Ναι» arms nothing).
 // Alone: --only NQ.
 async function runMockNQ() {
   const RQ = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
@@ -1299,6 +1301,58 @@ async function runMockNQ() {
       ok('NQε (' + q + '): … the stakes item is there word for word as before', ks.every(x => x.sys.includes('STAKES (τι κινδυνεύει, τι πίεση χρόνου ή ψυχολογική πίεση υπάρχει, τι έχει ήδη δοκιμαστεί και δεν βοήθησε)')));
       await s.browser.close();
     }
+  }
+  // ── NQστ — the card's rule: AURA's MOST RECENT question is the readiness question (John, 15/11/2026; the false negative of (α) fixed).
+  // Synthetic sessions with the fake model, every reply scripted by the order of the calls. «arms» = the message AFTER the «Ναι» is not sent to
+  // the model and the card opens (door 2). Unit tests of the same rule: auratests/test_notes_card_1511.js (στ). NO condition for a change of
+  // subject or phase exists (John, 15/11): the one case that would need it is checked as it is and named in the report.
+  { const M1 = 'Σκέφτομαι να αλλάξω δουλειά αλλά κάτι με κρατάει.', M2 = 'Η σταθερότητα του μισθού.', ROOT = 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.';
+    const R0 = 'Τι σε κρατάει περισσότερο;', NOQ = 'Εννοώ το πόσο καθαρό σου φαίνεται τώρα.', NOQ2 = 'Δηλαδή αν έχει αρχίσει να φαίνεται.', GAP = 'Πες μου κι άλλο.', ASK = 'Τι βαραίνει περισσότερο;';
+    const OTHER = 'Εννοώ το ωράριο. Σε αφορά αυτό;';
+    const arms = (pm, i) => !!pm[i] && pm[i].calls === 0 && pm[i].card;      // that message opened the card without a model call
+    const sentOnly = (pm, i) => !!pm[i] && pm[i].calls === 1 && !pm[i].card; // that message went to the model, and no card
+    const ONE = async (script, msgs) => { const r = await run('?stageA=1', script, msgs); await r.s.browser.close(); return r.perMsg; };
+    let pm;
+    pm = await ONE([R0, RQ, GAP], [M1, M2, 'Ναι', ROOT]);
+    ok('NQστ case 1 — «Ναι» right after the question: no model call, then the next message opens the card (as before)', pm.length === 4 && pm[2].calls === 0 && arms(pm, 3));
+    pm = await ONE([R0, RQ, NOQ, ASK, GAP], [M1, M2, 'τι εννοείς;', 'Ναι', ROOT]);
+    ok('NQστ case 2 — one clarification, AURA answers with NO question, then «Ναι»: the «Ναι» goes to the model once and the NEXT message opens the card', pm.length === 5 && sentOnly(pm, 3) && arms(pm, 4));
+    pm = await ONE([R0, RQ, OTHER, ASK, GAP], [M1, M2, 'τι εννοείς;', 'Ναι', ROOT]);
+    ok('NQστ case 3 — one clarification, AURA asks ANOTHER question, then «Ναι»: no card, every message goes to the model (finding 161, on purpose)', pm.length === 5 && pm.every(x => x.calls === 1 && !x.card));
+    pm = await ONE([R0, RQ, 'Εννοώ αυτό: ' + RQ, GAP], [M1, M2, 'τι εννοείς;', 'Ναι', ROOT]);
+    ok('NQστ case 4 — one clarification, AURA asks the readiness question AGAIN, then «Ναι»: no model call, then the card', pm.length === 5 && pm[3].calls === 0 && arms(pm, 4));
+    pm = await ONE([R0, RQ, NOQ, NOQ2, ASK, GAP], [M1, M2, 'τι εννοείς;', 'δηλαδή;', 'Ναι', ROOT]);
+    ok('NQστ several AURA replies without a question (and a question of the USER between them), then «Ναι»: the next message opens the card', pm.length === 6 && sentOnly(pm, 4) && arms(pm, 5));
+    pm = await ONE([R0, RQ, RQ, GAP], [M1, M2, 'δεν ξέρω ακόμα', 'Ναι', ROOT]);
+    ok('NQστ the readiness question repeated: asked, set aside, asked again, then «Ναι»: no model call, then the card', pm.length === 5 && pm[3].calls === 0 && arms(pm, 4));
+    pm = await ONE([R0, RQ, OTHER, RQ, GAP], [M1, M2, 'τι εννοείς;', 'Όχι ακριβώς', 'Ναι', ROOT]);
+    ok('NQστ another question ends it, the readiness question asked again brings it back: «Ναι» → no model call, then the card', pm.length === 6 && pm[4].calls === 0 && arms(pm, 5));
+    pm = await ONE([R0, RQ, 'Εννοώ το ωράριο. Σε αφορά αυτό; Πες μου περισσότερα.', ASK, GAP], [M1, M2, 'τι εννοείς;', 'Ναι', ROOT]);
+    ok('NQστ another question in the MIDDLE of a longer reply ends it too: no card, every message goes to the model', pm.length === 5 && pm.every(x => x.calls === 1 && !x.card));
+    pm = await ONE([R0, RQ, 'Εντάξει, για το σπίτι· τι έγινε με αυτό;', ASK, GAP], [M1, M2, 'Άλλαξα θέμα, σκέφτομαι το σπίτι.', 'Ναι', ROOT]);
+    ok('NQστ the user changes the subject and AURA asks about the new subject: no card (the new question ended it)', pm.length === 5 && pm.every(x => x.calls === 1 && !x.card));
+    pm = await ONE([R0, RQ, 'Εντάξει, για το σπίτι.', ASK, GAP], [M1, M2, 'Άλλαξα θέμα, σκέφτομαι το σπίτι.', 'Ναι', ROOT]);
+    ok('NQστ the user changes the subject and AURA answers with NO question: the card ARMS — the rule has no subject-change condition (John: not added; named in the report)', pm.length === 5 && sentOnly(pm, 3) && arms(pm, 4));
+    // the confirmation is spent: after a «Ναι» that armed the card and a «πίσω», an old «Ναι» can arm nothing a second time. AURA's replies
+    // carry no question mark, so the readiness question STAYS her most recent question — only the spent latch can stop it.
+    const spent = async (script, msgs, label, first) => {
+      const r = await run('?stageA=1', script, msgs);
+      const cardAt = r.perMsg.length - 1, opened = r.perMsg[cardAt] && r.perMsg[cardAt].card && r.perMsg[cardAt].calls === 0;
+      let again = null, cont = [];
+      if (opened) {
+        const before = r.s.calls.length;
+        await r.s.page.getByRole('button', { name: 'Δεν το βρήκα ακόμα, συνέχισε' }).click(); await r.s.page.waitForTimeout(1200);
+        const back = r.s.calls.length - before;
+        for (const m of ['Ναι', 'Ότι φοβάμαι να ζητήσω αύξηση.']) { const b = r.s.calls.length; await send(r.s.page, m); cont.push({ calls: r.s.calls.length - b, card: await card(r.s.page) }); }
+        again = { back, cont };
+      }
+      await r.s.browser.close();
+      ok(label + ': the card opens first (' + first + ')', !!opened);
+      ok(label + ': after «πίσω» the model answers once, then a new «Ναι» and the next message BOTH go to the model and no card opens — the old «Ναι» is spent',
+        !!again && again.back === 1 && again.cont.length === 2 && again.cont.every(x => x.calls === 1 && !x.card));
+    };
+    await spent([R0, RQ, 'Εντάξει, συνεχίζουμε.', GAP, GAP], [M1, M2, 'Ναι', ROOT], 'NQστ consumption (door 2 before the model)', '«Ναι» right after the question');
+    await spent([R0, RQ, NOQ, GAP, 'Εντάξει, συνεχίζουμε.', GAP, GAP], [M1, M2, 'τι εννοείς;', 'Ναι', ROOT], 'NQστ consumption (the «Ναι» after a clarification)', 'the new case 2');
   }
 }
 

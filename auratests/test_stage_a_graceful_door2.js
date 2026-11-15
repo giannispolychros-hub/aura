@@ -143,7 +143,9 @@ const SHORT = JOHN.slice(0, 4); // two user messages so far
   // RE-BASED / UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (α), John — finding 161, the card's silent arming): the arming path after a reply
   // stays, but with the switch open it now takes ONLY a «Ναι» that answers the readiness question asked right before it
   // (answersReadinessQuestion); the old flow exactly as before. Behaviour: auratests/test_notes_card_1511.js (α), browser section NQα.
-  assert('DOOR 2: the arming path after a reply stays — with the switch open only for a «Ναι» that answers the readiness question right before it; the old flow as before',
+  // RE-BASED / UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (στ), John): the LABEL only — «right before it» became «while the readiness question is AURA's most recent
+  // question» (the code line the check reads is unchanged; auratests/test_notes_card_1511.js (στ), browser NQ).
+  assert('DOOR 2: the arming path after a reply stays — with the switch open only for a «Ναι» that answers the readiness question (AURA\'s most recent question); the old flow as before',
     /else stageARootArmed\.current = true;/.test(GEN) &&
     /else if \(coreReadinessAsked\.current && lastUserMsgForReadiness &&\s*detectsAffirmativeShort\(lastUserMsgForReadiness\.content\) &&\s*(?:\/\/[^\n]*\n\s*)?\(!stageAActive\.current \|\| answersReadinessQuestion\(msgs\)\)\) \{/.test(GEN));
   // UPDATED (12/10/2026, ADR «12 Οκτωβρίου (γ)», John): the «Ναι» counts only in a clear form — the same start words, then only words
