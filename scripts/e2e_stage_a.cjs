@@ -1586,6 +1586,11 @@ async function runMockSR() {
   const mark = (per, f) => per.map(x => (f(x) ? 1 : 0)).join('');
   const speak = x => x.sys.includes(SPEAK), fu = x => x.sys.includes(FU), add = x => x.sys.includes(ADD), rt = x => x.sys.includes(RTN);
   const blocks = (x, start) => x.sys.split(/\n(?=\[)/).filter(b => b.replace(/^\s+/, '').startsWith(start)).length;
+  // commit 6 (John, 15/11/2026): two wording corrections of the note — the wording rule WR instead of «a plain near-equivalent»; the example «how the two relate for them, or whether they relate at all»; nothing that makes the two things compete
+  const WR = 'use their own words; if you change a word, only to a plain one of the SAME meaning that adds no judgement, size or weight (never a word that makes it heavier, bigger or more negative than they said), and never a new label, category or abstract name';
+  const EX = '(for example how the two relate for them, or whether they relate at all; you do not know unless they said so)';
+  const OLDW = /near-equivalent|staying as close to their own words|weighs more|connected at all|which of them|opposition/i, cnt = (s, sub) => s.split(sub).length - 1;
+  const noteBlock = (x, start) => x.sys.split(/\n(?=\[)/).filter(b => b.replace(/^\s+/, '').startsWith(start)).join('\n');
   const src = fs.readFileSync(path.join(REPO, 'api', 'aura.js'), 'utf8');
   const handler = (await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'))).default;
   const viaGuard = async body => { // the request through the REAL guard of api/aura.js (what production does)
@@ -1611,6 +1616,10 @@ async function runMockSR() {
     ok('SR1 (Stage A): … it is a permission with its limits: «a permission, not an instruction», the shape, the never-list, the five things it takes precedence over, «overrides nothing else»',
       n.includes('This is a permission, not an instruction: if another question is worth more now, or they asked for something else, do that and leave this note aside.') && n.includes('If you do speak: 1–3 short lines.') &&
       n.includes('a sentence that starts with «Άρα».') && n.includes('For this one reply only, this takes precedence over five things') && n.includes('It overrides nothing else:'));
+    ok('SR1 (Stage A): … the wording rule stands where «a plain near-equivalent» stood — twice (the shape, and the list of the five things) — and the example of what is not known yet is «how the two relate for them, or whether they relate at all»',
+      (() => { const b = noteBlock(per[5], '[CODE-VERIFIED: ' + SPEAK); return b.length > 800 && cnt(b, WR) === 2 && cnt(b, 'Wording: ' + WR + '.') === 1 && cnt(b, '«their own words only» (' + WR + ');') === 1 && cnt(b, 'say plainly what you do not know yet ' + EX) === 1; })());
+    ok('SR1 (Stage A): … and in no request of the session is there «a plain near-equivalent», «which of them», «weighs more», «connected at all» or «opposition» in the note (' + per.length + ' requests)',
+      per.every(x => !OLDW.test(noteBlock(x, '[CODE-VERIFIED: ' + SPEAK)) && !OLDW.test(noteBlock(x, '[CODE-VERIFIED: ' + FU)) && !OLDW.test(noteBlock(x, '[CODE-VERIFIED: ' + RTN))));
     ok('SR1 (Stage A): … it carries no word of the user (not one content word of the 6 messages typed so far is in the note) and no Greek outside the quotes of «Άρα», «αλλά»/«όμως»', (() => {
       const a = n.indexOf('[CODE-VERIFIED: ' + SPEAK), blk = n.slice(a, n.indexOf(']\n', a) + 1), w = new Set(U9.slice(0, 6).flatMap(m => [...words(m)])), f = words(blk.replace(/«[^»]*»/g, ' '));
       return a >= 0 && blk.length > 800 && [...w].every(x => !f.has(x)) && !/[α-ωά-ώ]/i.test(blk.replace(/«[^»]*»/g, '')); })());
@@ -1620,6 +1629,7 @@ async function runMockSR() {
     ok('SR1: the request that carries the offer, and the one that carries the follow-up, pass the guard of api/aura.js unchanged (status ' + g1.status + '/' + g2.status + ', Anthropic called ' + g1.upstream + '/' + g2.upstream + ' time)', g1.status === 200 && g1.upstream === 1 && g2.status === 200 && g2.upstream === 1);
     ok('SR1 (Stage A): the follow-up tells the model what to do with a no and with a yes, and nothing about the user\'s words',
       per[6].sys.includes('go back to exploring in their own words, and do not defend the connection') && per[6].sys.includes('it is not an answer to the readiness question and not a root') && !speak(per[6]));
+    ok('SR1 (Stage A): the follow-up is not a synthesis: it carries no wording rule', cnt(noteBlock(per[6], '[CODE-VERIFIED: ' + FU), WR) === 0 && noteBlock(per[6], '[CODE-VERIFIED: ' + FU).length > 400);
     await s.browser.close();
   }
   // SR2 — five questions in a row AND enough material: ONE note, the ROUND TYPE note with the connection added (and the follow-up added to it on the next request)
@@ -1629,7 +1639,9 @@ async function runMockSR() {
       per.slice(5).every(x => blocks(x, '[CODE-VERIFIED: ' + RTN) === 1) && per.every(x => blocks(x, '[CODE-VERIFIED: ' + SPEAK) === 0));
     ok('SR2 (Stage A): … the rule «this reply must not end with a question» stays first and whole, then the addition: a statement that leaves it open to correct, a permission, the same limits',
       per[5].sys.includes('this reply must not end with a question. Counted from this conversation, not inferred: your last 5 replies each ended with a question') && per[5].sys.includes('AND because the material is also enough') &&
-      per[5].sys.includes('it ends as a statement that leaves it open for them to correct') && per[5].sys.includes('It is a permission: the other kinds of statement above stay available.') && per[5].sys.includes('never a sentence that starts with «Άρα»'));
+      per[5].sys.includes('It ends as a statement that leaves it open for them to correct') && per[5].sys.includes('It is a permission: the other kinds of statement above stay available.') && per[5].sys.includes('never a sentence that starts with «Άρα»'));
+    ok('SR2 (Stage A): … the wording rule stands once, as its own sentence before «It ends as a statement», and the unified block has none of the old words («a plain near-equivalent», «opposition», …)',
+      (() => { const b = noteBlock(per[5], '[CODE-VERIFIED: ' + RTN); return b.length > 1800 && cnt(b, 'Wording: ' + WR + '. It ends as a statement') === 1 && cnt(b, WR) === 1 && !OLDW.test(b); })() && per.every(x => !OLDW.test(noteBlock(x, '[CODE-VERIFIED: ' + RTN))));
     ok('SR2 (Stage A): … on the 7th request the follow-up is in the same block (' + mark(per, fu) + ')', mark(per, fu) === '000000100' && blocks(per[6], '[CODE-VERIFIED: ' + RTN) === 1 && per[6].sys.includes('ALSO, the previous reply of yours was sent with a permission'));
     const g = await viaGuard(per[5].body);
     ok('SR2: the unified request passes the guard of api/aura.js unchanged (status ' + g.status + ', Anthropic called ' + g.upstream + ' time)', g.status === 200 && g.upstream === 1);

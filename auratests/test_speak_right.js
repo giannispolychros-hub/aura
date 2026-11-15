@@ -277,18 +277,18 @@ safely('(5)', () => {
   assert('(5.3) it carries no text of the user: not one content word of their messages is in the note, and no Greek is in it outside the quotes of «Άρα», «αλλά»/«όμως»', noUserText(N, NAT_PLAIN) && !/[α-ωά-ώ]/i.test(N.replace(/«[^»]*»/g, '')));
   assert('(5.4) it is a permission, not an order: «a permission, not an instruction», and if another question is worth more now, or they asked for something else, do that and leave the note aside',
     /This is a permission, not an instruction: if another question is worth more now, or they asked for something else, do that and leave this note aside\./.test(N) && !/\byou (?:must|have to|should)\b|this reply must/i.test(N));
-  assert('(5.5) the shape, if the model speaks: 1–3 short lines; two or three DIFFERENT things they said side by side, as close to their words as possible (a plain near-equivalent is fine, no new label), and that both are there; then plainly what is not known yet; then open for them to correct',
-    /If you do speak: 1–3 short lines\./.test(N) && /two or three DIFFERENT things they said/.test(N) && /a plain near-equivalent of a word of theirs is fine; no new label, category or abstract name/.test(N) && /say that both are there/.test(N) &&
+  assert('(5.5) the shape, if the model speaks: 1–3 short lines; two or three DIFFERENT things they said side by side, and that both are there; the wording rule (their own words; a changed word only to a plain one of the SAME meaning, no judgement, size or weight, no new label); then plainly what is not known yet; then open for them to correct',
+    /If you do speak: 1–3 short lines\./.test(N) && /two or three DIFFERENT things they said/.test(N) && /Wording: use their own words; if you change a word, only to a plain one of the SAME meaning that adds no judgement, size or weight/.test(N) && /say that both are there/.test(N) &&
     /say plainly what you do not know yet/.test(N) && /Leave it open for them to correct/.test(N));
   assert('(5.6) what is never said, not even as a question: a feeling, a cause, a motive or a link they did not state; advice; a step or a road; naming the root; options as A/B, an order, costs or gains; a verdict; a number they did not say; one diagnosis that merges two open things; a sentence that starts with «Άρα»',
     /Never, not even as a question: a feeling, a cause, a motive or a link between the things that they did not state; advice; a step or a road; naming the root or what it might be; options as A\/B, an order, costs or gains; a verdict; a number they did not say; one diagnosis that merges two open things; a sentence that starts with «Άρα»\./.test(N));
-  assert('(5.7) for this one reply only it takes precedence over five things, and only as far as it says: «nothing they said is said back a second time» (a connection is not an echo), the compression check «never said aloud», «their own words only» (a plain near-equivalent is fine), «one question», and the Stage A line against raising the structure of a thought (you may say that both things are there, nothing more)',
-    /For this one reply only, this takes precedence over five things, and only as far as it says here: «nothing they said is said back a second time» \(a connection of different things is not an echo of one\); the compression check «never said aloud»; «their own words only» \(a plain near-equivalent is fine\); «one question»; and the Stage A line against raising the structure of a thought beyond what they gave \(you may say that both things are there, nothing more\)\./.test(N));
+  assert('(5.7) for this one reply only it takes precedence over five things, and only as far as it says: «nothing they said is said back a second time» (a connection is not an echo), the compression check «never said aloud», «their own words only» (with the wording rule), «one question», and the Stage A line against raising the structure of a thought (you may say that both things are there, nothing more)',
+    /For this one reply only, this takes precedence over five things, and only as far as it says here: «nothing they said is said back a second time» \(a connection of different things is not an echo of one\); the compression check «never said aloud»; «their own words only» \(use their own words; if you change a word, only to a plain one of the SAME meaning that adds no judgement, size or weight \(never a word that makes it heavier, bigger or more negative than they said\), and never a new label, category or abstract name\); «one question»; and the Stage A line against raising the structure of a thought beyond what they gave \(you may say that both things are there, nothing more\)\./.test(N));
   assert('(5.8) … and it overrides nothing else: the other Stage A rules (no roads, steps, ways or plan; no certainty raised beyond what they gave), the ban on advice and on evaluation, and every safety rule',
     /It overrides nothing else: the other Stage A rules \(no roads, steps, ways or plan; no certainty raised beyond what they gave\), the ban on advice and on evaluation, and every safety rule stay in force\./.test(N));
   assert('(5.9) it asks nothing itself: no question mark in the note, and no «first step», «next step» or ROAD DISCOVERY', N.length > 0 && !/\?/.test(N) && !/first step|next step|ROAD DISCOVERY|PATH TWO/.test(N));
   const dC = dec(natC()), NC = threw(dC) ? '' : call('describeSpeakRightCtx', dC, natC());
-  assert('(5.10) through Г the note says in which message they put the opposition (a number) and still no text of theirs', !threw(dC) && dC.kind === 'speak' && dC.viaC === true && NC.includes('in message ' + dC.tensionAt.join(', ') + ' they set an opposition («αλλά»/«όμως») with a stance on both sides') && noUserText(NC, natC()));
+  assert('(5.10) through Г the note says in which message they put a stance on each side of «αλλά»/«όμως» (a number; not «an opposition») and still no text of theirs', !threw(dC) && dC.kind === 'speak' && dC.viaC === true && NC.includes('in message ' + dC.tensionAt.join(', ') + ' they put a stance on each side of «αλλά»/«όμως»') && noUserText(NC, natC()));
   assert('(5.11) the pure part is stable: the same input gives the same note, and nothing in the decision is changed by writing it', (() => { const k = JSON.stringify(d); const a = call('describeSpeakRightCtx', d, NAT_PLAIN), b = call('describeSpeakRightCtx', d, NAT_PLAIN); return a === b && JSON.stringify(d) === k; })());
   assert('(5.12) nothing for a decision that is neither an offer nor a follow-up when the Stage A rule does not hold: no kind, an empty kind, nothing, text, "held" missing or false — even where the ROUND TYPE note would be lit',
     ['', 'x', undefined].every(k => call('describeSpeakRightCtx', { kind: k }, NAT_UNIFIED) === '' && call('describeSpeakRightCtx', { kind: k, held: false }, NAT_UNIFIED, false) === '') && call('describeSpeakRightCtx', null, NAT_UNIFIED) === '' && call('describeSpeakRightCtx', 'speak', NAT_UNIFIED) === '' && call('describeSpeakRightCtx', undefined, NAT_UNIFIED) === '');
@@ -309,7 +309,7 @@ safely('(6)', () => {
   const head = typeof rt === 'string' && rt.length > 2 ? rt.slice(0, rt.lastIndexOf(']')) : '#';
   assert('(6.2) the note is ONE block: the ROUND TYPE note as it is, with one sentence more for the connection — not two notes that could disagree', typeof N === 'string' && N.startsWith(head) && N.endsWith(']\n') && guardBlocks(N).length === 1 && guardAccepts(N) && N.length < 4800);
   assert('(6.3) the rule «this reply must not end with a question» stays first and whole; the addition says a connection of different things is one more thing that may be written, ends as a statement, leaves it open for them to correct, and is a permission: the other kinds of statement stay available',
-    /AND because the material is also enough \(counted from this conversation:/.test(N) && /one more: a short connection of different things they gave/.test(N) && /it ends as a statement that leaves it open for them to correct/.test(N) && /It is a permission: the other kinds of statement above stay available\./.test(N));
+    /AND because the material is also enough \(counted from this conversation:/.test(N) && /one more: a short connection of different things they gave/.test(N) && /It ends as a statement that leaves it open for them to correct/.test(N) && /It is a permission: the other kinds of statement above stay available\./.test(N));
   assert('(6.4) … with the same limits (no feeling, cause, motive or link they did not state; no diagnosis that merges two open things; no sentence that starts with «Άρα») and the same counts as the single note, no text of the user',
     /never states a feeling, a cause, a motive or a link they did not state, never a diagnosis that merges two open things, never a sentence that starts with «Άρα»/.test(N) && N.includes(d.userCount + ' messages with ' + d.mass + ' different content words of 5+ letters') && noUserText(N.replace(head, ''), NAT_UNIFIED) && !/\?/.test(N));
   const twoDontKnow = [...mk({ n: 5, sharedIn: [2, 3, 4], extra: 30 }), A(5, false), U('δεν ξέρω'), A(6, false), U('Δεν ξέρω.')];
@@ -340,6 +340,62 @@ safely('(7)', () => {
   const d7 = call('speakRightDecision', true, false, m7, { at: 6, mass: 30 }, RISK0), N7 = threw(d7) ? '' : call('describeSpeakRightCtx', d7, m7), rt7 = call('describeRoundTypeCtx', true, false, m7);
   assert('(7.6) when the ROUND TYPE note is also lit on that message → ONE block again: the ROUND TYPE note, then the follow-up in the same block', typeof rt7 === 'string' && rt7.startsWith('\n[CODE-VERIFIED: this reply must not end') && N7.startsWith(rt7.slice(0, rt7.lastIndexOf(']'))) && guardBlocks(N7).length === 1 && /previous reply of yours was sent with a permission/.test(N7) && !/\?/.test(N7));
   assert('(7.7) the follow-up carries no text of the user either', noUserText(N, m6) && noUserText(N7.replace(rt7.slice(0, rt7.lastIndexOf(']')), ''), m7));
+});
+
+// ── (7b) «δικαίωμα ομιλίας», commit 6 (John, 15/11/2026): TWO WORDING CORRECTIONS of the note — the text only (prompt, api/aura.js, the safety path, the thresholds and the pace are as they were) ─────────────
+//  (1) «a plain near-equivalent of a word of theirs is fine» is gone wherever it stood (the shape; the list of what the note takes precedence over — «their own words only»; the unified form), replaced by the wording rule WR:
+//      their own words; a changed word only to a plain one of the SAME meaning that adds no judgement, size or weight (never heavier, bigger or more negative than they said); never a new label, category or abstract name
+//  (2) the example of what is not known yet no longer says which of the two «weighs more» (nor «connected at all»): «how the two relate for them, or whether they relate at all» — and no form suggests that the two things
+//      compete (the measured tension is told as «a stance on each side of «αλλά»/«όμως»», not as «an opposition»).
+// The FOLLOW-UP never held either phrase: it is pinned unchanged. The commit-5 texts (0c13fa0) are pinned by their sha256 on fixed conversations: the only difference between old and new is what is named here.
+safely('(7b)', () => {
+  const WR = 'use their own words; if you change a word, only to a plain one of the SAME meaning that adds no judgement, size or weight (never a word that makes it heavier, bigger or more negative than they said), and never a new label, category or abstract name';
+  const EX = '(for example how the two relate for them, or whether they relate at all; you do not know unless they said so)';
+  const OLD_SHAPE = 'Put side by side two or three DIFFERENT things they said, staying as close to their own words as you can (a plain near-equivalent of a word of theirs is fine; no new label, category or abstract name), and say that both are there. Then say plainly what you do not know yet (for example which of them weighs more for them, or whether they are connected at all; you do not know unless they said so).';
+  const NEW_SHAPE = 'Put side by side two or three DIFFERENT things they said, and say that both are there. Wording: ' + WR + '. Then say plainly what you do not know yet ' + EX + '.';
+  const OLD_LIST = '«their own words only» (a plain near-equivalent is fine);', NEW_LIST = '«their own words only» (' + WR + ');';
+  const OLD_UNI = 'two or three different things they said side by side, staying as close to their own words as you can (a plain near-equivalent is fine; no new label or category), and what you do not know yet; it ends as a statement';
+  const NEW_UNI = 'two or three different things they said side by side, and what you do not know yet. Wording: ' + WR + '. It ends as a statement';
+  const OLD_TENSION = 'they set an opposition («αλλά»/«όμως») with a stance on both sides', NEW_TENSION = 'they put a stance on each side of «αλλά»/«όμως»';
+  const twoDK = [...mk({ n: 5, sharedIn: [2, 3, 4], extra: 30 }), A(5, false), U('δεν ξέρω'), A(6, false), U('Δεν ξέρω.')];
+  const m6 = NAT_PLAIN.concat([A(6), U('Όχι, δεν το βλέπω έτσι. Το ενοίκιο δεν είναι το θέμα.')]), m7 = natConv().concat([A(6), U('Όχι, δεν είναι αυτό.')]);
+  const dPC = dec(natC());
+  const F6 = {
+    plainB: call('describeSpeakRightCtx', dec(NAT_PLAIN), NAT_PLAIN), plainC: call('describeSpeakRightCtx', dPC, natC()),
+    unified: call('describeSpeakRightCtx', dec(NAT_UNIFIED), NAT_UNIFIED), unified2: call('describeSpeakRightCtx', dec(twoDK), twoDK),
+    follow: call('describeSpeakRightCtx', call('speakRightDecision', true, false, m6, { at: 6, mass: 30 }, RISK0), m6),
+    followUnified: call('describeSpeakRightCtx', call('speakRightDecision', true, false, m7, { at: 6, mass: 30 }, RISK0), m7),
+  };
+  const S16 = s => sha(s).slice(0, 16);
+  const PIN = { plainB: '94bdbd7879545292', plainC: '8164264219ab1e7a', unified: '7f6a8e26c43207c7', unified2: '4e99b4b01848b8a3', follow: '698a27a144aa486e', followUnified: '363821f0f7c165d6' }; // sha256 (first 16) of the commit-5 texts (0c13fa0) for these conversations
+  const all = Object.values(F6), isStr = x => typeof x === 'string' && x.length > 300;
+  const cnt = (s, sub) => s.split(sub).length - 1;
+  const COMPETE = /\bweighs? (?:more|most)\b|\bweighing\b|\boutweigh|compet|opposition|against each other|which of them|connected at all|\brival|\bversus\b/i;
+  assert('(7b.1) the six forms exist: the offer (a word comes back; a tension), the offer with the ROUND TYPE note (5 questions; two «δεν ξέρω»), the follow-up alone and with the ROUND TYPE note',
+    all.every(isStr) && F6.plainB.startsWith('\n[CODE-VERIFIED: this reply may say back a connection between things the user gave.') && F6.plainC.startsWith('\n[CODE-VERIFIED: this reply may say back a connection between things the user gave.') &&
+    [F6.unified, F6.unified2].every(x => x.startsWith('\n[CODE-VERIFIED: this reply must not end with a question.') && x.includes('AND because the material is also enough')) &&
+    F6.follow.startsWith('\n[CODE-VERIFIED: the previous reply of yours was sent with a permission') && F6.followUnified.startsWith('\n[CODE-VERIFIED: this reply must not end with a question.') && F6.followUnified.includes('ALSO, the previous reply of yours was sent with a permission'));
+  assert('(7b.2) the offer: the wording rule stands in the SHAPE (right after «say that both are there», before what is not known yet) and again in the list of the five things it takes precedence over — twice, word for word, in both ways of lighting (a word that comes back; a tension)',
+    [F6.plainB, F6.plainC].every(x => isStr(x) && cnt(x, WR) === 2 && cnt(x, NEW_SHAPE) === 1 && cnt(x, NEW_LIST) === 1));
+  assert('(7b.3) the offer with the ROUND TYPE note: the wording rule stands once, as its own sentence before «It ends as a statement» — in both reasons of the ROUND TYPE note',
+    [F6.unified, F6.unified2].every(x => isStr(x) && cnt(x, WR) === 1 && cnt(x, NEW_UNI) === 1));
+  assert('(7b.4) the follow-up is not a synthesis: neither form carries the wording rule, and its text is unchanged (sha256 pinned)', [F6.follow, F6.followUnified].every(x => isStr(x) && cnt(x, WR) === 0) && S16(F6.follow) === PIN.follow && S16(F6.followUnified) === PIN.followUnified);
+  assert('(7b.5) what is not known yet is told with the new example in the offer — «how the two relate for them, or whether they relate at all; you do not know unless they said so» — once',
+    [F6.plainB, F6.plainC].every(x => isStr(x) && cnt(x, 'say plainly what you do not know yet ' + EX) === 1));
+  assert('(7b.6) in NO form is there «a plain near-equivalent», «staying as close to their own words as you can», «which of them», «weighs more», «connected at all», «opposition» or anything that makes the two things compete',
+    all.every(x => isStr(x) && !/near-equivalent|staying as close to their own words/.test(x) && !COMPETE.test(x)));
+  assert('(7b.7) the measured tension is told neutrally: in message(s) N they put a stance on each side of «αλλά»/«όμως» — not «an opposition»',
+    !threw(dPC) && dPC.viaC === true && isStr(F6.plainC) && cnt(F6.plainC, 'in message ' + dPC.tensionAt.join(', ') + ' ' + NEW_TENSION) === 1 && !/opposition/i.test(F6.plainC));
+  assert('(7b.8) nothing else changed: with the new pieces put back to the commit-5 words, each form is the commit-5 text byte for byte (sha256 of the old texts pinned on these conversations)',
+    (() => {
+      const back = (x, pairs) => pairs.reduce((s, [n, o]) => (cnt(s, n) === 1 ? s.split(n).join(o) : '#NOT-APPLIED#' + s), x);
+      return S16(back(F6.plainB, [[NEW_SHAPE, OLD_SHAPE], [NEW_LIST, OLD_LIST]])) === PIN.plainB &&
+        S16(back(F6.plainC, [[NEW_SHAPE, OLD_SHAPE], [NEW_LIST, OLD_LIST], ['in message ' + dPC.tensionAt.join(', ') + ' ' + NEW_TENSION, 'in message ' + dPC.tensionAt.join(', ') + ' ' + OLD_TENSION]])) === PIN.plainC &&
+        S16(back(F6.unified, [[NEW_UNI, OLD_UNI]])) === PIN.unified && S16(back(F6.unified2, [[NEW_UNI, OLD_UNI]])) === PIN.unified2;
+    })());
+  assert('(7b.9) the thresholds and the pace are as they were (30 words; a word in 3 messages; 3 / 2 phrases; 3 messages and 15 new words between two offers), and every form is still one block the api guard accepts, with no question mark',
+    JSON.stringify(F.SPEAK_RIGHT_PARAMS) === JSON.stringify({ minWords: 30, recurIn: 3, phrasesB: 3, phrasesC: 2, rearmMessages: 3, rearmWords: 15 }) &&
+    all.every(x => isStr(x) && guardBlocks(x).length === 1 && guardAccepts(x) && !/\?/.test(x) && x.endsWith(']\n')));
 });
 
 // ── (8) the wiring ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
