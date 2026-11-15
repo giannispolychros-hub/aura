@@ -140,8 +140,12 @@ const SHORT = JOHN.slice(0, 4); // two user messages so far
     /!coreReadinessConfirmed\.current/.test(blk) && /!stageARef\.current\.phase/.test(blk) && /!reflectionDelivered\.current/.test(blk) && /!stageASafetyHold\(riskSignalKind\.current, dangerFromOther\.current\)/.test(blk)); // UPDATED (23/10, Ο5): + the danger latch — danger from another person (test_danger_from_other_2310.js)
   assert('DOOR 2: the latch flips exactly as it would have after the reply, the «Ναι» is shown (not sent), door 1\'s question opens, the turn ENDS — nothing sent',
     /coreReadinessConfirmed\.current = true;[^\n]*\n\s*addUiBubble\(userText, messages\.length\);[^\n]*\n\s*stageADispatch\(\{ type: "ready" \}\);\s*return;\s*\}/.test(blk) && !/generateResponse|callAura|setMessages/.test(blk));
-  assert('DOOR 2: the old arming path after a reply stays for the «Ναι» that this block does not catch (unchanged)', /else stageARootArmed\.current = true;/.test(GEN) &&
-    /else if \(coreReadinessAsked\.current && lastUserMsgForReadiness &&\s*detectsAffirmativeShort\(lastUserMsgForReadiness\.content\)\) \{/.test(GEN));
+  // RE-BASED / UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (α), John — finding 161, the card's silent arming): the arming path after a reply
+  // stays, but with the switch open it now takes ONLY a «Ναι» that answers the readiness question asked right before it
+  // (answersReadinessQuestion); the old flow exactly as before. Behaviour: auratests/test_notes_card_1511.js (α), browser section NQα.
+  assert('DOOR 2: the arming path after a reply stays — with the switch open only for a «Ναι» that answers the readiness question right before it; the old flow as before',
+    /else stageARootArmed\.current = true;/.test(GEN) &&
+    /else if \(coreReadinessAsked\.current && lastUserMsgForReadiness &&\s*detectsAffirmativeShort\(lastUserMsgForReadiness\.content\) &&\s*(?:\/\/[^\n]*\n\s*)?\(!stageAActive\.current \|\| answersReadinessQuestion\(msgs\)\)\) \{/.test(GEN));
   // UPDATED (12/10/2026, ADR «12 Οκτωβρίου (γ)», John): the «Ναι» counts only in a clear form — the same start words, then only words
   // that keep it a plain yes («νιώθω χάλια» is not a «Ναι»; test_round3_1210.js). The question detector is untouched.
   assert('DOOR 2: coreReadinessCtx and the readiness question detector are untouched; the «Ναι» keeps the same start words',

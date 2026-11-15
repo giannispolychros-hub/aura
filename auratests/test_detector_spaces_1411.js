@@ -153,7 +153,7 @@ assert('(Η) the prompt fingerprint is still b5f303cc9405aa21', crypto.createHas
   assert('(Θ) each of the ' + UNDO.length + ' pieces of this package is in src/App.jsx exactly once, all inside detectSafetySignal or detectsDangerFromOther',
     present === UNDO.length && UNDO.every(([nw]) => (extract('detectSafetySignal') + extract('detectsDangerFromOther')).includes(nw.split('\n').filter(Boolean).slice(-1)[0])));
   assert('(Θ) … and with them taken out, src/App.jsx is byte for byte the file of release-candidate c85259c (sha256 f6092fe6…) — nothing else changed',
-    present === UNDO.length && crypto.createHash('sha256').update(back).digest('hex') === 'f6092fe66f63e4c5c1448474bd58f2212bba925950ab91afce046e6ab0eb3cf7');
+    present === UNDO.length && crypto.createHash('sha256').update(back).digest('hex') === '597dd3a3af1e240a816821bd149c44a3860e89b0404444304dbb26cf9c27c261' /* UPDATED (15/11/2026, ADR «15 Νοεμβρίου», John: only this value moved — this round's changes (the root card and the per-turn notes) lie outside this test's cut; proved first: auratests/test_notes_card_1511.js (Ω), with them taken out src/App.jsx is release-candidate 50beff6 byte for byte) */);
 }
 
 console.log(passed + ' passed, ' + failed + ' failed');

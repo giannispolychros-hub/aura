@@ -202,7 +202,7 @@ const LONG = ('Αυτό είναι ένα πολύ μεγάλο κείμενο �
     let back = raw; for (const [nw, old] of UNDO) back = back.split(nw).join(old);
     assert('(Ε3) each of the ' + UNDO.length + ' changes of this round is in src/App.jsx exactly once', present === UNDO.length);
     assert('(Ε4) … and with them taken out, src/App.jsx is byte for byte the file of release-candidate 52f85dc (sha256 c7083048…; with the white-space package of 14/11/2026, c50ad398… — test_detector_spaces_1411.js (Θ)) — nothing else changed',
-      present === UNDO.length && sha(back) === 'c50ad39850094080e6ca1247f977c028e21cf6016d17c6c9aa685792cbcf0cb7' /* UPDATED (14/11/2026, John, a safety package: white space at the detectors' input — proved first, auratests/test_detector_spaces_1411.js (Θ)) */);
+      present === UNDO.length && sha(back) === '93055550152cce419178eecef585ccb05d460832e23b044c5a4608022dd2243b' /* UPDATED (15/11/2026, ADR «15 Νοεμβρίου», John: only this value moved — this round's changes (the root card and the per-turn notes) lie outside this test's cut; proved first: auratests/test_notes_card_1511.js (Ω), with them taken out src/App.jsx is release-candidate 50beff6 byte for byte) */ /* UPDATED (14/11/2026, John, a safety package: white space at the detectors' input — proved first, auratests/test_detector_spaces_1411.js (Θ)) */);
   } catch (e) { failed++; console.log('FAIL — the test crashed: ' + (e && e.message)); }
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);

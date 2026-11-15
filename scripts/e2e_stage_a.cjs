@@ -1016,6 +1016,8 @@ async function runMock() {
   await runMockBX(); // 9/11 (round 11): S1–S9 beside the tool's sessions, the two danger sessions, the labels fix
   await runMockSD(); // 31/10 (ζ): the safety detectors' gaps (item 117, S5–S9) — the existing line on the screen
   await runMockWS(); // 14/11: white space at the safety detectors' input — the same line, the text as typed
+  await runMockNQ(); // 15/11: per-turn notes and the root card (ADR «15 Νοεμβρίου»)
+  await runMockNQS(); // 15/11: the safety path byte for byte as 50beff6 sent it (ADR «15 Νοεμβρίου», condition 3)
 }
 
 // ── SD: ADR «31 Οκτωβρίου (ζ)» (John, a safety fix (α)) — the gaps of the two safety detectors, on the screen. Stage A (?stageA=1&rec=1),
@@ -1156,6 +1158,146 @@ async function runMockWS() {
     ok('WS ' + id + ', typed key by key with Shift+Enter between the words: the box held it as typed, the same reply bubble as written, on the safety path, and the request carries it as typed',
       k.text === v && num.test(k.aura) && k.aura === a.aura && k.safety && k.sent.some(x => x.includes(v)));
   }
+}
+// ── NQ: PER-TURN NOTES AND THE ROOT CARD (John, 15/11/2026, ADR «15 Νοεμβρίου», release-candidate). Fake model, SYNTHETIC messages only
+// (no real session's words). NO CRISIS PHRASE IS WRITTEN HERE: where a check needs the safety path, it uses the benchmark's safety
+// scenario S5 (benchmark/scenarios.json), read at run time by its code; no label prints it. Unit tests: auratests/test_notes_card_1511.js.
+//  NQα — the root card arms ONLY when a plain «Ναι» answers the readiness question asked right before it (finding 161). A later plain «Ναι»
+//        to another question no longer arms it silently: the next message goes to the model and no card opens (7, 28 and 31 messages).
+//        A «Ναι» right after the question still shows door 1's question at once, and the answer opens the card. The two controls of before
+//        are unchanged, and the old flow (?stageA=0) still flips its own readiness latch on the late «Ναι», as before.
+// Alone: --only NQ.
+async function runMockNQ() {
+  const RQ = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+  const card = async page => (await page.getByRole('button', { name: 'Ναι, αυτό είναι', exact: true }).count()) > 0;
+  const sysOf = b => (b.system || []).map(x => x.text || '').join('\n');
+  const run = async (query, script, msgs) => {
+    const s = await session(query, script);
+    const perMsg = [];
+    for (let i = 0; i < msgs.length; i++) {
+      const before = s.calls.length;
+      await send(s.page, msgs[i]);
+      if (i === 0 && await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, 'Γιατί με βαραίνει κάθε μέρα.');
+      perMsg.push({ calls: s.calls.length - before, card: await card(s.page), sys: s.calls.slice(before).map(sysOf).join('\n') });
+      if (perMsg[i].card) break;
+    }
+    const foundShown = async t => (await s.page.getByText('«' + t + '»', { exact: false }).count()) > 0;
+    return { s, perMsg, foundShown };
+  };
+  // ── NQα
+  const U = ['Σκέφτομαι να αλλάξω δουλειά αλλά κάτι με κρατάει.', 'Η σταθερότητα του μισθού, αλλά νιώθω ότι κάτι άλλο παίζει.',
+    'Ναι, νομίζω ότι φοβάμαι να το πω στον πατέρα μου.', 'Θα απογοητευόταν, έτσι νομίζω τουλάχιστον.', 'Ναι, σωστά.', 'Όχι καλά, θύμωσε πολύ τότε.', 'Δεν ξέρω τι άλλο να πω.'];
+  const R = ['Τι σε κρατάει περισσότερο;', RQ, 'Τι θα γινόταν αν του το έλεγες;', 'Του έχεις μιλήσει ποτέ για τη δουλειά σου;', 'Και πώς αντέδρασε τότε;', 'Τι σου έμεινε από εκείνη τη στιγμή;', 'Πες μου κι άλλο.'];
+  { // short: the readiness question answered with more than «Ναι», then a plain «Ναι» to ANOTHER question
+    const { s, perMsg } = await run('?stageA=1', R, U);
+    ok('NQα: «ναι» WITH more in it, to the readiness question → goes to the model (1 call), no card — as before', perMsg[2] && perMsg[2].calls === 1 && !perMsg[2].card);
+    ok('NQα: a later plain «Ναι» to ANOTHER question → goes to the model (1 call), no card', perMsg[4] && perMsg[4].calls === 1 && !perMsg[4].card);
+    ok('NQα: the NEXT message → IS sent to the model (1 call) and no card opens — it is not taken as the root', perMsg[5] && perMsg[5].calls === 1 && !perMsg[5].card);
+    ok('NQα: the whole session — 7 messages, 7 calls, never a card', perMsg.length === 7 && perMsg.every(x => x.calls === 1 && !x.card));
+    await s.browser.close();
+  }
+  { // long: the plain «Ναι» at message 27
+    const filler = [], fr = [];
+    for (let k = 0; k < 22; k++) { filler.push('Σκέφτομαι ακόμα το θέμα με τη δουλειά, για τη μέρα ' + (k + 1) + '.'); fr.push('Τι άλλαξε από χθες στη μέρα ' + (k + 1) + ';'); }
+    const { s, perMsg } = await run('?stageA=1', [...R.slice(0, 4), ...fr, ...R.slice(4)], [...U.slice(0, 4), ...filler, ...U.slice(4)]);
+    ok('NQα (29 messages): every message goes to the model, never a card — the late «Ναι» at 27 arms nothing', perMsg.length === 29 && perMsg.every(x => x.calls === 1 && !x.card));
+    await s.browser.close();
+  }
+  { // shaped like a long session, synthetic words: the question at reply 15, «ναι» + a «how» question at 16, a late «Ναι…» (U+2026) at 29
+    const M = [], A = [];
+    for (let k = 1; k <= 31; k++) { M.push('Σκέφτομαι το θέμα της δουλειάς ξανά, κομμάτι ' + k + '.'); A.push('Τι αλλάζει όταν το σκέφτεσαι, στο κομμάτι ' + k + ';'); }
+    M[9] = 'Δεν ξέρω πώς να το αλλάξω. Εσύ τι λες;'; A[9] = 'Θα το ψάξουμε μαζί. Τι έχεις δοκιμάσει ως τώρα;';
+    A[14] = 'Ακούω. ' + RQ;
+    M[15] = 'Ναι, νομίζω πως είναι το ωράριο. Πώς το διορθώνω;'; M[17] = 'Το πρώτο νομίζω'; M[19] = 'Μάλλον το πρώτο'; M[24] = 'Όχι'; M[25] = 'Δεν ξέρω';
+    M[27] = 'Δεν είμαι σίγουρος. Εσύ τι θα έκανες;'; A[27] = 'Τι από αυτά ισχύει για σένα;';
+    M[28] = 'Ναι… σωστά'; A[28] = 'Πότε το πρόσεξες τελευταία φορά;';
+    M[29] = 'Όχι, το ωράριο είναι το ίδιο κάθε εβδομάδα.';
+    const { s, perMsg } = await run('?stageA=1', A, M.slice(0, 31));
+    ok('NQα (shaped like a long session, 31 messages): all 31 go to the model, never a card', perMsg.length === 31 && perMsg.every(x => x.calls === 1 && !x.card));
+    await s.browser.close();
+  }
+  { // door 2 still works: a plain «Ναι» RIGHT AFTER the readiness question
+    const U3 = [U[0], U[1], 'Ναι, σωστά.', 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.'];
+    const { s, perMsg, foundShown } = await run('?stageA=1', R, U3);
+    ok('NQα: «Ναι» right after the readiness question → not sent to the model (0 calls), door 1\'s question instead — as before', perMsg[2] && perMsg[2].calls === 0 && !perMsg[2].card);
+    ok('NQα: … and the answer opens the card (0 calls), «Τι βρήκες» is that answer, whole — door 2 works', perMsg[3] && perMsg[3].calls === 0 && perMsg[3].card && await foundShown(U3[3]));
+    await s.browser.close();
+  }
+  { // control: the late «ναι» has more in it → no arming
+    const U2 = [...U]; U2[4] = 'Ναι, του έχω μιλήσει μία φορά πέρυσι.';
+    const { s, perMsg } = await run('?stageA=1', R, U2);
+    ok('NQα (control): a late «ναι» WITH more in it arms nothing — 7 messages, 7 calls, no card — as before', perMsg.length === 7 && perMsg.every(x => x.calls === 1 && !x.card));
+    await s.browser.close();
+  }
+  { // control: the readiness question with a line break inside it → never registered (known gap, unchanged)
+    const R2 = [...R]; R2[1] = RQ.replace('αρχίσει να ', 'αρχίσει\nνα ');
+    const { s, perMsg } = await run('?stageA=1', R2, U);
+    ok('NQα (control): the readiness question broken by a line break is not registered — nothing arms, no card — as before', perMsg.length === 7 && perMsg.every(x => x.calls === 1 && !x.card));
+    await s.browser.close();
+  }
+  { // the old flow (comparison tool only): its own latch still flips on the late «Ναι», exactly as before
+    const { s, perMsg } = await run('?stageA=0', R, U);
+    ok('NQα (old flow): the late plain «Ναι» still flips the old flow\'s readiness latch — the next request carries its note, as before',
+      perMsg.length === 7 && perMsg[5] && perMsg[5].sys.includes('[The user just confirmed readiness to name the core themselves') && !perMsg[4].sys.includes('[The user just confirmed readiness'));
+    await s.browser.close();
+  }
+}
+// ── NQS: THE SAFETY PATH, BYTE FOR BYTE (John, 15/11/2026, ADR «15 Νοεμβρίου», condition 3 of his approval). Every request from the crisis
+// or danger message on — the crisis turn and every turn after the line — sends exactly what release-candidate 50beff6 sent: the same
+// kind, the same per-turn part and the same whole body (system + messages), as SHA-256 (first 16 hex) recorded on 50beff6 with this same
+// section (NQ_RECORD=1). NO CRISIS PHRASE IS WRITTEN HERE: the crisis is the benchmark's S5 and the danger from another person its S2
+// (benchmark/scenarios.json), read at run time by their code. Everything else is everyday synthetic text. Alone: --only NQS.
+// recorded on release-candidate 50beff6 (src/App.jsx sha256 86a8da15…), twice, identical both times
+const NQ_SAFETY_BASELINE = {
+  stageA_midCrisis: "supportive:4cf2491cb20c788f:3a15961a00229f27 main:b298395175799c51:8ab8433b5e39bb65 main:64215f4e0800a7ed:6d65b750bbeffe40 main:da18304a1a21c51b:51722380d28acc45 main:da18304a1a21c51b:5d636718d173db1e main:da18304a1a21c51b:2f7f954cb4c0d377 main:870ee15e7a655b47:110a58b453cc35ef",
+  stageA_firstCrisis: "supportive:7f2248ddda4cdac5:5e070b591c404aba main:da99234b5e51b1ac:86c30a8a485cec4f main:4956e4beafc11407:34fd47d9450c9079 main:ce5b6a7a3abf760c:c0adcefdaf202d41 main:e1ad97c542ee6dea:1eba8683a5f749b7",
+  stageA_danger: "main:e18172077a4e6b22:a4d699a2a9665fec main:e18172077a4e6b22:317bd7792fff2dfe main:de977f1044fd003e:9142c52ff31ac4cb main:7a5375821d5499d4:a740425f52ad9067 main:33ee02022a495763:1732020542adf652 main:386930464bdbd7c2:5345485d00ce8de4",
+  oldFlow_crisis: "supportive:9f3b3f46433750ff:2afea89e7c26e37c main:6fac00f42527a48b:7ea5fe7ffcf69b70 main:3d650ea45ef81b83:7926214e9c1e64fd main:b1c7180065526d2d:02505ace017de8d2 main:af59c600e1070018:895f6f5af5766992",
+};
+async function runMockNQS() {
+  const crypto = require('crypto');
+  const sha = t => crypto.createHash('sha256').update(String(t), 'utf8').digest('hex').slice(0, 16);
+  const SAFE = {};
+  for (const sc of BL.loadBench().safety.scenarios) {
+    const p = BL.benchPersona(sc, 'safety'), at = sc.id === 'S2' ? '1' : Object.keys(p.forcedMarks || {})[0];
+    SAFE[sc.id] = at ? p.forced[at] : '';
+  }
+  const trace = async (query, script, msgs, from) => {
+    const s = await session(query, script);
+    const per = [];
+    for (let i = 0; i < msgs.length; i++) {
+      const before = s.calls.length;
+      if (await s.page.locator('textarea.textarea').count()) await send(s.page, msgs[i]);
+      if (i === 0 && await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, 'Γιατί με βαραίνει κάθε μέρα.');
+      per.push(s.calls.slice(before));
+    }
+    await s.browser.close();
+    const reqs = per.slice(from).flat().map(b => { const c = LIB.classifyRequest(b, APP); return { kind: c.kind, d: c.dynamic || '', whole: JSON.stringify([b.system, b.messages]) }; });
+    return { reqs, hash: reqs.map(r => r.kind + ':' + sha(r.d) + ':' + sha(r.whole)).join(' ') };
+  };
+  const REPLIES = ['Ο προϊστάμενος φορτώνει — από πότε γίνεται αυτό;', 'Τι άλλαξε όταν έφυγε;', 'Τι βαραίνει πιο πολύ;', 'Τι βαραίνει πιο πολύ;',
+    'Ποιο από τα δύο σε τραβάει;', 'Εντάξει.', 'Είμαι εδώ. Πώς είσαι αυτή τη στιγμή;', 'Είμαι εδώ.'];
+  const AFTER = ['εντάξει', 'δεν ξέρω', 'Η δουλειά με κουράζει.', 'δεν ξέρω', 'Ναι.', 'Ο προϊστάμενος φορτώνει πάλι.'];
+  const PLAN = {
+    stageA_midCrisis: ['?stageA=1', ['Ο προϊστάμενος φορτώνει όλη τη δουλειά πάνω μου κάθε μέρα.', 'Ξεκίνησε πέρσι, όταν έφυγε ένας συνάδελφος.',
+      'Ή θα μείνω ή θα φύγω, δεν ξέρω.', 'Ή θα μείνω ή θα φύγω, το σκέφτομαι συνέχεια.', 'Θέλω να φύγω αλλά φοβάμαι να φύγω.', 'δεν ξέρω', SAFE.S5, ...AFTER], 6],
+    stageA_firstCrisis: ['?stageA=1', [SAFE.S5, ...AFTER.slice(0, 4)], 0],
+    stageA_danger: ['?stageA=1', ['Θέλω να μιλήσουμε για το σπίτι.', SAFE.S2, ...AFTER.slice(0, 5)], 1],
+    oldFlow_crisis: ['?stageA=0', ['Δεν ξέρω αν πρέπει να αλλάξω δουλειά, κάθε μέρα είναι ίδια.', 'Ο προϊστάμενος φορτώνει όλη τη δουλειά πάνω μου.', SAFE.S5, ...AFTER.slice(0, 4)], 2],
+  };
+  ok('NQS: the benchmark\'s S5 and S2 load (read by code)', !!SAFE.S5 && !!SAFE.S2);
+  const all = [];
+  for (const [name, [q, msgs, from]] of Object.entries(PLAN)) {
+    const t = await trace(q, REPLIES, msgs, from);
+    if (process.env.NQ_RECORD === '1') { console.log('NQS-RECORD ' + name + ' = ' + JSON.stringify(t.hash)); continue; }
+    const onPath = t.reqs.length >= 3 && t.reqs.every(r => r.d.includes('[MASTER PRIORITY RULE — STAGE: SAFETY'));
+    ok(`NQS ${name}: every request from the ${name.includes('danger') ? 'danger' : 'crisis'} message on is on the safety path (${t.reqs.length} requests)`, onPath);
+    ok(`NQS ${name}: … and each one sends exactly what 50beff6 sent — kind, per-turn part and whole body (${t.hash.split(' ').length})`, t.hash === NQ_SAFETY_BASELINE[name]);
+    all.push(...t.reqs);
+  }
+  if (process.env.NQ_RECORD === '1') return;
+  ok('NQS: on the safety path the «switch family» note is still sent as before (ζ, John\'s decision pending)', all.some(r => r.d.includes('has been the highest-attention signal')));
+  ok('NQS: on the safety path the knowledge-state note keeps its old wording, word for word (ζ, John\'s decision pending)', all.some(r => r.d.includes('OBSTACLE (τι το εμποδίζει συγκεκριμένα)')));
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -7284,7 +7426,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

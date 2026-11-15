@@ -6101,6 +6101,18 @@ function detectsOutcomeScaleAsked(text) {
 function detectsCoreReadinessAsked(text) {
   return /νιώθεις ότι.{0,40}ξεκαθαρίζει.{0,60}πραγματικά σε απασχολεί/i.test(text || "");
 }
+// ADR «15 Νοεμβρίου» (α) (John, finding 161 — the root card's silent arming): in Stage A a plain «Ναι» confirms readiness only when it
+// answers the readiness question asked RIGHT BEFORE it — the message just before the user's last one is AURA's own reply (not one of the
+// app's fixed STAGE_A texts) with that question. A «Ναι» to any other question later in the session no longer arms door 2, so the next
+// message is not taken as the root. Pure: it reads only the order of the messages; whether the answer is a plain «Ναι» stays the job of
+// detectsAffirmativeShort. auratests/test_notes_card_1511.js; browser: section NQ.
+function answersReadinessQuestion(msgs) {
+  const list = Array.isArray(msgs) ? msgs : [];
+  let u = list.length - 1;
+  while (u >= 0 && !(list[u] && list[u].role === "user")) u--;
+  const prev = u > 0 ? list[u - 1] : null;
+  return !!prev && prev.role === "assistant" && prev.msgMode !== "STAGE_A" && typeof prev.content === "string" && detectsCoreReadinessAsked(prev.content);
+}
 // ADR «12 Οκτωβρίου (γ)» (John): the «Ναι» to a yes/no question counts only in a CLEAR form — the same start words as before,
 // and after them only words that keep it a plain yes. «Νιώθω χάλια», «Ναι αλλά φοβάμαι», «ναι μάλλον», «Νιώθω το ίδιο» are not a
 // «Ναι»: when the app is not sure it decides nothing, and the message goes to the model (a person writing how they feel must not
@@ -8040,7 +8052,7 @@ A line missing above means only that one pattern was not matched — the absence
           }), { active: true, rootConfirmed: stageARef.current.stats.rootConfirmed === 1, lastUserText, earlierUserTexts: _earlierUserTexts }),
           armed: stageARootArmed.current, rootPhase: stageARef.current.phase,
           latchFlips: !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1 &&
-            (detectsSpontaneousCoreRecognition(lastUserText) || (coreReadinessAsked.current && detectsAffirmativeShort(lastUserText))),
+            (detectsSpontaneousCoreRecognition(lastUserText) || (coreReadinessAsked.current && detectsAffirmativeShort(lastUserText) && answersReadinessQuestion(msgs))),
         })));
         // ADR «19 Οκτωβρίου (δ)»: the crisis turn and every turn after the crisis line are SAFETY — `safetyMode` above is the state
         // of the previous render (it changes only after this call), and crisis B never sets it.
@@ -8874,7 +8886,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
         if (lastUserMsgForReadiness && detectsSpontaneousCoreRecognition(lastUserMsgForReadiness.content)) {
           coreReadinessConfirmed.current = true;
         } else if (coreReadinessAsked.current && lastUserMsgForReadiness &&
-            detectsAffirmativeShort(lastUserMsgForReadiness.content)) {
+            detectsAffirmativeShort(lastUserMsgForReadiness.content) &&
+            // ADR «15 Νοεμβρίου» (α): in Stage A only a «Ναι» to the readiness question asked right before it (the old flow as before)
+            (!stageAActive.current || answersReadinessQuestion(msgs))) {
           coreReadinessConfirmed.current = true;
         } else if (detectsCoreReadinessAsked(text)) {
           coreReadinessAsked.current = true;
