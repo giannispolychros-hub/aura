@@ -1420,7 +1420,10 @@ function describeEscalationCtx(level) {
     case 0: return '';
     case 1: return `\n[ESCALATION LEVEL 1 (Pivot) — CODE-VERIFIED: a stuck pattern (loop/avoidance/repetition/stagnation) was just detected this turn. Per ESCALATION above, this is the first attempt.]\n`;
     case 2: return `\n[ESCALATION LEVEL 2 (targeted follow-up) — CODE-VERIFIED: the stuck pattern has now persisted through Level 1. Per ESCALATION above, do not repeat Level 1's move — ask a sharper, targeted follow-up that builds on the previous answer.]\n`;
-    case 3: return `\n[ESCALATION LEVEL 3 (Perspective Swap) — CODE-VERIFIED: the stuck pattern has persisted through Levels 1 and 2. Per ESCALATION above, this is the final attempt — apply Perspective Swap.]\n`;
+    // ADR «15 Νοεμβρίου» (γ) (John): level 3 no longer calls each turn «the final attempt» — with the switch open, before the root, it holds
+    // turn after turn (never AUTO-KILL, unchanged), and the same «last try» was asked again and again. Now: once, honestly, «it may not be
+    // found yet»; no pretended new try, no closing, no advice, no root. The ladder (computeEscalationLevel) and the other levels are unchanged.
+    case 3: return `\n[ESCALATION LEVEL 3 (Perspective Swap) — CODE-VERIFIED: the stuck pattern has persisted through Levels 1 and 2. Be honest instead of presenting another try as new: if you have not already said it in this conversation, say once, in one plain sentence, that what really concerns them may not have been found yet. Then at most one short question, built only from their own words — Perspective Swap (ESCALATION above) only if it has not been tried in this stall; never the same question again in other words. No advice, road or step; do not name the root or push toward naming it; do not suggest ending the conversation. If this message also carries the note that a sign of heaviness or risk was seen, follow that note instead.]\n`;
     default: return `\n[AUTO-KILL — CODE-VERIFIED: escalation attempts produced no movement. Per ESCALATION and GENERAL EXIT CRITERIA above, offer Graceful Exit now rather than a further attempt.]\n`;
   }
 }

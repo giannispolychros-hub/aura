@@ -4,6 +4,8 @@
 //  (α) the root card arms ONLY when a plain «Ναι» answers the readiness question asked right before it (finding 161, the card's silent
 //      arming): answersReadinessQuestion(msgs) — the message just before the user's last one is AURA's reply with the readiness question
 //  (β) the «switch family» note is no longer sent off the safety path; on the safety path exactly as before (finding ζ, John decides)
+//  (γ) level 3 of the escalation ladder says once, honestly, that it may not be found yet — no pretended attempt, no closing, no advice, no root
+//  (Λ) every new note: an echo is taken off the screen whole, and the guard of api/aura.js accepts it as it is
 //  (Ω) nothing else changed: with this round's changes taken out, src/App.jsx is 50beff6's, byte for byte; prompt, api/aura.js, openings,
 //      screen filter untouched
 const fs = require('fs');
@@ -63,12 +65,63 @@ const load = (names, ret) => { try { return new Function(names.map(extract).join
     !!extract('detectAssistantSelfRepetition') && !!extract('detectUserStagnation') && !!extract('detectsMethodFailureSignal'));
 }
 
+// ── (γ) level 3 of the escalation ladder: honest, once — no pretended new attempt, no closing, no advice, no root ───────────────────────
+{
+  const E = load(['describeEscalationCtx'], 'describeEscalationCtx');
+  const C = load(['computeEscalationLevel'], 'computeEscalationLevel');
+  assert('(γ) the escalation note builder and the level function load', typeof E === 'function' && typeof C === 'function');
+  if (typeof E === 'function' && typeof C === 'function') {
+    const t = E(3);
+    assert('(γ) level 3 keeps its head — the opening the guard knows and the label head the screen filter knows', t.startsWith('\n[ESCALATION LEVEL 3 (Perspective Swap) — CODE-VERIFIED: '));
+    assert('(γ) it no longer presents another try as «the final attempt»', !/final attempt/i.test(t) && /instead of presenting another try as new/.test(t));
+    assert('(γ) it asks for ONE honest sentence, once in the conversation: what really concerns them may not have been found yet',
+      /if you have not already said it in this conversation, say once, in one plain sentence, that what really concerns them may not have been found yet/.test(t));
+    assert('(γ) no forced question: at most one, from their own words; never the same question in other words',
+      /at most one short question, built only from their own words/.test(t) && /never the same question again in other words/.test(t));
+    assert('(γ) no advice, road or step; no root named or pushed for; no closing suggested',
+      /No advice, road or step/.test(t) && /do not name the root or push toward naming it/.test(t) && /do not suggest ending the conversation/.test(t));
+    assert('(γ) when the note of a sign of heaviness or risk is there, that note governs', /note that a sign of heaviness or risk was seen, follow that note instead/.test(t));
+    assert('(γ) no name of the app\'s code, not the Stage A marker, one bracket only (its own head)', !/\b[a-z][A-Za-z]+Ctx\b/.test(t) && !t.includes('FREE PART') && t.split('[').length === 2 && t.trim().endsWith(']'));
+    assert('(γ) levels 0, 1, 2 and AUTO-KILL are word for word as before', E(0) === '' && E(1) === "\n[ESCALATION LEVEL 1 (Pivot) — CODE-VERIFIED: a stuck pattern (loop/avoidance/repetition/stagnation) was just detected this turn. Per ESCALATION above, this is the first attempt.]\n" && E(2) === "\n[ESCALATION LEVEL 2 (targeted follow-up) — CODE-VERIFIED: the stuck pattern has now persisted through Level 1. Per ESCALATION above, do not repeat Level 1's move — ask a sharper, targeted follow-up that builds on the previous answer.]\n" &&
+      E(4) === "\n[AUTO-KILL — CODE-VERIFIED: escalation attempts produced no movement. Per ESCALATION and GENERAL EXIT CRITERIA above, offer Graceful Exit now rather than a further attempt.]\n");
+    assert('(γ) the ladder itself is unchanged: before the root the level stops at 3 (never AUTO-KILL); otherwise 4; no signal → 0',
+      C(2, true, 3) === 3 && C(3, true, 3) === 3 && C(3, true, 4) === 4 && C(3, false, 3) === 0 && C(0, true, 3) === 1);
+  }
+}
+
+// ── (Λ) every new note text of this round: if the model echoes it, the screen filter takes it off whole (only the reply stays); and a
+// request carrying it after the fixed prompt passes the guard of api/aura.js as it is (no new opening needed). Each commit adds its own.
+{
+  const LBL = (() => { try { const a = CODE.indexOf('const INTERNAL_LABEL_HEADS'), b = CODE.indexOf('function stripAraDeclarative'); return new Function(CODE.slice(a, b) + '\nreturn stripInternalLabels;')(); } catch (e) { console.log('LOAD ERROR — ' + e.message); return null; } })();
+  const api = fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8');
+  const blockOf = (a, b) => { const i = api.indexOf(a), j = api.indexOf(b, i); return i >= 0 && j > i ? api.slice(i, j) : ''; };
+  const fnSrc = name => { const a = api.indexOf('function ' + name + '('); if (a < 0) return ''; let d = 0; for (let j = api.indexOf('{', a); j < api.length; j++) { if (api[j] === '{') d++; else if (api[j] === '}') { d--; if (!d) return api.slice(a, j + 1); } } return ''; };
+  let GD = null;
+  try { GD = new Function(blockOf('// BEGIN PROMPT FINGERPRINTS', '// END PROMPT FINGERPRINTS') + '\n' + blockOf('const REQUEST_LIMITS = ', ';\n') + ';\n' + fnSrc('checkAuraRequest') + '\nreturn { PROMPT_FINGERPRINTS, REQUEST_LIMITS, checkAuraRequest };')(); } catch (e) { console.log('LOAD ERROR — ' + e.message); }
+  const shaHex = t => crypto.createHash('sha256').update(t, 'utf8').digest('hex');
+  const core = (() => { const h = 'const AURA_CORE_PERSONALITY = `'; const a = raw.indexOf(h), b = a + h.length; return Function('return `' + raw.slice(b, raw.indexOf('`;', b)) + '`;')(); })();
+  const guard = note => GD.checkAuraRequest({ system: [{ type: 'text', text: core }, { type: 'text', text: '\n' + note.replace(/^\n+/, '') }], messages: [{ role: 'user', content: 'Γεια.' }] }, GD.PROMPT_FINGERPRINTS, GD.REQUEST_LIMITS, shaHex);
+  assert('(Λ) the screen filter and the guard of api/aura.js load', typeof LBL === 'function' && !!GD);
+  assert('(Λ) controls: a block that is not one of the app\'s notes is refused (403), and a bracket that is no label stays on the screen',
+    !!GD && (guard('[NOT ONE OF THE APP NOTES] x') || {}).status === 403 && typeof LBL === 'function' && LBL('[σημείωση] Τι σου ήρθε πρώτο;').text === '[σημείωση] Τι σου ήρθε πρώτο;');
+  const NEW_NOTES = [
+    ['(γ) level 3', (load(['describeEscalationCtx'], 'describeEscalationCtx') || (() => ''))(3)],
+  ];
+  const REPLY = 'Τι σου ήρθε πρώτο;';
+  if (typeof LBL === 'function' && GD) for (const [k, n] of NEW_NOTES) {
+    const r = LBL(n.trim() + '\n\n' + REPLY);
+    assert('(Λ) ' + k + ': echoed above a reply, the filter takes it off whole — only the reply is shown', r.text === REPLY && r.count === 1);
+    assert('(Λ) ' + k + ': a request carrying it passes the guard of api/aura.js unchanged', guard(n) === null);
+  }
+}
+
 // ── (Ω) nothing else changed. Each change of this round, new → old, exactly as written (between the BEGIN/END marks; each commit of the
 // round adds its own). With them taken out, src/App.jsx must be the file of release-candidate 50beff6, byte for byte. This is the proof
 // behind the UPDATED fingerprint values of the earlier rounds' tests (John, 15/11/2026: only those values move). And the four things this
 // round must not touch: the fixed prompt (b5f303cc9405aa21), api/aura.js, the openings its guard accepts, the screen filter.
 {
   const UNDO = /* BEGIN UNDO */ [
+    ["    case 2: return `\\n[ESCALATION LEVEL 2 (targeted follow-up) — CODE-VERIFIED: the stuck pattern has now persisted through Level 1. Per ESCALATION above, do not repeat Level 1's move — ask a sharper, targeted follow-up that builds on the previous answer.]\\n`;\n    // ADR «15 Νοεμβρίου» (γ) (John): level 3 no longer calls each turn «the final attempt» — with the switch open, before the root, it holds\n    // turn after turn (never AUTO-KILL, unchanged), and the same «last try» was asked again and again. Now: once, honestly, «it may not be\n    // found yet»; no pretended new try, no closing, no advice, no root. The ladder (computeEscalationLevel) and the other levels are unchanged.\n    case 3: return `\\n[ESCALATION LEVEL 3 (Perspective Swap) — CODE-VERIFIED: the stuck pattern has persisted through Levels 1 and 2. Be honest instead of presenting another try as new: if you have not already said it in this conversation, say once, in one plain sentence, that what really concerns them may not have been found yet. Then at most one short question, built only from their own words — Perspective Swap (ESCALATION above) only if it has not been tried in this stall; never the same question again in other words. No advice, road or step; do not name the root or push toward naming it; do not suggest ending the conversation. If this message also carries the note that a sign of heaviness or risk was seen, follow that note instead.]\\n`;\n    default: return `\\n[AUTO-KILL — CODE-VERIFIED: escalation attempts produced no movement. Per ESCALATION and GENERAL EXIT CRITERIA above, offer Graceful Exit now rather than a further attempt.]\\n`;\n", "    case 2: return `\\n[ESCALATION LEVEL 2 (targeted follow-up) — CODE-VERIFIED: the stuck pattern has now persisted through Level 1. Per ESCALATION above, do not repeat Level 1's move — ask a sharper, targeted follow-up that builds on the previous answer.]\\n`;\n    case 3: return `\\n[ESCALATION LEVEL 3 (Perspective Swap) — CODE-VERIFIED: the stuck pattern has persisted through Levels 1 and 2. Per ESCALATION above, this is the final attempt — apply Perspective Swap.]\\n`;\n    default: return `\\n[AUTO-KILL — CODE-VERIFIED: escalation attempts produced no movement. Per ESCALATION and GENERAL EXIT CRITERIA above, offer Graceful Exit now rather than a further attempt.]\\n`;\n"],
     ["}\n// ADR «15 Νοεμβρίου» (β) (John): OFF the safety path this note is no longer sent. It named the code note that came last in the collision\n// logger's order — in the stored runs #43–#70 the gates note 118 times, the safety-path note 39, the knowledge-state note 2, never a\n// strategy family of the prompt — and told the model to leave it while the gates note said it was still due. Its instruction is the\n// prompt's own EXPLORATION COVERAGE PRINCIPLE / WHICH FAMILY TO SWITCH TO, which stay, as do the notes that see a stall in the replies\n// themselves (self-repetition, stagnation, method failure). ON the safety path it stays exactly as it was until John decides (finding ζ).\nfunction describeLastFiredFamilyCtx(family, streak, offSafetyPath) {\n  if (offSafetyPath === true) return '';\n  if (!family || streak < 2) return ''; // nothing worth flagging until the SAME family has won twice or more\n", "}\nfunction describeLastFiredFamilyCtx(family, streak) {\n  if (!family || streak < 2) return ''; // nothing worth flagging until the SAME family has won twice or more\n"],
     ["}\n// ADR «15 Νοεμβρίου» (α) (John, finding 161 — the root card's silent arming): in Stage A a plain «Ναι» confirms readiness only when it\n// answers the readiness question asked RIGHT BEFORE it — the message just before the user's last one is AURA's own reply (not one of the\n// app's fixed STAGE_A texts) with that question. A «Ναι» to any other question later in the session no longer arms door 2, so the next\n// message is not taken as the root. Pure: it reads only the order of the messages; whether the answer is a plain «Ναι» stays the job of\n// detectsAffirmativeShort. auratests/test_notes_card_1511.js; browser: section NQ.\nfunction answersReadinessQuestion(msgs) {\n  const list = Array.isArray(msgs) ? msgs : [];\n  let u = list.length - 1;\n  while (u >= 0 && !(list[u] && list[u].role === \"user\")) u--;\n  const prev = u > 0 ? list[u - 1] : null;\n  return !!prev && prev.role === \"assistant\" && prev.msgMode !== \"STAGE_A\" && typeof prev.content === \"string\" && detectsCoreReadinessAsked(prev.content);\n}\n// ADR «12 Οκτωβρίου (γ)» (John): the «Ναι» to a yes/no question counts only in a CLEAR form — the same start words as before,\n", "}\n// ADR «12 Οκτωβρίου (γ)» (John): the «Ναι» to a yes/no question counts only in a CLEAR form — the same start words as before,\n"],
     ["          latchFlips: !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1 &&\n            (detectsSpontaneousCoreRecognition(lastUserText) || (coreReadinessAsked.current && detectsAffirmativeShort(lastUserText) && answersReadinessQuestion(msgs))),\n        })));\n", "          latchFlips: !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1 &&\n            (detectsSpontaneousCoreRecognition(lastUserText) || (coreReadinessAsked.current && detectsAffirmativeShort(lastUserText))),\n        })));\n"],

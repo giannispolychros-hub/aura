@@ -1167,6 +1167,8 @@ async function runMockWS() {
 //        A «Ναι» right after the question still shows door 1's question at once, and the answer opens the card. The two controls of before
 //        are unchanged, and the old flow (?stageA=0) still flips its own readiness latch on the late «Ναι», as before.
 //  NQβ — the «switch family» note is not sent off the safety path (a Stage A session with the gates due); on the safety path: NQS.
+//  NQγ — level 3 of the escalation ladder: the new text on every level-3 request; the ladder as before (3 holds before the root, the old flow
+//        still reaches AUTO-KILL).
 // Alone: --only NQ.
 async function runMockNQ() {
   const RQ = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
@@ -1252,6 +1254,27 @@ async function runMockNQ() {
     // (the SESSION COVERAGE note still lists code names — item (1β) of the plan, not approved, not touched)
     ok('NQβ: … and no request carries the «switch family» note (nor the name of the gates note it used to give)', perMsg.every(x => !x.sys.includes('has been the highest-attention signal') && !x.sys.includes('"gatesCtx"')));
     await s.browser.close();
+  }
+  // ── NQγ — level 3 of the escalation ladder: the new text on every level-3 request; the ladder itself as before (both flows)
+  { const OPEN = ['Με πιέζει πολύ η δουλειά τελευταία και δεν ξέρω τι να κάνω.', 'Ο προϊστάμενος ζητάει συνέχεια περισσότερα πράγματα.', 'Μένω μέχρι αργά σχεδόν κάθε μέρα.', 'Δεν το έχω πει σε κανέναν ακόμα.'];
+    const NON = ['Δεν ξέρω', 'Όχι', 'Ίσως', 'Δεν ξέρω'];
+    const Q = k => ['Τι συμβαίνει τα πρωινά', 'Πώς το ζεις μέσα σου', 'Ποιος άλλος το ξέρει', 'Πότε ξεκίνησε όλο αυτό', 'Τι θα ήθελες να γίνει', 'Πού το νιώθεις πιο έντονα',
+      'Τι λένε οι φίλοι σου', 'Με ποιον το συζητάς', 'Τι σε κουράζει στο σπίτι', 'Τι άλλαξε φέτος'][k % 10] + ' — ' + ['πρώτα', 'τώρα', 'μετά', 'συνήθως', 'σήμερα'][k % 5] + ';';
+    const level = t => t.includes('[AUTO-KILL') ? 4 : t.includes('[ESCALATION LEVEL 3') ? 3 : t.includes('[ESCALATION LEVEL 2') ? 2 : t.includes('[ESCALATION LEVEL 1') ? 1 : 0;
+    const NEW3 = 'say once, in one plain sentence, that what really concerns them may not have been found yet';
+    for (const q of ['?stageA=1', '?stageA=0']) {
+      const { s, perMsg } = await run(q, Array.from({ length: 30 }, (_, k) => Q(k)), [...OPEN, ...Array.from({ length: 14 }, (_, k) => NON[k % 4])]);
+      const lv = perMsg.map(x => level(x.sys)), l3 = perMsg.filter(x => level(x.sys) === 3);
+      if (q === '?stageA=1') {
+        ok('NQγ (Stage A, 18 messages of which 14 non-answers): the ladder as before — 1, 2, 3 at messages 6–8, then 3 to the end, never AUTO-KILL before the root',
+          perMsg.length === 18 && lv[5] === 1 && lv[6] === 2 && lv.slice(7).every(l => l === 3) && !perMsg.some(x => x.sys.includes('[AUTO-KILL')));
+      } else {
+        ok('NQγ (old flow, comparison tool only): the ladder as before — it reaches AUTO-KILL after one level-3 request', lv.includes(3) && lv.includes(4) && lv.indexOf(4) === lv.indexOf(3) + 1);
+      }
+      ok('NQγ (' + q + '): every level-3 request carries the new text, none «the final attempt» (' + l3.length + ' requests)',
+        l3.length > 0 && l3.every(x => x.sys.includes(NEW3) && !x.sys.includes('final attempt')));
+      await s.browser.close();
+    }
   }
 }
 
@@ -6131,7 +6154,8 @@ async function runMockIM() {
 }
 // the per-turn part of each request of the two old-flow sessions of IM (iv), as a409a47 sent them (SHA-256, first 16 hex)
 // UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (β), John's condition 4): only request 4 moved: the «switch family» note is no longer in it — every other line byte for byte as before (line diff: the round's report)
-const IM_BASELINE = { oldFlow: '9cc0489d84cd11e3 dcce58fc3d30a888 0d3f7589c795f424 105a20406ec01efa',
+// UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (γ), John's condition 4): only request 4 of the «Πες μου τι να κάνω» session moved: its level-3 note has the new text — every other line byte for byte as before (line diff: the round's report)
+const IM_BASELINE = { oldFlow: '9cc0489d84cd11e3 dcce58fc3d30a888 0d3f7589c795f424 db004c3707d13336',
   oldFlowNoQ: '9cc0489d84cd11e3 a4c883a93feb0f09 dde96cc9e936a39c 97d8e356804044cb' };
 
 // ═══ ΤΑ 6 ΣΕΝΑΡΙΑ (ψεύτικο ή πραγματικό μοντέλο) ═════════════════════════════
