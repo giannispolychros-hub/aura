@@ -1018,6 +1018,7 @@ async function runMock() {
   await runMockWS(); // 14/11: white space at the safety detectors' input — the same line, the text as typed
   await runMockNQ(); // 15/11: per-turn notes and the root card (ADR «15 Νοεμβρίου»)
   await runMockNQS(); // 15/11: the safety path byte for byte as 50beff6 sent it (ADR «15 Νοεμβρίου», condition 3)
+  await runMockCV(); // 15/11: «συνομιλία v1» — four separate commits on conversation-v1
 }
 
 // ── SD: ADR «31 Οκτωβρίου (ζ)» (John, a safety fix (α)) — the gaps of the two safety detectors, on the screen. Stage A (?stageA=1&rec=1),
@@ -1412,6 +1413,48 @@ async function runMockNQS() {
   if (process.env.NQ_RECORD === '1') return;
   ok('NQS: on the safety path the «switch family» note is still sent as before (ζ, John\'s decision pending)', all.some(r => r.d.includes('has been the highest-attention signal')));
   ok('NQS: on the safety path the knowledge-state note keeps its old wording, word for word (ζ, John\'s decision pending)', all.some(r => r.d.includes('OBSTACLE (τι το εμποδίζει συγκεκριμένα)')));
+  ok('NQS: on the safety path the stagnation note is still sent with its old text, the ROAD DISCOVERY pointer included («συνομιλία v1», commit 1)', all.some(r => r.d.includes('THIS IS THE MOMENT FOR ROAD DISCOVERY')));
+}
+
+// ── CV: «ΣΥΝΟΜΙΛΙΑ v1» (John, 15/11/2026) — four separate commits on the branch conversation-v1, from release-candidate e4b2ae6. Code only: the fixed
+// prompt, api/aura.js and the screen filter are not touched. Synthetic everyday text, no crisis phrase: the safety path is section NQS
+// (byte for byte), plus the checks below that name it. Unit tests of the same rules: auratests/test_conversation_v1.js. Alone: --only CV.
+async function runMockCV() {
+  const card = async page => (await page.getByRole('button', { name: 'Ναι, αυτό είναι', exact: true }).count()) > 0;
+  const sysOf = b => (b.system || []).map(x => x.text || '').join('\n');
+  const run = async (query, script, msgs) => {
+    const s = await session(query, script);
+    const perMsg = [];
+    for (let i = 0; i < msgs.length; i++) {
+      const before = s.calls.length;
+      await send(s.page, msgs[i]);
+      if (i === 0 && await s.page.getByText('Γιατί έχει σημασία αυτό για σένα τώρα;').count()) await send(s.page, 'Γιατί με βαραίνει κάθε μέρα.');
+      perMsg.push({ calls: s.calls.length - before, card: await card(s.page), sys: s.calls.slice(before).map(sysOf).join('\n') });
+      if (perMsg[i].card) break;
+    }
+    return { s, perMsg };
+  };
+  // ── CV1 — commit 1: the stagnation note, in Stage A before the root, no longer sends the model to ROAD DISCOVERY (old flow: as before)
+  { const M = ['Σκέφτομαι να αλλάξω δουλειά αλλά κάτι με κρατάει εδώ και καιρό.', 'Η σταθερότητα του μισθού με κρατάει, και το ότι ξέρω τους ανθρώπους.',
+      'Ναι, κάτι τέτοιο, όλα αυτά μαζί μπερδεύονται στο μυαλό μου τελευταία.', 'Δεν ξέρω', 'Δεν ξέρω', 'Δεν ξέρω'];
+    const RR = ['Τι σε κρατάει περισσότερο;', 'Τι σημαίνει για σένα η σταθερότητα;', 'Τι από όλα αυτά βαραίνει πιο πολύ;', 'Τι σου έρχεται όταν το σκέφτεσαι;', 'Πώς είναι αυτή η στιγμή;', 'Και τώρα;'];
+    const OBS = 'the user\'s own last 2 replies introduced almost no new material', POINT = 'THIS IS THE MOMENT FOR ROAD DISCOVERY', SHAPE = 'Showing them the actual shape of their decision space is the work.';
+    const RULE = 'Here, roads, a map, options and a step come only after the root: do not move toward them.';
+    for (const q of ['?stageA=1', '?stageA=0']) {
+      const { s, perMsg } = await run(q, RR, M);
+      const withNote = perMsg.filter(x => x.sys.includes(OBS));
+      ok('CV1 (' + q + '): the stagnation note is sent once the last two replies are «Δεν ξέρω» (' + withNote.length + ' requests)', withNote.length >= 1);
+      if (q === '?stageA=1') {
+        ok('CV1 (Stage A, before the root): the note says the roads come after the root, and not «this is the moment for ROAD DISCOVERY» nor «the shape of their decision space is the work»',
+          withNote.length >= 1 && withNote.every(x => x.sys.includes(RULE) && !x.sys.includes(POINT) && !x.sys.includes(SHAPE)));
+        ok('CV1 (Stage A, before the root): … and its two moves are still there, word for word', withNote.every(x => x.sys.includes('(a) ASK WHY IT IS STILL OPEN') && x.sys.includes('(b) QUESTION THE FRAME')));
+      } else {
+        ok('CV1 (old flow, comparison tool only): the note is as before — it still points to ROAD DISCOVERY and carries no Stage A sentence',
+          withNote.length >= 1 && withNote.every(x => x.sys.includes(POINT) && x.sys.includes(SHAPE) && !x.sys.includes(RULE)));
+      }
+      await s.browser.close();
+    }
+  }
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
@@ -7545,7 +7588,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

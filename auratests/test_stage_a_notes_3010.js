@@ -80,7 +80,8 @@ assert('(Γ) the coverage note gets the rule as its fourth argument (the crisis 
   /const coverageReportCtx = _crisisTurn \? '' : buildCoverageReport\(msgs, familiesUsed\.current,\s*t => \{ const l = structuralLabelsIn\(t\); return l\.road \|\| l\.beat; \}, _saNotesHeld\);/.test(gr));
 assert('(Γ) both notes still reach the model through dynamicSuffix (only their content changes)',
   /const dynamicSuffix = \[[^\]]*materialEvidenceCtx/s.test(CODE) && /const dynamicSuffix = \[[^\]]*coverageReportCtx/s.test(CODE));
-assert('(Γ) no other note reads the rule (gates, goal/obstacle/stakes, tension, the marker are untouched)', (CODE.split('_saNotesHeld').length - 1) === 3);
+assert('(Γ) no other note reads the rule (gates, goal/obstacle/stakes, tension, the marker are untouched)', (CODE.split('_saNotesHeld').length - 1) === 4 /* UPDATED (15/11/2026, «συνομιλία v1», John, commit 1): 3 → 4 — the stagnation note
+  reads the rule too (it sends its Stage A text before the root); proved: auratests/test_conversation_v1.js (1.8) names that one reader, (Ω1) shows nothing else moved */);
 
 // ── (Δ) the rest unchanged ──────────────────────────────────────────────────────────────────────────────────────────────────────
 const lit = n => { const a = raw.indexOf('const ' + n + ' = `'); return a < 0 ? '' : raw.slice(raw.indexOf('`', a) + 1, raw.indexOf('`;', a + 1)); };
