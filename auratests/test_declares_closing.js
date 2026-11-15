@@ -250,8 +250,13 @@ assert('the pair is still pushed when the message is a real answer — the guard
 // unchanged, only to LEAVE a closing message out of «Τα λόγια σου στη διαδρομή». The count of the flow's call sites is the same 15, now
 // read outside that block; the block's own use is pinned apart (exactly one).
 const _tm = (() => { const a = raw.indexOf('// THOUGHT MAP, phase 1'); const b = raw.indexOf("// A root typed into the flow (door 1's answer"); return a < 0 || b < a ? '' : raw.slice(a, b); })();
+// UPDATED (15/11/2026, «συνομιλία v1», commit 5, John): a second block reads the SAME detector, unchanged and read-only — the frozen copy of the Thought Map's chain inside
+// «δικαίωμα ομιλίας από υλικό» (speakRightPhrases), only to LEAVE a closing message out of the count of separate phrases. Counted apart, like the Thought Map block above:
+// the flow's call sites are still the same 15 (the block's own use is pinned below: exactly one). Proved: auratests/test_speak_right.js (2.12) — the copy gives what the Thought Map gives.
+const _sr = (() => { const a = raw.indexOf('«δικαίωμα ομιλίας από υλικό»'); const b = raw.indexOf('function detectUserStagnation(', a); return a < 0 || b < a ? '' : raw.slice(a, b); })();
 assert('exactly fifteen call sites are wired, matching the current stated scope',
-  (raw.replace(_tm, '').match(/declaresClosing\s*\(/g) || []).length === 16); // 15 call sites + the definition
+  (raw.replace(_tm, '').replace(_sr, '').match(/declaresClosing\s*\(/g) || []).length === 16); // 15 call sites + the definition
+assert('the block of «δικαίωμα ομιλίας από υλικό» (commit 5) reads it once, only to leave a message out', _sr.length > 8000 && (_sr.match(/declaresClosing\s*\(/g) || []).length === 1);
 assert('the Thought Map block (phase 1) reads it once, only to leave a message out', (_tm.match(/declaresClosing\s*\(/g) || []).length === 1);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

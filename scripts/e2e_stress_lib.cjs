@@ -1995,6 +1995,11 @@ const NOTE_LABELS = [
   [/^\[The user just confirmed readiness/, 'CORE_READINESS'], [/^\[The user just confirmed they feel something changed/, 'SHIFT_CHECK'],
   [/^\[The user just answered "yes" to the friend-perspective/, 'FRIEND_PERSPECTIVE'], [/^\[EXPLICIT PAUSE AVAILABLE/, 'EXPLICIT_PAUSE'],
   [/^\[CODE-VERIFIED: the safety path was activated/, 'SAFETY_PATH'], [/^\[CODE-VERIFIED: this turn matches CLARITY PIVOT's/, 'CLARITY_PIVOT'],
+  // «δικαίωμα ομιλίας» (commit 5): when the ROUND TYPE note is lit too, the two are ONE block — the ROUND TYPE note with the connection (or its follow-up) added; the longer patterns first
+  [/^\[CODE-VERIFIED: this reply must not end with a question[\s\S]*one more: a short connection of different things they gave/, 'SPEAK_RIGHT+ROUND_TYPE'],
+  [/^\[CODE-VERIFIED: this reply must not end with a question[\s\S]*ALSO, the previous reply of yours was sent with a permission to say back a connection/, 'SPEAK_RIGHT_FOLLOWUP+ROUND_TYPE'],
+  [/^\[CODE-VERIFIED: this reply may say back a connection between things the user gave/, 'SPEAK_RIGHT'],
+  [/^\[CODE-VERIFIED: the previous reply of yours was sent with a permission to say back a connection/, 'SPEAK_RIGHT_FOLLOWUP'],
   [/^\[CODE-VERIFIED: this reply must not end with a question/, 'ROUND_TYPE'], // «συνομιλία v1», commit 3
 ];
 // The notes that steer the strategy. The others are background: the stage, the marker, counts, the first-reply floor — and, in Stage A,

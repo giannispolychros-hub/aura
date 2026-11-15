@@ -6807,6 +6807,204 @@ function detectSelfMarkedTension(text) {
   return STANCE.test(a) && STANCE.test(b) &&
          a.trim().split(/\s+/).length >= 3 && b.trim().split(/\s+/).length >= 3;
 }
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// «δικαίωμα ομιλίας από υλικό» (John, 15/11/2026), commit 5 of «συνομιλία v1». A PERMISSION, never an order. When the user has given enough material, ONE note tells the
+// model that this reply MAY say back a short connection of DIFFERENT things they gave — as close to their own words as possible, what it does not know yet, open for
+// them to correct. If another question is worth more, or they asked for something else, the model does that and leaves the note aside; if they say no, back to exploring.
+// Why: in the stored real-model runs the model asks question after question (83% of the replies end in one; the longest run is 14). The fixed prompt has rules that
+// favour a reflection (CONTRACT: «a named unknown»; GIVE-BACK; THE «ΑΡΑ» PATTERN: two different things plus a question) and rules that hold it back (Stage A: no raising of the
+// structure of a thought; «their own words only»; «nothing said back a second time»; «never said aloud»; «one question»). The note names the ones it takes precedence over,
+// for this one reply only, and says what it never overrides. Nothing is added to the prompt, to api/aura.js or to the screen filter: the note begins with an opening the
+// guard already lists. A sentence that STARTS with «Άρα» is taken out by the exit (stripAraDeclarative), so the note forbids it: the synthesis would lose its first sentence.
+// WHAT COUNTS AS MATERIAL — all of it counted from what the user wrote, never read for meaning — А ∧ (В ∨ Г):
+//   А  at least 30 different content words in the user's messages so far (5+ letters, accents folded, 75 stop words out);
+//   В  a word that comes back in 3 messages or more AND 3 separate phrases (the Thought Map's own rule for a phrase: a message that follows a question of AURA, a first
+//      sentence of 4+ words, no repeats of each other or of the first message — but with the user's latest message counted too);
+//   Г  a self-marked tension (detectSelfMarkedTension, the detector of the tension note) in any message AND 2 separate phrases.
+// The Thought Map's functions are display only and used nowhere else in the app (auratests/test_pick_branches.js (Ζ)), so the chain for «a separate phrase» is copied here under
+// its own names (speakRight…) and frozen: auratests/test_speak_right.js (2.10–2.13) proves the copy gives what the Thought Map gives, on generated conversations, so a change
+// of the Thought Map shows up there as a failure, and the thresholds below, measured with this chain, do not move without a decision.
+// The note carries NUMBERS only (how many messages, how many words, the numbers of the messages where a word comes back or where the phrases stand): never a word of the user's.
+// Stage A before a confirmed root only, off the safety path (`stageAPreRoot`, the rule of 30/10); not while the readiness question is the most recent question AURA asked; not
+// with any risk in the session (branchSessionSafe: heaviness, crisis, danger from another person, a referral to help).
+// When the ROUND TYPE note is lit as well (5 questions in a row, or two «δεν ξέρω»), the two are ONE note: the ROUND TYPE note as it is, with one more thing the model may write.
+// When neither the offer nor its follow-up is due, describeSpeakRightCtx hands back the ROUND TYPE note exactly as it was: the one slot, the one name.
+// PACE: the pace of a second offer (3 more messages and 15 new different words) is new here and just as temporary; a retry of the same turn is the same turn (the record is the
+// message number); on the message after an offer a follow-up note says: if they correct it or say no → back to exploring in their own words, no defence; a yes is a yes to
+// that connection only, not the readiness question and not a root.
+// κατώφλια ΠΡΟΣΩΡΙΝΑ, ΕΝΤΟΣ ΔΕΙΓΜΑΤΟΣ (76 συνεδρίες), όχι μόνιμος κανόνας· το πρώτο πληρωμένο τρέξιμο είναι το πρώτο ανεξάρτητο δείγμα.
+// Το δείγμα: 76 συνεδρίες (χωρίς κρίση, χωρίς περσόνα κινδύνου, με τουλάχιστον έναν γύρο) από 9 αποθηκευμένα runs με πραγματικό μοντέλο (#43, #44, #45, #46, #47, #50, #52, #53, #60):
+// 9, 12, 6, 9, 1, 14, 19, 2, 4 συνεδρίες ανά run· 54 διακριτά σενάρια (15 επαναλαμβάνονται σε 37 συνεδρίες, άρα δεν είναι 76 ανεξάρτητες)· 66 με χρήστη από μοντέλο (περσόνα) και
+// 10 με σταθερά μηνύματα (όλες στο run 52)· κανένας πραγματικός άνθρωπος. Τα κατώφλια βρέθηκαν και μετρήθηκαν στο ίδιο δείγμα. auratests/test_speak_right.js · browser: section SR.
+const SPEAK_RIGHT_PARAMS = { minWords: 30, recurIn: 3, phrasesB: 3, phrasesC: 2, rearmMessages: 3, rearmWords: 15 };
+const SPEAK_RIGHT_STOP = new Set(['ειναι','εχω','θελω','αυτο','αυτη','αυτος','αυτα','κατι','πολυ','οταν','γιατι','επειδη','ομως','αλλα','μονο','ακομα','παντα','ποτε','τωρα','εδω','εκει','μου','σου','τους','μας','σας','εγω','εσυ','ειχα','ειχε','μπορω','πρεπει','νομιζω','ξερω','κανω','κανει','λεω','λεει','ηταν','ειμαι','εχει','εχουν','ισως','λιγο','πιο','τιποτα','κατι','ολα','ολο','ολη','ολοι','μετα','πριν','πανω','κατω','χωρις','μαζι','περισσοτερο','πραγματικα','δηλαδη','οπως','ετσι','αρκετα','σχεδον','μερικες','μερικα','καθε','καποιος','καποια','καποιο','υπαρχει','υπαρχουν','γινει','γινεται','εγινε','μιλαω']);
+const SPEAK_RIGHT_FOLLOWUP_BODY = "the previous reply of yours was sent with a permission to say back a connection between things the user gave; this is their next message. Only if that reply did say such a connection: if they now correct it, say no, or say it does not fit, take that as their answer, go back to exploring in their own words, and do not defend the connection, repeat it or explain why you said it; if they say it fits, that yes belongs to that connection only: it is not an answer to the readiness question and not a root, and you name nothing. If that reply did not say a connection, leave this note aside. The Stage A rules and every safety rule stay in force.";
+const SPEAK_RIGHT_MAX_CHARS = 200;
+const SPEAK_RIGHT_JACCARD = 0.6;
+const SPEAK_RIGHT_ABBR = ["δηλ", "κλπ", "κτλ", "σελ", "τηλ", "βλ", "αρ", "κα", "κος", "κυρ", "χλμ", "λεπ", "περ", "παρ", "οδ", "εκ", "τμ", "etc", "vs", "dr", "mr", "mrs"];
+const SPEAK_RIGHT_DISMISS_START = /^(?:αστο|ασ το|τιποτα|δεν (?:το )?ξερω|δεν ειμαι σιγουρ(?:ος|οσ|η|ο)|δεν εχω ιδεα|ιδεα δεν εχω)(?![α-ω])/;
+const SPEAK_RIGHT_CONTENT_WORDS = /(?:^|[^α-ω])(?:αν|εαν|γιατι|τι|πως|ποιος|ποιοσ|ποια|ποιο|ποτε|που|η|αλλα|οτι)(?![α-ω])/;
+const SPEAK_RIGHT_HEAVY_WORDS = /(?:^|[^α-ω])(?:δεν αντεχω|δεν μπορω αλλο|δεν την παλευω|δεν παλευεται|δεν εχει νοημα|τα παρατησα)(?![α-ω])/;
+function speakRightWords(text) {
+  return (String(text || "").toLowerCase().match(/[a-zα-ωάέήίόύώϊϋΐΰ]{5,}/g) || [])
+    .map(w => w.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()).filter(w => !SPEAK_RIGHT_STOP.has(w));
+}
+// The sentences of a text as exact [start, end) spans, and whether a cut is UNCERTAIN — a copy of the Thought Map's, under another name (see above).
+function speakRightSpans(text) {
+  const t = typeof text === "string" ? text : "";
+  const isMark = c => c === "." || c === "!" || c === "?" || c === ";" || c === ";";
+  const raw = [];
+  let start = 0, uncertain = false, i = 0;
+  while (i < t.length) {
+    const c = t[i];
+    if (c === "\n") { raw.push([start, i]); start = i + 1; i++; continue; }
+    if (!isMark(c)) { i++; continue; }
+    let j = i;
+    while (j < t.length && isMark(t[j])) j++;
+    const run = t.slice(i, j);
+    if (/^\.{2,}$/.test(run) || !(j >= t.length || /\s/.test(t[j]))) { i = j; continue; }
+    if (run[0] === ".") {
+      const before = t.slice(start, i);
+      const tok = ((before.match(/(\S+)$/) || [])[1] || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/^[^a-zα-ω0-9]+/, "");
+      if (/^\d+$/.test(before.trim()) || /[a-zα-ω]\.[a-zα-ω]/.test(tok) || /^[a-zα-ω]$/.test(tok) || SPEAK_RIGHT_ABBR.includes(tok)) uncertain = true;
+    }
+    raw.push([start, j]); start = j; i = j;
+  }
+  if (start < t.length) raw.push([start, t.length]);
+  const spans = [];
+  for (const [a, b] of raw) {
+    let s = a, e = b;
+    while (s < e && /\s/.test(t[s])) s++;
+    while (e > s && /\s/.test(t[e - 1])) e--;
+    if (e > s) spans.push([s, e]);
+  }
+  return { spans, uncertain };
+}
+function speakRightEndsWithQuestion(text) {
+  const t = typeof text === "string" ? text.replace(/\s+$/, "") : "";
+  if (!t) return false;
+  const last = t[t.length - 1];
+  if (last !== "?" && last !== ";" && last !== ";") return false;
+  const { spans, uncertain } = speakRightSpans(t);
+  if (uncertain || !spans.length) return false;
+  const s = t.slice(spans[spans.length - 1][0], spans[spans.length - 1][1]);
+  const marks = (s.match(/[.!?;;]+$/) || [""])[0];
+  if (/[.!]/.test(marks)) return false;
+  return /[a-zα-ωά-ώϊϋΐΰ]{2,}/i.test(s);
+}
+function speakRightJaccard(a, b) {
+  const words = x => new Set(String(x || "").normalize("NFC").toLowerCase().split(/[^0-9a-zÀ-ɏΆΈ-ΊΌΎ-ΡΣ-Ͽἀ-῿]+/).filter(Boolean));
+  const A = words(a), B = words(b);
+  if (!A.size || !B.size) return 0;
+  let n = 0;
+  for (const w of A) if (B.has(w)) n++;
+  return n / (A.size + B.size - n);
+}
+// The separate phrases of the user's messages, by the Thought Map's chain: every user message but the first (the entrance), the latest one included; 0, or 2–3 of them (more than 3 → the
+// first, the middle and the last). → [{ text, msg, start, end }], never throws. `msg` is the place in `messages`.
+function speakRightPhrases(messages, knew) {
+  try {
+    const list = Array.isArray(messages) ? messages : [];
+    const userIdx = [];
+    list.forEach((m, i) => { if (m && m.role === "user" && typeof m.content === "string") userIdx.push(i); });
+    const fold = x => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-zα-ω0-9]+/g, " ").replace(/\s+/g, " ").trim();
+    const fKnew = fold(knew);
+    const kept = [];
+    for (const i of userIdx.slice(1)) {
+      const content = list[i].content;
+      const prev = list[i - 1];
+      if (!prev || prev.role !== "assistant" || prev.msgMode !== "ANSWER") continue;
+      if (!speakRightEndsWithQuestion(prev.content)) continue;
+      if (detectSafetySignal(content) || detectsDangerFromOther(content)) continue;
+      if (rootAnswerIsDismissal(content) || rootAnswerIsUnsure(content) || isExplicitClosure(content) || declaresClosing(content) || matchesClosingWord(content)) continue;
+      if (SPEAK_RIGHT_HEAVY_WORDS.test(fold(content))) continue;
+      const { spans, uncertain } = speakRightSpans(content);
+      if (uncertain) continue;
+      const first = spans.find(([a, b]) => substanceOfSentence(content.slice(a, b), KNEW_MIN_SUBSTANCE_WORDS) !== null);
+      if (!first) continue;
+      const text = content.slice(first[0], first[1]);
+      if (text.length > SPEAK_RIGHT_MAX_CHARS) continue;
+      const fText = fold(text);
+      const dismissStart = fText.match(SPEAK_RIGHT_DISMISS_START);
+      if (detectSafetySignal(text) || detectsDangerFromOther(text) || rootAnswerIsDismissal(text) || rootAnswerIsUnsure(text) ||
+        (dismissStart && !SPEAK_RIGHT_CONTENT_WORDS.test(fText.slice(dismissStart[0].length)))) continue;
+      if (!fText || (fKnew && fKnew.includes(fText))) continue;
+      if (knew && speakRightJaccard(text, knew) >= SPEAK_RIGHT_JACCARD) continue;
+      if (kept.some(k => speakRightJaccard(text, k.text) >= SPEAK_RIGHT_JACCARD)) continue;
+      kept.push({ text, msg: i, start: first[0], end: first[1] });
+    }
+    if (kept.length < 2) return [];
+    if (kept.length <= 3) return kept;
+    const pick = [];
+    for (let k = 0; k < 3; k++) pick.push(kept[Math.round(k * (kept.length - 1) / 2)]);
+    return pick;
+  } catch (e) {
+    return [];
+  }
+}
+// What the user has given so far, as numbers — the cheap part, only their words and the tension (no phrases, no safety check): how many messages, how many different content words (the
+// mass), the words that come back (how many, and the numbers of the messages of the one that comes back most) and where a self-marked tension stands. The user's messages are counted as
+// theirs alone: the first is 1. `list` and `users` stay inside the module (the places in `messages`); the decision stops here on most turns, so the dearer part below runs rarely.
+function speakRightCounts(messages) {
+  const list = Array.isArray(messages) ? messages : [];
+  const users = [];
+  list.forEach((m, i) => { if (m && m.role === "user" && typeof m.content === "string") users.push({ at: i, text: m.content }); });
+  const sets = users.map(u => new Set(speakRightWords(u.text)));
+  const all = new Set(), count = new Map();
+  sets.forEach(s => s.forEach(w => { all.add(w); count.set(w, (count.get(w) || 0) + 1); }));
+  let top = null, recurWords = 0;
+  count.forEach((n, w) => { if (n >= SPEAK_RIGHT_PARAMS.recurIn) { recurWords++; if (!top || n > top.n) top = { w, n }; } });
+  const recurAt = top ? sets.map((s, i) => (s.has(top.w) ? i + 1 : 0)).filter(Boolean) : [];
+  const tensionAt = users.map((u, i) => (detectSelfMarkedTension(u.text) ? i + 1 : 0)).filter(Boolean);
+  return { list, users, userCount: users.length, mass: all.size, recurWords, recurAt, tensionAt };
+}
+// The dearer part: the separate phrases (how many, 0 / 2 / 3, and where) — none when the session carries a risk (`safe` false).
+function speakRightPhraseCounts(c, safe) {
+  const picked = safe === true && c.users.length >= 2 ? speakRightPhrases(c.list, c.users[0].text) : [];
+  const phraseAt = picked.map(b => c.users.findIndex(u => u.at === b.msg) + 1).filter(n => n > 0).sort((a, b) => a - b);
+  return { phraseN: phraseAt.length, phraseAt };
+}
+function speakRightMaterial(messages, risk) {
+  const c = speakRightCounts(messages);
+  return Object.assign({ userCount: c.userCount, mass: c.mass, recurWords: c.recurWords, recurAt: c.recurAt, tensionAt: c.tensionAt }, speakRightPhraseCounts(c, branchSessionSafe(c.list, risk)));
+}
+// → { kind: "", held } (nothing) | { kind: "speak", held, viaB, viaC, ...material } | { kind: "followup", held, userCount, mass }. `held` is the Stage A rule as it was given. `last` = { at, mass }: the user's
+// message number and the mass of the last turn that carried the offer. Order of work, cheap first: the Stage A rule and the readiness question; the words (enough? does a word come back, or is there a
+// tension?); the pace of a second offer; only then the session's risk and the phrases.
+function speakRightDecision(stageAPreRoot, readinessPending, messages, last, risk) {
+  const held = stageAPreRoot === true;
+  if (!held || readinessPending === true) return { kind: "", held };
+  const P = SPEAK_RIGHT_PARAMS, c = speakRightCounts(messages);
+  const at = last && Number.isInteger(last.at) && last.at > 0 ? last.at : 0;
+  const was = last && Number.isFinite(last.mass) ? last.mass : 0;
+  const follow = at > 0 && c.userCount === at + 1;
+  if (!follow) {
+    if (c.mass < P.minWords || (c.recurWords < 1 && c.tensionAt.length === 0)) return { kind: "", held };
+    if (at > 0 && c.userCount !== at && (c.userCount - at < P.rearmMessages || c.mass - was < P.rearmWords)) return { kind: "", held };
+  }
+  if (!branchSessionSafe(messages, risk)) return { kind: "", held };
+  if (follow) return { kind: "followup", held, userCount: c.userCount, mass: c.mass };
+  const m = Object.assign({ userCount: c.userCount, mass: c.mass, recurWords: c.recurWords, recurAt: c.recurAt, tensionAt: c.tensionAt }, speakRightPhraseCounts(c, true));
+  const viaB = m.recurWords >= 1 && m.phraseN >= P.phrasesB, viaC = m.tensionAt.length > 0 && m.phraseN >= P.phrasesC;
+  if (!(viaB || viaC)) return { kind: "", held };
+  return Object.assign({ kind: "speak", held, viaB, viaC }, m);
+}
+function describeSpeakRightCtx(d, messages, readinessPending) {
+  const x = d && typeof d === "object" ? d : {};
+  if (x.kind !== "speak" && x.kind !== "followup") return describeRoundTypeCtx(x.held === true, readinessPending, messages); // neither is due: the ROUND TYPE note, exactly as before
+  const rt = describeRoundTypeCtx(true, false, messages); // when it is lit too: ONE note, the ROUND TYPE note as it is, with one more sentence
+  const head = rt ? rt.slice(0, rt.lastIndexOf("]")) : "";
+  if (x.kind === "followup") return rt ? head + " ALSO, " + SPEAK_RIGHT_FOLLOWUP_BODY + "]\n" : `\n[CODE-VERIFIED: ${SPEAK_RIGHT_FOLLOWUP_BODY}]\n`;
+  const arr = a => (Array.isArray(a) ? a : []);
+  const nums = a => (a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1]);
+  const counted = [`they have written ${x.userCount} messages with ${x.mass} different content words of 5+ letters`];
+  if (x.viaB && arr(x.recurAt).length) counted.push(`one word of theirs comes back in ${x.recurAt.length} of their messages (their messages ${nums(x.recurAt)})`);
+  if (x.viaC && arr(x.tensionAt).length) counted.push(`in message${x.tensionAt.length > 1 ? "s" : ""} ${nums(x.tensionAt)} they set an opposition («αλλά»/«όμως») with a stance on both sides`);
+  counted.push(`${x.phraseN} separate things they said stand on their own (their messages ${nums(arr(x.phraseAt))})`);
+  const c = counted.join("; ");
+  if (rt) return head + ` AND because the material is also enough (counted from this conversation: ${c}), among the things you may write instead of a question here is one more: a short connection of different things they gave — 1–3 lines, two or three different things they said side by side, staying as close to their own words as you can (a plain near-equivalent is fine; no new label or category), and what you do not know yet; it ends as a statement that leaves it open for them to correct (for example a plain invitation to correct you where it does not fit). It is a permission: the other kinds of statement above stay available. The same limits hold, and for this one reply only a connection of different things is not «a summary said back a second time» and not an «interpretation»: it never states a feeling, a cause, a motive or a link they did not state, never a diagnosis that merges two open things, never a sentence that starts with «Άρα».]\n`;
+  return `\n[CODE-VERIFIED: this reply may say back a connection between things the user gave. Counted from this conversation, not inferred: ${c}. This is a permission, not an instruction: if another question is worth more now, or they asked for something else, do that and leave this note aside. If you do speak: 1–3 short lines. Put side by side two or three DIFFERENT things they said, staying as close to their own words as you can (a plain near-equivalent of a word of theirs is fine; no new label, category or abstract name), and say that both are there. Then say plainly what you do not know yet (for example which of them weighs more for them, or whether they are connected at all; you do not know unless they said so). Leave it open for them to correct, with a short plain question or a plain invitation. Never, not even as a question: a feeling, a cause, a motive or a link between the things that they did not state; advice; a step or a road; naming the root or what it might be; options as A/B, an order, costs or gains; a verdict; a number they did not say; one diagnosis that merges two open things; a sentence that starts with «Άρα». For this one reply only, this takes precedence over five things, and only as far as it says here: «nothing they said is said back a second time» (a connection of different things is not an echo of one); the compression check «never said aloud»; «their own words only» (a plain near-equivalent is fine); «one question»; and the Stage A line against raising the structure of a thought beyond what they gave (you may say that both things are there, nothing more). It overrides nothing else: the other Stage A rules (no roads, steps, ways or plan; no certainty raised beyond what they gave), the ban on advice and on evaluation, and every safety rule stay in force.]\n`;
+}
 function detectUserStagnation(messages) {
   const userMsgs = (messages || []).filter(m => m.role === "user");
   if (userMsgs.length < 3) return { stagnant: false };
@@ -7700,6 +7898,7 @@ export default function AURAv2() {
   const outcomeScaleAsked    = useRef(false);
   const coreReadinessAsked     = useRef(false); // ROOT RE-FOCUS step-one question just posed
   const coreReadinessConfirmed = useRef(false);
+  const speakRightRef = useRef({ at: 0, mass: 0 }); // «δικαίωμα ομιλίας» (commit 5): the user's message number and the mass of the last turn that carried the offer
   const shiftCheckAsked        = useRef(false); // three-beat shift verification question just posed
   const shiftCheckConfirmed    = useRef(false); // one-way — user's own yes, per session
   // Emission counters for deliverOnce above — these gate how many turns the DIRECTIVE is repeated.
@@ -8483,7 +8682,12 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       const stageAMarkerCtx = buildStageAMarker(stageAActive.current);
       // «συνομιλία v1», commit 3: the ROUND TYPE note — Stage A before the root, off the safety path, not while the readiness question is the most recent one.
       // In the hard-constraint tier: right after the gates note, before the closing-drift, first-reply and safety-path notes and the Stage A marker (which stays last).
-      const roundTypeCtx = describeRoundTypeCtx(_saNotesHeld, answersReadinessQuestion(msgs), msgs);
+      // «δικαίωμα ομιλίας» (commit 5): the same slot and the same name. ONE note: the permission to say back a connection of what the user gave, or its follow-up on the next message,
+      // or — when neither is due — the ROUND TYPE note, exactly as before (describeSpeakRightCtx hands it back). The record is written only when the offer is sent; a retry of the same turn is the same turn.
+      const _srAsked = answersReadinessQuestion(msgs);
+      const _sr = speakRightDecision(_saNotesHeld, _srAsked, msgs, speakRightRef.current, { riskKind: riskSignalKind.current });
+      if (_sr.kind === "speak") speakRightRef.current = { at: _sr.userCount, mass: _sr.mass };
+      const roundTypeCtx = describeSpeakRightCtx(_sr, msgs, _srAsked);
       const dynamicSuffix = [
         memCtx, profileCtx, materialEvidenceCtx, goalObstacleStakesCtx, masterPriorityStageCtx, lastFiredFamilyCtx, coverageReportCtx, demoCtx, informationModeCtx, explicitPauseCtx,
         coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, repeatedElementsCtx, stopMomentCtx, riskClarificationCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, stageAActive.current ? '' : roadQuestionCtx,
@@ -10266,6 +10470,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     roadMapDelivered.current = false;
     roadMapRecovered.current = false;
     familiesUsed.current = [];
+    speakRightRef.current = { at: 0, mass: 0 }; // «δικαίωμα ομιλίας» (commit 5)
     roadQuestionState.current = null;
     window.__auraLastCollision = null;
     setValueUnlocked(false);

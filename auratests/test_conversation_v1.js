@@ -200,8 +200,11 @@ safely('(3.6)', () => {
     N.length > 0 && !/you should|try to|ROAD DISCOVERY|PATH TWO|\?|first step|next step|you may (?:also )?(?:suggest|offer|propose)|(?:suggest|propose|recommend|offer) (?:a|an|the|that|they)\b/i.test(N.replace('end with a question.', '')));
 });
 // (3.7) wiring
-assert('(3.7) the wiring: built from the Stage A rule, the readiness rule and the messages; sent in the hard-constraint tier, right after the gates note and before the closing-drift, first-reply and safety-path notes and the Stage A marker, which stays last',
-  /const roundTypeCtx = describeRoundTypeCtx\(_saNotesHeld, answersReadinessQuestion\(msgs\), msgs\);/.test(CODE) && /gatesCtx, roundTypeCtx, closingDriftCtx, stageAFirstReplyCtx, firstReplyFloorCtx, safetyPathCtx, stageAMarkerCtx,\n      \]\.filter\(Boolean\)\.join\('\\n'\);/.test(CODE));
+// UPDATED (15/11/2026, «συνομιλία v1», commit 5, John): the slot holds one function now, describeSpeakRightCtx — the offer, its follow-up, and, when neither is due, the ROUND TYPE note
+// itself (describeRoundTypeCtx with the Stage A rule and the readiness rule): same slot, same name, same order. Proved: auratests/test_speak_right.js (6.7) — byte for byte the same note, on 300 generated conversations.
+assert('(3.7) the wiring: built from the Stage A rule, the readiness rule and the messages (through describeSpeakRightCtx, which hands the note back when no offer is due); sent in the hard-constraint tier, right after the gates note and before the closing-drift, first-reply and safety-path notes and the Stage A marker, which stays last',
+  /const _srAsked = answersReadinessQuestion\(msgs\);/.test(CODE) && /const roundTypeCtx = describeSpeakRightCtx\(_sr, msgs, _srAsked\);/.test(CODE) && /const _sr = speakRightDecision\(_saNotesHeld, _srAsked, msgs, /.test(CODE) &&
+  /return describeRoundTypeCtx\(x\.held === true, readinessPending, messages\)/.test(CODE) && /gatesCtx, roundTypeCtx, closingDriftCtx, stageAFirstReplyCtx, firstReplyFloorCtx, safetyPathCtx, stageAMarkerCtx,\n      \]\.filter\(Boolean\)\.join\('\\n'\);/.test(CODE));
 assert('(3.7) the collision logger and the families are not told about it (it adds no state: a function of the messages)', !/const fired = Object\.entries\(\{[^}]*roundTypeCtx/.test(CODE));
 
 // ── (4) commit 4 — the NEW MATERIAL note leaves room for ONE brief recognition (never the same recognition twice) ─────────────────────────────

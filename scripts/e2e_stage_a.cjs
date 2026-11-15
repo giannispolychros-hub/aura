@@ -1019,6 +1019,7 @@ async function runMock() {
   await runMockNQ(); // 15/11: per-turn notes and the root card (ADR «15 Νοεμβρίου»)
   await runMockNQS(); // 15/11: the safety path byte for byte as 50beff6 sent it (ADR «15 Νοεμβρίου», condition 3)
   await runMockCV(); // 15/11: «συνομιλία v1» — four separate commits on conversation-v1
+  await runMockSR(); // 15/11: «δικαίωμα ομιλίας από υλικό» — commit 5 of conversation-v1
 }
 
 // ── SD: ADR «31 Οκτωβρίου (ζ)» (John, a safety fix (α)) — the gaps of the two safety detectors, on the screen. Stage A (?stageA=1&rec=1),
@@ -1554,6 +1555,110 @@ async function runMockCV() {
         withNote.every(x => x.sys.includes('«ωράριο εργασίας»') && x.sys.includes('a CHOICE QUESTION may offer these words as its options') && x.sys.includes('Ask for what they have NOT said yet.')));
       await s.browser.close();
     }
+  }
+}
+
+// ── SR: «ΔΙΚΑΙΩΜΑ ΟΜΙΛΙΑΣ ΑΠΟ ΥΛΙΚΟ» (John, 15/11/2026) — commit 5 of the branch conversation-v1. Code only: the fixed prompt, api/aura.js and the screen filter are not touched.
+// Synthetic everyday text, no crisis phrase of its own (the crisis message of SR5 is the benchmark's S5, read by code, as in NQS); the safety path as a whole is section NQS (byte for
+// byte). The fake model asks a question every time (it does not obey or disobey a permission — what it SAYS is not tested here, only what the app SENDS). Unit tests of the same rules:
+// auratests/test_speak_right.js. Alone: --only SR.
+async function runMockSR() {
+  const sysOf = b => (b.system || []).map(x => x.text || '').join('\n');
+  const U9 = ['Σκέφτομαι να μετακομίσω σε άλλη πόλη για τις σπουδές μου.', 'Το ενοίκιο εκεί είναι ακριβό και τα έξοδα της σχολής ανεβαίνουν κάθε χρόνο, ειδικά στα φοιτητικά διαμερίσματα.',
+    'Οι φίλοι μου μένουν εδώ και με βοηθούν στις σπουδές όποτε χρειάζεται.', 'Το πρόγραμμα της σχολής είναι καλό, όμως η απόσταση από το σπίτι μεγαλώνει.',
+    'Η αδελφή μου πιστεύει ότι οι σπουδές αξίζουν κάθε θυσία για το μέλλον.', 'Εγώ ακούω τους συμβούλους της σχολής και ζυγίζω τα έξοδα με τα οφέλη, χωρίς βιασύνη.',
+    'Δεν έχω μιλήσει με κανέναν από τη σχολή για το ενοίκιο ακόμα.', 'Ίσως ρωτήσω τον αδελφό μου που έχει περάσει από εκεί.', 'Θα δω πότε θα έχω χρόνο για αυτό.'];
+  const Q9 = ['Τι σε κάνει να το σκέφτεσαι τώρα;', 'Τι σημαίνει αυτό για τα σχέδιά σου;', 'Πώς είναι οι μέρες σου τώρα;', 'Τι περιμένεις να αλλάξει;', 'Και εσύ τι λες γι\' αυτό;',
+    'Τι σου έρχεται όταν το σκέφτεσαι;', 'Πώς το βλέπεις;', 'Και μετά;', 'Τι άλλο;'];
+  const RQ = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+  const SPEAK = 'this reply may say back a connection between things the user gave', FU = 'the previous reply of yours was sent with a permission to say back a connection', RTN = 'this reply must not end with a question',
+    ADD = 'one more: a short connection of different things they gave', MARK = '[FREE PART: ENDS AT ROOT]';
+  const run = async (query, script, msgs) => {
+    const s = await session(query, script);
+    const per = [];
+    for (let i = 0; i < msgs.length; i++) {
+      const before = s.calls.length;
+      await send(s.page, msgs[i]);
+      per.push({ calls: s.calls.length - before, syss: s.calls.slice(before).map(sysOf), sys: s.calls.slice(before).map(sysOf).join('\n'), body: s.calls[s.calls.length - 1] });
+    }
+    return { s, per };
+  };
+  const mark = (per, f) => per.map(x => (f(x) ? 1 : 0)).join('');
+  const speak = x => x.sys.includes(SPEAK), fu = x => x.sys.includes(FU), add = x => x.sys.includes(ADD), rt = x => x.sys.includes(RTN);
+  const blocks = (x, start) => x.sys.split(/\n(?=\[)/).filter(b => b.replace(/^\s+/, '').startsWith(start)).length;
+  const src = fs.readFileSync(path.join(REPO, 'api', 'aura.js'), 'utf8');
+  const handler = (await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'))).default;
+  const viaGuard = async body => { // the request through the REAL guard of api/aura.js (what production does)
+    let status = 0, upstream = 0; const realFetch = globalThis.fetch, hadKey = !!process.env.ANTHROPIC_API_KEY;
+    globalThis.fetch = async () => { upstream += 1; return { ok: true, status: 200, json: async () => ({ content: [{ type: 'text', text: 'x' }], usage: {} }) }; };
+    globalThis.__auraRate = new Map(); if (!hadKey) process.env.ANTHROPIC_API_KEY = 'e2e-no-network';
+    const raw = JSON.stringify(body || {});
+    if (body) await new Promise(resolve => { const res = { status(c) { status = c; return res; }, json() { resolve(); }, writeHead(c) { status = c; }, write() {}, end() { resolve(); } };
+      Promise.resolve(handler({ method: 'POST', headers: { 'content-length': String(Buffer.byteLength(raw)) }, body }, res)).catch(() => resolve()); });
+    globalThis.fetch = realFetch; if (!hadKey) delete process.env.ANTHROPIC_API_KEY;
+    return { status, upstream };
+  };
+  const words = t => new Set((String(t).toLowerCase().match(/[a-zα-ωάέήίόύώϊϋΐΰ]{5,}/g) || []).map(w => w.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ς/g, 'σ')));
+  // SR1 — a statement among the replies (no run of 5 questions): the offer on the 6th request only, the follow-up on the 7th, then nothing of it (the pace); the ROUND TYPE note alone later
+  { const R = Q9.slice(); R[1] = 'Άκουσα το ενοίκιο και τη σχολή.';
+    const { s, per } = await run('?stageA=1', R, U9);
+    ok('SR1 (Stage A): the offer is on the 6th request and on no other (' + mark(per, speak) + ')', per.length === 9 && mark(per, speak) === '000001000');
+    ok('SR1 (Stage A): … the follow-up is on the 7th request and on no other (' + mark(per, fu) + '); the ROUND TYPE note stays out of the plain offer (' + mark(per, rt) + ')', mark(per, fu) === '000000100' && !rt(per[5]) && !add(per[5]));
+    ok('SR1 (Stage A): … from the 8th request on the ROUND TYPE note is back alone, as before: no offer, no follow-up (' + mark(per, rt) + ')', mark(per, rt) === '000000011' && !speak(per[7]) && !fu(per[7]) && !speak(per[8]) && !fu(per[8]));
+    const n = per[5].sys;
+    ok('SR1 (Stage A): the offer counts, in numbers, from the conversation: 6 messages, the different words, the message numbers where a word comes back and where the separate things stand',
+      /they have written 6 messages with \d+ different content words of 5\+ letters; one word of theirs comes back in \d+ of their messages \(their messages [\d, and]+\); \d separate things they said stand on their own \(their messages [\d, and]+\)/.test(n));
+    ok('SR1 (Stage A): … it is a permission with its limits: «a permission, not an instruction», the shape, the never-list, the five things it takes precedence over, «overrides nothing else»',
+      n.includes('This is a permission, not an instruction: if another question is worth more now, or they asked for something else, do that and leave this note aside.') && n.includes('If you do speak: 1–3 short lines.') &&
+      n.includes('a sentence that starts with «Άρα».') && n.includes('For this one reply only, this takes precedence over five things') && n.includes('It overrides nothing else:'));
+    ok('SR1 (Stage A): … it carries no word of the user (not one content word of the 6 messages typed so far is in the note) and no Greek outside the quotes of «Άρα», «αλλά»/«όμως»', (() => {
+      const a = n.indexOf('[CODE-VERIFIED: ' + SPEAK), blk = n.slice(a, n.indexOf(']\n', a) + 1), w = new Set(U9.slice(0, 6).flatMap(m => [...words(m)])), f = words(blk.replace(/«[^»]*»/g, ' '));
+      return a >= 0 && blk.length > 800 && [...w].every(x => !f.has(x)) && !/[α-ωά-ώ]/i.test(blk.replace(/«[^»]*»/g, '')); })());
+    ok('SR1 (Stage A): … it is sent before the Stage A marker, which stays last', n.lastIndexOf(SPEAK) > 0 && n.trimEnd().endsWith(MARK) && n.lastIndexOf(SPEAK) < n.lastIndexOf(MARK));
+    ok('SR1 (Stage A): … and it is ONE note: exactly one block of it in the request, and the ROUND TYPE note is not in it', blocks(per[5], '[CODE-VERIFIED: ' + SPEAK) === 1 && blocks(per[5], '[CODE-VERIFIED: ' + RTN) === 0);
+    const g1 = await viaGuard(per[5].body), g2 = await viaGuard(per[6].body);
+    ok('SR1: the request that carries the offer, and the one that carries the follow-up, pass the guard of api/aura.js unchanged (status ' + g1.status + '/' + g2.status + ', Anthropic called ' + g1.upstream + '/' + g2.upstream + ' time)', g1.status === 200 && g1.upstream === 1 && g2.status === 200 && g2.upstream === 1);
+    ok('SR1 (Stage A): the follow-up tells the model what to do with a no and with a yes, and nothing about the user\'s words',
+      per[6].sys.includes('go back to exploring in their own words, and do not defend the connection') && per[6].sys.includes('it is not an answer to the readiness question and not a root') && !speak(per[6]));
+    await s.browser.close();
+  }
+  // SR2 — five questions in a row AND enough material: ONE note, the ROUND TYPE note with the connection added (and the follow-up added to it on the next request)
+  { const { s, per } = await run('?stageA=1', Q9, U9);
+    ok('SR2 (Stage A): the ROUND TYPE note is on the 6th request and the next ones (' + mark(per, rt) + '); the offer is added INSIDE it on the 6th only (' + mark(per, add) + ')', per.length === 9 && mark(per, rt) === '000001111' && mark(per, add) === '000001000');
+    ok('SR2 (Stage A): … ONE block: exactly one block that begins «this reply must not end with a question», none that begins with the plain offer (' + per.map(x => blocks(x, '[CODE-VERIFIED: ' + RTN)).join('') + ' / ' + per.map(x => blocks(x, '[CODE-VERIFIED: ' + SPEAK)).join('') + ')',
+      per.slice(5).every(x => blocks(x, '[CODE-VERIFIED: ' + RTN) === 1) && per.every(x => blocks(x, '[CODE-VERIFIED: ' + SPEAK) === 0));
+    ok('SR2 (Stage A): … the rule «this reply must not end with a question» stays first and whole, then the addition: a statement that leaves it open to correct, a permission, the same limits',
+      per[5].sys.includes('this reply must not end with a question. Counted from this conversation, not inferred: your last 5 replies each ended with a question') && per[5].sys.includes('AND because the material is also enough') &&
+      per[5].sys.includes('it ends as a statement that leaves it open for them to correct') && per[5].sys.includes('It is a permission: the other kinds of statement above stay available.') && per[5].sys.includes('never a sentence that starts with «Άρα»'));
+    ok('SR2 (Stage A): … on the 7th request the follow-up is in the same block (' + mark(per, fu) + ')', mark(per, fu) === '000000100' && blocks(per[6], '[CODE-VERIFIED: ' + RTN) === 1 && per[6].sys.includes('ALSO, the previous reply of yours was sent with a permission'));
+    const g = await viaGuard(per[5].body);
+    ok('SR2: the unified request passes the guard of api/aura.js unchanged (status ' + g.status + ', Anthropic called ' + g.upstream + ' time)', g.status === 200 && g.upstream === 1);
+    await s.browser.close();
+  }
+  // SR3 — the readiness question is the most recent question AURA asked: nothing on that request; the next one has the offer, the one after the follow-up
+  { const R = Q9.slice(); R[1] = 'Άκουσα το ενοίκιο και τη σχολή.'; R[4] = RQ;
+    const { s, per } = await run('?stageA=1', R, U9);
+    ok('SR3 (Stage A): the readiness question is the most recent question (after message 5) → no offer on the 6th request; the offer is on the 7th, the follow-up on the 8th (' + mark(per, speak) + ' / ' + mark(per, fu) + ')',
+      per.length === 9 && mark(per, speak) === '000000100' && mark(per, fu) === '000000010' && !rt(per[5]));
+    await s.browser.close();
+  }
+  // SR4 — the old flow (comparison tool only): never
+  { const { s, per } = await run('?stageA=0', Q9, U9);
+    ok('SR4 (old flow, comparison tool only): no request carries the offer or the follow-up, with all the material and a run of questions (' + per.length + ' messages)', per.length >= 9 && per.every(x => !speak(x) && !fu(x) && !add(x) && !rt(x)));
+    await s.browser.close();
+  }
+  // SR5 — the safety path: the offer is sent on the 6th request (the control, in the same session); the 7th message is a crisis message (the benchmark's S5, read by code) — the follow-up
+  // would be due on that very request: it is held; from there on, no offer and no follow-up either (every request is on the safety path)
+  { const S5 = (() => { const sc = BL.loadBench().safety.scenarios.find(x => x.id === 'S5'); const p = sc ? BL.benchPersona(sc, 'safety') : null; const at = p ? Object.keys(p.forcedMarks || {})[0] : null; return at ? p.forced[at] : ''; })();
+    const R = Q9.slice(); R[1] = 'Άκουσα το ενοίκιο και τη σχολή.';
+    const msgs = [...U9.slice(0, 6), S5, 'εντάξει', 'δεν ξέρω', 'Ναι.'];
+    const { s, per } = await run('?stageA=1', [...R.slice(0, 6), 'Είμαι εδώ. Πώς είσαι αυτή τη στιγμή;', 'Είμαι εδώ.', 'Είμαι εδώ.', 'Είμαι εδώ.'], msgs);
+    const reqs = per.slice(6).flatMap(x => x.syss);
+    ok('SR5: the crisis message of the benchmark loads (read by code)', !!S5);
+    ok('SR5 (Stage A): the control — with the same material the offer is on the 6th request, before the crisis message', speak(per[5]));
+    ok('SR5 (Stage A): from the crisis message on (' + reqs.length + ' requests, all on the safety path) no request carries the offer or the follow-up — the follow-up that was due on the crisis request included',
+      reqs.length >= 3 && reqs.every(t => t.includes('[MASTER PRIORITY RULE — STAGE: SAFETY') && !t.includes(SPEAK) && !t.includes(FU) && !t.includes(ADD)));
+    await s.browser.close();
   }
 }
 
@@ -7689,7 +7794,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
