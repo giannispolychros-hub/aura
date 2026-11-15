@@ -3,6 +3,7 @@
 // SYNTHETIC words only; no crisis phrase and no real session's words. Browser checks of the same: scripts/e2e_stage_a.cjs, section NQ.
 //  (α) the root card arms ONLY when a plain «Ναι» answers the readiness question asked right before it (finding 161, the card's silent
 //      arming): answersReadinessQuestion(msgs) — the message just before the user's last one is AURA's reply with the readiness question
+//  (β) the «switch family» note is no longer sent off the safety path; on the safety path exactly as before (finding ζ, John decides)
 //  (Ω) nothing else changed: with this round's changes taken out, src/App.jsx is 50beff6's, byte for byte; prompt, api/aura.js, openings,
 //      screen filter untouched
 const fs = require('fs');
@@ -41,14 +42,37 @@ const load = (names, ret) => { try { return new Function(names.map(extract).join
   }
 }
 
+// ── (β) the «switch family» note — off the safety path no longer sent ─────────────────────────────────────────────────────────────────
+// Checked first (John's condition): the note named the code note that came LAST in the collision logger's order — in the stored runs #43–#70
+// the gates note 118 times, the safety-path note 39 and the knowledge-state note 2, never one of the prompt's strategy families — and its
+// instruction («consider a family not yet used») is the prompt's own EXPLORATION COVERAGE PRINCIPLE / WHICH FAMILY TO SWITCH TO, which stay.
+{
+  const B = load(['describeLastFiredFamilyCtx'], 'describeLastFiredFamilyCtx');
+  const OLD = '\n[CODE-VERIFIED: "gatesCtx" has been the highest-attention signal (per the collision logger\'s own "highest = fired[fired.length-1]" rule) for 3 consecutive turns now. Per EXPLORATION COVERAGE PRINCIPLE/WHICH FAMILY TO SWITCH TO above, consider a family not yet used this session.]\n';
+  assert('(β) the note builder loads', typeof B === 'function');
+  if (typeof B === 'function') {
+    assert('(β) off the safety path: no «switch family» note, whatever the family and the streak', B('gatesCtx', 3, true) === '' && B('safetyPathCtx', 5, true) === '' && B('premiseInversionCtx', 2, true) === '');
+    assert('(β) on the safety path: the note exactly as before, word for word (finding ζ — John decides later)', B('gatesCtx', 3, false) === OLD);
+    assert('(β) … and, as before, nothing below a streak of 2 or without a family', B('gatesCtx', 1, false) === '' && B(null, 0, false) === '');
+  }
+  const P = raw.slice(ci, ce);
+  assert('(β) the strategy guidance it pointed to stays in the fixed prompt: EXPLORATION COVERAGE PRINCIPLE, WHICH FAMILY TO SWITCH TO (with its families), STRATEGY BY STATE',
+    P.includes('EXPLORATION COVERAGE PRINCIPLE (non-negotiable') && P.includes('WHICH FAMILY TO SWITCH TO (specific to strategy-switching') &&
+    P.includes('Contradiction Detection, Premise Inversion, VERBATIM COST COLLISION') && P.includes('If the last two questions of one strategy brought nothing new, change the strategy, not the wording.'));
+  assert('(β) the notes that see a stall in the replies themselves are still built: AURA\'s self-repetition, the user\'s stagnation, the method failure',
+    !!extract('detectAssistantSelfRepetition') && !!extract('detectUserStagnation') && !!extract('detectsMethodFailureSignal'));
+}
+
 // ── (Ω) nothing else changed. Each change of this round, new → old, exactly as written (between the BEGIN/END marks; each commit of the
 // round adds its own). With them taken out, src/App.jsx must be the file of release-candidate 50beff6, byte for byte. This is the proof
 // behind the UPDATED fingerprint values of the earlier rounds' tests (John, 15/11/2026: only those values move). And the four things this
 // round must not touch: the fixed prompt (b5f303cc9405aa21), api/aura.js, the openings its guard accepts, the screen filter.
 {
   const UNDO = /* BEGIN UNDO */ [
+    ["}\n// ADR «15 Νοεμβρίου» (β) (John): OFF the safety path this note is no longer sent. It named the code note that came last in the collision\n// logger's order — in the stored runs #43–#70 the gates note 118 times, the safety-path note 39, the knowledge-state note 2, never a\n// strategy family of the prompt — and told the model to leave it while the gates note said it was still due. Its instruction is the\n// prompt's own EXPLORATION COVERAGE PRINCIPLE / WHICH FAMILY TO SWITCH TO, which stay, as do the notes that see a stall in the replies\n// themselves (self-repetition, stagnation, method failure). ON the safety path it stays exactly as it was until John decides (finding ζ).\nfunction describeLastFiredFamilyCtx(family, streak, offSafetyPath) {\n  if (offSafetyPath === true) return '';\n  if (!family || streak < 2) return ''; // nothing worth flagging until the SAME family has won twice or more\n", "}\nfunction describeLastFiredFamilyCtx(family, streak) {\n  if (!family || streak < 2) return ''; // nothing worth flagging until the SAME family has won twice or more\n"],
     ["}\n// ADR «15 Νοεμβρίου» (α) (John, finding 161 — the root card's silent arming): in Stage A a plain «Ναι» confirms readiness only when it\n// answers the readiness question asked RIGHT BEFORE it — the message just before the user's last one is AURA's own reply (not one of the\n// app's fixed STAGE_A texts) with that question. A «Ναι» to any other question later in the session no longer arms door 2, so the next\n// message is not taken as the root. Pure: it reads only the order of the messages; whether the answer is a plain «Ναι» stays the job of\n// detectsAffirmativeShort. auratests/test_notes_card_1511.js; browser: section NQ.\nfunction answersReadinessQuestion(msgs) {\n  const list = Array.isArray(msgs) ? msgs : [];\n  let u = list.length - 1;\n  while (u >= 0 && !(list[u] && list[u].role === \"user\")) u--;\n  const prev = u > 0 ? list[u - 1] : null;\n  return !!prev && prev.role === \"assistant\" && prev.msgMode !== \"STAGE_A\" && typeof prev.content === \"string\" && detectsCoreReadinessAsked(prev.content);\n}\n// ADR «12 Οκτωβρίου (γ)» (John): the «Ναι» to a yes/no question counts only in a CLEAR form — the same start words as before,\n", "}\n// ADR «12 Οκτωβρίου (γ)» (John): the «Ναι» to a yes/no question counts only in a CLEAR form — the same start words as before,\n"],
     ["          latchFlips: !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1 &&\n            (detectsSpontaneousCoreRecognition(lastUserText) || (coreReadinessAsked.current && detectsAffirmativeShort(lastUserText) && answersReadinessQuestion(msgs))),\n        })));\n", "          latchFlips: !coreReadinessConfirmed.current && !stageARef.current.phase && !reflectionDelivered.current && riskSignalKind.current !== 1 &&\n            (detectsSpontaneousCoreRecognition(lastUserText) || (coreReadinessAsked.current && detectsAffirmativeShort(lastUserText))),\n        })));\n"],
+    ["      // try/catch, after this turn's `fired` array exists.\n      const lastFiredFamilyCtx = _crisisTurn ? '' : describeLastFiredFamilyCtx(lastFiredFamily.current.family, lastFiredFamily.current.streak, !_safetyPath); // ADR «15 Νοεμβρίου» (β)\n\n", "      // try/catch, after this turn's `fired` array exists.\n      const lastFiredFamilyCtx = _crisisTurn ? '' : describeLastFiredFamilyCtx(lastFiredFamily.current.family, lastFiredFamily.current.streak);\n\n"],
     ["        } else if (coreReadinessAsked.current && lastUserMsgForReadiness &&\n            detectsAffirmativeShort(lastUserMsgForReadiness.content) &&\n            // ADR «15 Νοεμβρίου» (α): in Stage A only a «Ναι» to the readiness question asked right before it (the old flow as before)\n            (!stageAActive.current || answersReadinessQuestion(msgs))) {\n          coreReadinessConfirmed.current = true;\n", "        } else if (coreReadinessAsked.current && lastUserMsgForReadiness &&\n            detectsAffirmativeShort(lastUserMsgForReadiness.content)) {\n          coreReadinessConfirmed.current = true;\n"],
   ] /* END UNDO */;
   const present = UNDO.filter(([nw]) => raw.split(nw).length === 2).length;

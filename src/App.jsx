@@ -1521,7 +1521,13 @@ function computeLastFiredFamily(prevFamily, prevStreak, highestThisTurn) {
   const streak = (highestThisTurn === prevFamily) ? (prevStreak + 1) : 1;
   return { family: highestThisTurn, streak };
 }
-function describeLastFiredFamilyCtx(family, streak) {
+// ADR «15 Νοεμβρίου» (β) (John): OFF the safety path this note is no longer sent. It named the code note that came last in the collision
+// logger's order — in the stored runs #43–#70 the gates note 118 times, the safety-path note 39, the knowledge-state note 2, never a
+// strategy family of the prompt — and told the model to leave it while the gates note said it was still due. Its instruction is the
+// prompt's own EXPLORATION COVERAGE PRINCIPLE / WHICH FAMILY TO SWITCH TO, which stay, as do the notes that see a stall in the replies
+// themselves (self-repetition, stagnation, method failure). ON the safety path it stays exactly as it was until John decides (finding ζ).
+function describeLastFiredFamilyCtx(family, streak, offSafetyPath) {
+  if (offSafetyPath === true) return '';
   if (!family || streak < 2) return ''; // nothing worth flagging until the SAME family has won twice or more
   return `\n[CODE-VERIFIED: "${family}" has been the highest-attention signal (per the collision logger's own "highest = fired[fired.length-1]" rule) for ${streak} consecutive turns now. Per EXPLORATION COVERAGE PRINCIPLE/WHICH FAMILY TO SWITCH TO above, consider a family not yet used this session.]\n`;
 }
@@ -8063,7 +8069,7 @@ A line missing above means only that one pattern was not matched — the absence
       // PREVIOUS turn (same deliberate one-turn-behind timing as familiesUsed/coverageReportCtx
       // above): this turn's own update happens later, inside the existing collision-logger
       // try/catch, after this turn's `fired` array exists.
-      const lastFiredFamilyCtx = _crisisTurn ? '' : describeLastFiredFamilyCtx(lastFiredFamily.current.family, lastFiredFamily.current.streak);
+      const lastFiredFamilyCtx = _crisisTurn ? '' : describeLastFiredFamilyCtx(lastFiredFamily.current.family, lastFiredFamily.current.streak, !_safetyPath); // ADR «15 Νοεμβρίου» (β)
 
       // ── Explicit Pause injection (#5 fix) ──
       // Max 1 per 5 sessions. Injected as system instruction — AURA decides when to use it naturally.

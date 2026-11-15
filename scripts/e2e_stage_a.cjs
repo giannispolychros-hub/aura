@@ -1166,6 +1166,7 @@ async function runMockWS() {
 //        to another question no longer arms it silently: the next message goes to the model and no card opens (7, 28 and 31 messages).
 //        A «Ναι» right after the question still shows door 1's question at once, and the answer opens the card. The two controls of before
 //        are unchanged, and the old flow (?stageA=0) still flips its own readiness latch on the late «Ναι», as before.
+//  NQβ — the «switch family» note is not sent off the safety path (a Stage A session with the gates due); on the safety path: NQS.
 // Alone: --only NQ.
 async function runMockNQ() {
   const RQ = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
@@ -1241,7 +1242,19 @@ async function runMockNQ() {
       perMsg.length === 7 && perMsg[5] && perMsg[5].sys.includes('[The user just confirmed readiness to name the core themselves') && !perMsg[4].sys.includes('[The user just confirmed readiness'));
     await s.browser.close();
   }
+  // ── NQβ — the «switch family» note is no longer sent off the safety path (on the safety path: section NQS, as before)
+  { const M = ['Σκέφτομαι αν πρέπει να μετακομίσω σε άλλη πόλη για τη δουλειά.', 'Η εταιρεία μου προτείνει μετάθεση από τον Ιανουάριο.', 'Εκεί δεν ξέρω κανέναν.',
+      'Εδώ έχω την αδερφή μου και τους φίλους μου.', 'Ο μισθός θα είναι λίγο μεγαλύτερος.', 'Το σκέφτομαι κάθε βράδυ πριν κοιμηθώ.', 'Δεν έχω αποφασίσει τίποτα ακόμα.', 'Μου έδωσαν προθεσμία έναν μήνα.'];
+    const RB = ['Τι σε τραβάει σε αυτό;', 'Πώς το άκουσες όταν σου το είπαν;', 'Τι σημαίνει αυτό για σένα;', 'Ποιοι είναι αυτοί για σένα;', 'Τι αλλάζει με αυτό;', 'Τι σκέφτεσαι τότε;', 'Τι λείπει για να αποφασίσεις;', 'Πώς το ζεις αυτό;'];
+    const { s, perMsg } = await run('?stageA=1', RB, M);
+    ok('NQβ: a Stage A session of 8 messages with the gates due — every message goes to the model', perMsg.length === 8 && perMsg.every(x => x.calls === 1));
+    ok('NQβ: … the gates note is there from the 3rd request (the situation that used to light the «switch family» note)', perMsg.slice(2).every(x => x.sys.includes('[GATES DUE CHECK')));
+    // (the SESSION COVERAGE note still lists code names — item (1β) of the plan, not approved, not touched)
+    ok('NQβ: … and no request carries the «switch family» note (nor the name of the gates note it used to give)', perMsg.every(x => !x.sys.includes('has been the highest-attention signal') && !x.sys.includes('"gatesCtx"')));
+    await s.browser.close();
+  }
 }
+
 // ── NQS: THE SAFETY PATH, BYTE FOR BYTE (John, 15/11/2026, ADR «15 Νοεμβρίου», condition 3 of his approval). Every request from the crisis
 // or danger message on — the crisis turn and every turn after the line — sends exactly what release-candidate 50beff6 sent: the same
 // kind, the same per-turn part and the same whole body (system + messages), as SHA-256 (first 16 hex) recorded on 50beff6 with this same
@@ -5791,7 +5804,8 @@ async function runMockDF() {
 // In Stage A before the root the coverage note no longer carries its road-map line. Checked on 30/10 with this session: main 17334b2
 // still sends the old two, and its per-turn part minus that one line is, byte for byte, what this branch sends. Requests 1–3 and the
 // switch-closed flow are unchanged.
-const SN_BASELINE = { closed: '9cc0489d84cd11e3 a4c883a93feb0f09 599d159dd7d6e616 56c94429f4ecc181 1311a6c72dc7db4b 04d947de9e723755',
+// UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (β), John's condition 4): only request 4 moved: the «switch family» note is no longer in it — every other line byte for byte as before (line diff: the round's report)
+const SN_BASELINE = { closed: '9cc0489d84cd11e3 a4c883a93feb0f09 599d159dd7d6e616 8bcfd65b21f59829 1311a6c72dc7db4b 04d947de9e723755',
   open: 'b7117c3a6d998739 319083b10b16b87e 6ebd5644c901c40e a562e9934d7447dd d86935d67c4667d1' };
 
 // ── MC: the MODEL's own closing summary before the root (ADR «11 Οκτωβρίου (β)», found by the stress test with the real model,
@@ -6116,8 +6130,9 @@ async function runMockIM() {
     ok(`IM (iv) old flow: … every request byte for byte as a409a47 sent it (${hs})`, hs === IM_BASELINE.oldFlowNoQ); }
 }
 // the per-turn part of each request of the two old-flow sessions of IM (iv), as a409a47 sent them (SHA-256, first 16 hex)
-const IM_BASELINE = { oldFlow: '9cc0489d84cd11e3 dcce58fc3d30a888 0d3f7589c795f424 8ef1f33c44d365b1',
-  oldFlowNoQ: '9cc0489d84cd11e3 a4c883a93feb0f09 dde96cc9e936a39c bb733972022ad7b8' };
+// UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (β), John's condition 4): only request 4 moved: the «switch family» note is no longer in it — every other line byte for byte as before (line diff: the round's report)
+const IM_BASELINE = { oldFlow: '9cc0489d84cd11e3 dcce58fc3d30a888 0d3f7589c795f424 105a20406ec01efa',
+  oldFlowNoQ: '9cc0489d84cd11e3 a4c883a93feb0f09 dde96cc9e936a39c 97d8e356804044cb' };
 
 // ═══ ΤΑ 6 ΣΕΝΑΡΙΑ (ψεύτικο ή πραγματικό μοντέλο) ═════════════════════════════
 function fakeModel() {
