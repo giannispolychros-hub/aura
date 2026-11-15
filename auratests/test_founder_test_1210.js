@@ -232,7 +232,9 @@ assert('QUOTE-ONLY: a message of only «"» becomes empty (not shown); not a str
   assert('WIRING: the three notes are built from the conversation so far and sent with the turn (situational tier, before the hard constraints)',
     GEN.includes('const stopMomentCtx = _notSupportive ? describeStopMomentCtx(countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current, stageAActive.current && dangerFromOther.current)) : \'\';') /* UPDATED (23/10, Ο5): + the danger latch (danger from another person, test_danger_from_other_2310.js) */ &&
     GEN.includes('const riskClarificationCtx = _notSupportive ? describeRiskClarificationCtx(countRiskClarifications(msgs), ([...msgs].reverse().find(m => m.role === "user") || {}).content) : \'\';') &&
-    GEN.includes('const repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs)) : \'\';') &&
+    // UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (δ), John): + whether this turn is off the safety path — off it the note allows the choice
+    // question with the user's words; on it, word for word as before (auratests/test_notes_card_1511.js (δ), browser NQδ, NQS). Same place, same tier.
+    GEN.includes('const repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs), !_safetyPath) : \'\'; // ADR «15 Νοεμβρίου» (δ)') &&
     /selfRepetitionCtx, repeatedElementsCtx, stopMomentCtx, riskClarificationCtx, methodFailureCtx/.test(GEN));
   // SAFETY (found by the real-model run 21, session 16): the notes rode along to the crisis prompt (SYSTEM_SUPPORTIVE + the same
   // per-turn suffix) and the crisis reply opened with «Ας σταθούμε λίγο εδώ.», quoted «δεν θέλω να ζω άλλο» and added hotline

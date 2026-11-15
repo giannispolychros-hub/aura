@@ -2948,8 +2948,12 @@ function repeatedUserElements(msgs) {
   }
   return echoed.slice(-3).map(f => userForm.get(f));
 }
-function describeRepeatedElementsCtx(list) {
+// ADR «15 Νοεμβρίου» (δ) (John): OFF the safety path the note is no longer stricter than its own rule — NEW MATERIAL lets what they said be
+// reorganized when their answer will be new, and CHOICE QUESTION builds its options from their words, so a choice question may offer
+// them; the closing's screen labels are not named. ON the safety path the note is exactly as before (the safety path does not change).
+function describeRepeatedElementsCtx(list, offSafetyPath) {
   if (!Array.isArray(list) || !list.length) return '';
+  if (offSafetyPath === true) return `\n[CODE-VERIFIED: these words of the user have already been said back to them in an earlier reply: ${list.map(x => '«' + x + '»').join(', ')}. Do not say them back again as an echo, a recap or a quote (NEW MATERIAL). As NEW MATERIAL allows reorganizing what they said when their answer will be new, a CHOICE QUESTION may offer these words as its options, in their own words. Its other two exceptions stay: the one-time closing summary and the user's new phrase quoted in a STOP MOMENT. Ask for what they have NOT said yet.]\n`;
   return `\n[CODE-VERIFIED: these words of the user have already been said back to them in an earlier reply: ${list.map(x => '«' + x + '»').join(', ')}. Do not say them back again (NEW MATERIAL) — the only exceptions are the one-time ΗΡΘΕΣ ΜΕ / ΒΡΗΚΕΣ / ΦΕΥΓΕΙΣ ΜΕ summary and the user's new phrase quoted in a STOP MOMENT. Ask for what they have NOT said yet.]\n`;
 }
 // CLOSING — the ΗΡΘΕΣ ΜΕ / ΒΡΗΚΕΣ / ΦΕΥΓΕΙΣ ΜΕ summary is shown ONCE per session: once one was shown, a later reply loses its three
@@ -8369,7 +8373,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // SAFETY (real-model run 21, session 16): never on a SUPPORTIVE (crisis / distress) turn — the crisis prompt gets the same
       // suffix, and with the gentle-form note the crisis reply opened with «Ας σταθούμε λίγο εδώ.». That path stays as it was.
       const _notSupportive = currentMode !== "SUPPORTIVE";
-      const repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs)) : '';
+      const repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs), !_safetyPath) : ''; // ADR «15 Νοεμβρίου» (δ)
       const stopMomentCtx = _notSupportive ? describeStopMomentCtx(countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current, stageAActive.current && dangerFromOther.current)) : '';
       const riskClarificationCtx = _notSupportive ? describeRiskClarificationCtx(countRiskClarifications(msgs), ([...msgs].reverse().find(m => m.role === "user") || {}).content) : '';
       // ADR «12 Οκτωβρίου (β)», decision 2: after the safety path, support only — one fixed sentence, never on a SUPPORTIVE turn.

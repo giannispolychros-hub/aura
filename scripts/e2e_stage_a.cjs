@@ -1169,6 +1169,7 @@ async function runMockWS() {
 //  NQβ — the «switch family» note is not sent off the safety path (a Stage A session with the gates due); on the safety path: NQS.
 //  NQγ — level 3 of the escalation ladder: the new text on every level-3 request; the ladder as before (3 holds before the root, the old flow
 //        still reaches AUTO-KILL).
+//  NQδ — the NEW MATERIAL note, off the safety path, allows the choice question with the user's own words.
 // Alone: --only NQ.
 async function runMockNQ() {
   const RQ = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
@@ -1275,6 +1276,16 @@ async function runMockNQ() {
         l3.length > 0 && l3.every(x => x.sys.includes(NEW3) && !x.sys.includes('final attempt')));
       await s.browser.close();
     }
+  }
+  // ── NQδ — the NEW MATERIAL note, off the safety path, allows the choice question with the user's own words (on the safety path: NQS)
+  { const M = ['Το ωράριο εργασίας με εξαντλεί κάθε εβδομάδα.', 'Και ο μισθός δεν φτάνει, αυτό με τρώει.', 'Το ωράριο εργασίας και ο μισθός, αυτά τα δύο.', 'Δεν ξέρω ποιο από τα δύο.'];
+    const RD = ['Το ωράριο εργασίας — από πότε σε εξαντλεί;', 'Ο μισθός — τι σημαίνει αυτό για σένα;', 'Ποιο από τα δύο βαραίνει;', 'Τι σου ήρθε πρώτο;'];
+    const { s, perMsg } = await run('?stageA=1', RD, M);
+    const withNote = perMsg.filter(x => x.sys.includes('these words of the user have already been said back to them'));
+    ok('NQδ: once AURA has said the user\'s words back, the NEW MATERIAL note is sent with them (' + withNote.length + ' requests)', withNote.length >= 2 && withNote.every(x => x.sys.includes('«ωράριο εργασίας»')));
+    ok('NQδ: … and each time it allows the choice question with those words, without the closing\'s screen labels',
+      withNote.every(x => x.sys.includes('a CHOICE QUESTION may offer these words as its options') && !/the one-time ΗΡΘΕΣ ΜΕ/.test(x.sys)));
+    await s.browser.close();
   }
 }
 
