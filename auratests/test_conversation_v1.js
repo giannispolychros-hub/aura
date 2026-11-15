@@ -3,6 +3,7 @@
 //  (1) commit 1 — the stagnation note no longer sends the model to ROAD DISCOVERY in Stage A before the root (code 8397 ↔ prompt STAGE A (1)).
 //  (2) commit 2 — the two gates (Decision Space Anchors, Stakes Question) are not asked for in Stage A before the root.
 //  (3) commit 3 — the ROUND TYPE note: after 5 replies in a row that end in a question, or two short «δεν ξέρω» in a row, this reply must not end with a question.
+//  (4) commit 4 — the NEW MATERIAL note leaves room for ONE brief recognition (never the same recognition phrase twice); off the safety path only.
 // The EXACT text each request carries is checked in the browser (scripts/e2e_stage_a.cjs, section NQ, «CV1»); here, the pure part and the wiring.
 
 const fs = require('fs');
@@ -202,6 +203,31 @@ safely('(3.6)', () => {
 assert('(3.7) the wiring: built from the Stage A rule, the readiness rule and the messages; sent in the hard-constraint tier, right after the gates note and before the closing-drift, first-reply and safety-path notes and the Stage A marker, which stays last',
   /const roundTypeCtx = describeRoundTypeCtx\(_saNotesHeld, answersReadinessQuestion\(msgs\), msgs\);/.test(CODE) && /gatesCtx, roundTypeCtx, closingDriftCtx, stageAFirstReplyCtx, firstReplyFloorCtx, safetyPathCtx, stageAMarkerCtx,\n      \]\.filter\(Boolean\)\.join\('\\n'\);/.test(CODE));
 assert('(3.7) the collision logger and the families are not told about it (it adds no state: a function of the messages)', !/const fired = Object\.entries\(\{[^}]*roundTypeCtx/.test(CODE));
+
+// ── (4) commit 4 — the NEW MATERIAL note leaves room for ONE brief recognition (never the same recognition twice) ─────────────────────────────
+// The note (off the safety path) said «do not say them back again … ask for what they have NOT said yet» and nothing about recognizing what they just said;
+// the stored runs show the model filling that gap with the same stock phrase turn after turn. Now, off the safety path, one more sentence: one brief
+// recognition is allowed — one plain sentence in the model's own words, not a stock phrase, never the same recognition phrase used earlier in the conversation.
+// On the safety path the text is the one that was sent, word for word. The prompt's NEW MATERIAL rule is not touched; Context Refresh and the knowledge-state
+// (GOS) note are not touched either (they wait for John's decision).
+{
+  const D = ldr('describeRepeatedElementsCtx').describeRepeatedElementsCtx, L = ['δώδεκα χρόνια', 'ωράριο εργασίας'];
+  const ADD = 'One brief recognition of what they just said is allowed: one plain sentence in your own words, not a stock phrase, and never the same recognition phrase you already used earlier in this conversation. ';
+  const OFF_BEFORE = 'ec9b9b227327e8a7dbe57be4e513f0eadf38c6bf540db489cea84a0d0c0ecb37', ON_BEFORE = 'd5f4c57297b769669df4389832338e67e9bdef4a6402e7d6ccce52694323b5f1';
+  const off = typeof D === 'function' ? D(L, true) : '', on = typeof D === 'function' ? D(L, false) : '';
+  assert('(4.1) off the safety path the note is the note of e4b2ae6 (sha256 ec9b9b22…) with exactly one sentence added: one brief recognition is allowed, never the same recognition phrase twice',
+    typeof D === 'function' && off.includes(ADD) && sha(off.replace(ADD, '')) === OFF_BEFORE);
+  assert('(4.2) … the sentence sits right after «Do not say them back again as an echo, a recap or a quote (NEW MATERIAL).», so the rule it softens is read first',
+    off.includes('(NEW MATERIAL). ' + ADD + 'As NEW MATERIAL allows reorganizing'));
+  assert('(4.3) on the safety path (false, nothing) the note is exactly as before, word for word (sha256 d5f4c572…)', typeof D === 'function' && sha(on) === ON_BEFORE && sha(D(L)) === ON_BEFORE && !on.includes('brief recognition'));
+  assert('(4.4) everything the (δ) tests pin is still there: the words named, «do not say them back again», the choice question with their words, the other two exceptions, «ask for what they have NOT said yet», one bracket',
+    off.includes('«δώδεκα χρόνια», «ωράριο εργασίας»') && /a CHOICE QUESTION may offer these words as its options, in their own words/.test(off) && /the one-time closing summary/.test(off) && /STOP MOMENT/.test(off) &&
+    /Ask for what they have NOT said yet\./.test(off) && off.split('[').length === 2 && !/ΗΡΘΕΣ ΜΕ|ΒΡΗΚΕΣ|ΦΕΥΓΕΙΣ ΜΕ/.test(off));
+  assert('(4.5) nothing when no words were said back, on either path; one block that the api guard accepts', typeof D === 'function' && D([], true) === '' && D(null, true) === '' && D([], false) === '' && guardAccepts(off) && off.startsWith('\n[CODE-VERIFIED: these words') && off.endsWith(']\n'));
+  assert('(4.6) the wiring is the one of the (δ) commit (the call passes !_safetyPath), and the prompt\'s two rules it follows are unchanged',
+    CODE.includes("const repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs), !_safetyPath) : ''; // ADR «15 Νοεμβρίου» (δ)") &&
+    raw.includes('Reorganizing or connecting what they said counts only if their answer will be new.') && raw.includes('two or three options built ONLY from what they already said, in their words'));
+}
 
 // ── (Ω1) nothing else changed. Each change of the branch conversation-v1, new → old, exactly as written (between the BEGIN/END marks; each commit
 // adds its own, in auratests/conversation_v1_undo.json). With them taken out, src/App.jsx must be the file of release-candidate e4b2ae6, byte for byte — this is the proof behind the UPDATED

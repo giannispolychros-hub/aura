@@ -1541,6 +1541,20 @@ async function runMockCV() {
       await s.browser.close();
     }
   }
+  // ── CV4 — commit 4: the NEW MATERIAL note, off the safety path, leaves room for one brief recognition (the safety path: NQS, byte for byte)
+  { const M = ['Το ωράριο εργασίας με εξαντλεί κάθε εβδομάδα.', 'Και ο μισθός δεν φτάνει, αυτό με τρώει.', 'Το ωράριο εργασίας και ο μισθός, αυτά τα δύο.', 'Δεν ξέρω ποιο από τα δύο.'];
+    const RD = ['Το ωράριο εργασίας — από πότε σε εξαντλεί;', 'Ο μισθός — τι σημαίνει αυτό για σένα;', 'Ποιο από τα δύο βαραίνει;', 'Τι σου ήρθε πρώτο;'];
+    const ADD = 'One brief recognition of what they just said is allowed: one plain sentence in your own words, not a stock phrase, and never the same recognition phrase you already used earlier in this conversation.';
+    for (const q of ['?stageA=1', '?stageA=0']) {
+      const { s, perMsg } = await run(q, RD, M);
+      const withNote = perMsg.filter(x => x.sys.includes('these words of the user have already been said back to them'));
+      ok('CV4 (' + q + '): once AURA has said the user\'s words back, the NEW MATERIAL note is sent (' + withNote.length + ' requests) and allows ONE brief recognition, never the same recognition twice',
+        withNote.length >= 2 && withNote.every(x => x.sys.includes(ADD)));
+      ok('CV4 (' + q + '): … with what it said before — the words, «do not say them back again», the choice question, the exceptions, «ask for what they have NOT said yet»',
+        withNote.every(x => x.sys.includes('«ωράριο εργασίας»') && x.sys.includes('a CHOICE QUESTION may offer these words as its options') && x.sys.includes('Ask for what they have NOT said yet.')));
+      await s.browser.close();
+    }
+  }
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),
