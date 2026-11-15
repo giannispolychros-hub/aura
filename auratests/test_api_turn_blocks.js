@@ -55,10 +55,11 @@ const openingsIn = text => [...new Set(OPEN.flatMap(re => [...text.matchAll(re)]
 const EXPECTED = ['memCtx', 'profileCtx', 'materialEvidenceCtx', 'goalObstacleStakesCtx', 'masterPriorityStageCtx', 'lastFiredFamilyCtx', 'coverageReportCtx',
   'demoCtx', 'informationModeCtx', 'explicitPauseCtx', 'coreReadinessCtx', 'shiftCheckCtx', 'premiseInversionCtx', 'friendPerspectiveCtx', 'clarityPivotCtx',
   'selfRepetitionCtx', 'repeatedElementsCtx', 'stopMomentCtx', 'riskClarificationCtx', 'methodFailureCtx', 'userStagnationCtx', 'escalationCtx', 'tensionCtx',
-  'roadQuestionCtx', 'postMapCloseCtx', 'gatesCtx', 'closingDriftCtx', 'stageAFirstReplyCtx', 'firstReplyFloorCtx', 'safetyPathCtx', 'stageAMarkerCtx'];
+  'roadQuestionCtx', 'postMapCloseCtx', 'gatesCtx', 'roundTypeCtx', 'closingDriftCtx', 'stageAFirstReplyCtx', 'firstReplyFloorCtx', 'safetyPathCtx', 'stageAMarkerCtx'];
+// UPDATED (15/11/2026, «συνομιλία v1», commit 3, John): 31 → 32 — the ROUND TYPE note (roundTypeCtx), added here as this test asks, with its opening checked below ((Β), (Γ)).
 const arr = (raw.match(/const dynamicSuffix = \[([\s\S]*?)\]\.filter\(Boolean\)/) || ['', ''])[1];
 const NAMES = [...new Set([...arr.matchAll(/\b(\w+Ctx)\b/g)].map(m => m[1]))];
-assert('(Α) dynamicSuffix joins exactly the 31 notes this test knows (a new note must be added here, with its opening checked)',
+assert('(Α) dynamicSuffix joins exactly the 32 notes this test knows (a new note must be added here, with its opening checked)',
   NAMES.length === EXPECTED.length && EXPECTED.every(n => NAMES.includes(n)));
 assert('(Α) the notes are joined with line breaks, so each one starts a block of its own', /\]\.filter\(Boolean\)\.join\('\\n'\)/.test(raw));
 

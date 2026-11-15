@@ -80,8 +80,8 @@ assert('(Γ) the coverage note gets the rule as its fourth argument (the crisis 
   /const coverageReportCtx = _crisisTurn \? '' : buildCoverageReport\(msgs, familiesUsed\.current,\s*t => \{ const l = structuralLabelsIn\(t\); return l\.road \|\| l\.beat; \}, _saNotesHeld\);/.test(gr));
 assert('(Γ) both notes still reach the model through dynamicSuffix (only their content changes)',
   /const dynamicSuffix = \[[^\]]*materialEvidenceCtx/s.test(CODE) && /const dynamicSuffix = \[[^\]]*coverageReportCtx/s.test(CODE));
-assert('(Γ) no other note reads the rule (gates, goal/obstacle/stakes, tension, the marker are untouched)', (CODE.split('_saNotesHeld').length - 1) === 5 /* UPDATED (15/11/2026, «συνομιλία v1», John, commits 1–2): 3 → 5 — the stagnation note sends its Stage A text before the root (commit 1)
-  and the gates note is held there (commit 2); proved: auratests/test_conversation_v1.js (1.8) and (2.1) name those two readers, (Ω1) shows nothing else moved */);
+assert('(Γ) no other note reads the rule (gates, goal/obstacle/stakes, tension, the marker are untouched)', (CODE.split('_saNotesHeld').length - 1) === 6 /* UPDATED (15/11/2026, «συνομιλία v1», John, commits 1–3): 3 → 6 — the stagnation note sends its Stage A text before the root (commit 1), the gates
+  note is held there (commit 2) and the ROUND TYPE note is built from the rule (commit 3); proved: auratests/test_conversation_v1.js (1.8), (2.1) and (3.7) name those three readers, (Ω1) shows nothing else moved */);
 
 // ── (Δ) the rest unchanged ──────────────────────────────────────────────────────────────────────────────────────────────────────
 const lit = n => { const a = raw.indexOf('const ' + n + ' = `'); return a < 0 ? '' : raw.slice(raw.indexOf('`', a) + 1, raw.indexOf('`;', a + 1)); };

@@ -2,6 +2,7 @@
 // the fixed prompt (b5f303cc9405aa21), api/aura.js and the screen filter are not touched, and the safety path sends what it sent.
 //  (1) commit 1 — the stagnation note no longer sends the model to ROAD DISCOVERY in Stage A before the root (code 8397 ↔ prompt STAGE A (1)).
 //  (2) commit 2 — the two gates (Decision Space Anchors, Stakes Question) are not asked for in Stage A before the root.
+//  (3) commit 3 — the ROUND TYPE note: after 5 replies in a row that end in a question, or two short «δεν ξέρω» in a row, this reply must not end with a question.
 // The EXACT text each request carries is checked in the browser (scripts/e2e_stage_a.cjs, section NQ, «CV1»); here, the pure part and the wiring.
 
 const fs = require('fs');
@@ -113,6 +114,94 @@ assert('(2.6) the latches still follow what the model asks, and the ledger still
   const sample = evalGates({ msgs, msgCount: 5, road: false, anchors: false, stakes: false, safety: false, held: false });
   assert('(2.7) … and the grid is not vacuous: the unheld block does send the gates note on the plain case (Anchors and Stakes due)', sample.text.includes('[GATES DUE CHECK') && sample.text.includes('Decision Space Anchors') && sample.text.includes('Stakes Question'));
 }
+
+// ── (3) commit 3 — the ROUND TYPE note: a constraint, not a strategy ───────────────────────────────────────────────────────────────────────
+// Stored real-model runs #43–#70 (counts only, 574 replies of 78 ordinary sessions): 83% of the replies end in a question, the longest run of
+// question-ending replies in a row is 14, and SESSION COVERAGE reports that very count every turn without directing. The note says one thing:
+// this reply must not end with a question. It is lit by (1) the last 5 replies of AURA each ending in a question (the counter of SESSION COVERAGE) or
+// (2) the user's last two messages each a short «δεν ξέρω» or the like (the words and the 6-word limit of detectUserStagnation); only in Stage A before a
+// confirmed root, off the safety path, and not while the readiness question is the most recent question AURA asked. Code only: it begins with an opening
+// the guard already lists, so api/aura.js and the fixed prompt are not touched.
+const ldr = (...names) => { try { return new Function(names.map(fnSrc).join('\n') + '\nreturn {' + names.join(',') + '};')(); } catch (e) { console.log('LOAD ERROR ' + names + ' — ' + e.message); return {}; } };
+const safely = (label, fn) => { try { fn(); } catch (e) { assert(label + ' — the check itself threw: ' + e.message, false); } };
+const RT = ldr('trailingQuestionReplies', 'userSaysDontKnowTwice', 'describeRoundTypeCtx');
+const CR = ldr('buildCoverageReport');
+const A = t => ({ role: 'assistant', content: t }), U = t => ({ role: 'user', content: t });
+const Q = i => A('Τι σημαίνει αυτό για σένα, μέρος ' + i + ';'), SENT = i => A('Άκουσα το μέρος ' + i + '.');
+const convo = (n, mk) => { const m = []; for (let i = 0; i < n; i++) { m.push(U('Κάτι που έγινε ' + i)); m.push(mk(i)); } m.push(U('Και κάτι ακόμα')); return m; };
+assert('(3.1) three pure functions: trailingQuestionReplies, userSaysDontKnowTwice, describeRoundTypeCtx(stageAPreRoot, readinessPending, messages, streakLimit)',
+  ['trailingQuestionReplies', 'userSaysDontKnowTwice', 'describeRoundTypeCtx'].every(n => typeof RT[n] === 'function') && typeof CR.buildCoverageReport === 'function');
+// (3.2) the counter is the counter of SESSION COVERAGE: same answer as buildCoverageReport on 600 generated conversations (seeded)
+safely('(3.2)', () => {
+  let seed = 20261115; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  const ENDS = ['?', '?', '?', '?', ';', ';', ' ?', '?  \n', '.', '!', '…', '?»', '\u037e', ' ', '', ':)'];
+  let diff = 0, nonZero = 0, over5 = 0;
+  for (let c = 0; c < 600; c++) {
+    const list = [], n = Math.floor(rnd() * 16);
+    if (c % 3 === 1) { // a third of them are talkers that mostly ask: user, reply, user, reply … (9 of 10 replies end in a question mark or a semicolon)
+      for (let i = 0; i < 6 + Math.floor(rnd() * 8); i++) { list.push(U('μήνυμα ' + i)); list.push(A('απάντηση ' + i + (rnd() < 0.9 ? ['?', ';', '?  \n'][Math.floor(rnd() * 3)] : '.'))); }
+    } else for (let i = 0; i < n; i++) {
+      const r = rnd();
+      if (r < 0.18) list.push(U('μήνυμα ' + i));
+      else if (r < 0.34) list.push({ role: 'assistant', content: 'Κλείσιμο' + ENDS[Math.floor(rnd() * ENDS.length)], msgMode: 'TERMINATION' });
+      else if (r < 0.38) list.push({ role: 'assistant', content: 'Κλείσιμο;', isTermination: true });
+      else if (r < 0.40) list.push({ role: 'assistant', content: 12345 });
+      else if (r < 0.42) list.push(null);
+      else list.push(A('απάντηση ' + i + ENDS[Math.floor(rnd() * ENDS.length)]));
+    }
+    const rep = CR.buildCoverageReport(list, [], () => false, true), m = /counting back from the last one: (\d+)/.exec(rep), want = m ? Number(m[1]) : 0, got = RT.trailingQuestionReplies(list);
+    if (got !== want) diff++; if (want > 0) nonZero++; if (want >= 5) over5++;
+  }
+  assert('(3.2) trailingQuestionReplies gives the number SESSION COVERAGE reports (nothing under 3 replies; closing messages left out) on 600 generated conversations — ' + nonZero + ' with a run, ' + over5 + ' of 5 or more, ' + diff + ' differences', diff === 0 && nonZero > 100 && over5 > 20);
+});
+// (3.3) the «δεν ξέρω» words are the words of detectUserStagnation, letter for letter
+safely('(3.3)', () => {
+  const lit = s => { const m = /const NO_PROGRESS = (\/\(δεν ξέρω[^\n]*?\/i);/.exec(s); return m ? m[1] : null; };
+  assert('(3.3) the «δεν ξέρω» words of the note are those of detectUserStagnation, letter for letter', lit(fnSrc('userSaysDontKnowTwice')) !== null && lit(fnSrc('userSaysDontKnowTwice')) === lit(fnSrc('detectUserStagnation')));
+});
+// (3.4) two «δεν ξέρω» in a row
+safely('(3.4)', () => {
+  const f = RT.userSaysDontKnowTwice, ok2 = (...t) => f(t.map(U));
+  assert('(3.4) two short «δεν ξέρω»/equivalents in a row → yes; one, a long one, one apart, or a different short answer → no',
+    ok2('δεν ξέρω', 'Δεν ξέρω.') && ok2('Δεν έχω ιδέα', 'ό,τι πεις') && ok2('όπως θες', 'άκυρο') && ok2('κάτι άλλο', 'δεν μπορώ να πω', 'δεν ξέρω τι') &&
+    !ok2('δεν ξέρω') && !ok2('Δεν ξέρω', 'Ναι') && !ok2('Ναι', 'Δεν ξέρω') && !ok2('δεν ξέρω', 'Δεν ξέρω αν θα το κάνω ποτέ τελικά αυτό') && !ok2('Δεν ξέρω', 'Εντάξει', 'Δεν ξέρω') &&
+    f([U('δεν ξέρω'), A('Τι;'), U('δεν ξέρω')]) === true && f(null) === false && f([]) === false && f([{ role: 'user', content: 7 }, U('δεν ξέρω')]) === false);
+});
+// (3.5) when the note is due
+safely('(3.5)', () => {
+  const f = RT.describeRoundTypeCtx, L = (n, mk) => convo(n, mk), L5 = L(5, Q), L4 = L(4, Q), L6 = L(6, Q);
+  const rows = [
+    ['5 question-ending replies in a row, Stage A before the root → the note', f(true, false, L5) !== '' && /your last 5 replies each ended with a question/.test(f(true, false, L5))],
+    ['… 6 and 9 → the note says so (6 / 9)', /your last 6 replies/.test(f(true, false, L6)) && /your last 9 replies/.test(f(true, false, L(9, Q)))],
+    ['4 in a row → nothing', f(true, false, L4) === ''],
+    ['5 questions but a statement in between (the run is 2) → nothing', f(true, false, L(5, i => i === 3 ? SENT(i) : Q(i))) === ''],
+    ['the run is cut by a statement as the LAST reply → nothing', f(true, false, [...L5.slice(0, -1), SENT(9), U('και')]) === ''],
+    ['the limit is a parameter: 4 questions with a limit of 4 → the note; 5 with a limit of 6 → nothing; a bad limit → 5', f(true, false, L4, 4) !== '' && f(true, false, L5, 6) === '' && f(true, false, L4, 'x') === '' && f(true, false, L4, 2) === ''],
+    ['two «δεν ξέρω» in a row, no run → the note, with that reason only', (() => { const m = [U('Έχω ένα θέμα με τη δουλειά'), SENT(1), U('δεν ξέρω'), SENT(2), U('Δεν ξέρω')], n = f(true, false, m); return /last two messages were each «δεν ξέρω»/.test(n) && !/replies each ended/.test(n); })()],
+    ['both reasons → both are named', (() => { const m = [...L5.slice(0, -1), U('δεν ξέρω'), Q(7), U('δεν ξέρω')], n = f(true, false, m); return /replies each ended with a question/.test(n) && /last two messages were each/.test(n); })()],
+    ['not Stage A before the root (old flow, after the root, safety path) → nothing, whatever the run', [false, undefined, null, 'true', 1].every(v => f(v, false, L6) === '')],
+    ['the readiness question is the most recent question → nothing', f(true, true, L6) === '' && f(true, true, [U('δεν ξέρω'), SENT(1), U('δεν ξέρω')]) === ''],
+    ['fewer than 3 replies, or nothing, → nothing', f(true, false, [U('α'), Q(1), U('β'), Q(2), U('γ')]) === '' && f(true, false, []) === '' && f(true, false, null) === ''],
+  ];
+  for (const [label, cond] of rows) assert('(3.5) ' + label, cond === true);
+});
+// (3.6) what the note says — and what it never says
+safely('(3.6)', () => {
+  const N = RT.describeRoundTypeCtx ? RT.describeRoundTypeCtx(true, false, convo(5, Q)) : '';
+  assert('(3.6) it is one block that begins and ends as the model expects, and the api guard accepts it (the opening is one the guard already lists)',
+    N.startsWith('\n[CODE-VERIFIED: this reply must not end with a question.') && N.endsWith(']\n') && !/\n\[/.test(N.slice(1)) && guardAccepts(N) && N.length < 1600);
+  assert('(3.6) it is a constraint, with the five things the model may choose between: a recognition not used before, one observation from their own words, a short summary in their own words, a change of angle from two things already said, an honest «may not have been found yet» only if not said',
+    /brief recognition/.test(N) && /you have not used before in this conversation/.test(N) && /ONLY from their own words/.test(N) && /short summary of what they have said so far, in their own words/.test(N) &&
+    /only sets side by side two things they already said/.test(N) && /only if they have not already said what really concerns them and you have not already said so in this conversation/.test(N));
+  assert('(3.6) … and always: no interpretation, no advice, no road or step, no naming of the root, no supposition; it takes precedence over «ask one question» for this reply only',
+    /no interpretation, no advice, no road or step, do not name the root or suggest what it is, no supposition about them or their situation/.test(N) && /takes precedence over any instruction to end with a question or to ask one question, for this reply only: the next reply is free again/.test(N));
+  assert('(3.6) it proposes nothing: no «you should», no option for the user, no ROAD DISCOVERY, no question mark in its own instructions',
+    N.length > 0 && !/you should|try to|ROAD DISCOVERY|PATH TWO|\?|first step|next step|you may (?:also )?(?:suggest|offer|propose)|(?:suggest|propose|recommend|offer) (?:a|an|the|that|they)\b/i.test(N.replace('end with a question.', '')));
+});
+// (3.7) wiring
+assert('(3.7) the wiring: built from the Stage A rule, the readiness rule and the messages; sent in the hard-constraint tier, right after the gates note and before the closing-drift, first-reply and safety-path notes and the Stage A marker, which stays last',
+  /const roundTypeCtx = describeRoundTypeCtx\(_saNotesHeld, answersReadinessQuestion\(msgs\), msgs\);/.test(CODE) && /gatesCtx, roundTypeCtx, closingDriftCtx, stageAFirstReplyCtx, firstReplyFloorCtx, safetyPathCtx, stageAMarkerCtx,\n      \]\.filter\(Boolean\)\.join\('\\n'\);/.test(CODE));
+assert('(3.7) the collision logger and the families are not told about it (it adds no state: a function of the messages)', !/const fired = Object\.entries\(\{[^}]*roundTypeCtx/.test(CODE));
 
 // ── (Ω1) nothing else changed. Each change of the branch conversation-v1, new → old, exactly as written (between the BEGIN/END marks; each commit
 // adds its own, in auratests/conversation_v1_undo.json). With them taken out, src/App.jsx must be the file of release-candidate e4b2ae6, byte for byte — this is the proof behind the UPDATED

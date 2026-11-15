@@ -1995,6 +1995,7 @@ const NOTE_LABELS = [
   [/^\[The user just confirmed readiness/, 'CORE_READINESS'], [/^\[The user just confirmed they feel something changed/, 'SHIFT_CHECK'],
   [/^\[The user just answered "yes" to the friend-perspective/, 'FRIEND_PERSPECTIVE'], [/^\[EXPLICIT PAUSE AVAILABLE/, 'EXPLICIT_PAUSE'],
   [/^\[CODE-VERIFIED: the safety path was activated/, 'SAFETY_PATH'], [/^\[CODE-VERIFIED: this turn matches CLARITY PIVOT's/, 'CLARITY_PIVOT'],
+  [/^\[CODE-VERIFIED: this reply must not end with a question/, 'ROUND_TYPE'], // «συνομιλία v1», commit 3
 ];
 // The notes that steer the strategy. The others are background: the stage, the marker, counts, the first-reply floor — and, in Stage A,
 // GATES (sent from the 3rd round on while Anchors / Stakes are «due») and LAST_FAMILY (from the 5th: it names the family that came last

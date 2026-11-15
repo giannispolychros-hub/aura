@@ -1485,6 +1485,62 @@ async function runMockCV() {
       await s.browser.close();
     }
   }
+  // ── CV3 — commit 3: the ROUND TYPE note. Stage A before the root: after 5 replies in a row that end in a question, or two short «δεν ξέρω» in a row, the next
+  // request carries «this reply must not end with a question»; once a reply is a statement the run is cut and the note is gone. Not while the readiness question
+  // is the most recent question. Not in the old flow. The safety path: NQS (byte for byte) — its crisis sessions have runs of 5+ questions, so a leak would show.
+  { const NOTE = 'this reply must not end with a question', RQ3 = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+    const has = x => x.sys.includes(NOTE);
+    const M8 = ['Σκέφτομαι να αλλάξω δουλειά αλλά κάτι με κρατάει.', 'Η σταθερότητα του μισθού με κρατάει.', 'Και το ότι ξέρω τους ανθρώπους εκεί.', 'Φοβάμαι ότι θα μετανιώσω αν φύγω.',
+      'Και αν μείνω θα μετανιώσω επίσης.', 'Δεν έχω μιλήσει σε κανέναν γι\' αυτό.', 'Ίσως μιλήσω με τον αδερφό μου.', 'Θα δω πότε.'];
+    const QS = ['Τι σε κρατάει περισσότερο;', 'Τι σημαίνει για σένα η σταθερότητα;', 'Τι από όλα αυτά βαραίνει πιο πολύ;', 'Τι θα άλλαζε αν έφευγες;', 'Πώς το βλέπεις τώρα;', 'Τι θα ήθελες να γίνει;', 'Και μετά;', 'Τι άλλο;'];
+    { // (a) the model keeps asking: the note from the 6th message on, with the count; (the fake model does not obey)
+      const { s, perMsg } = await run('?stageA=1', QS, M8);
+      const lit = perMsg.map(has);
+      ok('CV3 (Stage A): 5 replies in a row that end in a question → the note on the 6th request, and not before (' + lit.map(b => b ? 1 : 0).join('') + ')', perMsg.length === 8 && lit.slice(0, 5).every(b => !b) && lit.slice(5).every(b => b));
+      ok('CV3 (Stage A): … it names the count it saw (5, 6, 7) and the five things the model may choose, and forbids interpretation, advice, road, step, root and supposition',
+        perMsg.slice(5).every((x, i) => x.sys.includes('your last ' + (5 + i) + ' replies each ended with a question')) && perMsg[5].sys.includes('a brief recognition') && perMsg[5].sys.includes('ONLY from their own words') &&
+        perMsg[5].sys.includes('no interpretation, no advice, no road or step, do not name the root or suggest what it is, no supposition about them or their situation'));
+      const at = perMsg[5].sys.lastIndexOf(NOTE), mk = perMsg[5].sys.lastIndexOf('[FREE PART: ENDS AT ROOT]');
+      ok('CV3 (Stage A): … it is sent before the Stage A marker, which stays last', at > 0 && mk > at && perMsg[5].sys.trimEnd().endsWith('[FREE PART: ENDS AT ROOT]'));
+      // the request through the REAL guard of api/aura.js (what production does): accepted, upstream called once
+      const src = fs.readFileSync(path.join(REPO, 'api', 'aura.js'), 'utf8');
+      const handler = (await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'))).default;
+      const body = s.calls.find(b => sysOf(b).includes(NOTE));
+      let status = 0, upstream = 0; const realFetch = globalThis.fetch, hadKey = !!process.env.ANTHROPIC_API_KEY;
+      globalThis.fetch = async () => { upstream += 1; return { ok: true, status: 200, json: async () => ({ content: [{ type: 'text', text: 'x' }], usage: {} }) }; };
+      globalThis.__auraRate = new Map(); if (!hadKey) process.env.ANTHROPIC_API_KEY = 'e2e-no-network';
+      const raw = JSON.stringify(body || {});
+      if (body) await new Promise(resolve => { const res = { status(c) { status = c; return res; }, json() { resolve(); }, writeHead(c) { status = c; }, write() {}, end() { resolve(); } };
+        Promise.resolve(handler({ method: 'POST', headers: { 'content-length': String(Buffer.byteLength(raw)) }, body }, res)).catch(() => resolve()); });
+      globalThis.fetch = realFetch; if (!hadKey) delete process.env.ANTHROPIC_API_KEY;
+      ok('CV3: a request that carries the note passes the guard of api/aura.js unchanged (status ' + status + ', Anthropic called ' + upstream + ' time)', !!body && status === 200 && upstream === 1);
+      await s.browser.close();
+    }
+    { // (b) the model obeys: a statement at the 6th reply cuts the run → no note on the 7th and 8th request
+      const R = [...QS]; R[5] = 'Μου λες ότι σε κρατούν ο μισθός και οι άνθρωποι, και ότι φοβάσαι τη μεταμέλεια είτε φύγεις είτε μείνεις.';
+      const { s, perMsg } = await run('?stageA=1', R, M8);
+      ok('CV3 (Stage A): the reply to the 6th message is a statement → the run is cut: the note is on the 6th request only (' + perMsg.map(x => has(x) ? 1 : 0).join('') + ')', perMsg.length === 8 && perMsg.map(has).join() === 'false,false,false,false,false,true,false,false');
+      await s.browser.close();
+    }
+    { // (c) two short «δεν ξέρω» in a row, with statements as replies (no run of questions)
+      const { s, perMsg } = await run('?stageA=1', ['Άκουσα.', 'Άκουσα τον μισθό.', 'Εντάξει.', 'Εντάξει.'], ['Σκέφτομαι να αλλάξω δουλειά.', 'Η σταθερότητα του μισθού με κρατάει εδώ και πολλά χρόνια.', 'Δεν ξέρω', 'Δεν ξέρω']);
+      ok('CV3 (Stage A): two «δεν ξέρω» in a row → the note on the 4th request only, with that reason and not the count of questions (' + perMsg.map(x => has(x) ? 1 : 0).join('') + ')',
+        perMsg.length === 4 && perMsg.map(has).join() === 'false,false,false,true' && perMsg[3].sys.includes('the user\'s last two messages were each «δεν ξέρω» or the like') && !perMsg[3].sys.includes('replies each ended with a question'));
+      await s.browser.close();
+    }
+    { // (d) the readiness question is the most recent question: no note on that turn; the next turn (a newer question) has it
+      const { s, perMsg } = await run('?stageA=1', ['Τι σε κρατάει;', 'Τι άλλο;', 'Και μετά;', 'Πώς είναι;', RQ3, 'Εννοώ το πόσο καθαρό σου φαίνεται τώρα;', 'Και;'],
+        ['Σκέφτομαι να αλλάξω δουλειά.', 'Η σταθερότητα του μισθού.', 'Και οι άνθρωποι εκεί.', 'Φοβάμαι ότι θα μετανιώσω.', 'Δεν είμαι σίγουρος.', 'τι εννοείς;', 'Δεν ξέρω ακόμα.']);
+      ok('CV3 (Stage A): the readiness question is the most recent question (message 6, 5 questions in a row) → no note; the next request, after a newer question, has it (' + perMsg.map(x => has(x) ? 1 : 0).join('') + ')',
+        perMsg.length === 7 && perMsg.map(has).join() === 'false,false,false,false,false,false,true');
+      await s.browser.close();
+    }
+    { // (e) the old flow: never
+      const { s, perMsg } = await run('?stageA=0', QS, M8);
+      ok('CV3 (old flow, comparison tool only): no request carries the note, however many questions in a row (' + perMsg.length + ' messages)', perMsg.length >= 8 && perMsg.every(x => !has(x)));
+      await s.browser.close();
+    }
+  }
 }
 
 // ── OF: John, 11/10/2026 (ADR «11 Οκτωβρίου (η)»), before the link goes to the 20 testers. A phone (390×844, mobile, touch),

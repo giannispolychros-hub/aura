@@ -6845,6 +6845,48 @@ function describeUserStagnationCtx(stageAPreRoot) {
   if (stageAPreRoot === true) return `\n[CODE-VERIFIED: the user's own last 2 replies introduced almost no new material AND became markedly shorter than their earlier ones. This is observed from what they actually wrote, not inferred about how they feel. It is direct evidence that the current approach has stopped producing movement FOR THEM — the strongest possible input to STRATEGY PRE-MORTEM GATE's "is this strategy failing here?" check. Do not wait for them to repeat themselves further or to say so explicitly: switch to a genuinely different region of INTERVENTION SPACE now, or if enough material already exists, stop gathering and reflect the shape of what they have already given (PROBLEM STRUCTURE MAP / VERBATIM COST COLLISION). A user who has stopped producing new material is not asking for another question; they have given what they have. Here, roads, a map, options and a step come only after the root: do not move toward them. TWO MOVES THAT BELONG SPECIFICALLY TO THIS MOMENT, available here and nowhere else (founder's framing — the product is not an AI that asks good questions, it is one that works out which question this person's thinking needs now; both of these become possible precisely because the evidence above shows the problem has stopped being understanding of the topic and has become inability to move): (a) ASK WHY IT IS STILL OPEN rather than asking more about the topic — "τι είναι αυτό που σε κάνει να το σκέφτεσαι ακόμα;" targets the stuckness itself, not its content, and it works on any subject because it presupposes nothing about what kind of problem this is. (b) QUESTION THE FRAME, but only where their own material contradicts it — when someone has described a decision at length while everything they actually said points elsewhere, "μήπως δεν προσπαθείς να αποφασίσεις αυτό, αλλά κάτι άλλο;" is legitimate. HARD CONDITION on (b): only when the evidence for the mismatch is in their own words, never as a general-purpose move, and always as a question they can reject outright — if they say no, that is the end of it and the frame stands. Offered as a question, never as an interpretation stated.]\n`;
   return `\n[CODE-VERIFIED: the user's own last 2 replies introduced almost no new material AND became markedly shorter than their earlier ones. This is observed from what they actually wrote, not inferred about how they feel. It is direct evidence that the current approach has stopped producing movement FOR THEM — the strongest possible input to STRATEGY PRE-MORTEM GATE's "is this strategy failing here?" check. Do not wait for them to repeat themselves further or to say so explicitly: switch to a genuinely different region of INTERVENTION SPACE now, or if enough material already exists, stop gathering and reflect the shape of what they have already given (PROBLEM STRUCTURE MAP / VERBATIM COST COLLISION). AND IF GENUINELY DISTINCT DIRECTIONS ARE ALREADY IMPLIED BY WHAT THEY HAVE SAID, THIS IS THE MOMENT FOR ROAD DISCOVERY — THE ONE NAMED EXCEPTION's PATH TWO, with all its output tests (distinctness, consequence, level, completeness) and their QUALITY BAILOUT clauses intact. A user who has stopped producing new material is not asking for another question; they have given what they have. Showing them the actual shape of their decision space is the work. If the material genuinely does not support distinct directions, say that plainly instead — that is also a real finding, never a reason to invent one. TWO MOVES THAT BELONG SPECIFICALLY TO THIS MOMENT, available here and nowhere else (founder's framing — the product is not an AI that asks good questions, it is one that works out which question this person's thinking needs now; both of these become possible precisely because the evidence above shows the problem has stopped being understanding of the topic and has become inability to move): (a) ASK WHY IT IS STILL OPEN rather than asking more about the topic — "τι είναι αυτό που σε κάνει να το σκέφτεσαι ακόμα;" targets the stuckness itself, not its content, and it works on any subject because it presupposes nothing about what kind of problem this is. (b) QUESTION THE FRAME, but only where their own material contradicts it — when someone has described a decision at length while everything they actually said points elsewhere, "μήπως δεν προσπαθείς να αποφασίσεις αυτό, αλλά κάτι άλλο;" is legitimate. HARD CONDITION on (b): only when the evidence for the mismatch is in their own words, never as a general-purpose move, and always as a question they can reject outright — if they say no, that is the end of it and the frame stands. Offered as a question, never as an interpretation stated.]\n`;
 }
+// «συνομιλία v1», commit 3 (John, 15/11/2026) — the ROUND TYPE note: a constraint, not a strategy.
+// What was measured on the stored real-model runs #43–#70 (counts only, 574 replies of 78 ordinary sessions): 83% of the replies end in a question, and the
+// longest run of replies in a row that end in a question is 14 — although SESSION COVERAGE reports that very count to the model every turn (it reports and
+// never directs). Two things light this note: (1) the last 5 replies of AURA each end in a question (the same rule as that report); (2) the user's last two
+// messages are each a short «δεν ξέρω» or the like (the NO_PROGRESS words of detectUserStagnation, each message at most 6 words, as its own second path).
+// Then, for that one reply, the model is told only what it must NOT do: end with a question. It chooses what to write instead, from a short list of things that
+// stay inside the mirror. No interpretation, advice, road, step, root or supposition is ever allowed by the note.
+// Only in Stage A before a confirmed root and off the safety path (stageAPreRootNotesHeld). And not while the readiness question is the most recent question
+// AURA asked (answersReadinessQuestion): the card's rule (στ) reads a plain «Ναι» against that question, so a statement-reply at that moment would keep its window
+// open for a «Ναι» meant for something else. Nothing is added to the prompt, to api/aura.js or to the screen filter: the note begins with an opening the guard
+// already lists. Measured on the stored runs: the note is lit in 30,5% of the positions without it, about 10% if the model obeys (it breaks its own run).
+// auratests/test_conversation_v1.js (3); browser: section CV.
+function trailingQuestionReplies(messages) {
+  const list = Array.isArray(messages) ? messages : [];
+  const replies = list
+    .filter(m => m && m.role === "assistant" && typeof m.content === "string")
+    .filter(m => m.msgMode !== "TERMINATION" && m.isTermination !== true)
+    .map(m => m.content);
+  if (replies.length < 3) return 0;
+  let streak = 0;
+  for (let i = replies.length - 1; i >= 0; i--) {
+    if (/[;?]\s*$/.test(replies[i].trim())) streak += 1; else break;
+  }
+  return streak;
+}
+function userSaysDontKnowTwice(messages) {
+  const users = (Array.isArray(messages) ? messages : []).filter(m => m && m.role === "user" && typeof m.content === "string");
+  if (users.length < 2) return false;
+  const NO_PROGRESS = /(δεν ξέρω|δεν έχω ιδέα|ό,?τι πεις|όπως θες|δεν ξέρω τι|άκυρο|δεν μπορώ να πω)/i;
+  return users.slice(-2).every(m => NO_PROGRESS.test(m.content) && m.content.trim().split(/\s+/).length <= 6);
+}
+function describeRoundTypeCtx(stageAPreRoot, readinessPending, messages, streakLimit) {
+  if (stageAPreRoot !== true || readinessPending === true) return '';
+  const limit = Number.isInteger(streakLimit) && streakLimit >= 3 ? streakLimit : 5;
+  const streak = trailingQuestionReplies(messages);
+  const dontKnow = userSaysDontKnowTwice(messages);
+  if (streak < limit && !dontKnow) return '';
+  const why = [];
+  if (streak >= limit) why.push(`your last ${streak} replies each ended with a question`);
+  if (dontKnow) why.push(`the user's last two messages were each «δεν ξέρω» or the like`);
+  return `\n[CODE-VERIFIED: this reply must not end with a question. Counted from this conversation, not inferred: ${why.join(", and ")}. For this one reply, write a statement and stop there. You decide which one fits what they actually said: a brief recognition of what they just told you, in a plain sentence you have not used before in this conversation (never a stock phrase); or one observation built ONLY from their own words, in their own words (a mirror, not an interpretation); or a short summary of what they have said so far, in their own words; or a change of angle that only sets side by side two things they already said; or, only if they have not already said what really concerns them and you have not already said so in this conversation, one plain honest sentence that what really concerns them may not have been found yet. Always: no interpretation, no advice, no road or step, do not name the root or suggest what it is, no supposition about them or their situation. This takes precedence over any instruction to end with a question or to ask one question, for this reply only: the next reply is free again.]\n`;
+}
 // ONE-TIME CTX DELIVERY (live-session finding: the three-beat ΗΡΘΕΣ ΜΕ/ΒΡΗΚΕΣ/ΦΕΥΓΕΙΣ ΜΕ block
 // appeared TWICE in one session even though the prompt says "NO SECOND THREE-BEAT" explicitly.
 // Cause: shiftCheckConfirmed is deliberately one-way per session — other mechanisms read it — but
@@ -8437,11 +8479,14 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // STAGE A (step 3.0): with the switch open, the marker goes LAST (hard-constraint tier) and the two
       // notes whose only job is the map are not sent. Closed switch: marker "", same notes, same order.
       const stageAMarkerCtx = buildStageAMarker(stageAActive.current);
+      // «συνομιλία v1», commit 3: the ROUND TYPE note — Stage A before the root, off the safety path, not while the readiness question is the most recent one.
+      // In the hard-constraint tier: right after the gates note, before the closing-drift, first-reply and safety-path notes and the Stage A marker (which stays last).
+      const roundTypeCtx = describeRoundTypeCtx(_saNotesHeld, answersReadinessQuestion(msgs), msgs);
       const dynamicSuffix = [
         memCtx, profileCtx, materialEvidenceCtx, goalObstacleStakesCtx, masterPriorityStageCtx, lastFiredFamilyCtx, coverageReportCtx, demoCtx, informationModeCtx, explicitPauseCtx,
         coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, repeatedElementsCtx, stopMomentCtx, riskClarificationCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, stageAActive.current ? '' : roadQuestionCtx,
         stageAActive.current ? '' : postMapCloseCtx,
-        gatesCtx, closingDriftCtx, stageAFirstReplyCtx, firstReplyFloorCtx, safetyPathCtx, stageAMarkerCtx,
+        gatesCtx, roundTypeCtx, closingDriftCtx, stageAFirstReplyCtx, firstReplyFloorCtx, safetyPathCtx, stageAMarkerCtx,
       ].filter(Boolean).join('\n');
       // PROTOCOL COLLISION LOGGER (red-team gap: nothing recorded when two or more families fired on
       // the same turn, or which one won — so arbitration was asserted by the rules and never observed.
