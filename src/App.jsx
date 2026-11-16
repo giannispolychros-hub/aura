@@ -7090,6 +7090,55 @@ function describeRoundTypeCtx(stageAPreRoot, readinessPending, messages, streakL
   if (dontKnow) why.push(`the user's last two messages were each «δεν ξέρω» or the like`);
   return `\n[CODE-VERIFIED: this reply must not end with a question. Counted from this conversation, not inferred: ${why.join(", and ")}. For this one reply, write a statement and stop there. You decide which one fits what they actually said: a brief recognition of what they just told you, in a plain sentence you have not used before in this conversation (never a stock phrase); or one observation built ONLY from their own words, in their own words (a mirror, not an interpretation); or a short summary of what they have said so far, in their own words; or a change of angle that only sets side by side two things they already said; or, only if they have not already said what really concerns them and you have not already said so in this conversation, one plain honest sentence that what really concerns them may not have been found yet. Always: no interpretation, no advice, no road or step, do not name the root or suggest what it is, no supposition about them or their situation. This takes precedence over any instruction to end with a question or to ask one question, for this reply only: the next reply is free again.]\n`;
 }
+// ROUND TRACE (John, 16/11/2026) — a passive record for the ?debug=1 panel, and nothing else. For every request of the main flow (generateResponse) the panel shows (α) how many of AURA's
+// replies in a row had ended in a question when the request was made, (β) whether the ROUND TYPE note was in that request (yes/no), (γ) whether the reply that came ended in a question (yes/no).
+// Numbers and yes/no only — never a word of the conversation; no reply, no request, no limit and no text the model reads is changed by it. It is recorded only with ?debug=1 (debugMode), inside a
+// try, and cleared in resetSession. (α) counts the replies and the ending as trailingQuestionReplies does, but gives the true number from the first reply (that function says 0 below three replies,
+// which only matters for its limit of 5); (β) is read from the note itself (alone, or inside the one note with the offer or its follow-up), never from a second decision; (γ) is the same test as
+// the ending in (α), so the next round's (α) is this one's +1 exactly when (γ) is yes. auratests/test_round_trace_debug.js; browser: section DBG.
+const ROUND_TRACE_KEEP = 200;
+const ROUND_TRACE_SHOW = 30;
+const ROUND_TRACE_LEGEND = "γύρος: σειρά ερωτήσεων · σημείωση «τύπος γύρου» στάλθηκε · η απάντηση τελείωσε σε ερώτηση";
+function replyEndsInQuestion(text) {
+  return typeof text === "string" && /[;?]\s*$/.test(text.trim());
+}
+function questionStreakNow(messages) {
+  const list = Array.isArray(messages) ? messages : [];
+  let streak = 0;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const m = list[i];
+    if (!m || m.role !== "assistant" || typeof m.content !== "string") continue;
+    if (m.msgMode === "TERMINATION" || m.isTermination === true) continue;
+    if (replyEndsInQuestion(m.content)) streak += 1; else break;
+  }
+  return streak;
+}
+function roundTypeNoteSent(ctx) {
+  return typeof ctx === "string" && /^\s*\[CODE-VERIFIED: this reply must not end with a question/.test(ctx);
+}
+function roundTraceNumber(n) {
+  const v = typeof n === "number" && Number.isFinite(n) ? Math.floor(n) : 0;
+  return Math.max(0, Math.min(9999, v));
+}
+function roundTraceBegin(rows, round, streak, noteSent) {
+  const n = roundTraceNumber(round);
+  const kept = (Array.isArray(rows) ? rows : []).filter(r => r && r.n !== n); // a retry of the same round replaces its row
+  kept.push({ n, s: roundTraceNumber(streak), note: noteSent === true, q: null });
+  return kept.slice(-ROUND_TRACE_KEEP);
+}
+function roundTraceFinish(rows, round, endedInQuestion) {
+  const list = Array.isArray(rows) ? rows : [];
+  const n = roundTraceNumber(round);
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i] && list[i].n === n) return [...list.slice(0, i), { n, s: list[i].s, note: list[i].note === true, q: endedInQuestion === true }, ...list.slice(i + 1)];
+  }
+  return list;
+}
+function roundTraceLine(row) {
+  const r = row && typeof row === "object" ? row : {};
+  const yesNo = v => (v === true ? "ναι" : "όχι");
+  return roundTraceNumber(r.n) + ": " + roundTraceNumber(r.s) + " · " + yesNo(r.note) + " · " + (r.q === true || r.q === false ? yesNo(r.q) : "—");
+}
 // ONE-TIME CTX DELIVERY (live-session finding: the three-beat ΗΡΘΕΣ ΜΕ/ΒΡΗΚΕΣ/ΦΕΥΓΕΙΣ ΜΕ block
 // appeared TWICE in one session even though the prompt says "NO SECOND THREE-BEAT" explicitly.
 // Cause: shiftCheckConfirmed is deliberately one-way per session — other mechanisms read it — but
@@ -7902,6 +7951,7 @@ export default function AURAv2() {
   const coreReadinessAsked     = useRef(false); // ROOT RE-FOCUS step-one question just posed
   const coreReadinessConfirmed = useRef(false);
   const speakRightRef = useRef({ at: 0, mass: 0 }); // «δικαίωμα ομιλίας» (commit 5): the user's message number and the mass of the last turn that carried the offer
+  const roundTraceRef = useRef([]); // ROUND TRACE (John, 16/11/2026): numbers and yes/no per request, for the ?debug=1 panel only (see roundTraceBegin); cleared in resetSession
   const shiftCheckAsked        = useRef(false); // three-beat shift verification question just posed
   const shiftCheckConfirmed    = useRef(false); // one-way — user's own yes, per session
   // Emission counters for deliverOnce above — these gate how many turns the DIRECTIVE is repeated.
@@ -8731,6 +8781,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                       '| highest-attention:', fired[fired.length - 1]);
         }
       } catch (e) { /* logging must never affect the session */ }
+      // ROUND TRACE (John, 16/11/2026): for the ?debug=1 panel only — numbers and yes/no, passive; it reads the note and the messages that this request is made of and changes neither.
+      // Before the lines that build the system text and call the model, which stay exactly as they were (auratests/test_api_cost.js evaluates them on their own).
+      if (debugMode.current) { try { roundTraceRef.current = roundTraceBegin(roundTraceRef.current, msgs.filter(m => m && m.role === "user").length, questionStreakNow(msgs), roundTypeNoteSent(roundTypeCtx)); } catch (e) { /* passive: never the session's problem */ } }
       // PROMPT CACHING — this path hands callAura a plain STRING and lets it place the breakpoint,
       // exactly as the other six call sites already did. It used to build its own array with the
       // marker AFTER the lens suffix, and that one difference was the single largest avoidable cost
@@ -9113,6 +9166,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       const _methodLine = stageAMethodLineDue({ active: stageAActive.current, auraBefore: msgs.some(m => m && m.role === "assistant"), supportive: currentMode === "SUPPORTIVE", riskKind: riskSignalKind.current, dangerFromOther: dangerFromOther.current, safetyMode, lastUserText: lastUserMsg });
       const _fk = finishReply(displayText, _finCtx); if (_fk.failed) throw finalCheckError(msgs); displayText = _fk.content;
       if (displayText.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode, ...(_methodLine ? { methodLine: true } : {}) }]);
+      // ROUND TRACE (John, 16/11/2026): the reply that was just written — after the write, so nothing between the final check and the write is touched; the panel draws it on the render that follows
+      if (debugMode.current && displayText.trim()) { try { roundTraceRef.current = roundTraceFinish(roundTraceRef.current, msgs.filter(m => m && m.role === "user").length, replyEndsInQuestion(displayText)); } catch (e) { /* passive */ } }
       // PASSIVE MEASUREMENT ONLY — fires after display, never blocks or alters anything. See
       // detectsPossibleAraPatternViolation's comment for full context (Measurement Before
       // Modification, heuristic proxy, visibility during real testing only). Deliberately logs
@@ -10474,6 +10529,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     roadMapRecovered.current = false;
     familiesUsed.current = [];
     speakRightRef.current = { at: 0, mass: 0 }; // «δικαίωμα ομιλίας» (commit 5)
+    roundTraceRef.current = []; // ROUND TRACE (John, 16/11/2026)
     roadQuestionState.current = null;
     window.__auraLastCollision = null;
     setValueUnlocked(false);
@@ -10957,6 +11013,13 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                 to read — `unsup` is known to under-report, see classifyRoadProvenance. */}
             {roadTraceLast.current?.provenance && (
               <div>prov: sup={roadTraceLast.current.provenance.supported}/{roadTraceLast.current.provenance.lines} unsup={roadTraceLast.current.provenance.unsupported} mild={roadTraceLast.current.provenance.mild} sev={roadTraceLast.current.provenance.severe} novel={roadTraceLast.current.provenance.novelFactLines}</div>
+            )}
+            {/* ROUND TRACE (John, 16/11/2026): one row per request of the main flow — numbers and yes/no only, made by roundTraceLine from numbers, never from a message. */}
+            {roundTraceRef.current.length > 0 && (
+              <div data-round-trace="1" style={{marginTop:"3px",lineHeight:1.35}}>
+                <div>{ROUND_TRACE_LEGEND}</div>
+                {roundTraceRef.current.slice(-ROUND_TRACE_SHOW).map(r => (<div key={r.n}>{roundTraceLine(r)}</div>))}
+              </div>
             )}
             {/* THE ONE INTERACTIVE ELEMENT IN THIS PANEL, and it needs pointerEvents of its own:
                 the container sets them to "none" so the overlay never intercepts a tap meant for

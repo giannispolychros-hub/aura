@@ -1020,6 +1020,7 @@ async function runMock() {
   await runMockNQS(); // 15/11: the safety path byte for byte as 50beff6 sent it (ADR «15 Νοεμβρίου», condition 3)
   await runMockCV(); // 15/11: «συνομιλία v1» — four separate commits on conversation-v1
   await runMockSR(); // 15/11: «δικαίωμα ομιλίας από υλικό» — commit 5 of conversation-v1
+  await runMockDBG(); // 16/11: the round trace in the ?debug=1 panel — passive, numbers and yes/no only
 }
 
 // ── SD: ADR «31 Οκτωβρίου (ζ)» (John, a safety fix (α)) — the gaps of the two safety detectors, on the screen. Stage A (?stageA=1&rec=1),
@@ -1671,6 +1672,106 @@ async function runMockSR() {
     ok('SR5 (Stage A): from the crisis message on (' + reqs.length + ' requests, all on the safety path) no request carries the offer or the follow-up — the follow-up that was due on the crisis request included',
       reqs.length >= 3 && reqs.every(t => t.includes('[MASTER PRIORITY RULE — STAGE: SAFETY') && !t.includes(SPEAK) && !t.includes(FU) && !t.includes(ADD)));
     await s.browser.close();
+  }
+}
+
+// ── DBG: ROUND TRACE in the ?debug=1 panel (John, 16/11/2026) — conversation-v1. PASSIVE: numbers and yes/no, never a word of the conversation; the fixed prompt, api/aura.js, the notes, their limits and the
+// safety path are not touched. Fake model through the real app, cost $0, synthetic everyday text. For every request of the main flow the panel shows (α) how many of AURA's replies in a row had ended in a question,
+// (β) whether the ROUND TYPE note was in that request, (γ) whether the reply that came ended in a question. The «note» column is checked against the bodies the fake model really received.
+// Unit tests of the same rules: auratests/test_round_trace_debug.js. Alone: --only DBG.
+async function runMockDBG() {
+  const sysOf = b => (b.system || []).map(x => x.text || '').join('\n');
+  const U9 = ['Σκέφτομαι να μετακομίσω σε άλλη πόλη για τις σπουδές μου.', 'Το ενοίκιο εκεί είναι ακριβό και τα έξοδα της σχολής ανεβαίνουν κάθε χρόνο, ειδικά στα φοιτητικά διαμερίσματα.',
+    'Οι φίλοι μου μένουν εδώ και με βοηθούν στις σπουδές όποτε χρειάζεται.', 'Το πρόγραμμα της σχολής είναι καλό, όμως η απόσταση από το σπίτι μεγαλώνει.',
+    'Η αδελφή μου πιστεύει ότι οι σπουδές αξίζουν κάθε θυσία για το μέλλον.', 'Εγώ ακούω τους συμβούλους της σχολής και ζυγίζω τα έξοδα με τα οφέλη, χωρίς βιασύνη.',
+    'Δεν έχω μιλήσει με κανέναν από τη σχολή για το ενοίκιο ακόμα.', 'Ίσως ρωτήσω τον αδελφό μου που έχει περάσει από εκεί.', 'Θα δω πότε θα έχω χρόνο για αυτό.'];
+  const Q9 = ['Τι σε κάνει να το σκέφτεσαι τώρα;', 'Τι σημαίνει αυτό για τα σχέδιά σου;', 'Πώς είναι οι μέρες σου τώρα;', 'Τι περιμένεις να αλλάξει;', 'Και εσύ τι λες γι\' αυτό;',
+    'Τι σου έρχεται όταν το σκέφτεσαι;', 'Πώς το βλέπεις;', 'Και μετά;', 'Τι άλλο;'];
+  const STATEMENT = 'Άκουσα το ενοίκιο και τη σχολή.';
+  const RQ = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+  const RTN = 'this reply must not end with a question';
+  const LEGEND = 'γύρος: σειρά ερωτήσεων · σημείωση «τύπος γύρου» στάλθηκε · η απάντηση τελείωσε σε ερώτηση';
+  const want = (n, s, note, q) => n + ': ' + s + ' · ' + (note ? 'ναι' : 'όχι') + ' · ' + (q === null ? '—' : q ? 'ναι' : 'όχι');
+  const panel = async page => { const loc = page.locator('[data-round-trace]'); if (!(await loc.count())) return null;
+    const lines = (await loc.first().innerText()).split('\n').map(x => x.trim()).filter(Boolean); return { legend: lines[0], rows: lines.slice(1) }; };
+  const parse = l => { const m = /^(\d+): (\d+) · (ναι|όχι) · (ναι|όχι|—)$/.exec(l); return m ? { n: +m[1], s: +m[2], note: m[3] === 'ναι', q: m[4] === '—' ? null : m[4] === 'ναι' } : null; };
+  const run = async (query, script, msgs, vp) => { const s = await session(query, script); const snaps = []; if (vp) await s.page.setViewportSize(vp);
+    for (let i = 0; i < msgs.length; i++) { await send(s.page, msgs[i]); snaps.push(await panel(s.page)); } return { s, snaps }; };
+  const words = t => new Set((String(t).toLowerCase().match(/[a-zα-ωάέήίόύώϊϋΐΰ]{5,}/g) || []).map(w => w.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ς/g, 'σ')));
+  // the note column against the bodies the fake model received; the streak column against the N the note itself carries
+  const agrees = (rows, calls) => rows.length === calls.length && rows.every((r, i) => { const p = parse(r), t = sysOf(calls[i]); return p && p.n === i + 1 && p.note === t.includes(RTN) && (!p.note || t.includes('your last ' + p.s + ' replies each ended with a question') || t.includes('were each «δεν ξέρω»')); });
+  // DBG1 — a question every time, 8 messages: the streak grows by one with each reply, the note from the 6th request, every reply ends in a question
+  { const { s, snaps } = await run('?debug=1&stageA=1', Q9, U9.slice(0, 8), vpOr({ width: 390, height: 700 }));
+    await s.page.screenshot({ path: path.join(OUT, 'DBG-1-panel.png'), fullPage: false }); // what the panel looks like on a phone (numbers and yes/no only)
+    const last = snaps[7], rows = last ? last.rows : [], wantRows = Array.from({ length: 8 }, (_, i) => want(i + 1, i, i >= 5, true));
+    ok('DBG1 (Stage A, ?debug=1): after 8 messages the panel lists 8 rounds — the streak 0,1,2,…,7, the note from the 6th round on, every reply ended in a question (' + rows.join(' | ') + ')', !!last && JSON.stringify(rows) === JSON.stringify(wantRows));
+    ok('DBG1: … under the legend, word for word', !!last && last.legend === LEGEND);
+    ok('DBG1: … one row more after each message, and the earlier rows never change (' + snaps.map(x => x ? x.rows.length : '-').join(',') + ')', snaps.every((sn, i) => !!sn && sn.rows.length === i + 1 && sn.rows.every((r, j) => r === wantRows[j])));
+    ok('DBG1: … the «note» column is what the request really carried: the 8 bodies the fake model received (' + s.calls.length + ' requests) say the same, and the note\'s own N is the streak of the row', s.calls.length === 8 && agrees(rows, s.calls));
+    const W = new Set([...U9.flatMap(m => [...words(m)]), ...Q9.flatMap(m => [...words(m)])]), shown = new Set(snaps.flatMap(sn => [...words((sn ? [sn.legend, ...sn.rows] : []).join(' '))]));
+    ok('DBG1: no word of the conversation is in the panel: of the ' + W.size + ' content words typed or answered, none is in any snapshot of it (' + shown.size + ' words shown, all from the legend)', W.size > 40 && shown.size > 0 && [...shown].every(w => !W.has(w)) &&
+      snaps.every(sn => !!sn && sn.rows.every(r => parse(r) !== null)));
+    await s.browser.close();
+  }
+  // DBG2 — a statement among the replies: that round says no, the streak starts again from 0, the true number is shown from the first reply, and the plain offer of the 6th request is NOT the ROUND TYPE note
+  { const R = Q9.slice(); R[2] = STATEMENT;
+    const { s, snaps } = await run('?debug=1&stageA=1', R, U9);
+    const rows = snaps[8] ? snaps[8].rows : [];
+    const wantRows = [want(1, 0, false, true), want(2, 1, false, true), want(3, 2, false, false), want(4, 0, false, true), want(5, 1, false, true), want(6, 2, false, true), want(7, 3, false, true), want(8, 4, false, true), want(9, 5, true, true)];
+    ok('DBG2 (Stage A): a statement as the 3rd reply: «3: 2 · όχι · όχι» (the reply did not end in a question), then the streak is 0, 1, 2, 3, 4 and the note comes at 5 — the 9th round (' + rows.join(' | ') + ')', JSON.stringify(rows) === JSON.stringify(wantRows));
+    ok('DBG2: … the 6th request carried the plain offer (a different note) and the panel says no to the ROUND TYPE note for it; and the «note» column agrees with all 9 bodies',
+      s.calls.length === 9 && sysOf(s.calls[5]).includes('this reply may say back a connection between things the user gave') && !sysOf(s.calls[5]).includes(RTN) && agrees(rows, s.calls));
+    await s.browser.close();
+  }
+  // DBG3 — the note is read from the request, not guessed from the streak: the readiness question is the most recent question (5 questions in a row, the note HELD → no); two «δεν ξέρω» (streak 2, the note LIT → yes)
+  { const R = Q9.slice(); R[4] = RQ;
+    const { s, snaps } = await run('?debug=1&stageA=1', R, U9.slice(0, 7));
+    const rows = snaps[6] ? snaps[6].rows : [];
+    ok('DBG3 (Stage A): the readiness question as the 5th reply: the 6th round has a streak of 5 and NO note («6: 5 · όχι · ναι»), because the note is held while that question is the most recent one; the 7th has the note (' + rows.slice(4).join(' | ') + ')',
+      rows[5] === want(6, 5, false, true) && rows[6] === want(7, 6, true, true) && s.calls.length === 7 && agrees(rows, s.calls));
+    await s.browser.close();
+    const two = await run('?debug=1&stageA=1', Q9, ['Σκέφτομαι να αλλάξω δουλειά.', 'δεν ξέρω', 'δεν ξέρω']);
+    const r2 = two.snaps[2] ? two.snaps[2].rows : [];
+    ok('DBG3 (Stage A): two «δεν ξέρω» in a row at the 3rd message: a streak of only 2 and the note IS in the request («3: 2 · ναι · ναι») — the second trigger shows too (' + r2.join(' | ') + ')', r2[2] === want(3, 2, true, true) && two.s.calls.length === 3 && agrees(r2, two.s.calls));
+    await two.s.browser.close();
+  }
+  // DBG4 — without ?debug=1: no panel, no legend, nothing of it anywhere on the page
+  { const { s, snaps } = await run('?stageA=1', Q9, U9.slice(0, 7));
+    const text = await s.page.locator('body').innerText();
+    ok('DBG4 (Stage A, no ?debug=1): after 7 messages (the note is in the requests from the 6th) the page has no round trace — no block, no legend, no row', snaps.every(x => x === null) && !text.includes('σειρά ερωτήσεων') && !text.includes('στάλθηκε') &&
+      s.calls.length === 7 && sysOf(s.calls[5]).includes(RTN));
+    await s.browser.close();
+  }
+  // DBG5 — «Νέα συνεδρία» (resetSession, the button of the end screen — reached the way X7 reaches it: the root, the step, the word): the rows are gone, and the next session counts from the start
+  { const T = APP.texts, BACK = T.back;
+    const btn = (page, name) => { const loc = page.getByRole('button', { name, exact: true }); const go = async () => { if (await loc.count()) await loc.first().click({ timeout: 4000 }); }; return { count: () => loc.count(), click: go }; };
+    const F1 = 'Γεια. Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.';
+    const s = await session('?debug=1&stageA=1', ['Τι εννοείς με το «άξιζα»;', 'Και τι σε τραβάει αλλού;', 'Και τι θα σήμαινε αυτό;', 'Και τι άλλο;', 'Και μετά;']);
+    await s.page.setViewportSize(vpOr({ width: 390, height: 700 }));
+    await send(s.page, F1); await send(s.page, 'Η σταθερότητα κυρίως.'); await send(s.page, 'Ευχαριστώ.');
+    await btn(s.page, BACK).click(); await s.page.waitForTimeout(400);
+    await btn(s.page, 'Νομίζω βρήκα τι με απασχολεί').click(); await s.page.waitForTimeout(400);
+    await send(s.page, 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.');
+    await btn(s.page, T.yes).click(); await s.page.waitForTimeout(400);
+    await btn(s.page, COACH_OFFER_OPEN ? T.notNow : T.stepUnknown).click(); await s.page.waitForTimeout(400);
+    await btn(s.page, '6').click(); await s.page.waitForTimeout(400);
+    await send(s.page, 'πατέρας'); await s.page.waitForTimeout(1200);
+    const before = await panel(s.page), onEnd = await btn(s.page, 'Νέα συνεδρία').count();
+    await btn(s.page, 'Νέα συνεδρία').click(); await s.page.waitForTimeout(600);
+    const gone = await panel(s.page);
+    if (await s.page.getByText('Ξεκίνα με το πρόβλημά σου').count()) await s.page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await send(s.page, F1);
+    const again = await panel(s.page);
+    ok('DBG5: at the end of a session the panel holds the rounds of it (' + (before ? before.rows.length : 0) + ' rows, from the model calls — the app\'s own steps are not rounds), «Νέα συνεδρία» is there (' + onEnd + ')', !!before && before.rows.length >= 2 && before.rows.every(r => parse(r) !== null) && onEnd === 1);
+    ok('DBG5: after «Νέα συνεδρία» (resetSession) there are no rows; in the new session the first round is «1: 0 · όχι · ναι» — nothing is carried over (' + (again ? again.rows.join(' | ') : '-') + ')',
+      gone === null && !!again && JSON.stringify(again.rows) === JSON.stringify([want(1, 0, false, true)]));
+    await s.browser.close();
+  }
+  // DBG6 — it changes nothing that is sent: the same messages with and without ?debug=1 give the same bodies, byte for byte (7 requests, the note and the offer among them)
+  { const a = await run('?stageA=1', Q9, U9.slice(0, 7)), b = await run('?debug=1&stageA=1', Q9, U9.slice(0, 7));
+    const same = a.s.calls.length === 7 && b.s.calls.length === 7 && a.s.calls.every((c, i) => JSON.stringify(c) === JSON.stringify(b.s.calls[i]));
+    ok('DBG6: the same 7 messages typed with and without ?debug=1: the 7 request bodies are identical byte for byte (' + a.s.calls.map(c => JSON.stringify(c).length).join(',') + ' characters)', same && a.s.calls.some(c => sysOf(c).includes(RTN)));
+    await a.s.browser.close(); await b.s.browser.close();
   }
 }
 
@@ -7806,7 +7907,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
