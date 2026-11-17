@@ -1780,6 +1780,8 @@ async function runMockDBG() {
 // The app's OWN root question (door 1: the button; «Διόρθωσε»; and a silently armed card): a SHORT message that only says the question was not understood must get what «Δεν κατάλαβα» always got —
 // the fixed «Πες το λίγο πιο ολοκληρωμένα…», no card, no model call — and never the card «Τι βρήκες». Real words of a root that begin with «Δεν κατάλαβα…» still open the card (the NEGATIVE).
 // MU3 also REPORTS what the screen shows when the same phrase is said twice in a row (it asserts only: no card, no model call; the counts are in the label). Nothing here changes what is sent.
+// 17/11 (John's second order, commit 9): the closed form also takes «καθόλου», «καλά», «σου» — MU1 (+3 phrases that were a card before), MU1b (+2 variants), MU2 (+2 negatives, one of them «Δεν κατάλαβα καθόλου τον εαυτό μου»),
+// MU5b (a phrase with a new word at the silently armed card).
 // Unit tests: auratests/test_root_misunderstood_1711.js. Screenshot: MU-3-twice.png (the screen after the same phrase twice). Alone: --only MU.
 async function runMockMU() {
   const T = APP.texts;
@@ -1799,8 +1801,9 @@ async function runMockMU() {
   const toAsk = async () => { const s = await session('?stageA=1&rec=1', R0); await send(s.page, F1);
     await s.page.getByRole('button', { name: T.button }).click(); await s.page.waitForTimeout(400); return s; };
   const GIVEN = ['Δεν κατάλαβα την ερώτηση', 'Δεν καταλαβαίνω τι ρωτάς', 'Δεν κατάλαβα τι εννοείς', 'Δεν καταλαβαίνω την ερώτηση'];
-  // MU1 — John's four phrases, each in a session of its own: the fixed text, no card, no model call, nothing counted as a root
-  for (const x of GIVEN) {
+  const NEWER = ['Δεν καταλαβαίνω καθόλου την ερώτηση', 'Δεν κατάλαβα καλά την ερώτηση', 'Δεν κατάλαβα την ερώτησή σου']; // commit 9: a card before, the fixed text now
+  // MU1 — John's four phrases + the three of the second order (commit 9), each in a session of its own: the fixed text, no card, no model call, nothing counted as a root
+  for (const x of [...GIVEN, ...NEWER]) {
     const s = await toAsk(); const c0 = s.calls.length;
     await send(s.page, x);
     ok('MU1: in the app\'s own question, «' + x + '» → the fixed text «Πες το λίγο πιο ολοκληρωμένα…» (' + await retryN(s.page) + '), NO card, 0 model calls (' + (s.calls.length - c0) + '), no root event in the telemetry (' + await telRoot(s.page) + ')',
@@ -1808,14 +1811,14 @@ async function runMockMU() {
     await s.browser.close();
   }
   // MU1b — the same phrases without accents, in capitals, with punctuation: one session, one after the other (the question stays, the card never opens)
-  { const s = await toAsk(); const c0 = s.calls.length; const V = ['δεν καταλαβα την ερωτηση', 'ΔΕΝ ΚΑΤΑΛΑΒΑ ΤΙ ΡΩΤΑΣ', 'Δεν κατάλαβα την ερώτηση!', 'Δεν καταλαβαίνω τι εννοείς;'];
+  { const s = await toAsk(); const c0 = s.calls.length; const V = ['δεν καταλαβα την ερωτηση', 'ΔΕΝ ΚΑΤΑΛΑΒΑ ΤΙ ΡΩΤΑΣ', 'Δεν κατάλαβα την ερώτηση!', 'Δεν καταλαβαίνω τι εννοείς;', 'Δεν κατάλαβα καθόλου!', 'δεν καταλαβαινω καλα τι ρωτασ\u037e'];
     const rows = [];
     for (const x of V) { const typed = await say(s.page, x); rows.push(!typed ? 'no input (card open)' : (await card(s.page)) ? 'card' : 'no card'); }
     ok('MU1b: without accents, in capitals, with «!» and «;» (' + V.length + ' messages in a row): never a card (' + rows.join(', ') + '), 0 model calls (' + (s.calls.length - c0) + ')', rows.every(r => r === 'no card') && s.calls.length - c0 === 0 && (await retryN(s.page)) >= 1);
     await s.browser.close();
   }
   // MU2 — the NEGATIVE: real words of a root that begin with «Δεν κατάλαβα…» open the card with exactly the typed words, as always
-  for (const x of ['Δεν κατάλαβα ότι φοβάμαι τον πατέρα μου', 'Δεν καταλαβαίνω γιατί φοβάμαι']) {
+  for (const x of ['Δεν κατάλαβα ότι φοβάμαι τον πατέρα μου', 'Δεν καταλαβαίνω γιατί φοβάμαι', 'Δεν κατάλαβα καθόλου τον εαυτό μου', 'Δεν κατάλαβα καλά γιατί φοβάμαι τη μετάθεση']) {
     const s = await toAsk(); const c0 = s.calls.length;
     await send(s.page, x);
     ok('MU2 (the negative): «' + x + '» is a root candidate — the card «Τι βρήκες» opens with exactly these words, 0 model calls (' + (s.calls.length - c0) + '), the app\'s «root card shown» event is there (' + await telRoot(s.page) + ')',
@@ -1863,6 +1866,11 @@ async function runMockMU() {
       yesCalls === 1 && !yesCard && !(await card(s.page)) && nextCalls === 0 && (await askN(s.page)) >= 1 && !(await shown(s.page, 'Δεν κατάλαβα την ερώτηση')));
     await say(s.page, REAL);
     ok('MU5: … and then a real root opens the card with exactly those words, 0 model calls more', (await card(s.page)) && (await shown(s.page, REAL)));
+    await s.browser.close();
+  }
+  { const { s, yesCalls, yesCard, nextCalls } = await armed('Δεν κατάλαβα καλά την ερώτηση');
+    ok('MU5b (commit 9): the silently armed card, a phrase with a NEW word: «Δεν κατάλαβα καλά την ερώτηση» → NO card, the model is not called (' + nextCalls + '), the app\'s own question is shown (' + await askN(s.page) + ')',
+      yesCalls === 1 && !yesCard && !(await card(s.page)) && nextCalls === 0 && (await askN(s.page)) >= 1);
     await s.browser.close();
   }
   { const { s, yesCalls, nextCalls } = await armed(REAL);

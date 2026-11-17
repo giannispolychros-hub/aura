@@ -2763,13 +2763,14 @@ function thoughtMapRecFields(view, recOn) {
 // John, 17/11/2026 (an exception to the freeze): a SHORT message that only says the app's question was not understood is not a root either.
 // «Δεν κατάλαβα την ερώτηση» / «Δεν καταλαβαίνω τι ρωτάς» had «substance» and became the card «Τι βρήκες», while «Δεν κατάλαβα» and «Τι εννοείς;» got the
 // fixed retry text. A small CLOSED form, not a search for every phrase (Constitution §21.6): «δεν κατάλαβα / δεν καταλαβαίνω» followed ONLY by words of
-// John's four phrases (την, τι, ερώτηση, ρωτάς, εννοείς), at most 6 words (the limit of detectsAffirmativeShort); accents, case, punctuation and the final
-// sigma do not matter. Any other word and the message is judged as before: real words of a root («Δεν κατάλαβα ότι φοβάμαι τον πατέρα μου») are never caught.
+// John's four phrases (την, τι, ερώτηση, ρωτάς, εννοείς) and, by his second order of 17/11/2026, καθόλου, καλά, σου — at most 6 words (the limit of
+// detectsAffirmativeShort); accents, case, punctuation and the final sigma do not matter. Any other word and the message is judged as before: real words of a
+// root («Δεν κατάλαβα ότι φοβάμαι τον πατέρα μου», «Δεν κατάλαβα καθόλου τον εαυτό μου») are never caught.
 function rootTextHasSubstance(text) {
   if (typeof text !== "string") return false;
   if (!splitSentences(text).some(raw => substanceOfSentence(raw, ROOT_MIN_SUBSTANCE_WORDS, ROOT_FILLER_WORDS) !== null)) return false;
   const w = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ς/g, "σ").replace(/[^α-ωa-z]+/g, " ").trim().split(" ");
-  return !(w.length <= 6 && w[0] === "δεν" && (w[1] === "καταλαβα" || w[1] === "καταλαβαινω") && w.slice(2).every(x => ["την", "τι", "ερωτηση", "ρωτασ", "εννοεισ"].includes(x)));
+  return !(w.length <= 6 && w[0] === "δεν" && (w[1] === "καταλαβα" || w[1] === "καταλαβαινω") && w.slice(2).every(x => ["την", "τι", "ερωτηση", "ρωτασ", "εννοεισ", "καθολου", "καλα", "σου"].includes(x)));
 }
 // ADR «12 Οκτωβρίου (γ)» (John: when the app is not sure, it does not decide alone): an answer to the app's root question that only
 // says «I don't know» («Δεν ξέρω», «Δεν ξέρω ακόμα», «Δεν ξέρω τι με απασχολεί», «Δεν είμαι σίγουρη», «Δεν μπορώ να το πω») is not a

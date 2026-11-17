@@ -125,10 +125,11 @@ assert('UNCHANGED: «Δεν το βρήκα ακόμα» — the model is called
   /if \(_ph === "card" && _door === 2\) \{\s*turnCount\.current \+= 1;\s*generateResponse\(messages, mode\);\s*\}/.test(extractBlock('const handleStageABack = useCallback(') || ''));
 assert('UNCHANGED: the question text and the «Δεν το βρήκα ακόμα» text',
   CODE.includes('ask: "Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;",') && CODE.includes('back: "Δεν το βρήκα ακόμα, συνέχισε",'));
+// UPDATED (17/11/2026 (β), «συνομιλία v1», commit 9, John's second order): rootTextHasSubstance changed on purpose again — the closed form also takes «καθόλου», «καλά», «σου» (auratests/test_root_misunderstood_1711.js).
 // UPDATED (17/11/2026, «συνομιλία v1», commit 8, John — an exception to the freeze): rootTextHasSubstance changed on purpose — a small closed form inside it, so that a short message that only says the
 // question was not understood («Δεν κατάλαβα την ερώτηση») is not a root and gets the fixed retry text; every other message is judged as before (auratests/test_root_misunderstood_1711.js).
 assert('UNCHANGED: the crisis capture rule and the root rule (byte for byte)',
-  sha(extractBlock('function stageACaptureAllowed(')) === 'f8a46ebc62fe4ecd' && sha(extractBlock('function rootTextHasSubstance(')) === '9ee24b73ca2ec258'); // UPDATED (23/10, Ο5): stageACaptureAllowed changed on purpose — danger from another person (test_danger_from_other_2310.js).
+  sha(extractBlock('function stageACaptureAllowed(')) === 'f8a46ebc62fe4ecd' && sha(extractBlock('function rootTextHasSubstance(')) === '272756a0bd1f3345'); // UPDATED (23/10, Ο5): stageACaptureAllowed changed on purpose — danger from another person (test_danger_from_other_2310.js).
 // UPDATED (22/10, ADR «22 Οκτωβρίου (ε)», John): changed on purpose — a bare «γεια» before any conversation is an opening, not an exit
 // (isOpeningGreeting, test_hello_default_2210.js); every other exit as before.
 assert('UNCHANGED: the closings (decideTermination byte for byte)', sha(fullFnSrc('decideTermination')) === '60778a7e90295a31');
