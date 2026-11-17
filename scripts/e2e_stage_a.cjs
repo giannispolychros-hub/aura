@@ -1021,6 +1021,7 @@ async function runMock() {
   await runMockCV(); // 15/11: «συνομιλία v1» — four separate commits on conversation-v1
   await runMockSR(); // 15/11: «δικαίωμα ομιλίας από υλικό» — commit 5 of conversation-v1
   await runMockDBG(); // 16/11: the round trace in the ?debug=1 panel — passive, numbers and yes/no only
+  await runMockMU(); // 17/11: «Δεν κατάλαβα την ερώτηση» is not a root — the app's own root question, John's exception to the freeze
 }
 
 // ── SD: ADR «31 Οκτωβρίου (ζ)» (John, a safety fix (α)) — the gaps of the two safety detectors, on the screen. Stage A (?stageA=1&rec=1),
@@ -1772,6 +1773,101 @@ async function runMockDBG() {
     const same = a.s.calls.length === 7 && b.s.calls.length === 7 && a.s.calls.every((c, i) => JSON.stringify(c) === JSON.stringify(b.s.calls[i]));
     ok('DBG6: the same 7 messages typed with and without ?debug=1: the 7 request bodies are identical byte for byte (' + a.s.calls.map(c => JSON.stringify(c).length).join(',') + ' characters)', same && a.s.calls.some(c => sysOf(c).includes(RTN)));
     await a.s.browser.close(); await b.s.browser.close();
+  }
+}
+
+// ── MU: John, 17/11/2026 (an exception to the freeze, branch conversation-v1) — «Δεν κατάλαβα την ερώτηση» is not a root. Stage A (?stageA=1&rec=1), fake model, a phone-size window.
+// The app's OWN root question (door 1: the button; «Διόρθωσε»; and a silently armed card): a SHORT message that only says the question was not understood must get what «Δεν κατάλαβα» always got —
+// the fixed «Πες το λίγο πιο ολοκληρωμένα…», no card, no model call — and never the card «Τι βρήκες». Real words of a root that begin with «Δεν κατάλαβα…» still open the card (the NEGATIVE).
+// MU3 also REPORTS what the screen shows when the same phrase is said twice in a row (it asserts only: no card, no model call; the counts are in the label). Nothing here changes what is sent.
+// Unit tests: auratests/test_root_misunderstood_1711.js. Screenshot: MU-3-twice.png (the screen after the same phrase twice). Alone: --only MU.
+async function runMockMU() {
+  const T = APP.texts;
+  const F1 = 'Δεν ξέρω αν πρέπει να φύγω από τη δουλειά μου στην τράπεζα.';
+  const R0 = ['Ακούω ότι σε βαραίνει η δουλειά. Τι είναι αυτό που σε κρατάει εκεί;', 'Τι θα άλλαζε αν το έλεγες στον πατέρα σου;'];
+  const RQ = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+  const REAL = 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.';
+  const card = async page => (await page.getByRole('button', { name: T.yes, exact: true }).count()) > 0;
+  // `say`: types only while the input box is there (with a card open it is not) — a check that fails must be a FAIL line, never a run that stops
+  const say = async (page, text) => { if (!(await page.locator('textarea.textarea').count())) return false; await send(page, text); return true; };
+  const retryN = page => page.getByText(T.retry, { exact: true }).count();
+  const askN = page => page.getByText(T.ask, { exact: true }).count();
+  const shown = async (page, t) => (await page.getByText('«' + t + '»', { exact: false }).count()) > 0;
+  const bubblesOf = async (page, t) => page.evaluate(x => (document.body.textContent.split(x).length - 1), t);
+  const telRoot = page => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]').filter(r => /root_card_shown|root_answer/.test(JSON.stringify(r))).length; } catch (e) { return -1; } });
+  // door 1: the first message, then the button → the app's own question (phase ask)
+  const toAsk = async () => { const s = await session('?stageA=1&rec=1', R0); await send(s.page, F1);
+    await s.page.getByRole('button', { name: T.button }).click(); await s.page.waitForTimeout(400); return s; };
+  const GIVEN = ['Δεν κατάλαβα την ερώτηση', 'Δεν καταλαβαίνω τι ρωτάς', 'Δεν κατάλαβα τι εννοείς', 'Δεν καταλαβαίνω την ερώτηση'];
+  // MU1 — John's four phrases, each in a session of its own: the fixed text, no card, no model call, nothing counted as a root
+  for (const x of GIVEN) {
+    const s = await toAsk(); const c0 = s.calls.length;
+    await send(s.page, x);
+    ok('MU1: in the app\'s own question, «' + x + '» → the fixed text «Πες το λίγο πιο ολοκληρωμένα…» (' + await retryN(s.page) + '), NO card, 0 model calls (' + (s.calls.length - c0) + '), no root event in the telemetry (' + await telRoot(s.page) + ')',
+      (await retryN(s.page)) >= 1 && !(await card(s.page)) && s.calls.length - c0 === 0 && (await telRoot(s.page)) === 0 && !(await shown(s.page, x)));
+    await s.browser.close();
+  }
+  // MU1b — the same phrases without accents, in capitals, with punctuation: one session, one after the other (the question stays, the card never opens)
+  { const s = await toAsk(); const c0 = s.calls.length; const V = ['δεν καταλαβα την ερωτηση', 'ΔΕΝ ΚΑΤΑΛΑΒΑ ΤΙ ΡΩΤΑΣ', 'Δεν κατάλαβα την ερώτηση!', 'Δεν καταλαβαίνω τι εννοείς;'];
+    const rows = [];
+    for (const x of V) { const typed = await say(s.page, x); rows.push(!typed ? 'no input (card open)' : (await card(s.page)) ? 'card' : 'no card'); }
+    ok('MU1b: without accents, in capitals, with «!» and «;» (' + V.length + ' messages in a row): never a card (' + rows.join(', ') + '), 0 model calls (' + (s.calls.length - c0) + ')', rows.every(r => r === 'no card') && s.calls.length - c0 === 0 && (await retryN(s.page)) >= 1);
+    await s.browser.close();
+  }
+  // MU2 — the NEGATIVE: real words of a root that begin with «Δεν κατάλαβα…» open the card with exactly the typed words, as always
+  for (const x of ['Δεν κατάλαβα ότι φοβάμαι τον πατέρα μου', 'Δεν καταλαβαίνω γιατί φοβάμαι']) {
+    const s = await toAsk(); const c0 = s.calls.length;
+    await send(s.page, x);
+    ok('MU2 (the negative): «' + x + '» is a root candidate — the card «Τι βρήκες» opens with exactly these words, 0 model calls (' + (s.calls.length - c0) + '), the app\'s «root card shown» event is there (' + await telRoot(s.page) + ')',
+      (await card(s.page)) && (await shown(s.page, x)) && s.calls.length - c0 === 0 && (await telRoot(s.page)) >= 1 && (await retryN(s.page)) === 0);
+    await s.browser.close();
+  }
+  // MU3 — REPORT: the same phrase twice in a row, and two different ones in a row. Asserted: no card, no model call. Counted (in the label): the fixed text on the screen and the user's bubbles.
+  { const s = await toAsk(); const c0 = s.calls.length; const x = 'Δεν κατάλαβα την ερώτηση';
+    await say(s.page, x); const r1 = await retryN(s.page), b1 = await bubblesOf(s.page, x), a1 = await askN(s.page);
+    await say(s.page, x); const r2 = await retryN(s.page), b2 = await bubblesOf(s.page, x), a2 = await askN(s.page);
+    await s.page.screenshot({ path: path.join(OUT, 'MU-3-twice.png'), fullPage: false });
+    ok('MU3 (report): the same phrase TWICE in a row → after the 1st: fixed text ×' + r1 + ', the user\'s words shown ×' + b1 + ', the root question ×' + a1 + '; after the 2nd: fixed text ×' + r2 + ', the user\'s words shown ×' + b2 + ', the root question ×' + a2 +
+      ' — never a card, 0 model calls (' + (s.calls.length - c0) + ')', r1 >= 1 && r2 >= 1 && !(await card(s.page)) && s.calls.length - c0 === 0);
+    await say(s.page, 'Δεν καταλαβαίνω τι ρωτάς'); const r3 = await retryN(s.page);
+    ok('MU3 (report): … and a DIFFERENT closed phrase as the 3rd message → the fixed text ×' + r3 + ', no card, 0 model calls (' + (s.calls.length - c0) + ')', r3 >= 1 && !(await card(s.page)) && s.calls.length - c0 === 0);
+    await say(s.page, REAL);
+    ok('MU3: … and then a real root → the card opens with it, 0 model calls (' + (s.calls.length - c0) + ')', (await card(s.page)) && (await shown(s.page, REAL)) && s.calls.length - c0 === 0);
+    await s.browser.close();
+  }
+  // MU4 — «Διόρθωσε» (phase correct): a closed phrase in place of the corrected root → the fixed text, no new card; a real corrected root still opens it
+  { const s = await toAsk(); const c0 = s.calls.length;
+    await send(s.page, REAL);
+    const first = await card(s.page);
+    await s.page.getByRole('button', { name: T.correct, exact: true }).click(); await s.page.waitForTimeout(400);
+    const asked = (await s.page.getByText(T.correctAsk, { exact: true }).count()) >= 1;
+    await say(s.page, 'Δεν κατάλαβα την ερώτηση');
+    ok('MU4: after «Διόρθωσε» (' + (asked ? 'the app asks for the root again' : 'NO ask shown') + '): «Δεν κατάλαβα την ερώτηση» → the fixed text (' + await retryN(s.page) + '), NO card, 0 model calls (' + (s.calls.length - c0) + ')',
+      first && asked && (await retryN(s.page)) >= 1 && !(await card(s.page)) && s.calls.length - c0 === 0);
+    const fixed = 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου, όχι τη δουλειά.';
+    await say(s.page, fixed);
+    ok('MU4: … and a real corrected root opens the card with exactly those words, 0 model calls (' + (s.calls.length - c0) + ')', (await card(s.page)) && (await shown(s.page, fixed)) && s.calls.length - c0 === 0);
+    await s.browser.close();
+  }
+  // MU5 — the silently armed card (door 2 after the model's turn): the readiness question, two replies of AURA with no «;», a plain «Ναι» (it goes to the model), then the next message.
+  // A closed phrase → the app's question instead of a card (the card stays shut, the model is not called); a real root → the card, as before. (The readiness rule itself is NOT touched: «Ναι» still arms.)
+  const U = ['Σκέφτομαι να αλλάξω δουλειά αλλά κάτι με κρατάει.', 'Η σταθερότητα του μισθού, αλλά νιώθω ότι κάτι άλλο παίζει.', 'Ο μισθός είναι σταθερός και ο προϊστάμενός μου είναι εντάξει.', 'Και ο πατέρας μου θα απογοητευόταν.'];
+  const REPLIES = ['Τι σε κρατάει περισσότερο;', RQ, 'Είπες ότι ο μισθός είναι σταθερός και ο προϊστάμενός σου είναι εντάξει.', 'Ανέφερες τον πατέρα σου και την απογοήτευση.', 'Το είπες καθαρά.', 'Και τι έχει σημασία για αυτό;'];
+  const armed = async next => { const s = await session('?stageA=1&rec=1', REPLIES);
+    for (const u of U) await send(s.page, u);
+    const cYes = s.calls.length; await send(s.page, 'Ναι'); const yesCalls = s.calls.length - cYes, yesCard = await card(s.page);
+    const cNext = s.calls.length; await say(s.page, next);
+    return { s, yesCalls, yesCard, nextCalls: s.calls.length - cNext }; };
+  { const { s, yesCalls, yesCard, nextCalls } = await armed('Δεν κατάλαβα την ερώτηση');
+    ok('MU5: the silently armed card (the «Ναι» went to the model: ' + yesCalls + ' call, no card yet: ' + !yesCard + '): the next message «Δεν κατάλαβα την ερώτηση» → NO card, the model is not called (' + nextCalls + '), the app\'s own question is shown (' + await askN(s.page) + ')',
+      yesCalls === 1 && !yesCard && !(await card(s.page)) && nextCalls === 0 && (await askN(s.page)) >= 1 && !(await shown(s.page, 'Δεν κατάλαβα την ερώτηση')));
+    await say(s.page, REAL);
+    ok('MU5: … and then a real root opens the card with exactly those words, 0 model calls more', (await card(s.page)) && (await shown(s.page, REAL)));
+    await s.browser.close();
+  }
+  { const { s, yesCalls, nextCalls } = await armed(REAL);
+    ok('MU5 (control, unchanged): the same sequence with a real root as the next message → the card opens at once with those words, 0 model calls (' + nextCalls + '; the «Ναι» itself made ' + yesCalls + ')', yesCalls === 1 && nextCalls === 0 && (await card(s.page)) && (await shown(s.page, REAL)));
+    await s.browser.close();
   }
 }
 
@@ -7907,7 +8003,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
