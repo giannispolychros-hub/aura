@@ -139,11 +139,12 @@ const VOICE_1910 = [['«Θέλω να αδυνατίσω» → «Έγινε κά
     '(e.g. όταν ο χρήστης έχει πει "πέντε χρόνια": «Πέντε χρόνια έτσι. Δεν είναι λίγο.»); when they do not, none. Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης, με τα δικά του λόγια· ποτέ μη μετράς ή υπολογίζεις εσύ.'],
   ['(e.g. όταν ο χρήστης έχει πει "πέντε χρόνια": «Πέντε χρόνια έτσι. Δεν είναι λίγο.»); when they do not, none. Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης, με τα δικά του λόγια· ποτέ μη μετράς ή υπολογίζεις εσύ.',
     '(e.g. «Πέντε χρόνια έτσι. Δεν είναι λίγο.»); when they do not, none.']];
+const undoPackage1 = p => JSON.parse(fs.readFileSync(path.join(__dirname, 'package1_undo.json'), 'utf8')).reduce((t, [now, before]) => (t.split(now).length === 2 ? t.replace(now, before) : 'MISSING ' + now), String(p || '')); // UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt moved by three more lines (912, 918, 927) — taken out first, then John's voice edits
 const undoVoice1910 = p => VOICE_1910.reduce((t, [now, before]) => (t.split(now).length === 2 ? t.replace(now, before) : 'MISSING ' + now), String(p || ''));
 {
   const h = s => crypto.createHash('sha256').update(s || '').digest('hex').slice(0, 16);
   // UPDATED (19/10, ADR «19 Οκτωβρίου (ε)»): commit A changed no prompt; commit B moved it only by John's two voice edits
-  assert('UNCHANGED: the fixed prompt (as in 013a4de), apart from John\'s voice edits of 19/10 (ε) and (ζ)', h(undoVoice1910(raw.slice(_s, _e))) === 'a6d7fe7ae33515a0' && h(raw.slice(_s, _e)) !== 'a6d7fe7ae33515a0');
+  assert('UNCHANGED: the fixed prompt (as in 013a4de), apart from John\'s voice edits of 19/10 (ε) and (ζ)', h(undoVoice1910(undoPackage1(raw.slice(_s, _e)))) === 'a6d7fe7ae33515a0' && h(raw.slice(_s, _e)) !== 'a6d7fe7ae33515a0');
   const sup = (raw.match(/const SYSTEM_SUPPORTIVE = `([\s\S]*?)`;/) || ['', ''])[1];
   assert('UNCHANGED: the crisis prompt (SYSTEM_SUPPORTIVE)', h(sup) === 'c7815b96d83ebae8' && sup.length === 851);
   // UPDATED (22/10, ADR «22 Οκτωβρίου (β)», SAFETY): detectSafetySignal and classifyCrisisTier changed on purpose — Greeklish and spelling by

@@ -16,6 +16,7 @@
 // crisis path without danger included — auratests/test_line_claims_2510.js), then this check. (Ζ) reads the new wiring; (Η) stays
 // true of stripDangerPromises alone, and is closed at the reply level by stripLineClaims.
 //  (Θ) nothing else changed: the danger check, its line, the table, the cleaners, the prompt and the crisis prompt
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -180,7 +181,7 @@ assert('(Θ) UNCHANGED: detectsDangerFromOther, dangerInMessages, buildDangerLin
   h(fnSrc('dangerInMessages')) === '8d5baab173a81fbe' && h(fnSrc('buildDangerLine')) === 'df6f7df2a56379a2');
 assert('(Θ) UNCHANGED: dropModelSentences, stripForeignHelplines, lookBehind, HELPLINES', h(fnSrc('dropModelSentences')) === 'fc3e2f15320beae4' &&
   h(fnSrc('stripForeignHelplines')) === '1230688f6654ee84' && h(fnSrc('lookBehind')) === '0f4e7d856673bb16' && h(CODE.slice(CODE.indexOf('const HELPLINES = ['), CODE.indexOf('\n];', CODE.indexOf('const HELPLINES = [')) + 3)) === '392f594fe775a4cf');
-assert('(Θ) UNCHANGED: the prompt (AURA_CORE_PERSONALITY) and the crisis prompt', h(raw.slice(_s, _e)) === 'b5f303cc9405aa21' && h(lit('SYSTEM_SUPPORTIVE')) === 'ff063670f20343a7');
+assert('(Θ) UNCHANGED: the prompt (AURA_CORE_PERSONALITY) and the crisis prompt', h(raw.slice(_s, _e)) === '7e52268becda7360' && h(lit('SYSTEM_SUPPORTIVE')) === 'ff063670f20343a7');
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -15,6 +15,7 @@
 // against the narrow line: 0 new alarms in the 302 (idioms 40 + 80 + NEAR 16 + OTHER 6 + 160), the 96 greeklish, the 14,016 strings
 // of the tests and the tool as on 24/10, the 1,407 user messages and the 857 replies of the 43 stress runs; nothing the narrow line
 // caught is lost. (Α2) the new heads and endings; (Γ2) 14 everyday sentences with the new words, predictions written before.
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -155,7 +156,7 @@ assert('(Δ) the greeklish everyday sentences (both spellings): none is a crisis
 // ── (Ζ) nothing else changed ────────────────────────────────────────────────────────────────────────────────────────────────────
 assert('(Ζ) UNCHANGED: classifyCrisisTier, buildCrisisLine', h(fnSrc(raw, 'classifyCrisisTier')) === 'afa5cf7a370bb0d5' && h(fnSrc(raw, 'buildCrisisLine')) === 'd359e22dd7cf9a95');
 assert('(Ζ) UNCHANGED: HELPLINES and the danger check', h(arr('HELPLINES')) === '392f594fe775a4cf' && h(fnSrc(raw, 'detectsDangerFromOther')) === '59e2f828fda103fa' /* UPDATED (14/11/2026, John, a safety package: white space at the detectors' input — proved first, auratests/test_detector_spaces_1411.js (Θ)) */ /* UPDATED (3/11, ADR «3 Νοεμβρίου», a safety fix (α), John): with an adult partner or relative named, a sport word no longer excuses a blow (finding 130) — auratests/test_kin_sport_0311.js */ /* UPDATED (2/11, ADR «2 Νοεμβρίου (δ)», a safety fix (α), John): a child's kicks with a sport or play-place word are not read as danger (narrow; an adult still is) — auratests/test_bruises_sport_0211.js */ /* UPDATED (31/10, ADR «31 Οκτωβρίου (ζ)», a safety fix (α), John): + narrow, closed rules for danger from another person with no person named (item 117) — auratests/test_safety_detectors_3110.js */);
-assert('(Ζ) UNCHANGED: the prompt (AURA_CORE_PERSONALITY) and the crisis prompt', h(raw.slice(_s, _e)) === 'b5f303cc9405aa21' && h(lit('SYSTEM_SUPPORTIVE')) === 'ff063670f20343a7');
+assert('(Ζ) UNCHANGED: the prompt (AURA_CORE_PERSONALITY) and the crisis prompt', h(raw.slice(_s, _e)) === '7e52268becda7360' && h(lit('SYSTEM_SUPPORTIVE')) === 'ff063670f20343a7');
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

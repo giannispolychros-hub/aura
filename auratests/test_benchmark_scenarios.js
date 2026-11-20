@@ -7,6 +7,7 @@
 //  (Δ) the noise check and the pilot are fixed before the run (noise: none from the categories of the predictions ΠΡ1–ΠΡ4)
 //  (Ε) the app is not touched: the file only reads src/App.jsx
 // All scenario text is synthetic; no words of any real session.
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -110,9 +111,11 @@ assert('(Δ) noise: 9 runs in all; extra runs = 9 minus the noise scenarios alre
 assert('(Δ) the four root types are in the common rules', !!S && /\(α\)[^]*\(β\)[^]*\(γ\)[^]*\(δ\)/.test(S.common.root_rule));
 
 // (Ε) the baseline is the version of the 20
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the baseline is the version OF THE 20 — its prompt is, and stays, b5f303cc9405aa21 (a record, not a pin on the app).
 assert('(Ε) baseline: main 24aab8e, code 99178c5, prompt b5f303cc9405aa21', !!S && S.baseline.commit === '24aab8e' && /^99178c5/.test(S.baseline.code) && S.baseline.prompt_fingerprint === 'b5f303cc9405aa21');
 const fp = fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8').match(/core: \{ length: \d+, sha256: "([0-9a-f]{16})/);
-assert('(Ε) api/aura.js carries the same prompt fingerprint b5f303cc9405aa21', !!fp && fp[1] === 'b5f303cc9405aa21');
+// … and the app's prompt is no longer the baseline's: by John's order of 19/11/2026 (Package 1) it moved in three lines; api/aura.js carries the new core fingerprint.
+assert('(Ε) api/aura.js carries the app\'s prompt fingerprint 7e52268becda7360 (the baseline\'s was b5f303cc9405aa21: three lines, Package 1)', !!fp && fp[1] === '7e52268becda7360' && fp[1] !== S.baseline.prompt_fingerprint);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

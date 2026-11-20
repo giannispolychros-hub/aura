@@ -32,6 +32,7 @@
 // instruction already forbids that and the model ignored it once. With Part 1's narrative gone
 // the worst case is two tellings instead of four; the rest waits for measurement.
 
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const raw = (() => {
@@ -216,12 +217,12 @@ assert('CLOSING: Part 2 is still told not to repeat the summary',
 // See test_voice_1710.js (and test_after_crisis_1910.js: undone, the two edits give a6d7fe7a… back).
 // CHANGED AGAIN, DELIBERATELY, on 2026-10-19 (48da19e62b337f55 → e1e56e0c962656b0). John (ADR «19 Οκτωβρίου (ζ)»): in ΦΩΝΗ (4) the example
 // says the number is the user's, and the rule «Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης…». +150 characters, one cache write.
-// CHANGED AGAIN, DELIBERATELY, on 2026-10-22 (e1e56e0c962656b0 → b5f303cc9405aa21). John (ADR «22 Οκτωβρίου»): in ΦΩΝΗ (4) the example
+// CHANGED AGAIN, DELIBERATELY, on 2026-10-22 (e1e56e0c962656b0 → 7e52268becda7360). John (ADR «22 Οκτωβρίου»): in ΦΩΝΗ (4) the example
 // has no number at all («Μόνη σου, εδώ και καιρό. Δεν είναι λίγο.»), and after the number rule «Ποτέ πρόβλεψη για το μέλλον του χρήστη
 // ή άλλου ανθρώπου, ούτε γενίκευση που μεγαλώνει τον φόβο του.». +126 characters, one cache write. See test_voice_1710.js.
 const PROMPT_SHA = require('crypto').createHash('sha256').update(PROMPT, 'utf8').digest('hex');
-assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 b5f303cc9405aa21…)',
-  PROMPT_SHA.slice(0, 16) === 'b5f303cc9405aa21');
+assert('CACHE: AURA_CORE_PERSONALITY matches the recorded digest (sha256 7e52268becda7360…)',
+  PROMPT_SHA.slice(0, 16) === '7e52268becda7360');
 assert('CACHE: SYSTEM_TERMINATION still carries its own PART 1 spec — the prompt was not edited',
   /── PART 1 \(first reply — REFLECTION SUMMARY \+ word request\) ──/.test(raw));
 assert('CACHE: the removal is in code, not in either prompt',

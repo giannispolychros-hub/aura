@@ -12,6 +12,7 @@
 //  (Α) the phrases, written before the code   (Β) safety first   (Γ) which goodbye   (Δ) where it is read   (Ε) the session's shape
 //  (Ζ) what did not change
 
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -160,7 +161,7 @@ assert('(Δ) the door-3 path and the step answers are not touched', !/rootAnswer
 
 // ── (Ζ) what did not change ──────────────────────────────────────────────────────────────────────────────────────────────────────
 const lit = n => { const a = raw.indexOf('const ' + n + ' = `'); return a < 0 ? '' : raw.slice(raw.indexOf('`', a) + 1, raw.indexOf('`;', a + 1)); };
-assert('(Ζ) the prompt (AURA_CORE_PERSONALITY) is unchanged', h(lit('AURA_CORE_PERSONALITY')) === 'b5f303cc9405aa21');
+assert('(Ζ) the prompt (AURA_CORE_PERSONALITY) is unchanged', h(lit('AURA_CORE_PERSONALITY')) === '7e52268becda7360');
 let gen = ''; try { gen = cp.execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'gen_prompt_fingerprints.cjs'), '--check'], { encoding: 'utf8' }); } catch (e) { gen = String(e.stdout || ''); }
 assert('(Ζ) the prompt fingerprints in api/aura.js are up to date', /up to date/.test(gen));
 const PINS = { rootAnswerIsUnsure: '2c6461315a960668', rootTextHasSubstance: '272756a0bd1f3345' /* UPDATED (17/11/2026 (β), «συνομιλία v1», commit 9, John's second order — an exception to the freeze): rootTextHasSubstance changed on purpose again — the closed form also takes «καθόλου», «καλά», «σου»; every other message is judged as before (auratests/test_root_misunderstood_1711.js) */ /* UPDATED (17/11/2026, «συνομιλία v1», commit 8, John — an exception to the freeze): rootTextHasSubstance changed on purpose — a small closed form inside it, so that a short message that only says the question was not understood («Δεν κατάλαβα την ερώτηση») is not a root and gets the fixed retry text; every other message is judged as before (auratests/test_root_misunderstood_1711.js) */, stageAAfterCrisisText: 'e19c2a413a9ad99c',

@@ -10,6 +10,7 @@
 // the 15 that say «not clarified», missed 7 — the rule undercounts on purpose and the misses are listed, not hidden.
 //  (Α) the rule on the 30   (Β) the wiring on «Ναι»   (Γ) what is recorded and what leaves the device   (Δ) nothing else changes
 
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -115,7 +116,7 @@ for (const [n, want] of [['stageAStep', '67bb9bcb504396e8'], ['stageATelemetry',
 const sc = CODE.slice(CODE.indexOf('recordTelemetry("session_completed", {'), CODE.indexOf('recordTelemetry("session_completed", {') + 900);
 assert('(Δ) session_completed does not read it', sc.length > 100 && !/unclear|Unclear/.test(sc));
 const lit = n => { const a = raw.indexOf('const ' + n + ' = `'); return a < 0 ? '' : raw.slice(raw.indexOf('`', a) + 1, raw.indexOf('`;', a + 1)); };
-assert('(Δ) the prompt (AURA_CORE_PERSONALITY) is unchanged', h(lit('AURA_CORE_PERSONALITY')) === 'b5f303cc9405aa21');
+assert('(Δ) the prompt (AURA_CORE_PERSONALITY) is unchanged', h(lit('AURA_CORE_PERSONALITY')) === '7e52268becda7360');
 let gen = ''; try { gen = cp.execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'gen_prompt_fingerprints.cjs'), '--check'], { encoding: 'utf8' }); } catch (e) { gen = String(e.stdout || ''); }
 assert('(Δ) the prompt fingerprints in api/aura.js are up to date', /up to date/.test(gen));
 

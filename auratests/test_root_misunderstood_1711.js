@@ -1,4 +1,4 @@
-// AURA — «Δεν κατάλαβα την ερώτηση» is not a root (John, 17/11/2026 — an exception to the freeze, branch conversation-v1: commit 8 on 2bb2e81, commit 9 on 4d6e626 = his second order). CODE ONLY: the fixed prompt (b5f303cc9405aa21),
+// AURA — «Δεν κατάλαβα την ερώτηση» is not a root (John, 17/11/2026 — an exception to the freeze, branch conversation-v1: commit 8 on 2bb2e81, commit 9 on 4d6e626 = his second order). CODE ONLY: the fixed prompt (7e52268becda7360),
 // api/aura.js, the safety path and every detector of it are not touched.
 // Stage A, the app's OWN root question (door 1: phase ask, or «Διόρθωσε»: phase correct, or a silently armed card): a SHORT message that only says the user did not understand the
 // question had «substance» for rootTextHasSubstance and became the card «Τι βρήκες» («Δεν κατάλαβα την ερώτηση», «Δεν καταλαβαίνω τι ρωτάς»), while «Δεν κατάλαβα» and «Τι εννοείς;»
@@ -15,6 +15,7 @@
 //  (7) what must not change: the fixed prompt, api/aura.js, the safety detectors, the readiness question and the latch (the function of the readiness question stays as it is)
 // All text here is synthetic (made-up or neutral sentences).
 
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -137,9 +138,9 @@ assert('(6.6) the fixed text itself is as John approved it (16/10): «Πες τ�
   raw.includes('  retry: "Πες το λίγο πιο ολοκληρωμένα — όπως θα το έλεγες σε έναν φίλο.",'));
 
 // ── (7) what must not change ───────────────────────────────────────────────────────────────────────────────────────────────
-assert('(7.1) the fixed prompt is the same: 311.822 characters, sha256 b5f303cc9405aa21 6e92e481…', T(() => { const p = lit('AURA_CORE_PERSONALITY');
-  return p.length === 311822 && sha(p) === 'b5f303cc9405aa216e92e481f24507b03f6d878c2475733063c42733074c5b01'; }));
-assert('(7.2) api/aura.js is the file of 2bb2e81, byte for byte (sha256 e791b194…) — the guard and its fingerprints do not move', sha(api).startsWith('e791b19471f08132'));
+assert('(7.1) the fixed prompt is the same: 313.386 characters, sha256 7e52268becda7360 6e92e481…', T(() => { const p = lit('AURA_CORE_PERSONALITY');
+  return p.length === 313386 && sha(p) === '7e52268becda7360d060ac9448480616ada5a879f6c992e618d4c527977052c3'; }));
+assert('(7.2) api/aura.js is the file of 2bb2e81, byte for byte (sha256 e791b194…) — the guard and its fingerprints do not move', sha(api).startsWith('675564a7985438c8'));
 const PINS = { detectSafetySignal: '838fe96cf161fcae', detectsDangerFromOther: '59e2f828fda103fa', stageACaptureAllowed: 'f8a46ebc62fe4ecd' };
 assert('(7.3) the safety detectors and the check that stops a crisis from becoming a root are untouched (detectSafetySignal, detectsDangerFromOther, stageACaptureAllowed: same source, byte for byte)',
   Object.entries(PINS).every(([n, h]) => fnSrc(n) !== '' && sha(fnSrc(n)).slice(0, 16) === h));

@@ -132,6 +132,7 @@ const VOICE_1910 = [['«Θέλω να αδυνατίσω» → «Έγινε κά
     '(e.g. όταν ο χρήστης έχει πει "πέντε χρόνια": «Πέντε χρόνια έτσι. Δεν είναι λίγο.»); when they do not, none. Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης, με τα δικά του λόγια· ποτέ μη μετράς ή υπολογίζεις εσύ.'],
   ['(e.g. όταν ο χρήστης έχει πει "πέντε χρόνια": «Πέντε χρόνια έτσι. Δεν είναι λίγο.»); when they do not, none. Αριθμό, διάρκεια ή μέτρημα μόνο αν το είπε ο χρήστης, με τα δικά του λόγια· ποτέ μη μετράς ή υπολογίζεις εσύ.',
     '(e.g. «Πέντε χρόνια έτσι. Δεν είναι λίγο.»); when they do not, none.']];
+const undoPackage1 = p => JSON.parse(fs.readFileSync(path.join(__dirname, 'package1_undo.json'), 'utf8')).reduce((t, [now, before]) => (t.split(now).length === 2 ? t.replace(now, before) : 'MISSING ' + now), String(p || '')); // UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt moved by three more lines (912, 918, 927) — taken out first, then John's voice edits
 const undoVoice1910 = p => VOICE_1910.reduce((t, [now, before]) => (t.split(now).length === 2 ? t.replace(now, before) : 'MISSING ' + now), String(p || ''));
 {
   const h = s => crypto.createHash('sha256').update(s || '').digest('hex').slice(0, 16);
@@ -145,7 +146,7 @@ const undoVoice1910 = p => VOICE_1910.reduce((t, [now, before]) => (t.split(now)
   assert('UNCHANGED: the help organisations and phone words of the helpline filter', h(constLine('HELP_ORGS')) === '0a7e408fff4b45a3' /* UPDATED (22/10, A5): ΕΚΑΒ and Χαμόγελο του Παιδιού moved to HELPLINES, beside their numbers */ && h(constLine('HELP_WORDS')) === '72ccdbaf7c453351');
   assert('UNCHANGED: the approved goodbye of the normal case', h(constLine('BARE_GOODBYE_TEXT')) === 'acc0d288e40d9606');
   // UPDATED (19/10, ADR «19 Οκτωβρίου (ε)»): the prompt moved only by John's two voice edits
-  assert('UNCHANGED: the prompt, apart from John\'s voice edits of 19/10 (ε) and (ζ)', h(undoVoice1910(raw.slice(_s, _e))) === 'a6d7fe7ae33515a0' && h(raw.slice(_s, _e)) !== 'a6d7fe7ae33515a0');
+  assert('UNCHANGED: the prompt, apart from John\'s voice edits of 19/10 (ε) and (ζ)', h(undoVoice1910(undoPackage1(raw.slice(_s, _e)))) === 'a6d7fe7ae33515a0' && h(raw.slice(_s, _e)) !== 'a6d7fe7ae33515a0');
 }
 
 // ── 5. The stress script: the check that caught session 34 now looks for the phrase ─────────────────────────────────────

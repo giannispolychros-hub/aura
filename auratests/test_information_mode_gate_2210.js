@@ -10,6 +10,7 @@
 // guard are unchanged. Everywhere else (the old flow with no crisis, Stage A after the root) the note goes out exactly as before.
 // The EXACT text each request carries is checked in the browser (scripts/e2e_stage_a.cjs, section IM); here, the pure part and the wiring.
 
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -96,7 +97,7 @@ assert('3: the held state is set and cleared where it was — after the reply, i
   (raw.match(/informationModeActive\.current = false;/g) || []).length === 1 &&
   (raw.match(/informationModeActive\.current = true/g) || []).length === 2);
 assert('3: … and it still holds the method-failure note back, as before', /if \(!informationModeActive\.current && lastUserMsgForMethodFailure && detectsMethodFailureSignal\(lastUserMsgForMethodFailure\.content\)\) \{/.test(G));
-assert('3: the fixed prompt is a409a47\'s, byte for byte', h(PROMPT) === 'b5f303cc9405aa21');
+assert('3: the fixed prompt is a409a47\'s, byte for byte', h(PROMPT) === '7e52268becda7360');
 assert('3: the crisis prompt, the closing prompt and the honest-uncertainty rule are unchanged',
   h(lit('SYSTEM_SUPPORTIVE')) === 'c7815b96d83ebae8' && h(lit('SYSTEM_TERMINATION')) === 'd5a77ca926f9490b' && h(lit('HONEST_UNCERTAINTY_RULE')) === '80b2ffd69933aee9');
 // UPDATED (25/10, John, safety): api/aura.js has the pause switch (AURA_PAUSED) as the first thing in the handler — without it, the
@@ -106,7 +107,7 @@ assert('3: the crisis prompt, the closing prompt and the honest-uncertainty rule
   const end = api.indexOf(endMark);
   const without = at > 0 && end > at ? api.slice(0, at) + api.slice(end + endMark.length) : api;
   // UPDATED (6/11/2026, ADR «4 Νοεμβρίου (β)», John's approval, round 3): plus the stricter request check (A1, step 1) — only the expected value changed
-  assert('3: api/aura.js is a409a47\'s, byte for byte — guard and fingerprints (UPDATED 25/10: apart from the pause switch; UPDATED 6/11: plus the stricter request check)', at > 0 && h(without) === 'fa3d5a34c29b2814');
+  assert('3: api/aura.js is a409a47\'s, byte for byte — guard and fingerprints (UPDATED 25/10: apart from the pause switch; UPDATED 6/11: plus the stricter request check)', at > 0 && h(without) === 'f51fa08932286067' /* UPDATED (19/11/2026, «συνομιλία v1», Package 1, John: only this value moved — the package's changes lie outside the pieces this test cuts away or takes out; the prompt's three lines and the api fingerprint are proved in auratests/test_package1_prompt_1911.js (7.2)–(7.3)) */);
 }
 assert('3: the helper is in the file once, outside the prompt, right after perTurnSafety',
   raw.split(HELPER).length === 2 && raw.indexOf(HELPER) > raw.indexOf(fnSrc('perTurnSafety')) && raw.indexOf(HELPER) - (raw.indexOf(fnSrc('perTurnSafety')) + fnSrc('perTurnSafety').length) === 1 &&

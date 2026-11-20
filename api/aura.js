@@ -19,7 +19,7 @@ import { createHash } from "node:crypto";
 // the app's requests. It is not user authentication and is not presented as such.
 // BEGIN PROMPT FINGERPRINTS — written by scripts/gen_prompt_fingerprints.cjs from src/App.jsx («npm run build»). Do not edit by hand.
 const PROMPT_FINGERPRINTS = {
-  core: { length: 311822, sha256: "b5f303cc9405aa216e92e481f24507b03f6d878c2475733063c42733074c5b01" },
+  core: { length: 313386, sha256: "7e52268becda7360d060ac9448480616ada5a879f6c992e618d4c527977052c3" },
   supportive: { length: 851, sha256: "c7815b96d83ebae85ab1dd6856ae343c7ba114f0e8ba20362d26ce853266b298" },
   termination: { length: 20032, sha256: "d5a77ca926f9490b1d1a38c7164474c6935747964cac778a0f60754eef8e279a" },
   // the per-mode texts that may follow the core prompt (SYSTEM_LENS_SIMPLIFY, SYSTEM_LENS_CHALLENGE, SYSTEM_LENS_PERSPECTIVE, SYSTEM_LENS_EXPLORE, SYSTEM_COMPRESSION)

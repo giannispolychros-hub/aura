@@ -73,8 +73,11 @@ assert('RULE: the founder\'s allowed example', RULE.includes('✓ "Ανέφερ�
 assert('RULE: the founder\'s forbidden example (adds structure)', RULE.includes('❌ "Ανέφερες δύο δρόμους'));
 assert('RULE: violation examples are listed (costs/gains, ordering, new option, added details, certainty words)',
   /costs or gains/.test(RULE) && /ordering or comparing/.test(RULE) && /new option/.test(RULE) && /details added/.test(RULE) && /ξεκάθαρα/.test(RULE));
-assert('RULE: honest deferral when asked what to do — «τι κάνω» comes after the root',
-  /comes after the root/.test(RULE) && RULE.includes('το «τι κάνω» έρχεται μετά τη ρίζα'));
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John — a change of the founder's wording of 6/10 (ADR «6 Οκτωβρίου (ε)», rule 10), by his order: the Coach is closed (STAGE_A_COACH_OFFER = false), so
+// «it comes after the root» promised what the app does not give. Now: one honest sentence — it does not give ways or advice, and says what it does — and NO promise or hint of a later part, step or answer.
+assert('RULE: honest acknowledgement when asked what to do (a way, a tactic, advice) — ONE honest sentence, no promise of «later», no tactic of its own',
+  /acknowledge it with ONE honest sentence, once per request and without apology/.test(RULE) && RULE.includes('Συμβουλές ή τρόπους δεν δίνω· αυτό που κάνω είναι να βοηθάω να φανεί τι πραγματικά σε απασχολεί.') &&
+  /Never promise or hint at a later part, a later step or a later answer/.test(RULE) && /add no way, tactic, wording or step of your own/.test(RULE) && !/comes after the root/.test(RULE) && !RULE.includes('έρχεται μετά τη ρίζα'));
 assert('RULE: then ONE question toward the root (ONE REPLY, NOT A PROCEDURE)', /ONE question toward the root/.test(RULE) && /ONE REPLY, NOT A PROCEDURE/.test(RULE));
 assert('RULE: a step the user brings is not evaluated, developed or added to', /do not evaluate, develop or add to it/.test(RULE));
 assert('RULE: ROOT RE-FOCUS and its readiness question stay active', /ROOT RE-FOCUS and its readiness question stay fully active/.test(RULE));

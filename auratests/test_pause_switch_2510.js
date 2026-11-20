@@ -7,6 +7,7 @@
 //  (Β) not "1" (unset, "", "0", "true", " 1") → the endpoint as before (no key → 500; a foreign prompt → 403; an app request → upstream)
 //  (Γ) the switch is the first thing in the handler, and the rest of the file is the file of a409a47 byte for byte
 //  (Δ) the prompt fingerprints are up to date with src/App.jsx (a page already open is not refused)
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -85,12 +86,12 @@ const BLOCK_END = '    return res.status(503).json({ error: "' + MESSAGE + '" })
   const without = at > 0 && end > at ? src.slice(0, at) + src.slice(end + BLOCK_END.length) : '';
   // UPDATED (6/11/2026, ADR «4 Νοεμβρίου (β)», John's approval, round 3): api/aura.js now also holds the stricter request check (A1, step 1);
   // without the switch it is that approved file byte for byte. Only the expected value changed; the check is as strict as before.
-  assert('(Γ) without the switch, api/aura.js is a409a47\'s, byte for byte (guard, fingerprints, limits, model) — UPDATED 6/11: plus the stricter request check', h(without) === 'fa3d5a34c29b2814');
+  assert('(Γ) without the switch, api/aura.js is a409a47\'s, byte for byte (guard, fingerprints, limits, model) — UPDATED 6/11: plus the stricter request check', h(without) === 'f51fa08932286067' /* UPDATED (19/11/2026, «συνομιλία v1», Package 1, John: only this value moved — the package's changes lie outside the pieces this test cuts away or takes out; the prompt's three lines and the api fingerprint are proved in auratests/test_package1_prompt_1911.js (7.2)–(7.3)) */);
 
   // ── (Δ) open pages are not refused ──────────────────────────────────────────────────────────────────────────────────────────────
   let gen = ''; try { gen = cp.execSync('node ' + JSON.stringify(path.join(ROOT, 'scripts', 'gen_prompt_fingerprints.cjs')) + ' --check').toString(); } catch (e) { gen = String(e.stdout || ''); }
   assert('(Δ) the prompt fingerprints in api/aura.js are up to date with src/App.jsx', /up to date/.test(gen));
-  assert('(Δ) the prompt (AURA_CORE_PERSONALITY) and the crisis prompt are unchanged', h(lit('AURA_CORE_PERSONALITY')) === 'b5f303cc9405aa21' && h('const SYSTEM_SUPPORTIVE = `' + SUPPORTIVE + '`;') === 'ff063670f20343a7');
+  assert('(Δ) the prompt (AURA_CORE_PERSONALITY) and the crisis prompt are unchanged', h(lit('AURA_CORE_PERSONALITY')) === '7e52268becda7360' && h('const SYSTEM_SUPPORTIVE = `' + SUPPORTIVE + '`;') === 'ff063670f20343a7');
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);

@@ -10,6 +10,7 @@
 //  (Ζ) costs apart: AURA, the simulator and the evaluator never mixed
 //  (Η) the evaluator's sheet: no id, category, variant, title, prediction or hidden fact; the κ sample of 8 is fixed in advance
 //  (Θ) the version guard (Step 8) and the hooks in the runner
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -151,12 +152,12 @@ if (BL && SL) {
   // ── (Θ) ──
   const vm = BL.versionMeta();
   assert('(Θ) the version written in the report: commit, prompt fingerprint, sha256 of App.jsx, api/aura.js and the scenarios', !!vm.commit &&
-    vm.promptFingerprint === 'b5f303cc9405aa21' && /^[0-9a-f]{64}$/.test(vm.appSha256) && /^[0-9a-f]{64}$/.test(vm.apiSha256) && /^[0-9a-f]{64}$/.test(vm.scenariosSha256));
+    vm.promptFingerprint === '7e52268becda7360' && /^[0-9a-f]{64}$/.test(vm.appSha256) && /^[0-9a-f]{64}$/.test(vm.apiSha256) && /^[0-9a-f]{64}$/.test(vm.scenariosSha256));
   assert('(Θ) the guard refuses another prompt, local changes to the app, an unknown commit',
-    BL.versionGuard({ commit: 'x', promptFingerprint: 'b5f303cc9405aa21', localChanges: 0 }, 'b5f303cc9405aa21').length === 0 &&
-    BL.versionGuard({ commit: 'x', promptFingerprint: 'deadbeefdeadbeef', localChanges: 0 }, 'b5f303cc9405aa21').length === 1 &&
-    BL.versionGuard({ commit: 'x', promptFingerprint: 'b5f303cc9405aa21', localChanges: 2 }, 'b5f303cc9405aa21').length === 1 &&
-    BL.versionGuard({ commit: null, promptFingerprint: 'b5f303cc9405aa21', localChanges: 0 }, 'b5f303cc9405aa21').length === 1);
+    BL.versionGuard({ commit: 'x', promptFingerprint: '7e52268becda7360', localChanges: 0 }, '7e52268becda7360').length === 0 &&
+    BL.versionGuard({ commit: 'x', promptFingerprint: 'deadbeefdeadbeef', localChanges: 0 }, '7e52268becda7360').length === 1 &&
+    BL.versionGuard({ commit: 'x', promptFingerprint: '7e52268becda7360', localChanges: 2 }, '7e52268becda7360').length === 1 &&
+    BL.versionGuard({ commit: null, promptFingerprint: '7e52268becda7360', localChanges: 0 }, '7e52268becda7360').length === 1);
   assert('(Θ) the models: Haiku 4.5 at 0.3 for the speaker, 0 for the gate; Opus 5.5 for A1', BL.SIM_MODEL === 'claude-haiku-4-5' && BL.SPEAKER_TEMPERATURE === 0.3 &&
     BL.GATE_TEMPERATURE === 0 && BL.EVAL_MODEL === 'claude-opus-5-5');
   const R = fs.readFileSync(path.join(ROOT, 'scripts', 'e2e_stage_a.cjs'), 'utf8');
@@ -185,7 +186,7 @@ if (BL && SL) {
 // nothing of the app changed on this branch for the tool
 const crypto = require('crypto');
 const fp = fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8').match(/core: \{ length: \d+, sha256: "([0-9a-f]{16})/);
-assert('the prompt fingerprint is still b5f303cc9405aa21', !!fp && fp[1] === 'b5f303cc9405aa21');
+assert('the prompt fingerprint is still 7e52268becda7360', !!fp && fp[1] === '7e52268becda7360');
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

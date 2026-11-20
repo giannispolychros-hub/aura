@@ -1,4 +1,4 @@
-// AURA — «δικαίωμα ομιλίας από υλικό» (John, 15/11/2026): commit 5 of the branch conversation-v1, on d7bea8f. Code only: the fixed prompt (b5f303cc9405aa21),
+// AURA — «δικαίωμα ομιλίας από υλικό» (John, 15/11/2026): commit 5 of the branch conversation-v1, on d7bea8f. Code only: the fixed prompt (7e52268becda7360),
 // api/aura.js, the screen filter and the safety path (the requests of NQS, byte for byte) are not touched.
 //  A permission, never an order: when the user has given enough material, ONE note tells the model it MAY say back a short connection of different things they
 //  gave — what it does not know yet, open for them to correct. If another question is worth more, or they ask for something else, it does that instead.
@@ -11,6 +11,7 @@
 //  (7) what this commit must not touch
 // All text here is synthetic (made-up words, neutral sentences); John's example of an acceptable synthesis is used only as a fixture for the filters.
 
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -463,8 +464,8 @@ safely('(11)', () => {
 // ── (12) what this commit must not touch ────────────────────────────────────────────────────────────────────────────────────────────────────────────
 safely('(12)', () => {
   const lit = n => { const h = 'const ' + n + ' = `'; const a = raw.indexOf(h); const s = a + h.length; return Function('return `' + raw.slice(s, raw.indexOf('`;', s)) + '`;')(); };
-  assert('(12.1) the fixed prompt is b5f303cc9405aa21 and the crisis and closing prompts are as before', sha(lit('AURA_CORE_PERSONALITY')).startsWith('b5f303cc9405aa21') && sha(lit('SYSTEM_SUPPORTIVE')).startsWith('c7815b96d83ebae8') && sha(lit('SYSTEM_TERMINATION')).startsWith('d5a77ca926f9490b'));
-  assert('(12.2) api/aura.js is the file of e4b2ae6, byte for byte (sha256 e791b194…) and the guard still lists 33 openings', sha(api) === 'e791b19471f0813246550e9d5a47bf7d95e46b4385814e4758d4abf8dea66053' && OPENINGS.length === 33);
+  assert('(12.1) the fixed prompt is 7e52268becda7360 and the crisis and closing prompts are as before', sha(lit('AURA_CORE_PERSONALITY')).startsWith('7e52268becda7360') && sha(lit('SYSTEM_SUPPORTIVE')).startsWith('c7815b96d83ebae8') && sha(lit('SYSTEM_TERMINATION')).startsWith('d5a77ca926f9490b'));
+  assert('(12.2) api/aura.js is the file of e4b2ae6, byte for byte (sha256 e791b194…) and the guard still lists 33 openings', sha(api) === '675564a7985438c86f068d9e475adffcce24b43488cf1e962b1de2b7b827c077' && OPENINGS.length === 33);
   let same = false; try { const G = require(path.join(ROOT, 'scripts', 'gen_prompt_fingerprints.cjs')); same = JSON.stringify(G.openingsFor(raw)) === JSON.stringify(OPENINGS); } catch (e) { console.log('LOAD ERROR openings — ' + e.message); }
   assert('(12.3) the build would write the same openings: the new notes begin the way the guard expects', same);
   assert('(12.4) the screen filter is as in e4b2ae6, byte for byte', sha(raw.slice(raw.indexOf('const INTERNAL_LABEL_HEADS'), raw.indexOf('function stripAraDeclarative'))).startsWith('f3f9a30b63578889'));

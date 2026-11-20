@@ -13,6 +13,7 @@
 //  (Η) wiring: first in the one cleaning line of the main reply and of the First-WHY reply, the same messages, the safety path
 //  (Θ) what it CUTS (protective sentences, reported to John before) and KNOWN GAPS — written down, not fixed
 //  (Ι) nothing else changed: Ε2, the cleaners, the table, the lines, the safety path, the prompt and the crisis prompt
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -186,7 +187,7 @@ assert('(Ι) UNCHANGED: stripDangerPromises and its lists, dropModelSentences, l
 assert('(Ι) UNCHANGED: HELPLINES, buildCrisisLine, buildDangerLine, dangerInMessages, perTurnSafety',
   h(CODE.slice(CODE.indexOf('const HELPLINES = ['), CODE.indexOf('\n];', CODE.indexOf('const HELPLINES = [')) + 3)) === '392f594fe775a4cf' && h(fnSrc('buildCrisisLine')) === 'd359e22dd7cf9a95' &&
   h(fnSrc('buildDangerLine')) === 'df6f7df2a56379a2' && h(fnSrc('dangerInMessages')) === '8d5baab173a81fbe' && h(fnSrc('perTurnSafety')) === '42c868d331e2229a');
-assert('(Ι) UNCHANGED: the prompt (AURA_CORE_PERSONALITY) and the crisis prompt', h(raw.slice(_s, _e)) === 'b5f303cc9405aa21' && h(lit('SYSTEM_SUPPORTIVE')) === 'ff063670f20343a7');
+assert('(Ι) UNCHANGED: the prompt (AURA_CORE_PERSONALITY) and the crisis prompt', h(raw.slice(_s, _e)) === '7e52268becda7360' && h(lit('SYSTEM_SUPPORTIVE')) === 'ff063670f20343a7');
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

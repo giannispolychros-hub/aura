@@ -1,5 +1,5 @@
 // AURA — ROUND TRACE for the ?debug=1 panel (John, 16/11/2026). Branch conversation-v1, on 144bd21. PASSIVE: numbers and yes/no, never a word of the conversation;
-// no reply, no request, no limit and no text that the model reads is changed. The fixed prompt (b5f303cc9405aa21), api/aura.js, the ROUND TYPE note and its limit of 5,
+// no reply, no request, no limit and no text that the model reads is changed. The fixed prompt (7e52268becda7360), api/aura.js, the ROUND TYPE note and its limit of 5,
 // the screen filter and the safety path are not touched.
 //  For every request of the main flow (generateResponse) the panel shows three things: (α) how many of AURA's replies in a row had ended in a question when the request was
 //  made, (β) whether the ROUND TYPE note was in that request (yes/no), (γ) whether the reply that came ended in a question (yes/no).
@@ -12,6 +12,7 @@
 //  (7) what must not change: the fixed prompt, api/aura.js, the ROUND TYPE note and its limit, the way the request is made
 // All text here is synthetic (made-up words, neutral sentences).
 
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -209,9 +210,9 @@ assert('(7.3) the way the request is made is as in 144bd21: the array of notes (
     raw.includes('      const system = basePrompt + dynamicSuffix;\n      const rawTextWithTags = await callAura([...contextRefresh, ...msgs], system);\n'); }));
 assert('(7.3b) … and the final check and the write of the reply stay side by side, untouched (nothing between «displayText = _fk.content;» and the line that writes it)',
   raw.includes('displayText = _fk.content;\n      if (displayText.trim()) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: displayText, msgMode: currentMode, ...(_methodLine ? { methodLine: true } : {}) }]);\n'));
-assert('(7.4) the fixed prompt is the one of 144bd21, byte for byte (sha256 b5f303cc9405aa21 6e92e481…), the crisis and closing prompts as before',
-  sha(lit('AURA_CORE_PERSONALITY')) === 'b5f303cc9405aa216e92e481f24507b03f6d878c2475733063c42733074c5b01' && sha(lit('SYSTEM_SUPPORTIVE')).startsWith('c7815b96d83ebae8') && sha(lit('SYSTEM_TERMINATION')).startsWith('d5a77ca926f9490b'));
-assert('(7.5) api/aura.js is the file of 144bd21, byte for byte (sha256 e791b194…)', sha(api) === 'e791b19471f0813246550e9d5a47bf7d95e46b4385814e4758d4abf8dea66053');
+assert('(7.4) the fixed prompt is the one of 144bd21, byte for byte (sha256 7e52268becda7360 6e92e481…), the crisis and closing prompts as before',
+  sha(lit('AURA_CORE_PERSONALITY')) === '7e52268becda7360d060ac9448480616ada5a879f6c992e618d4c527977052c3' && sha(lit('SYSTEM_SUPPORTIVE')).startsWith('c7815b96d83ebae8') && sha(lit('SYSTEM_TERMINATION')).startsWith('d5a77ca926f9490b'));
+assert('(7.5) api/aura.js is the file of 144bd21, byte for byte (sha256 e791b194…)', sha(api) === '675564a7985438c86f068d9e475adffcce24b43488cf1e962b1de2b7b827c077');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed > 0 ? 1 : 0);

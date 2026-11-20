@@ -1379,6 +1379,12 @@ const NQ_SAFETY_BASELINE = {
 async function runMockNQS() {
   const crypto = require('crypto');
   const sha = t => crypto.createHash('sha256').update(String(t), 'utf8').digest('hex').slice(0, 16);
+  // UPDATED 20/11/2026 (Package 1, approved by John). The baseline above was recorded on 50beff6, whose prompt is the one of sha256 b5f303cc…. Package 1 changed THREE lines of that
+  // prompt (912, 918, 927; the list auratests/package1_undo.json, new → old). Before hashing, those three are put back to their old text, so the whole-body hash still proves that NOTHING
+  // ELSE on the safety path moved — not one note, not one message, not one other character of the prompt. Without this step all four sessions differ in the whole body alone: the kind and the
+  // per-turn part stay equal on every one of the 23 requests (checked 20/11 with NQ_RECORD=1; the diff of the requests: NQ_DUMP, see the report).
+  const P1_UNDO = (() => { try { return JSON.parse(fs.readFileSync(path.join(REPO, 'auratests', 'package1_undo.json'), 'utf8')); } catch (e) { return []; } })();
+  const undoP1 = s => P1_UNDO.reduce((t, [nw, old]) => t.split(JSON.stringify(nw).slice(1, -1)).join(JSON.stringify(old).slice(1, -1)), s);
   const SAFE = {};
   for (const sc of BL.loadBench().safety.scenarios) {
     const p = BL.benchPersona(sc, 'safety'), at = sc.id === 'S2' ? '1' : Object.keys(p.forcedMarks || {})[0];
@@ -1394,7 +1400,7 @@ async function runMockNQS() {
       per.push(s.calls.slice(before));
     }
     await s.browser.close();
-    const reqs = per.slice(from).flat().map(b => { const c = LIB.classifyRequest(b, APP); return { kind: c.kind, d: c.dynamic || '', whole: JSON.stringify([b.system, b.messages]) }; });
+    const reqs = per.slice(from).flat().map(b => { const c = LIB.classifyRequest(b, APP); return { kind: c.kind, d: c.dynamic || '', whole: undoP1(JSON.stringify([b.system, b.messages])) }; });
     return { reqs, hash: reqs.map(r => r.kind + ':' + sha(r.d) + ':' + sha(r.whole)).join(' ') };
   };
   const REPLIES = ['Ο προϊστάμενος φορτώνει — από πότε γίνεται αυτό;', 'Τι άλλαξε όταν έφυγε;', 'Τι βαραίνει πιο πολύ;', 'Τι βαραίνει πιο πολύ;',
@@ -1886,8 +1892,8 @@ async function runMockMU() {
 // closes the list and what is typed after it («Στο είπα ήδη») still becomes the card, as before; once per session. P1b the normal path is not touched: «Ναι» to the readiness question → the root
 // question WITHOUT a list. P1c the button, then a too-short answer → the 2nd ask → the list. P1d one earlier sentence only → no list. P1e an AURA reply with a help-line number in the session →
 // no list (the same session without it → the list). P1f the passive counter: root_new_words, two integers, no text. P1g ONE note per round: the 6th request carries ROUND TYPE and not NEW MATERIAL; the 5th
-// carries NEW MATERIAL as before. P1i the list's three counters in the device log (list_shown, list_picked, list_none — John's
-// addition, 20/11/2026): numbers only, none on the safety path. Unit tests: auratests/test_package1_1911.js. Alone: --only P1.
+// carries NEW MATERIAL as before. P1h the three lines of the prompt are in the requests the app sends. P1i the list's three counters in the device log (list_shown, list_picked, list_none — John's
+// addition, 20/11/2026): numbers only, none on the safety path. Unit tests: auratests/test_package1_1911.js (the code) and auratests/test_package1_prompt_1911.js (the prompt). Alone: --only P1.
 async function runMockP1() {
   const T = APP.texts;
   const TITLE = 'Δικά σου λόγια από πριν. Πάτα μία για να τη βάλεις στο πεδίο και να τη διορθώσεις όπως θες:', NONE = 'Καμία από αυτές';
@@ -2025,6 +2031,14 @@ async function runMockP1() {
       per.length === 6 && nm.slice(1, 5).every(b => b) && rt.slice(0, 5).every(b => !b) && per.slice(1, 5).every(x => x.includes(ASK)));
     ok('P1g: the 6th request (5 replies in a row ended in a question) carries the ROUND TYPE note (' + rt[5] + ') and NOT the NEW MATERIAL note (' + nm[5] + ') — exactly one of the two',
       rt[5] && !nm[5] && !per[5].includes(ASK));
+    await s.browser.close();
+  }
+  // ── P1h — the prompt: the three lines are in the core the app sends (the real api/aura.js guard accepts them: section AP and the unit tests)
+  { const s = await session('?stageA=1', ['Τι σε κρατά εκεί;']); const b = s.calls.length;
+    await send(s.page, 'Δεν κατάλαβα την ερώτηση που μου έκανες νωρίτερα στη συζήτηση.');
+    const sys = s.calls.slice(b).map(sysOf).join('\n');
+    ok('P1h: the core the app sends carries the 927 (7) misunderstanding protocol (' + sys.includes('(7) Misunderstanding:') + '), the 912 (3) honest sentence without a promise (' + sys.includes('Συμβουλές ή τρόπους δεν δίνω· αυτό που κάνω') + ') and the 918 sentence (' + sys.includes('You never rank, order or compare the options yourself') + '), and no longer the old promise (' + !sys.includes('έρχεται μετά τη ρίζα') + ')',
+      sys.includes('(7) Misunderstanding:') && sys.includes('Συμβουλές ή τρόπους δεν δίνω· αυτό που κάνω') && sys.includes('You never rank, order or compare the options yourself') && !sys.includes('έρχεται μετά τη ρίζα'));
     await s.browser.close();
   }
 }

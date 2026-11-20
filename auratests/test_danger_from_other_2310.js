@@ -10,6 +10,7 @@
 //  (Ι) the wiring, and the old flow (?stageA=0): the line only. (Κ) unchanged: the crisis check, its lines, HELPLINES, the prompt.
 //  (Λ) none of the 12.000+ strings of the other tests and browser scripts is caught (so no existing flow moves).
 // Run: node auratests/test_danger_from_other_2310.js
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -359,7 +360,7 @@ const PIN = { detectSafetySignal: '838fe96cf161fcae' /* UPDATED (14/11/2026, Joh
   crisisLineAfterFailedCall: 'c87733effcebde7e', mergeRiskKind: 'd3b56f5bad3ae14f' }; // as on merge-candidate a701c07
 for (const [n, v] of Object.entries(PIN)) assert(`(Κ) UNCHANGED, byte for byte: ${n}`, h(fnSrc(n)) === v);
 assert('(Κ) UNCHANGED, byte for byte: HELPLINES', h(arr('HELPLINES')) === '392f594fe775a4cf');
-assert('(Κ) UNCHANGED: the prompt (AURA_CORE_PERSONALITY) and the crisis prompt', h(raw.slice(_s, _e)) === 'b5f303cc9405aa21' && h(lit('SYSTEM_SUPPORTIVE')) === 'ff063670f20343a7');
+assert('(Κ) UNCHANGED: the prompt (AURA_CORE_PERSONALITY) and the crisis prompt', h(raw.slice(_s, _e)) === '7e52268becda7360' && h(lit('SYSTEM_SUPPORTIVE')) === 'ff063670f20343a7');
 assert('(Κ) UNCHANGED: the Stage A texts (no new text: the goodbye is the existing afterCrisis)', h(block('const STAGE_A_TEXTS = ')) === '6eb98181ff245492');
 
 // ── (Λ) no existing flow moves ──────────────────────────────────────────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 // ADR «19 Οκτωβρίου (θ)» (John, before the 20): at the start of a sentence of an AURA reply, «Πέστε μου» and «Πείτε μου» are SHOWN as
 // «Πες μου». Only these two phrases, nothing else: real-model runs 37/40, session 41 — the plural in the first reply («Πέστε μου τι
 // συμβαίνει…») twice in three runs, always with the singular right after it. Deterministic, on the screen only, no prompt change.
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -74,7 +75,7 @@ assert('CRISIS: the app\'s crisis lines themselves are untouched', S(L_A) === L_
   const h = s => crypto.createHash('sha256').update(s || '').digest('hex').slice(0, 16);
   // UPDATED (22/10, ADR «22 Οκτωβρίου»): John's voice edit (the example without a number, the prediction rule) — e1e56e0c… → b5f303cc…;
   // «Πες μου» itself is still display-only and never in the prompt
-  assert('UNCHANGED by «Πες μου»: the prompt (b5f303cc…, John\'s voice edit of 22/10)', h(PROMPT) === 'b5f303cc9405aa21' && !PROMPT.includes('singularTellMe'));
+  assert('UNCHANGED by «Πες μου»: the prompt (b5f303cc…, John\'s voice edit of 22/10)', h(PROMPT) === '7e52268becda7360' && !PROMPT.includes('singularTellMe'));
   // UPDATED (22/10, ADR «22 Οκτωβρίου (β)», SAFETY): detectSafetySignal and classifyCrisisTier changed on purpose — Greeklish and spelling by
   // ear, additive; the phrase list, the crisis lines and the numbers are unchanged (pinned in test_crisis_greeklish_2210.js).
   assert('UNCHANGED: buildCrisisLine, detectSafetySignal, classifyCrisisTier, replaceBareGoodbye',

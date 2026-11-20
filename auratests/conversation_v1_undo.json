@@ -86,5 +86,17 @@
  [
   "                  {rootPick && rootPick.length > 0 && (\n                    <div style={{marginBottom:\"14px\"}}>\n                      <div className=\"warning-text\" style={{opacity:0.85,marginBottom:\"8px\"}}>{ROOT_PICK_TEXTS.title}</div>\n                      <div className=\"choice-btns\" style={{flexDirection:\"column\",alignItems:\"stretch\"}}>\n                        {rootPick.map((t, i) => (\n                          <button key={i} className=\"choice-btn\" style={{textTransform:\"none\",letterSpacing:\"normal\",fontFamily:\"inherit\",fontSize:\"12px\",textAlign:\"left\",whiteSpace:\"normal\",lineHeight:1.5}} onClick={() => handleRootPickTap(t, i)}>{t}</button>\n                        ))}\n                        <button className=\"choice-btn\" onClick={handleRootPickNone}>{ROOT_PICK_TEXTS.none}</button>\n                      </div>\n                    </div>\n                  )}\n",
   ""
+ ],
+ [
+  "(3) If the user asks what to do, or asks for a way, a tactic, a method, advice, or what to say or how to handle something (e.g. «πώς να του το πω», «τι τακτική να ακολουθήσω», «δώσε μου έναν τρόπο», «τι προτείνεις», «τι να κάνω»), do not ignore the request and do not answer it: acknowledge it with ONE honest sentence, once per request and without apology, saying that you do not give ways or advice and what you do instead — e.g. \"Συμβουλές ή τρόπους δεν δίνω· αυτό που κάνω είναι να βοηθάω να φανεί τι πραγματικά σε απασχολεί.\" (vary the wording, never the meaning). Never promise or hint at a later part, a later step or a later answer («μετά», «αργότερα», «πρώτα», «θα σου πω»), and add no way, tactic, wording or step of your own, not even as a hint or an example. Then ask ONE question toward the root (ONE REPLY, NOT A PROCEDURE).",
+  "(3) If the user asks what to do, say honestly, once per request and without apology, that here we first find what really concerns them and that it comes after the root — e.g. \"Εδώ βρίσκουμε πρώτα τι πραγματικά σε απασχολεί· το «τι κάνω» έρχεται μετά τη ρίζα.\" (vary the wording, never the meaning) — then ask ONE question toward the root (ONE REPLY, NOT A PROCEDURE)."
+ ],
+ [
+  "You never rank, order or compare the options yourself: the question only asks the user what weighs more on them, and the ranking is theirs. ",
+  ""
+ ],
+ [
+  "(7) Misunderstanding: when the user says they did not understand what you said or asked («δεν κατάλαβα», «τι εννοείς;», «δεν κατάλαβα την ερώτηση» or the like), never repeat it in the same words. Say it once more in plainer, shorter words, going straight to the plainer version (no apology, no explanation of why it was unclear, no remark about the user). If you use an example, it comes only from words the user has already written, quoted in «»; never an example of your own; if none of their words fits as an example, simplify without an example. Only if they say again that they do not understand, drop that question for good and change the approach: reflect, in their own words, the last thing they said, or ask about another thing they said. Not on the safety path and not for a risk check: their own rules decide. This is the one case where new wording for the same question is right; STRATEGY BY STATE stays as it is for a user who is circling. ",
+  ""
  ]
 ]

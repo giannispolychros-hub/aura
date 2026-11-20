@@ -1,11 +1,12 @@
 // AURA — «συνομιλία v1» (John, 15/11/2026): four separate commits on the branch conversation-v1, from release-candidate e4b2ae6. Code only:
-// the fixed prompt (b5f303cc9405aa21), api/aura.js and the screen filter are not touched, and the safety path sends what it sent.
+// the fixed prompt (7e52268becda7360), api/aura.js and the screen filter are not touched, and the safety path sends what it sent.
 //  (1) commit 1 — the stagnation note no longer sends the model to ROAD DISCOVERY in Stage A before the root (code 8397 ↔ prompt STAGE A (1)).
 //  (2) commit 2 — the two gates (Decision Space Anchors, Stakes Question) are not asked for in Stage A before the root.
 //  (3) commit 3 — the ROUND TYPE note: after 5 replies in a row that end in a question, or two short «δεν ξέρω» in a row, this reply must not end with a question.
 //  (4) commit 4 — the NEW MATERIAL note leaves room for ONE brief recognition (never the same recognition phrase twice); off the safety path only.
 // The EXACT text each request carries is checked in the browser (scripts/e2e_stage_a.cjs, section NQ, «CV1»); here, the pure part and the wiring.
 
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -235,7 +236,7 @@ assert('(3.7) the collision logger and the families are not told about it (it ad
 // ── (Ω1) nothing else changed. Each change of the branch conversation-v1, new → old, exactly as written (between the BEGIN/END marks; each commit
 // adds its own, in auratests/conversation_v1_undo.json). With them taken out, src/App.jsx must be the file of release-candidate e4b2ae6, byte for byte — this is the proof behind the UPDATED
 // fingerprint values of the older tests (John, 15/11/2026: only those values move). And the things this branch must not touch: the fixed prompt
-// (b5f303cc9405aa21), api/aura.js, the openings its guard accepts, the screen filter, and the safety code (the 19 functions below, as in e4b2ae6).
+// (7e52268becda7360), api/aura.js, the openings its guard accepts, the screen filter, and the safety code (the 19 functions below, as in e4b2ae6).
 {
   // the list (new → old, one entry per change of the branch) is the data file auratests/conversation_v1_undo.json; test_notes_card_1511.js (Ω2) reads the same file
   const UNDO = JSON.parse(fs.readFileSync(path.join(__dirname, 'conversation_v1_undo.json'), 'utf8'));
@@ -245,9 +246,9 @@ assert('(3.7) the collision logger and the families are not told about it (it ad
   assert('(Ω1) … and with them taken out, src/App.jsx is byte for byte the file of release-candidate e4b2ae6 (sha256 1860c046…) — nothing else changed',
     present === UNDO.length && sha(back) === '1860c0465872482bd5a3bf4cbbf8dd962aeba92001a4ed774e3b4b7b7f9f077e');
   const lit = n => { const h = 'const ' + n + ' = `'; const a = raw.indexOf(h); const s = a + h.length; return Function('return `' + raw.slice(s, raw.indexOf('`;', s)) + '`;')(); };
-  assert('(Ω1) the fixed prompt is b5f303cc9405aa21, the crisis and closing prompts as before',
-    sha(lit('AURA_CORE_PERSONALITY')).startsWith('b5f303cc9405aa21') && sha(lit('SYSTEM_SUPPORTIVE')).startsWith('c7815b96d83ebae8') && sha(lit('SYSTEM_TERMINATION')).startsWith('d5a77ca926f9490b'));
-  assert('(Ω1) api/aura.js is the file of e4b2ae6, byte for byte (sha256 e791b194…)', sha(api) === 'e791b19471f0813246550e9d5a47bf7d95e46b4385814e4758d4abf8dea66053');
+  assert('(Ω1) the fixed prompt is 7e52268becda7360, the crisis and closing prompts as before',
+    sha(lit('AURA_CORE_PERSONALITY')).startsWith('7e52268becda7360') && sha(lit('SYSTEM_SUPPORTIVE')).startsWith('c7815b96d83ebae8') && sha(lit('SYSTEM_TERMINATION')).startsWith('d5a77ca926f9490b'));
+  assert('(Ω1) api/aura.js is the file of e4b2ae6, byte for byte (sha256 e791b194…)', sha(api) === '675564a7985438c86f068d9e475adffcce24b43488cf1e962b1de2b7b827c077');
   let same = false, count = 0;
   try { const G = require(path.join(ROOT, 'scripts', 'gen_prompt_fingerprints.cjs')); same = JSON.stringify(G.openingsFor(raw)) === JSON.stringify(OPENINGS); count = OPENINGS.length; } catch (e) { console.log('LOAD ERROR openings — ' + e.message); }
   assert('(Ω1) the build would write the same list of openings: every note of the app still begins the way the guard expects (' + count + ')', same && count === 33);

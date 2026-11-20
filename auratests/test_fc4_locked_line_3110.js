@@ -9,6 +9,7 @@
 // Browser: section FL of scripts/e2e_stage_a.cjs (both flows), and FC4.
 //  (Α) the line, as a pure function   (Β) where it is read: the first statement of handleSubmit   (Γ) once, never twice   (Δ) the rest
 
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): the prompt changed on purpose in exactly three lines (912, 918, 927; auratests/package1_undo.json) — every prompt fingerprint below moved from b5f303cc9405aa21 to 7e52268becda7360 (313386 characters, was 311822), and api/aura.js carries the new core fingerprint (sha256 675564a7985438c8…, was e791b194…). Nothing else of the prompt moved: auratests/test_package1_prompt_1911.js (7.2)–(7.3).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -86,7 +87,7 @@ assert('(Γ) a later reply that carries the numbers clears it, as for a failed c
 
 // ── (Δ) the rest ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 const lit = n => { const a = raw.indexOf('const ' + n + ' = `'); return a < 0 ? '' : raw.slice(raw.indexOf('`', a) + 1, raw.indexOf('`;', a + 1)); };
-assert('(Δ) the prompt (AURA_CORE_PERSONALITY) is unchanged', h(lit('AURA_CORE_PERSONALITY')) === 'b5f303cc9405aa21');
+assert('(Δ) the prompt (AURA_CORE_PERSONALITY) is unchanged', h(lit('AURA_CORE_PERSONALITY')) === '7e52268becda7360');
 let gen = ''; try { gen = cp.execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'gen_prompt_fingerprints.cjs'), '--check'], { encoding: 'utf8' }); } catch (e) { gen = String(e.stdout || ''); }
 assert('(Δ) the prompt fingerprints in api/aura.js are up to date', /up to date/.test(gen));
 assert('(Δ) the 30-second guard is not changed (options Α and Β were not chosen)', /30000/.test(CODE) && !/55000/.test(CODE));
