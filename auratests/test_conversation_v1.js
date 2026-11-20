@@ -228,7 +228,7 @@ assert('(3.7) the collision logger and the families are not told about it (it ad
     /Ask for what they have NOT said yet\./.test(off) && off.split('[').length === 2 && !/ΗΡΘΕΣ ΜΕ|ΒΡΗΚΕΣ|ΦΕΥΓΕΙΣ ΜΕ/.test(off));
   assert('(4.5) nothing when no words were said back, on either path; one block that the api guard accepts', typeof D === 'function' && D([], true) === '' && D(null, true) === '' && D([], false) === '' && guardAccepts(off) && off.startsWith('\n[CODE-VERIFIED: these words') && off.endsWith(']\n'));
   assert('(4.6) the wiring is the one of the (δ) commit (the call passes !_safetyPath), and the prompt\'s two rules it follows are unchanged',
-    CODE.includes("const repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs), !_safetyPath) : ''; // ADR «15 Νοεμβρίου» (δ)") &&
+    CODE.includes("let repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs), !_safetyPath) : ''; // ADR «15 Νοεμβρίου» (δ)") /* UPDATED (19/11/2026, «συνομιλία v1», Package 1, item 3, John: const → let — the NEW MATERIAL note is withdrawn right after the ROUND TYPE note is known, so exactly one of the two is sent; the note, its call and its arguments are as before) */ &&
     raw.includes('Reorganizing or connecting what they said counts only if their answer will be new.') && raw.includes('two or three options built ONLY from what they already said, in their words'));
 }
 

@@ -42,7 +42,7 @@ const statusOf = r => (r === null ? 200 : r.status);
 // ── the source, region by region ─────────────────────────────────────────────────────────────────────────────────────────────────
 const topFn = n => { const a = CODE.indexOf('\nfunction ' + n + '('); return a < 0 ? '' : CODE.slice(a + 1, CODE.indexOf('\n}', a + 1) + 2); };
 const topConst = n => { const a = CODE.indexOf('\nconst ' + n + ' = '); if (a < 0) return ''; return CODE.slice(a + 1, CODE.indexOf(';\n', a + 1) + 1); };
-const region = n => { const a = CODE.indexOf('const ' + n + ' = '); if (a < 0) return ''; const nx = CODE.slice(a + 1).search(/\n      (?:const |let |\/\/ )/); return CODE.slice(a, nx < 0 ? a + 3000 : a + 1 + nx); };
+const region = n => { const a = Math.max(CODE.indexOf('const ' + n + ' = '), CODE.indexOf('let ' + n + ' = ')); /* UPDATED (19/11/2026, Package 1, item 3, John: repeatedElementsCtx is a `let` now — the note is withdrawn when ROUND TYPE is sent; its code and opening are unchanged) */ if (a < 0) return ''; const nx = CODE.slice(a + 1).search(/\n      (?:const |let |\/\/ )/); return CODE.slice(a, nx < 0 ? a + 3000 : a + 1 + nx); };
 const expand = (text, depth) => { let all = text; const seen = new Set();
   for (let d = 0; d < depth; d++) for (const id of new Set([...all.matchAll(/\b([A-Za-z_]\w*)\b/g)].map(m => m[1]))) {
     if (seen.has(id)) continue; seen.add(id); const f = topFn(id) || (/^[A-Z_]+$/.test(id) ? topConst(id) : ''); if (f && !all.includes(f)) all += '\n' + f; }

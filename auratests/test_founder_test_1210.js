@@ -234,14 +234,14 @@ assert('QUOTE-ONLY: a message of only «"» becomes empty (not shown); not a str
     GEN.includes('const riskClarificationCtx = _notSupportive ? describeRiskClarificationCtx(countRiskClarifications(msgs), ([...msgs].reverse().find(m => m.role === "user") || {}).content) : \'\';') &&
     // UPDATED (15/11/2026, ADR «15 Νοεμβρίου» (δ), John): + whether this turn is off the safety path — off it the note allows the choice
     // question with the user's words; on it, word for word as before (auratests/test_notes_card_1511.js (δ), browser NQδ, NQS). Same place, same tier.
-    GEN.includes('const repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs), !_safetyPath) : \'\'; // ADR «15 Νοεμβρίου» (δ)') &&
+    GEN.includes('let repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs), !_safetyPath) : \'\'; // ADR «15 Νοεμβρίου» (δ)') /* UPDATED (19/11/2026, «συνομιλία v1», Package 1, item 3, John: const → let — the NEW MATERIAL note is withdrawn right after the ROUND TYPE note is known, so exactly one of the two is sent; the note, its call and its arguments are as before) */ &&
     /selfRepetitionCtx, repeatedElementsCtx, stopMomentCtx, riskClarificationCtx, methodFailureCtx/.test(GEN));
   // SAFETY (found by the real-model run 21, session 16): the notes rode along to the crisis prompt (SYSTEM_SUPPORTIVE + the same
   // per-turn suffix) and the crisis reply opened with «Ας σταθούμε λίγο εδώ.», quoted «δεν θέλω να ζω άλλο» and added hotline
   // details of its own. On a SUPPORTIVE (crisis / distress) turn none of the three notes is sent: that path stays as it was.
   assert('SAFETY: on a SUPPORTIVE (crisis / distress) turn NONE of the three new notes is sent — the safety path stays exactly as before',
     GEN.includes('const _notSupportive = currentMode !== "SUPPORTIVE";') &&
-    GEN.indexOf('const _notSupportive = currentMode !== "SUPPORTIVE";') < GEN.indexOf('const repeatedElementsCtx = '));
+    GEN.indexOf('const _notSupportive = currentMode !== "SUPPORTIVE";') < GEN.indexOf('let repeatedElementsCtx = ')); /* UPDATED (19/11/2026, «συνομιλία v1», Package 1, item 3, John: const → let — the NEW MATERIAL note is withdrawn right after the ROUND TYPE note is known, so exactly one of the two is sent; the note, its call and its arguments are as before) */
   const TRM = CODE.slice(CODE.indexOf('const deliverFinalClosure = useCallback('), CODE.indexOf('const triggerTermination = useCallback(') + 6000);
   assert('WIRING: the closing replies (Part 1, both paths, and Part 2) cannot show a second three-beat either',
     (TRM.match(/const text = stripRepeatedThreeBeat\(stripAraDeclarative\(cleanLabels\(rawText\.replace\(\/\\s\*\\\[\\\[EXIT:\(yes\|no\)\\\]\\\]\\s\*\$\/i, ""\)\)\), msgs\);/g) || []).length === 3);

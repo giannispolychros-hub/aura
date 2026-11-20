@@ -1022,6 +1022,7 @@ async function runMock() {
   await runMockSR(); // 15/11: «δικαίωμα ομιλίας από υλικό» — commit 5 of conversation-v1
   await runMockDBG(); // 16/11: the round trace in the ?debug=1 panel — passive, numbers and yes/no only
   await runMockMU(); // 17/11: «Δεν κατάλαβα την ερώτηση» is not a root — the app's own root question, John's exception to the freeze
+  await runMockP1(); // 19/11: PACKAGE 1 — «2η φορά», the passive counter, one note per round, the prompt's three lines
 }
 
 // ── SD: ADR «31 Οκτωβρίου (ζ)» (John, a safety fix (α)) — the gaps of the two safety detectors, on the screen. Stage A (?stageA=1&rec=1),
@@ -1875,6 +1876,155 @@ async function runMockMU() {
   }
   { const { s, yesCalls, nextCalls } = await armed(REAL);
     ok('MU5 (control, unchanged): the same sequence with a real root as the next message → the card opens at once with those words, 0 model calls (' + nextCalls + '; the «Ναι» itself made ' + yesCalls + ')', yesCalls === 1 && nextCalls === 0 && (await card(s.page)) && (await shown(s.page, REAL)));
+    await s.browser.close();
+  }
+}
+
+// ── P1: PACKAGE 1 (John, 19/11/2026; an exception to the freeze for this package only; branch conversation-v1). Fake model, cost $0; every word below is synthetic (the shape of John's
+// session of 18/11, not his words). P1a «2η φορά»: the readiness question was asked and not opened by a «Ναι», the user leaves («Ευχαριστώ.») → the app's root question comes, and with it
+// the user's own earlier sentences (3) and «Καμία από αυτές»; a tap COPIES one into the box (nothing is sent), the user sends it himself → the card with exactly those words; «Καμία από αυτές»
+// closes the list and what is typed after it («Στο είπα ήδη») still becomes the card, as before; once per session. P1b the normal path is not touched: «Ναι» to the readiness question → the root
+// question WITHOUT a list. P1c the button, then a too-short answer → the 2nd ask → the list. P1d one earlier sentence only → no list. P1e an AURA reply with a help-line number in the session →
+// no list (the same session without it → the list). P1f the passive counter: root_new_words, two integers, no text. P1g ONE note per round: the 6th request carries ROUND TYPE and not NEW MATERIAL; the 5th
+// carries NEW MATERIAL as before. P1i the list's three counters in the device log (list_shown, list_picked, list_none — John's
+// addition, 20/11/2026): numbers only, none on the safety path. Unit tests: auratests/test_package1_1911.js. Alone: --only P1.
+async function runMockP1() {
+  const T = APP.texts;
+  const TITLE = 'Δικά σου λόγια από πριν. Πάτα μία για να τη βάλεις στο πεδίο και να τη διορθώσεις όπως θες:', NONE = 'Καμία από αυτές';
+  const E = 'Δεν ξέρω αν πρέπει να αλλάξω γραφείο, με πιέζει το πρόγραμμα.';
+  const G1 = 'Το ωράριο είναι βαρύ και δεν αφήνει χρόνο για τίποτα άλλο.', G2 = 'Θέλω περισσότερο χρόνο για την οικογένειά μου.', G3 = 'Η μετακίνηση παίρνει δύο ώρες κάθε μέρα.';
+  const RQ = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+  const RR = ['Τι σε κρατά σε αυτή τη σκέψη τώρα;', 'Και τι θα άλλαζε με αυτό;', RQ, 'Τι έχει σημασία εδώ;', 'Τι κρατά το πράγμα στη θέση του;', 'Τι άλλο υπάρχει;'];
+  const NOREADY = ['Τι σε κρατά σε αυτή τη σκέψη τώρα;', 'Και τι θα άλλαζε με αυτό;', 'Τι έχει σημασία εδώ;', 'Τι κρατά το πράγμα στη θέση του;']; // the same, with no readiness question
+  const card = async page => (await page.getByRole('button', { name: T.yes, exact: true }).count()) > 0;
+  const boxOf = page => page.locator('textarea.textarea');
+  const boxValue = async page => ((await boxOf(page).count()) ? boxOf(page).inputValue() : null);
+  const titleN = page => page.getByText(TITLE, { exact: true }).count();
+  const btnN = (page, t) => page.getByRole('button', { name: t, exact: true }).count();
+  const shown = async (page, t) => (await page.getByText('«' + t + '»', { exact: false }).count()) > 0;
+  const sysOf = b => (b.system || []).map(x => x.text || '').join('\n');
+  const say = async (page, text) => { if (!(await boxOf(page).count())) return false; await send(page, text); return true; };
+  // a missing button is a FAIL line below, never a run that stops (the same section runs on the code before the package)
+  const click = async (page, t) => { const b = page.getByRole('button', { name: t, exact: true }); if (!(await b.count())) return false; await b.click(); await page.waitForTimeout(300); return true; };
+  const telLog = page => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
+  // John's session, synthetic: the readiness question is asked and answered with a phrase that is not a clean «Ναι» (so it goes to the model); then the user leaves
+  const johnLike = async () => { const s = await session('?stageA=1&rec=1', RR);
+    for (const m of [E, G1, G2, 'Ναι στο είπα ήδη', G3]) await send(s.page, m);
+    const c0 = s.calls.length; await send(s.page, 'Ευχαριστώ.'); await s.page.waitForTimeout(300); return { s, c0 }; };
+  // ── P1a
+  { const { s, c0 } = await johnLike();
+    const lv = (await s.page.getByText(T.askLeaving, { exact: true }).count()) === 1;
+    const buttons = [await btnN(s.page, G1), await btnN(s.page, G2), await btnN(s.page, G3)], none = await btnN(s.page, NONE), t = await titleN(s.page);
+    ok('P1a: the user leaves after the readiness question was left unopened → the app\'s root question (' + lv + '), no model call for it (' + (s.calls.length - c0) + '), the title (' + t + '), the user\'s own sentences ' + buttons.join('/') + ', «' + NONE + '» (' + none + '), no card',
+      lv && s.calls.length - c0 === 0 && t === 1 && buttons.every(n => n === 1) && none === 1 && !(await card(s.page)));
+    await s.page.waitForTimeout(800); // the smooth scroll that follows the list
+    await s.page.screenshot({ path: path.join(OUT, 'P1-list.png'), fullPage: false }); // the screen with the list (John's look at it)
+    // found with this very screenshot: without the scroll after the list, its buttons sat below the fold, behind the sticky box
+    // (a button that is not there is "not in view" — a FAIL line, not a 30-second wait that ends the whole section: the old code has no «Καμία από αυτές»)
+    const above = async t => { const loc = s.page.getByRole('button', { name: t, exact: true }); if ((await loc.count()) !== 1) return false; const bb = await loc.boundingBox(), tb = await boxOf(s.page).boundingBox(); return !!bb && !!tb && bb.y >= 0 && bb.y + bb.height <= tb.y + 1; };
+    ok('P1a (screen): the bottom of the card is in view — «' + NONE + '» (' + await above(NONE) + ') and «' + T.back + '» (' + await above(T.back) + ') sit above the input box, not behind it', (await above(NONE)) && (await above(T.back)));
+    const order = await s.page.evaluate(([a, b, c]) => { const t = document.body.innerText; return [t.indexOf(a), t.indexOf(b), t.indexOf(c)]; }, [G1, G2, G3]);
+    ok('P1a: … in the order the user wrote them (' + order.join(' < ') + ')', order[0] > 0 && order[0] < order[1] && order[1] < order[2]);
+    const before = await boxValue(s.page), n0 = s.calls.length;
+    await click(s.page, G2);
+    ok('P1a: a tap COPIES the sentence into the box exactly (' + (await boxValue(s.page) === G2) + '), sends nothing (' + (s.calls.length - n0) + ' calls), opens no card, the list stays (' + (await titleN(s.page)) + ')',
+      before === '' && (await boxValue(s.page)) === G2 && s.calls.length === n0 && !(await card(s.page)) && (await titleN(s.page)) === 1);
+    // P1i (John's addition, 20/11/2026): the list's counters in the device log — numbers only. Shown once (3 sentences), picked once (the 2nd place), none: 0 so far.
+    { const log = await telLog(s.page), L = e => log.filter(r => r.ev === e), keys = r => (r ? Object.keys(r).sort().join(',') : '');
+      ok('P1i: the list\'s counters in the device log, numbers only — list_shown ×' + L('list_shown').length + ' (' + keys(L('list_shown')[0]) + '; n ' + (L('list_shown')[0] && L('list_shown')[0].n) + '), list_picked ×' + L('list_picked').length + ' (' + keys(L('list_picked')[0]) + '; pos ' + (L('list_picked')[0] && L('list_picked')[0].pos) + '), list_none ×' + L('list_none').length + '; no text in any record',
+        L('list_shown').length === 1 && keys(L('list_shown')[0]) === 'ev,n,t' && L('list_shown')[0].n === 3 && L('list_picked').length === 1 && keys(L('list_picked')[0]) === 'ev,pos,t' && L('list_picked')[0].pos === 2
+        && L('list_none').length === 0 && !log.some(r => JSON.stringify(r).includes(G2) || JSON.stringify(r).includes('οικογένεια')) && log.filter(r => /^list_/.test(r.ev)).every(r => Object.entries(r).every(([k, v]) => (k === 'ev' ? typeof v === 'string' : typeof v === 'number')))); }
+    { const go = s.page.getByRole('button', { name: 'Go' }); if (await go.isEnabled()) { await go.click(); await s.page.waitForTimeout(700); } }
+    ok('P1a: the user sends it himself → the card «Τι βρήκες» with exactly those words, 0 model calls (' + (s.calls.length - n0) + '), the list is gone (' + (await titleN(s.page)) + ')',
+      (await card(s.page)) && (await shown(s.page, G2)) && s.calls.length === n0 && (await titleN(s.page)) === 0);
+    await click(s.page, T.yes);
+    const rec = (await telLog(s.page)).filter(r => r.ev === 'root_new_words');
+    ok('P1f: the confirmed root is recorded ONCE as root_new_words with two integers and nothing else (' + JSON.stringify(rec.map(r => Object.keys(r).sort().join(','))) + '); every word of it was said before → newWords ' + (rec[0] && rec[0].newWords) + ', rootWords ' + (rec[0] && rec[0].rootWords) + '; no text in any record of the log',
+      rec.length === 1 && Object.keys(rec[0]).sort().join(',') === 'ev,newWords,rootWords,t' && rec[0].newWords === 0 && rec[0].rootWords >= 3 && Number.isInteger(rec[0].rootWords)
+      && !(await telLog(s.page)).some(r => JSON.stringify(r).includes(G2) || JSON.stringify(r).includes('οικογένεια')));
+    await s.browser.close();
+  }
+  { const { s, c0 } = await johnLike(); const n0 = s.calls.length;
+    await click(s.page, NONE);
+    ok('P1a: «' + NONE + '» closes the list (' + (await titleN(s.page)) + ' titles, ' + (await btnN(s.page, G1)) + ' sentences), the box is empty (' + JSON.stringify(await boxValue(s.page)) + '), the root question is still there, nothing was sent (' + (s.calls.length - n0) + ')',
+      (await titleN(s.page)) === 0 && (await btnN(s.page, G1)) === 0 && (await boxValue(s.page)) === '' && (await s.page.getByText(T.askLeaving, { exact: true }).count()) === 1 && s.calls.length === n0);
+    { const log = await telLog(s.page), L = e => log.filter(r => r.ev === e), keys = r => (r ? Object.keys(r).sort().join(',') : '');
+      ok('P1i: «' + NONE + '» → list_shown ×' + L('list_shown').length + ' (n ' + (L('list_shown')[0] && L('list_shown')[0].n) + '), list_none ×' + L('list_none').length + ' (' + keys(L('list_none')[0]) + '), list_picked ×' + L('list_picked').length,
+        L('list_shown').length === 1 && L('list_shown')[0].n === 3 && L('list_none').length === 1 && keys(L('list_none')[0]) === 'ev,t' && L('list_picked').length === 0); }
+    await send(s.page, 'Στο είπα ήδη');
+    ok('P1a (John\'s own words, as before — the app does not read the answer): «Στο είπα ήδη» typed after «' + NONE + '» still becomes the card with exactly those words, 0 model calls (' + (s.calls.length - n0) + ')',
+      (await card(s.page)) && (await shown(s.page, 'Στο είπα ήδη')) && s.calls.length === n0);
+    await s.browser.close();
+  }
+  // once per session: «Καμία από αυτές» → «Δεν το βρήκα ακόμα, συνέχισε» → the button again → the root question again: no list
+  { const { s } = await johnLike();
+    await click(s.page, NONE);
+    await click(s.page, T.back);
+    const btn = s.page.getByRole('button', { name: T.button });
+    const hasBtn = (await btn.count()) === 1;
+    if (hasBtn) { await btn.click(); await s.page.waitForTimeout(400); }
+    ok('P1a: once per session — the root question asked again later (' + hasBtn + ', the question: ' + (await s.page.getByText(T.ask, { exact: true }).count()) + ') comes WITHOUT the list (' + (await titleN(s.page)) + ')',
+      hasBtn && (await s.page.getByText(T.ask, { exact: true }).count()) === 1 && (await titleN(s.page)) === 0 && (await btnN(s.page, G1)) === 0);
+    await s.browser.close();
+  }
+  // ── P1b — the normal path: the readiness question, a clean «Ναι» → the root question, the FIRST ask → no list; a too-short answer → the 2nd ask → the list
+  { const s = await session('?stageA=1&rec=1', RR);
+    for (const m of [E, G1, G2]) await send(s.page, m);
+    const n0 = s.calls.length; await send(s.page, 'Ναι'); await s.page.waitForTimeout(300);
+    ok('P1b: the readiness question and a clean «Ναι» → the root question (' + (await s.page.getByText(T.ask, { exact: true }).count()) + '), 0 model calls (' + (s.calls.length - n0) + '), NO list (' + (await titleN(s.page)) + ') — the normal path is not touched',
+      (await s.page.getByText(T.ask, { exact: true }).count()) === 1 && s.calls.length === n0 && (await titleN(s.page)) === 0);
+    await send(s.page, 'ok'); await s.page.waitForTimeout(300);
+    const t = await titleN(s.page), bs = [await btnN(s.page, G1), await btnN(s.page, G2)];
+    ok('P1b: … a too-short answer → the app asks again («' + T.retry.slice(0, 20) + '…» ×' + (await s.page.getByText(T.retry, { exact: true }).count()) + ') = the 2nd ask → the list (title ' + t + ', the two sentences ' + bs.join('/') + ')',
+      (await s.page.getByText(T.retry, { exact: true }).count()) === 1 && t === 1 && bs.every(n => n === 1) && s.calls.length === n0);
+    await s.browser.close();
+  }
+  // ── P1c — the button: the first ask, no list; a too-short answer: the 2nd ask, the list
+  { const s = await session('?stageA=1&rec=1', NOREADY);
+    for (const m of [E, G1, G2]) await send(s.page, m);
+    await s.page.getByRole('button', { name: T.button }).click(); await s.page.waitForTimeout(400);
+    const first = await titleN(s.page);
+    await send(s.page, 'ok'); await s.page.waitForTimeout(300);
+    ok('P1c: the root button → the 1st ask: no list (' + first + '); a too-short answer → the 2nd ask: the list (' + (await titleN(s.page)) + ') with the two sentences (' + [await btnN(s.page, G1), await btnN(s.page, G2)].join('/') + ')',
+      first === 0 && (await titleN(s.page)) === 1 && (await btnN(s.page, G1)) === 1 && (await btnN(s.page, G2)) === 1);
+    await s.browser.close();
+  }
+  // ── P1d — one earlier sentence only → no list at all (the user is never offered "the" sentence)
+  { const s = await session('?stageA=1&rec=1', RR);
+    for (const m of [E, G1]) await send(s.page, m);
+    await s.page.getByRole('button', { name: T.button }).click(); await s.page.waitForTimeout(400);
+    await send(s.page, 'ok'); await s.page.waitForTimeout(300);
+    ok('P1d: only one earlier sentence → no list at the 2nd ask (' + (await titleN(s.page)) + '), the app\'s retry line as always (' + (await s.page.getByText(T.retry, { exact: true }).count()) + ')',
+      (await titleN(s.page)) === 0 && (await btnN(s.page, G1)) === 0 && (await s.page.getByText(T.retry, { exact: true }).count()) === 1);
+    ok('P1i: no list → no record of the list in the device log (' + (await telLog(s.page)).filter(r => /^list_/.test(r.ev)).length + ')', (await telLog(s.page)).filter(r => /^list_/.test(r.ev)).length === 0);
+    await s.browser.close();
+  }
+  // ── P1e — the safety path: an AURA reply that carries a number of the help-line table makes the whole session unsafe → no list. The same session without the number → the list (the control).
+  for (const withNumber of [false, true]) {
+    const replies = ['Τι σε κρατά σε αυτή τη σκέψη τώρα;', withNumber ? 'Αν χρειαστείς άμεση βοήθεια, καλέσε το 112. Και τι θα άλλαζε με αυτό;' : 'Και τι θα άλλαζε με αυτό;', 'Τι έχει σημασία εδώ;'];
+    const s = await session('?stageA=1&rec=1', replies);
+    for (const m of [E, G1, G2]) await send(s.page, m);
+    await s.page.getByRole('button', { name: T.button }).click(); await s.page.waitForTimeout(400);
+    await send(s.page, 'ok'); await s.page.waitForTimeout(300);
+    const carried = (await s.page.locator('body').innerText()).includes('112');
+    ok('P1e: 2nd ask, ' + (withNumber ? 'an AURA reply in the session carries the number 112 (on screen: ' + carried + ') → NO list (' + (await titleN(s.page)) + ')' : 'no number anywhere (control) → the list (' + (await titleN(s.page)) + ')'),
+      withNumber ? carried && (await titleN(s.page)) === 0 && (await btnN(s.page, G1)) === 0 : (await titleN(s.page)) === 1);
+    { const shownN = (await telLog(s.page)).filter(r => r.ev === 'list_shown').length;
+      ok('P1i: ' + (withNumber ? 'on the safety path (a help-line number in the session) the list is not shown and NOTHING of it is recorded (list_shown ×' + shownN + ')' : 'the control: the list is shown and recorded once (list_shown ×' + shownN + ')'),
+        withNumber ? shownN === 0 && (await telLog(s.page)).filter(r => /^list_/.test(r.ev)).length === 0 : shownN === 1); }
+    await s.browser.close();
+  }
+  // ── P1g — ONE note per round. Six requests, every reply ends in a question and the first one says back a pair of the user's words.
+  { const NM = 'these words of the user have already been said back to them in an earlier reply', RT = 'this reply must not end with a question', ASK = 'Ask for what they have NOT said yet.';
+    const msgs = ['Νιώθω ότι υπάρχει έλλειψη φαντασίας στη δουλειά μου.', 'Από πέρυσι.', 'Άλλαξε η ομάδα.', 'Έφυγαν δύο άνθρωποι.', 'Έμεινα μόνος.', 'Δεν έχω με ποιον να μιλήσω.'];
+    const reps = ['Η έλλειψη φαντασίας φαίνεται συχνά; Πότε το πρόσεξες;', 'Τι έγινε πέρυσι;', 'Τι άλλαξε με την ομάδα;', 'Πώς σε επηρέασε αυτό;', 'Τι σημαίνει μόνος εδώ;', 'Τι θα ήθελες να γίνει;'];
+    const s = await session('?stageA=1', reps); const per = [];
+    for (const m of msgs) { const b = s.calls.length; await send(s.page, m); per.push(s.calls.slice(b).map(sysOf).join('\n')); }
+    const nm = per.map(x => x.includes(NM)), rt = per.map(x => x.includes(RT));
+    ok('P1g: the NEW MATERIAL note is in the requests that follow the reply that said the words back, up to the 5th (' + nm.map(b => b ? 1 : 0).join('') + '), and its «' + ASK + '» is there while ROUND TYPE is not (' + rt.map(b => b ? 1 : 0).join('') + ')',
+      per.length === 6 && nm.slice(1, 5).every(b => b) && rt.slice(0, 5).every(b => !b) && per.slice(1, 5).every(x => x.includes(ASK)));
+    ok('P1g: the 6th request (5 replies in a row ended in a question) carries the ROUND TYPE note (' + rt[5] + ') and NOT the NEW MATERIAL note (' + nm[5] + ') — exactly one of the two',
+      rt[5] && !nm[5] && !per[5].includes(ASK));
     await s.browser.close();
   }
 }
@@ -8011,7 +8161,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

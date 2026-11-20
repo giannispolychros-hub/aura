@@ -254,8 +254,12 @@ const _tm = (() => { const a = raw.indexOf('// THOUGHT MAP, phase 1'); const b =
 // «δικαίωμα ομιλίας από υλικό» (speakRightPhrases), only to LEAVE a closing message out of the count of separate phrases. Counted apart, like the Thought Map block above:
 // the flow's call sites are still the same 15 (the block's own use is pinned below: exactly one). Proved: auratests/test_speak_right.js (2.12) — the copy gives what the Thought Map gives.
 const _sr = (() => { const a = raw.indexOf('«δικαίωμα ομιλίας από υλικό»'); const b = raw.indexOf('function detectUserStagnation(', a); return a < 0 || b < a ? '' : raw.slice(a, b); })();
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): a third block reads the SAME detector, unchanged and read-only — rootPickSentences (the user's own earlier sentences at the root question's 2nd ask), only to LEAVE a closing message out. Counted apart, like the two blocks above:
+// the flow's call sites are still the same 15 (the block's own use is pinned below: exactly one).
+const _p1 = (() => { const a = raw.indexOf('// PACKAGE 1 (John, 19/11/2026 — an exception to the freeze, for this package only; branch conversation-v1) — «2η φορά».'); const b = raw.indexOf('// PACKAGE 1, item 2 (John, 19/11/2026) — «ρίζα χωρίς νέα λόγια»'); return a < 0 || b < a ? '' : raw.slice(a, b); })();
 assert('exactly fifteen call sites are wired, matching the current stated scope',
-  (raw.replace(_tm, '').replace(_sr, '').match(/declaresClosing\s*\(/g) || []).length === 16); // 15 call sites + the definition
+  (raw.replace(_tm, '').replace(_sr, '').replace(_p1, '').match(/declaresClosing\s*\(/g) || []).length === 16); // 15 call sites + the definition
+assert('the block of the root question\'s list (Package 1) reads it once, only to leave a message out', _p1.length > 5000 && (_p1.match(/declaresClosing\s*\(/g) || []).length === 1);
 assert('the block of «δικαίωμα ομιλίας από υλικό» (commit 5) reads it once, only to leave a message out', _sr.length > 8000 && (_sr.match(/declaresClosing\s*\(/g) || []).length === 1);
 assert('the Thought Map block (phase 1) reads it once, only to leave a message out', (_tm.match(/declaresClosing\s*\(/g) || []).length === 1);
 

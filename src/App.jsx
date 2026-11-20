@@ -2794,6 +2794,144 @@ function rootAnswerIsDismissal(text) {
   const core = f.replace(/^ευχαριστω /, "").replace(/ ευχαριστω$/, "");
   return ROOT_DISMISSALS.includes(core);
 }
+// PACKAGE 1 (John, 19/11/2026 — an exception to the freeze, for this package only; branch conversation-v1) — «2η φορά».
+// When the APP asks the root question for the 2nd time in a session, it first shows up to 3 sentences the user wrote earlier, word for word, picked by code with an
+// A8-like filter (the rules of the 18/11 experiment, without its emotion rule). A tap COPIES one into the box; the user corrects it and sends it himself;
+// «Καμία από αυτές» closes the list. Nothing here reads what the user typed at the root question: only AURA's questions, the app's own counters and the earlier
+// messages (the sentences themselves). Never on the safety path (rootPickView). Once per session. Counting, John's: the model's own readiness question ("νιώθεις ότι
+// έχει αρχίσει να ξεκαθαρίζει…") is the first time the root is asked, so it counts as an earlier ask — unless the user's «Ναι» to it opened the root question (door 2):
+// then it is the same ask. Constants on single lines, the functions closed at column 0: the tests lift them by name.
+const ROOT_PICK_MAX = 3;
+const ROOT_PICK_MAX_CHARS = 200;
+const ROOT_PICK_TRIM_YES = /^ναι(?![α-ωά-ώϊϋΐΰ])(?:\s*[,.]?\s*(?:ακριβώς|ακριβως|αυτό|αυτο)(?![α-ωά-ώϊϋΐΰ]))*\s*[,.]?\s*/iu;
+const ROOT_PICK_TRIM_DK = /^δεν ξ[έε]ρω\s*(?:…|\.\.\.)\s*/iu;
+const ROOT_PICK_NO_START = /^οχι(?![α-ω])/;
+const ROOT_PICK_DEICTIC = /(?:ισχυει|με αυτο|οπωσ ειπεσ|αυτο που ειπεσ|το ιδιο)(?![α-ω])/;
+const ROOT_PICK_SELF_LABEL = /(?:χαζ|ηλιθι|βλακ|αχρηστ|αποτυχ|ντροπ|αδυναμ|δεν αξιζω|καμια αξια)/;
+const ROOT_PICK_SELF_BLAME = /(?:φταιω|φταιξ|φταιει|ενοχ|δικη μου ευθυνη|εγω φταιω)/;
+const ROOT_PICK_ADDRESSED = /(?:^|[^α-ω])(?:σου|εσυ|εσενα|πεσ μου|πειτε μου|απαντα|απαντησε|γραψε μου|ρωτασ|εισαι|ειστε)(?![α-ω])/;
+const ROOT_PICK_FILLER = /^(?:hmm+|χμ+|μμ+|εεε+|ωραια|οκ)(?![α-ω])/;
+const ROOT_PICK_CONNECTOR = /^(?:και|αλλα|ομωσ|μετα|ισωσ|μαλλον|δεν ξερω|απλα|ετσι|ουτε|επισησ|δηλαδη|λοιπον|ναι|οχι|ωραια|οκ|hmm+|χμ+|μμ+|εεε+|απο την αλλη)(?![α-ω])/;
+const ROOT_PICK_TEXTS = { title: "Δικά σου λόγια από πριν. Πάτα μία για να τη βάλεις στο πεδίο και να τη διορθώσεις όπως θες:", none: "Καμία από αυτές" };
+// Which ask is this? `appAsksBefore` = how many times the app has put the root question to the user before this one (counted by the screen's effect); `door2Asks` =
+// how many asks so far (this one included) opened with the user's «Ναι» to the readiness question. Always an integer ≥ 1.
+function rootAskNumber(messages, appAsksBefore, door2Asks) {
+  const list = Array.isArray(messages) ? messages : [];
+  const whole = n => (Number.isInteger(n) && n > 0 ? n : 0);
+  const readiness = list.filter(m => m && m.role === "assistant" && m.msgMode !== "STAGE_A" && typeof m.content === "string" && detectsCoreReadinessAsked(m.content)).length;
+  return Math.max(0, readiness - whole(door2Asks)) + whole(appAsksBefore) + 1;
+}
+// The sentences → [{ text, msg, start, end }], in time order: 0, or 2–3 (more than 3 → the first, the middle and the last). `text` === messages[msg].content.slice(start, end):
+// an exact, continuous piece of what the user typed. One sentence per message; a rejected sentence is replaced by the next sentence of the same message. The chain is the
+// Thought Map's, through its frozen copy in the speak-right block (speakRight*; proved identical, test_speak_right.js (2.12)): every user message but the first (the entrance), only as an answer to a question of AURA (msgMode ANSWER, ending in a question), and not the answer to
+// the readiness question (it is about the process, not the topic — by its place, no words). Left out: safety, a dismissal or «I don't know», a goodbye, heavy words
+// of not coping, a question, a sentence addressed to AURA, an answer-particle or connector start («Όχι», «Και», «Αλλά», «Δεν ξέρω…»), something the list does not show
+// («ισχύει», «όπως είπες»), a self-label or self-blame, a sentence over 200 characters, a near copy of one already chosen, and one identical to the question it answers.
+// A leading «Ναι, ακριβώς,» or «Δεν ξέρω…» (with the dots) is cut off — what is left is still an exact piece. Every sentence passes rootTextHasSubstance as it is, so sent
+// unchanged it becomes the root card, not the «say it more fully» line. Never throws; never changes its input.
+function rootPickSentences(messages) {
+  try {
+    const list = Array.isArray(messages) ? messages : [];
+    const userIdx = [];
+    list.forEach((m, i) => { if (m && m.role === "user" && typeof m.content === "string") userIdx.push(i); });
+    const plain = x => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ς/g, "σ");
+    const fold = x => plain(x).replace(/[^a-zα-ω0-9]+/g, " ").replace(/\s+/g, " ").trim();
+    const kept = [];
+    for (const i of userIdx.slice(1)) {
+      const content = list[i].content;
+      const prev = list[i - 1];
+      if (!prev || prev.role !== "assistant" || prev.msgMode !== "ANSWER" || typeof prev.content !== "string") continue;
+      if (!speakRightEndsWithQuestion(prev.content) || detectsCoreReadinessAsked(prev.content)) continue;
+      if (detectSafetySignal(content) || detectsDangerFromOther(content)) continue;
+      if (rootAnswerIsDismissal(content) || rootAnswerIsUnsure(content) || isExplicitClosure(content) || declaresClosing(content) || matchesClosingWord(content)) continue;
+      if (SPEAK_RIGHT_HEAVY_WORDS.test(fold(content))) continue;
+      const { spans, uncertain } = speakRightSpans(content);
+      if (uncertain) continue;
+      const asked = speakRightSpans(prev.content).spans.map(([a, b]) => fold(prev.content.slice(a, b)));
+      for (const [from, to] of spans) {
+        let start = from;
+        let text = content.slice(from, to);
+        if (text.length > ROOT_PICK_MAX_CHARS) continue;
+        for (let k = 0; k < 3; k++) {
+          const lead = ROOT_PICK_TRIM_YES.exec(text) || ROOT_PICK_TRIM_DK.exec(text);
+          if (!lead || !lead[0].length) break;
+          text = text.slice(lead[0].length); start += lead[0].length;
+        }
+        if (!text) continue;
+        const f = plain(text).trim(), folded = fold(text);
+        if (detectSafetySignal(text) || detectsDangerFromOther(text) || rootAnswerIsDismissal(text) || rootAnswerIsUnsure(text)) continue;
+        const dismissStart = folded.match(SPEAK_RIGHT_DISMISS_START);
+        if (dismissStart && !SPEAK_RIGHT_CONTENT_WORDS.test(folded.slice(dismissStart[0].length))) continue;
+        if (ROOT_PICK_NO_START.test(f) || ROOT_PICK_DEICTIC.test(f) || /[;?;]\s*$/.test(text) || ROOT_PICK_ADDRESSED.test(f)) continue;
+        if (ROOT_PICK_FILLER.test(f) || ROOT_PICK_CONNECTOR.test(f) || ROOT_PICK_SELF_LABEL.test(f) || ROOT_PICK_SELF_BLAME.test(f)) continue;
+        if (!rootTextHasSubstance(text) || !folded || asked.includes(folded)) continue;
+        if (kept.some(k => speakRightJaccard(text, k.text) >= SPEAK_RIGHT_JACCARD)) continue;
+        kept.push({ text, msg: i, start, end: to });
+        break;
+      }
+    }
+    if (kept.length < 2) return [];
+    if (kept.length <= ROOT_PICK_MAX) return kept;
+    const pick = [];
+    for (let k = 0; k < ROOT_PICK_MAX; k++) pick.push(kept[Math.round(k * (kept.length - 1) / (ROOT_PICK_MAX - 1))]);
+    return pick;
+  } catch (e) {
+    return [];
+  }
+}
+// The gate → { sentences } or null. Only at the root question (phase "ask"), from the 2nd ask on, once per session (`done`), and NEVER on the safety path — the app's latch
+// (crisis A or B, DISTRESS, danger from another person, safety mode, the failed-call crisis line) and the whole session checked again (branchSessionSafe), exactly the
+// check of the Thought Map. Fewer than two sentences → null: the user is never offered "the" sentence. Never throws.
+function rootPickView(o) {
+  try {
+    const x = o || {};
+    if (x.phase !== "ask" || x.done === true || !(Number.isInteger(x.askNo) && x.askNo >= 2)) return null;
+    const risk = { riskKind: typeof x.riskKind === "number" ? x.riskKind : 0, dangerFromOther: x.dangerFromOther === true, safetyMode: x.safetyMode === true };
+    if (risk.riskKind !== 0 || risk.dangerFromOther || risk.safetyMode || x.crisisFallback) return null;
+    if (!branchSessionSafe(x.messages, risk)) return null;
+    const sentences = rootPickSentences(x.messages);
+    return sentences.length >= 2 ? { sentences } : null;
+  } catch (e) {
+    return null;
+  }
+}
+// PACKAGE 1 (John's addition, 20/11/2026) — the list's three counters, NUMBERS ONLY: what happens to the list, as the record for the device log (?rec=1 / ?debug=1; read by nothing; the
+// log keeps only whole numbers and flags). shown: how many sentences were on the screen · picked: the PLACE of the sentence tapped (1 = the first), never the sentence · none: «Καμία από
+// αυτές», no field at all. Whatever is passed in, a field is a whole number from 0 to 9999; any other kind gives null. Pure: no storage, no network, no console, no message, no box.
+function rootPickRecord(kind, value) {
+  const whole = x => (Number.isInteger(x) && x >= 0 ? Math.min(x, 9999) : 0);
+  if (kind === "shown") return { event: "list_shown", fields: { n: whole(value) } };
+  if (kind === "picked") return { event: "list_picked", fields: { pos: whole(value) } };
+  if (kind === "none") return { event: "list_none", fields: {} };
+  return null;
+}
+// PACKAGE 1, item 2 (John, 19/11/2026) — «ρίζα χωρίς νέα λόγια»: a PASSIVE COUNTER, two integers for the device log (event root_new_words), read by nothing. Of the confirmed
+// root's words (no accents, lower case, 4+ letters, minus the same small words as rootAuraShare), how many appear in NO earlier message of the user. The root's own message is
+// the last user message that holds the root; a corrected root (typed in the correction box, so in no message) is judged against all of them. Only the user's words count: a
+// word first said by AURA is still new. A NUMBER: never shown, never sent, no text kept.
+function rootNewWordCount(found, msgs) {
+  try {
+    const norm = s => String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ς/g, "σ");
+    const STOP = new Set(['για','και','που','αυτο','ειναι','τους','την','της','του','στο','στη','στον','στην',
+                          'με','σε','απο','των','δεν','θα','να','τι','ενα','μια','ολα','κατι','αλλα','οτι','ευρω']);
+    const root = norm(found).trim();
+    const words = [...new Set(root.split(/[^a-zα-ω0-9]+/i).filter(w => w.length >= 4 && !STOP.has(w)))];
+    const users = (Array.isArray(msgs) ? msgs : []).filter(m => m && m.role === "user" && typeof m.content === "string");
+    let own = -1;
+    if (root) users.forEach((m, i) => { if (norm(m.content).includes(root)) own = i; });
+    const earlier = (own < 0 ? users : users.slice(0, own)).map(m => norm(m.content));
+    const fresh = words.filter(w => !earlier.some(t => t.includes(w))).length;
+    return { newWords: Math.min(9999, fresh), rootWords: Math.min(9999, words.length) };
+  } catch (e) {
+    return { newWords: 0, rootWords: 0 };
+  }
+}
+// PACKAGE 1, item 3 (John, 19/11/2026) — ONE note per round. The NEW MATERIAL note ends «Ask for what they have NOT said yet.»; the ROUND TYPE note says «this reply must not
+// end with a question». In John's 6th round both were in one request and the model did both. With the second in the request, the first is not sent.
+function repeatedElementsForRound(newMaterialCtx, roundTypeCtx) {
+  if (typeof newMaterialCtx !== "string") return "";
+  return roundTypeNoteSent(roundTypeCtx) ? "" : newMaterialCtx;
+}
 // §2.1α step 5 — «λέξη που κρατάς» equal to «Τι βρήκες»: lower case, no accents, no edge punctuation/space.
 function sameAsRootText(a, b) {
   const n = x => (typeof x === "string" ? x : "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
@@ -7873,6 +8011,13 @@ export default function AURAv2() {
   // THOUGHT MAP (John, 2/11/2026, ADR «2 Νοεμβρίου (β)»): how many messages there were when the root card opened — a number only, page
   // memory only; the screen reads `messages` up to it. Never stored, sent or logged.
   const rootCardMsgCount = useRef(0);
+  // PACKAGE 1 (John, 19/11/2026) — «2η φορά»: the user's own earlier sentences at the root question's second ask. Page memory only (never stored, sent or logged); all reset with the session.
+  const [rootPick, setRootPick] = useState(null);              // null | string[] — the sentences on screen now
+  const rootAskSeen = useRef({ ph: null, retry: false });       // what the effect saw last: the phase, and whether the app's re-ask line was showing
+  const rootAsksBefore = useRef(0);                             // how many times the app has put the root question to the user so far
+  const rootDoor2Asks = useRef(0);                              // how many of those opened with the user's «Ναι» to the readiness question (door 2)
+  const rootPickDone = useRef(false);                           // the list was shown once this session — never again
+  const rootNewWordsLogged = useRef(false);                     // item 2: the counter «ρίζα χωρίς νέα λόγια» is written once per session
   // THOUGHT MAP (John, 2/11/2026): the map's one record (branchCount, ?rec=1 only) is written once per session — reset with the session
   const thoughtMapLogged = useRef(false);
   // THOUGHT MAP, item 144 (John, 8/11/2026, ADR «8 Νοεμβρίου»): the map's one record, once per session (the latch), in the moment the map
@@ -8710,7 +8855,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       // SAFETY (real-model run 21, session 16): never on a SUPPORTIVE (crisis / distress) turn — the crisis prompt gets the same
       // suffix, and with the gentle-form note the crisis reply opened with «Ας σταθούμε λίγο εδώ.». That path stays as it was.
       const _notSupportive = currentMode !== "SUPPORTIVE";
-      const repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs), !_safetyPath) : ''; // ADR «15 Νοεμβρίου» (δ)
+      let repeatedElementsCtx = _notSupportive ? describeRepeatedElementsCtx(repeatedUserElements(msgs), !_safetyPath) : ''; // ADR «15 Νοεμβρίου» (δ)
       const stopMomentCtx = _notSupportive ? describeStopMomentCtx(countStopMoments(msgs), stopMomentGentleOnly(msgs, riskSignalKind.current, stageAActive.current && dangerFromOther.current)) : '';
       const riskClarificationCtx = _notSupportive ? describeRiskClarificationCtx(countRiskClarifications(msgs), ([...msgs].reverse().find(m => m.role === "user") || {}).content) : '';
       // ADR «12 Οκτωβρίου (β)», decision 2: after the safety path, support only — one fixed sentence, never on a SUPPORTIVE turn.
@@ -8749,6 +8894,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       const _sr = speakRightDecision(_saNotesHeld, _srAsked, msgs, speakRightRef.current, { riskKind: riskSignalKind.current });
       if (_sr.kind === "speak") speakRightRef.current = { at: _sr.userCount, mass: _sr.mass };
       const roundTypeCtx = describeSpeakRightCtx(_sr, msgs, _srAsked);
+      // PACKAGE 1, item 3 (John, 19/11/2026): ONE note per round. NEW MATERIAL ends «Ask for what they have NOT said yet.»; ROUND TYPE says «this reply must not end with a question» — with ROUND TYPE in
+      // this request, NEW MATERIAL is not sent (in John's 6th round the real model did both). Nothing else about either note changes; off the safety path only, as ROUND TYPE itself is.
+      repeatedElementsCtx = repeatedElementsForRound(repeatedElementsCtx, roundTypeCtx);
       const dynamicSuffix = [
         memCtx, profileCtx, materialEvidenceCtx, goalObstacleStakesCtx, masterPriorityStageCtx, lastFiredFamilyCtx, coverageReportCtx, demoCtx, informationModeCtx, explicitPauseCtx,
         coreReadinessCtx, shiftCheckCtx, premiseInversionCtx, friendPerspectiveCtx, clarityPivotCtx, selfRepetitionCtx, repeatedElementsCtx, stopMomentCtx, riskClarificationCtx, methodFailureCtx, userStagnationCtx, escalationCtx, tensionCtx, stageAActive.current ? '' : roadQuestionCtx,
@@ -10435,6 +10583,35 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
   // Nothing without ?rec=1; nothing else ever (thoughtMapRecFields builds the only fields; recordTelemetry drops anything else).
   const thoughtMapShown = thoughtMap !== null;
   useEffect(() => { if (thoughtMapShown) logThoughtMapOnce(thoughtMap); }, [thoughtMapShown]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ROOT PICK EFFECT — BEGIN
+  // PACKAGE 1 (John, 19/11/2026): when the app puts the root question to the user (the phase becomes "ask", or its re-ask line appears), count the ask; from the 2nd on, once per
+  // session and never on the safety path, show the user's own earlier sentences (rootPickView decides). It reads the phase, the counters, the session's flags and the earlier
+  // messages — nothing the user types, nothing about how an answer was understood. It stores and sends nothing; its one record is list_shown, a number (how many sentences), written
+  // where the list is set — so never on the safety path, where the gate says no (John's addition, 20/11/2026).
+  const rootRetryNow = stageAView.retry === true;
+  useEffect(() => {
+    const seen = rootAskSeen.current;
+    rootAskSeen.current = { ph: stageAPhase, retry: rootRetryNow };
+    if (!stageAActive.current) return;
+    if (stageAPhase !== "ask") { if (seen.ph === "ask") setRootPick(null); return; }
+    if (seen.ph === "ask" && !(rootRetryNow && !seen.retry)) return; // still the same ask
+    if (seen.ph !== "ask" && stageARef.current.door === 2) rootDoor2Asks.current += 1;
+    const askNo = rootAskNumber(messages, rootAsksBefore.current, rootDoor2Asks.current);
+    rootAsksBefore.current += 1;
+    const v = rootPickView({ phase: "ask", askNo, done: rootPickDone.current, messages, riskKind: riskSignalKind.current, dangerFromOther: dangerFromOther.current, safetyMode, crisisFallback });
+    if (v) { rootPickDone.current = true; setRootPick(v.sentences.map(s => s.text)); const _r = rootPickRecord("shown", v.sentences.length); if (_r) recordTelemetry(_r.event, _r.fields); }
+  }, [stageAPhase, rootRetryNow]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ROOT PICK EFFECT — END
+  // the list makes the root question's card taller AFTER the scroll of the phase effect (above) ran: on a phone its buttons stayed below the fold, behind the sticky box — scroll again, once the list is there
+  useEffect(() => { if (rootPick && rootPick.length) bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [rootPick]);
+  const handleRootPickTap = (t, i) => { setInput(t); const _r = rootPickRecord("picked", i + 1); if (_r) recordTelemetry(_r.event, _r.fields); setTimeout(() => textareaRef.current?.focus(), 0); };
+  const handleRootPickNone = () => { setRootPick(null); const _r = rootPickRecord("none"); if (_r) recordTelemetry(_r.event, _r.fields); setTimeout(() => textareaRef.current?.focus(), 0); };
+  // PACKAGE 1, item 2 (John, 19/11/2026) — «ρίζα χωρίς νέα λόγια»: PASSIVE. Once the root is confirmed, ONE record of two integers (event root_new_words): how many of the root's words are new, and how many it has. Nothing reads it; no text.
+  useEffect(() => {
+    if (!stageAActive.current || rootNewWordsLogged.current || stageARef.current.stats.rootConfirmed !== 1) return;
+    rootNewWordsLogged.current = true;
+    recordTelemetry("root_new_words", rootNewWordCount(stageARef.current.found, messages));
+  }, [stageAPhase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleKey = (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
@@ -10553,6 +10730,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setFinalDistillation(null);
     recentSurges.current = [];
     illuminAnimCancelled.current = true;
+    setRootPick(null); rootAskSeen.current = { ph: null, retry: false }; rootAsksBefore.current = 0; rootDoor2Asks.current = 0; rootPickDone.current = false; rootNewWordsLogged.current = false; // PACKAGE 1 (19/11/2026): the list, its counters and its once-per-session latches
   };
 
   // ── Memory Summary Card ──
@@ -11309,6 +11487,17 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                 <div className="warning-card">
                   <div className="warning-text">{stageAView.leaving ? STAGE_A_TEXTS.askLeaving : STAGE_A_TEXTS.ask}</div>
                   {stageAView.retry && <div className="warning-text" style={{opacity:0.85}}>{STAGE_A_TEXTS.retry}</div>}
+                  {rootPick && rootPick.length > 0 && (
+                    <div style={{marginBottom:"14px"}}>
+                      <div className="warning-text" style={{opacity:0.85,marginBottom:"8px"}}>{ROOT_PICK_TEXTS.title}</div>
+                      <div className="choice-btns" style={{flexDirection:"column",alignItems:"stretch"}}>
+                        {rootPick.map((t, i) => (
+                          <button key={i} className="choice-btn" style={{textTransform:"none",letterSpacing:"normal",fontFamily:"inherit",fontSize:"12px",textAlign:"left",whiteSpace:"normal",lineHeight:1.5}} onClick={() => handleRootPickTap(t, i)}>{t}</button>
+                        ))}
+                        <button className="choice-btn" onClick={handleRootPickNone}>{ROOT_PICK_TEXTS.none}</button>
+                      </div>
+                    </div>
+                  )}
                   <div className="choice-btns">
                     <button className="choice-btn" onClick={handleStageABack}>{STAGE_A_TEXTS.back}</button>
                   </div>

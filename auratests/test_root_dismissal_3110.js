@@ -130,10 +130,14 @@ const _tm = (() => { const a = CODE.indexOf('// THOUGHT MAP, phase 1'); const b 
 // «δικαίωμα ομιλίας από υλικό» (speakRightPhrases), only to LEAVE a dismissal out of the count of separate phrases (the message and its phrase: two uses, like the block above).
 // Counted apart: in the flow it is still read at one place only. Proved: auratests/test_speak_right.js (2.12) — the copy gives what the Thought Map gives.
 const _sr = (() => { const a = CODE.indexOf('«δικαίωμα ομιλίας από υλικό»'); const b = CODE.indexOf('function detectUserStagnation(', a); return a < 0 || b < a ? '' : CODE.slice(a, b); })();
+// UPDATED (19/11/2026, «συνομιλία v1», Package 1, John): a third block reads the SAME check, unchanged and read-only — rootPickSentences (the root question's list), only to LEAVE a dismissal out (the message and its sentence: two uses). Counted apart.
+const _p1 = (() => { const a = CODE.indexOf('// PACKAGE 1 (John, 19/11/2026 — an exception to the freeze, for this package only; branch conversation-v1) — «2η φορά».'); const b = CODE.indexOf('// PACKAGE 1, item 2 (John, 19/11/2026) — «ρίζα χωρίς νέα λόγια»'); return a < 0 || b < a ? '' : CODE.slice(a, b); })();
 assert('(Δ) the check is read at one place only, the goodbye chooser and the helper too',
-  (CODE.replace(_tm, '').replace(_sr, '').split('rootAnswerIsDismissal(').length - 1) === 2 && (CODE.split('stageADismissalGoodbye(').length - 1) === 2 && (CODE.split('stageADismiss(').length - 1) === 1);
+  (CODE.replace(_tm, '').replace(_sr, '').replace(_p1, '').split('rootAnswerIsDismissal(').length - 1) === 2 && (CODE.split('stageADismissalGoodbye(').length - 1) === 2 && (CODE.split('stageADismiss(').length - 1) === 1);
 assert('(Δ) the block of «δικαίωμα ομιλίας από υλικό» (commit 5) reads it twice, only to leave a dismissal out, and never the goodbye or stageADismiss',
   _sr.length > 8000 && (_sr.split('rootAnswerIsDismissal(').length - 1) === 2 && !/stageADismissalGoodbye|stageADismiss\(/.test(_sr));
+assert('(Δ) the block of the root question\'s list (Package 1) reads it twice, only to leave a dismissal out, and never the goodbye or stageADismiss',
+  _p1.length > 5000 && (_p1.split('rootAnswerIsDismissal(').length - 1) === 2 && !/stageADismissalGoodbye|stageADismiss\(/.test(_p1));
 assert('(Δ) the Thought Map block (phase 1) reads it twice, only to leave a dismissal out, and never the goodbye or stageADismiss',
   (_tm.split('rootAnswerIsDismissal(').length - 1) === 2 && !/stageADismissalGoodbye|stageADismiss\(/.test(_tm));
 assert('(Δ) the door-3 path and the step answers are not touched', !/rootAnswerIsDismissal|stageADismiss/.test(CODE.slice(CODE.indexOf('// STAGE A — door 2 (§1.4, §1.5).'), CODE.indexOf('// STAGE A — door 2 (§1.4, §1.5).') + 1500)) &&

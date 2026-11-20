@@ -328,7 +328,8 @@ assert('(Ι) Stage A only: the notes, the stop moment and the closing decision r
 // UPDATED (2/11/2026, Thought Map phase 2, ADR «2 Νοεμβρίου (β)»): a sixth pure Stage A reader — the Thought Map screen (thoughtMapView),
 // which reads the latch only to HIDE itself (any danger → no screen) and checks the switch first, like the others
 assert('(Ι) every Stage A door gets the latch: the button, the leaving door ×2, the model\'s close, the method line, door 2/3 ×3, armed — and the Thought Map screen',
-  (CODE.match(/dangerFromOther: dangerFromOther\.current/g) || []).length === 6 && (CODE.match(/!stageASafetyHold\(riskSignalKind\.current, dangerFromOther\.current\)/g) || []).length === 4);
+  // UPDATED (19/11/2026, «συνομιλία v1», Package 1, John, SAFETY-READ COUNT): a seventh pure Stage A reader — the root question's list (rootPickView, passed the latch by the effect rootPickEffect) reads it only to HIDE itself (any danger → no list); the effect checks the switch first and the gate needs the phase "ask", which exists only in Stage A. No safety function changed.
+  (CODE.match(/dangerFromOther: dangerFromOther\.current/g) || []).length === 7 && (CODE.match(/!stageASafetyHold\(riskSignalKind\.current, dangerFromOther\.current\)/g) || []).length === 4);
 // UPDATED (31/10/2026, ADR «31 Οκτωβρίου (δ)»): a third reader — the goodbye after a dismissal at the leaving door (stageADismiss).
 assert('(Ι) the pre-model goodbye after the line, the post-reply one, and the goodbye after a dismissal, all know the line was shown',
   (CODE.match(/dangerLine: dangerLineShown\.current\.length > 0/g) || []).length === 3);
@@ -346,7 +347,7 @@ assert('(Ι) the step stops on danger too, and the word is never taken from such
   const setClear = (CODE.match(/dangerFromOther\.current = (?:true|false)/g) || []).length;                  // 2
   const holdLines = CODE.split('\n').filter(l => l.includes('!stageASafetyHold(riskSignalKind.current, dangerFromOther.current)'));
   assert(`(Ι) old flow (?stageA=0): every read of the latch is gated by the switch — ${all} = ${gated} gated + ${passed_} passed + ${holds} holds + ${setClear} set/clear`,
-    all === gated + passed_ + holds + setClear && gated === 7 && passed_ === 6 && holds === 4 && setClear === 2 &&
+    all === gated + passed_ + holds + setClear && gated === 7 && passed_ === 7 && holds === 4 && setClear === 2 && /* UPDATED (19/11/2026, «συνομιλία v1», Package 1, John, SAFETY-READ COUNT): a seventh pure Stage A reader — the root question's list (rootPickView, passed the latch by the effect rootPickEffect) reads it only to HIDE itself (any danger → no list); the effect checks the switch first and the gate needs the phase "ask", which exists only in Stage A. No safety function changed. */
     holdLines.filter(l => /stageAActive\.current/.test(l) || /const _saArmed = stageARootArmed\.current/.test(l) || /^\s*!coreReadinessConfirmed\.current/.test(l)).length === 4);
   assert('(Ι) … the pure functions it is passed to all check the switch first',
     ['stageARootButtonVisible', 'stageALeavingDoorOpens', 'stageAModelClosesBeforeRoot', 'stageAMethodLineDue'].every(n => /\.active === true/.test(fnSrc(n))) &&
