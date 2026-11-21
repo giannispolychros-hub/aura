@@ -42,6 +42,9 @@ const APP = LIB.loadApp(fs.readFileSync(path.join(REPO, 'src', 'App.jsx'), 'utf8
 // 17/10 (δ): the €6 screen and the one-tap question are behind one constant in App.jsx. Their browser checks run only when it is open
 // (true); while it is closed, the same places check that they never appear and that the step comes instead.
 const COACH_OFFER_OPEN = /\nconst STAGE_A_COACH_OFFER = true;/.test(fs.readFileSync(path.join(REPO, 'src', 'App.jsx'), 'utf8'));
+// 21/11/2026 (John, test-two-sessions): the texts of the list of the user's own sentences (Package 1: its title and «Καμία από αυτές»), read from the app's
+// own source — one line, as the app keeps it — so the tool recognizes the list on the screen without a copy of the words. null = not found (the report then says so).
+const ROOT_PICK_TEXTS = (() => { try { const m = fs.readFileSync(path.join(REPO, 'src', 'App.jsx'), 'utf8').match(/^const ROOT_PICK_TEXTS = (\{.*\});$/m); return m ? new Function('return ' + m[1])() : null; } catch (e) { return null; } })();
 let BASE = opt('--url', null);
 // 17/10 (δ): --viewport 390x844 | 360x640 — every page of the check opens at this phone size (the sections that test a size of their
 // own, e.g. a short screen or the TX/VO size loops, still set it themselves). Without the option: the sizes each section had.
@@ -7341,7 +7344,10 @@ const PRICES_FOR_CHARGE = { aura: SL.PRICES.aura.output, user: SL.PRICES.user.ou
 async function runStressSession(item, aura, user, budget) {
   const p = item.persona, pol = SL.policyOf(p), T = APP.texts;
   const sess = { label: item.label, persona: { id: p.id, key: p.key, name: p.name, hiddenRoot: p.hiddenRoot, fixed: !!p.fixed, risk: p.risk || null, short: !!p.short, firstWhyType: !!p.firstWhyType, loop: !!p.loop, tier: p.tier || null, rehearsal: !!p.rehearsal,
-      mechanism: !!p.mechanism, kind: p.kind || null, sign: p.sign || null, signFrom: p.signFrom || null, expect: p.expect || null },
+      mechanism: !!p.mechanism, kind: p.kind || null, sign: p.sign || null, signFrom: p.signFrom || null, expect: p.expect || null,
+      // 21/11/2026 (John, test-two-sessions): John's own line numbers for the steps, and whether this session runs with no cheap-model call at all
+      twoSessions: !!p.twoSessions, noJudge: !!p.noJudge, lines: p.twoSessions ? (p.lines || null) : null,
+      lineKinds: p.twoSessions && Array.isArray(p.fixed) ? p.fixed.map(st => (st && st.press ? 'press' : 'type')) : null },
     turns: [], typed: [], notes: [], cost: 0, calls: [], modelTexts: [], crisisTurns: [], rootConfirmed: false, root: null, cardAt: null, yesAt: null, clarity: null, violations: [],
     checks: { labels: [], closing: [], verbatim: [], safety: [], pressure: [], stacked: [], advice: [], telemetry: [], voice: [] },
     applies: { safety: !!p.risk && p.risk !== 'leak', verbatim: !p.closed && !p.short, telemetry: !p.short } };
@@ -7497,8 +7503,28 @@ async function runStressSession(item, aura, user, budget) {
 
   // ── έλεγχοι με κώδικα, σε κάθε βήμα ──
   const labelsSeen = new Set(), farewellsSeen = new Set();
-  let askSeen = false, lastCardRoot = null;
+  let askSeen = false, lastCardRoot = null, tsLastCard = null;
+  if (p.twoSessions) { sess.tsCards = []; sess.tsMethodLine = T.methodLine || null; }
   const check = async s => {
+    // 21/11/2026 (John, test-two-sessions): what the app itself puts on its card under the root question — the question, its own «ζητά ξανά» line and the list of the
+    // user's own sentences with «Καμία από αυτές» (Package 1) — word for word as the screen shows it, each time the card changes. The tool only writes it down; only for
+    // the two sessions of that test. The labels are drawn in capitals by the style, so the words are compared without accents and case (SL.fold).
+    if (p.twoSessions) {
+      const all = (s.cards || []).join('\n— — —\n');
+      if (all && all !== tsLastCard) {
+        tsLastCard = all;
+        const afterLine = (p.lines || [])[fixedIdx - 1] || null;
+        const title = ROOT_PICK_TEXTS ? SL.fold(ROOT_PICK_TEXTS.title) : null, none = ROOT_PICK_TEXTS ? SL.fold(ROOT_PICK_TEXTS.none) : null;
+        let list = false, sentences = [];
+        for (const c of (s.cards || [])) {
+          const rows = c.split('\n').map(x => x.trim()).filter(Boolean);
+          const ti = title ? rows.findIndex(x => SL.fold(x) === title) : -1, ni = none ? rows.findIndex((x, k) => k > ti && SL.fold(x) === none) : -1;
+          if (ti >= 0 && ni > ti) { list = true; sentences = rows.slice(ti + 1, ni); break; }
+        }
+        sess.tsCards.push({ typed: sess.typed.length, afterLine, retry: SL.fold(all).includes(SL.fold(T.retry)), ask: !!s.ask, rootCard: !!s.rootCard, list, none: list, sentences, text: all });
+        app('[οθόνη της εφαρμογής μετά τη γραμμή ' + (afterLine || '—') + ' — οι κάρτες όπως φαίνονται]\n' + all);
+      }
+    }
     for (const l of SL.auraLabelFindings(s.feed)) if (!labelsSeen.has(l)) { labelsSeen.add(l); sess.checks.labels.push('«' + l + '» μετά από ' + sess.typed.length + ' μηνύματα'); }
     if (!p.closed && SL.preRootClosingChecked({ rootConfirmed: sess.rootConfirmed, exits, safetyExit })) {
       if (s.closureCard) sess.checks.closing.push('κάρτα «πριν κλείσουμε» (ρητές έξοδοι του χρήστη: ' + exits + ', μηνύματα: ' + sess.typed.length + ')');
@@ -7561,6 +7587,14 @@ async function runStressSession(item, aura, user, budget) {
     await sync();
     const s = await screen();
     await check(s);
+    // 21/11/2026 (John, test-two-sessions): the script is John's lines and nothing else. It ends when the last line is done and the screen after it is written down —
+    // or earlier, if the app puts up a card or a question of its own before the last line (a root card, a closing card, the step…): the tool then presses nothing, it
+    // has written down what the screen shows, and stops. It presses no card, no «Ναι», no step button of its own.
+    if (p.twoSessions && Array.isArray(p.fixed)) {
+      const done = fixedIdx >= p.fixed.length, own = !!(s.rootCard || s.warningCard || s.closureCard || s.memCard || s.offer || s.help || s.stepPhase || s.clarity || s.ended);
+      if (done || own) { sess.notes.push(done ? 'τέλος των γραμμών του σεναρίου — δεν πατήθηκε τίποτα άλλο'
+        : 'η εφαρμογή έδειξε κάρτα ή ερώτηση δική της μετά τη γραμμή ' + ((p.lines || [])[fixedIdx - 1] || '—') + ', πριν από το τέλος των γραμμών — το σενάριο σταμάτησε εδώ, δεν πατήθηκε τίποτα'); break; }
+    }
     if (crisisAt >= 0) {
       // after a crisis message: the crisis line, no root card, no offer
       if (!s.crisisLine) sess.checks.safety.push('μετά το μήνυμα κρίσης δεν εμφανίστηκε γραμμή κρίσης (1018 / 10306)');
@@ -7744,6 +7778,7 @@ async function runStressSession(item, aura, user, budget) {
   const log = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
   sess.events = SL.lastSessionEvents(log);
   if (!p.closed && !p.short) for (const x of SL.telemetryIssues(sess.events, acts)) sess.checks.telemetry.push(x);
+  if (p.twoSessions) sess.checks.telemetry = []; // 21/11 (test-two-sessions): the script ends early on purpose — the counts of a whole session do not apply (the events stay in sess.events)
   // ADR «17 Οκτωβρίου» — ΦΩΝΗ ΤΗΣ AURA, automatic: the model's replies in the free part (before the root, outside the safety path)
   // John, 22/10 (the run on 8c6bed4): (α) a quote not word for word in any earlier message of the user, (β) a word with a gender that may be
   // about the user before the user shows one (SUSPICIONS, for a human), and the replies that refuse in so many words — every reply of the
@@ -7875,6 +7910,7 @@ async function runStressSession(item, aura, user, budget) {
 
 // ADR «17 Οκτωβρίου» — the second judge: five questions about each reply of the free part (an aid for the reader, never pass/fail)
 async function judgeVoice(s, user) {
+  if (s.persona && s.persona.noJudge) return; // 21/11 (John, test-two-sessions): same
   const R = s.voice || [];
   if (!R.length) return;
   const r = await user({ system: SL.VOICE_JUDGE_SYSTEM, prompt: SL.voiceJudgePrompt(s.turns, R), schema: SL.VOICE_JUDGE_SCHEMA });
@@ -7931,6 +7967,7 @@ async function crisisRiskSources(sess, user, riskQ) {
   }
 }
 async function judgeSession(s, user) {
+  if (s.persona && s.persona.noJudge) return undefined; // 21/11 (John, test-two-sessions): these sessions have no cheap-model call, not even a judge
   const until = s.yesAt !== null ? s.turns.findIndex(t => t.who === 'app' && /^\[κάρτα ρίζας/.test(t.text)) : -1;
   const turns = (until >= 0 ? s.turns.slice(0, until) : s.turns).filter(t => t.who !== 'app');
   if (!turns.some(t => t.who === 'aura')) return { introduced_causes: [], root_match: 'none', root_match_reason: 'καμία απάντηση της AURA' };
@@ -7968,6 +8005,7 @@ async function mainStress() {
   const PEOPLE = has('--hard') ? SL.HARD_PERSONAS : only.length ? SL.PERSONAS.concat(SL.HARD_PERSONAS.filter(p => p.id >= 17), SL.FOUNDER_PERSONAS || [], SL.VOICE_PERSONAS || [], SL.LOOP_PERSONAS || [], SL.REHEARSAL_PERSONAS || [], SL.TARGETED_PERSONAS || [], SL.FINAL_PERSONAS || [], SL.MECHANISM_PERSONAS || [], SL.P3_PERSONAS || []) : SL.PERSONAS;
   if (only.length && !has('--hard')) PEOPLE.push(...(SL.COMPOSITE_PERSONAS || [])); // 24/10 (John): the composite session (171), tool only
   if (only.length && !has('--hard')) PEOPLE.splice(PEOPLE.length - (SL.COMPOSITE_PERSONAS || []).length, 0, ...(SL.DANGER_FIXED_PERSONAS || [])); // 9/11 (round 11): 173, 174, before 171–172
+  if (only.length && !has('--hard')) PEOPLE.push(...(SL.TWO_SESSIONS_PERSONAS || [])); // 21/11 (John, test-two-sessions): 9201–9203 — tool only, asked by number
   // 31/10 (John, ADR «31 Οκτωβρίου (ε)» / «(η)»): numbers 9001–9199 are the benchmark (benchmark/scenarios.json) — on their own, never mixed
   const BENCH = only.length > 0 && only.every(x => BL.isBenchAlias(x));
   // 9/11/2026 (John, round 11, ADR «9 Νοεμβρίου»): the benchmark's SAFETY scenarios S1–S9 (9001–9009: fixed messages only, no simulator,
