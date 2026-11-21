@@ -1,0 +1,1186 @@
+{
+  "meta": {
+    "mode": "πραγματικό μοντέλο",
+    "budget": 1.5,
+    "spent": 0.6346996500000001,
+    "by": {
+      "aura": 0.6346996500000001,
+      "user": 0,
+      "sim": 0,
+      "eval": 0
+    },
+    "stopped": null,
+    "skipped": [],
+    "filters": true,
+    "plan": [
+      {
+        "n": 1,
+        "label": "9201",
+        "id": 9201,
+        "name": "Εκδοχή 1 · συνεδρία 1 με το κουμπί της ρίζας (γραμμή 3) και «Στο είπα ήδη»",
+        "wave": 1
+      },
+      {
+        "n": 2,
+        "label": "9202",
+        "id": 9202,
+        "name": "Εκδοχή 2 · συνεδρία 1 με τη γραμμή 3 ως μήνυμα της συνομιλίας και «Στο είπα ήδη»",
+        "wave": 2
+      },
+      {
+        "n": 3,
+        "label": "9203",
+        "id": 9203,
+        "name": "Εκδοχή 3 · συνεδρία 2 · «τι να κάνω;» και «δεν κατάλαβα»",
+        "wave": 3
+      }
+    ],
+    "shortNames": "Εκδοχή 1=9201, Εκδοχή 2=9202, Εκδοχή 3=9203",
+    "holdExceeded": [],
+    "userCalls": [],
+    "version": {
+      "commit": "6f524ea8d4c3f995dc0a787a4c1e6bb6cee41541",
+      "branch": "test-two-sessions",
+      "promptFingerprint": "7e52268becda7360",
+      "appSha256": "46f8ed0cf1eace9a0257200dc84571bcc238ed35bc64f230c16b02478dabf393",
+      "apiSha256": "675564a7985438c86f068d9e475adffcce24b43488cf1e962b1de2b7b827c077",
+      "scenariosSha256": "f2d954f0daa1100052f47be30e0224045baf11871601d6a6421585cf8554dcf1",
+      "localChanges": 0
+    }
+  },
+  "sessions": [
+    {
+      "label": "9201",
+      "persona": {
+        "id": 9201,
+        "key": "two_s1",
+        "name": "Εκδοχή 1 · συνεδρία 1 με το κουμπί της ρίζας (γραμμή 3) και «Στο είπα ήδη»",
+        "hiddenRoot": "—",
+        "fixed": true,
+        "risk": null,
+        "short": false,
+        "firstWhyType": false,
+        "loop": false,
+        "tier": null,
+        "rehearsal": false,
+        "mechanism": false,
+        "kind": null,
+        "sign": null,
+        "signFrom": null,
+        "expect": null,
+        "twoSessions": true,
+        "noJudge": true,
+        "lines": [
+          "1",
+          "2α",
+          "2β",
+          "2γ",
+          "3",
+          "4"
+        ],
+        "lineKinds": [
+          "type",
+          "type",
+          "type",
+          "type",
+          "press",
+          "type"
+        ]
+      },
+      "turns": [
+        {
+          "who": "user",
+          "text": "Δεν ξέρω αν πρέπει να αλλάξω δουλειά"
+        },
+        {
+          "who": "aura",
+          "text": "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.\nΤι σε κάνει να το σκέφτεσαι τώρα;"
+        },
+        {
+          "who": "user",
+          "text": "Είμαι κουρασμένος από τη δουλειά τον τελευταίο καιρό."
+        },
+        {
+          "who": "aura",
+          "text": "Κουρασμένος από τι ακριβώς — το αντικείμενο, τους ανθρώπους, ή κάτι άλλο;"
+        },
+        {
+          "who": "user",
+          "text": "Τα λεφτά μετράνε, ο μισθός εδώ είναι σταθερός."
+        },
+        {
+          "who": "aura",
+          "text": "Αυτό που λες έχει δύο μέρη: η κούραση από τη δουλειά, και η σταθερότητα του μισθού που μετράει.\n\nΤι είναι αυτό που σε κουράζει πιο συγκεκριμένα;"
+        },
+        {
+          "who": "user",
+          "text": "Φοβάμαι το άγνωστο, δεν ξέρω τι θα βρω αλλού."
+        },
+        {
+          "who": "aura",
+          "text": "Ο φόβος του άγνωστου — και ταυτόχρονα κάτι σε κάνει να σκέφτεσαι την αλλαγή.\n\nΤι είναι αυτό που σε κρατά δυσαρεστημένο εκεί που είσαι;"
+        },
+        {
+          "who": "app",
+          "text": "[πάτησε «Νομίζω βρήκα τι με απασχολεί»]"
+        },
+        {
+          "who": "app",
+          "text": "[οθόνη της εφαρμογής μετά τη γραμμή 3 — οι κάρτες όπως φαίνονται]\nΠες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;\nΔΕΝ ΤΟ ΒΡΗΚΑ ΑΚΟΜΑ, ΣΥΝΕΧΙΣΕ"
+        },
+        {
+          "who": "app",
+          "text": "[ερώτηση της ρίζας] Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;"
+        },
+        {
+          "who": "aura",
+          "text": "Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;"
+        },
+        {
+          "who": "user",
+          "text": "Στο είπα ήδη"
+        },
+        {
+          "who": "app",
+          "text": "[οθόνη της εφαρμογής μετά τη γραμμή 4 — οι κάρτες όπως φαίνονται]\nΤΙ ΗΞΕΡΕΣ\n«Δεν ξέρω αν πρέπει να αλλάξω δουλειά»\nΤΙ ΒΡΗΚΕΣ\n«Στο είπα ήδη»\nΑυτά είναι δικά σου λόγια, όχι δικά μου. Είναι αυτό που πραγματικά σε απασχολεί;\nΜε το \"Ναι\" κλείνει αυτό το κομμάτι και σου δείχνω τι ακολουθεί.\nΔΙΟΡΘΩΣΕ\nΝΑΙ, ΑΥΤΟ ΕΙΝΑΙ\nΔΕΝ ΤΟ ΒΡΗΚΑ ΑΚΟΜΑ, ΣΥΝΕΧΙΣΕ"
+        }
+      ],
+      "typed": [
+        "Δεν ξέρω αν πρέπει να αλλάξω δουλειά",
+        "Είμαι κουρασμένος από τη δουλειά τον τελευταίο καιρό.",
+        "Τα λεφτά μετράνε, ο μισθός εδώ είναι σταθερός.",
+        "Φοβάμαι το άγνωστο, δεν ξέρω τι θα βρω αλλού.",
+        "Στο είπα ήδη"
+      ],
+      "notes": [
+        "τέλος των γραμμών του σεναρίου — δεν πατήθηκε τίποτα άλλο"
+      ],
+      "cost": 0.40622745,
+      "calls": [
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 84333,
+          "cacheRead": 0,
+          "typed": 1,
+          "stage": "OPENING",
+          "notes": [
+            "LENS:reduce and simplify",
+            "GOAL_OBSTACLE_STAKES",
+            "STAGE:OPENING",
+            "STAGE_A_FIRST",
+            "FIRST_REPLY_FLOOR",
+            "STAGE_A_MARKER"
+          ],
+          "cost": 0.31915275,
+          "hold": 0.4,
+          "charged": false,
+          "ms": 1949,
+          "inTok": 828,
+          "outTok": 28
+        },
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 84333,
+          "typed": 2,
+          "stage": "PERSPECTIVE_SWAP",
+          "notes": [
+            "LENS:reduce and simplify",
+            "GOAL_OBSTACLE_STAKES",
+            "STAGE:PERSPECTIVE_SWAP",
+            "STAGE_A_MARKER"
+          ],
+          "cost": 0.0281499,
+          "hold": 0.4,
+          "charged": false,
+          "ms": 3794,
+          "inTok": 695,
+          "outTok": 51
+        },
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 84333,
+          "typed": 3,
+          "stage": "PERSPECTIVE_SWAP",
+          "notes": [
+            "LENS:reduce and simplify",
+            "GOAL_OBSTACLE_STAKES",
+            "STAGE:PERSPECTIVE_SWAP",
+            "STAGE_A_MARKER"
+          ],
+          "cost": 0.0289659,
+          "hold": 0.4,
+          "charged": false,
+          "ms": 3217,
+          "inTok": 782,
+          "outTok": 88
+        },
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 84333,
+          "typed": 4,
+          "stage": "PERSPECTIVE_SWAP",
+          "notes": [
+            "LENS:reduce and simplify",
+            "GOAL_OBSTACLE_STAKES",
+            "STAGE:PERSPECTIVE_SWAP",
+            "COVERAGE",
+            "STAGE_A_MARKER"
+          ],
+          "cost": 0.029958899999999997,
+          "hold": 0.4,
+          "charged": false,
+          "ms": 2696,
+          "inTok": 1083,
+          "outTok": 94
+        }
+      ],
+      "modelTexts": [
+        {
+          "kind": "main",
+          "typed": 1,
+          "text": "Τι σε κάνει να το σκέφτεσαι τώρα;",
+          "filtered": "Τι σε κάνει να το σκέφτεσαι τώρα;"
+        },
+        {
+          "kind": "main",
+          "typed": 2,
+          "text": "Κουρασμένος από τι ακριβώς — το αντικείμενο, τους ανθρώπους, ή κάτι άλλο;",
+          "filtered": "Κουρασμένος από τι ακριβώς — το αντικείμενο, τους ανθρώπους, ή κάτι άλλο;"
+        },
+        {
+          "kind": "main",
+          "typed": 3,
+          "text": "Αυτό που λες έχει δύο μέρη: η κούραση από τη δουλειά, και η σταθερότητα του μισθού που μετράει.\n\nΤι είναι αυτό που σε κουράζει πιο συγκεκριμένα;",
+          "filtered": "Αυτό που λες έχει δύο μέρη: η κούραση από τη δουλειά, και η σταθερότητα του μισθού που μετράει.\n\nΤι είναι αυτό που σε κουράζει πιο συγκεκριμένα;"
+        },
+        {
+          "kind": "main",
+          "typed": 4,
+          "text": "Ο φόβος του άγνωστου — και ταυτόχρονα κάτι σε κάνει να σκέφτεσαι την αλλαγή.\n\nΤι είναι αυτό που σε κρατά δυσαρεστημένο εκεί που είσαι;",
+          "filtered": "Ο φόβος του άγνωστου — και ταυτόχρονα κάτι σε κάνει να σκέφτεσαι την αλλαγή.\n\nΤι είναι αυτό που σε κρατά δυσαρεστημένο εκεί που είσαι;"
+        }
+      ],
+      "crisisTurns": [],
+      "rootConfirmed": false,
+      "root": null,
+      "cardAt": null,
+      "yesAt": null,
+      "clarity": null,
+      "violations": [],
+      "checks": {
+        "labels": [],
+        "closing": [],
+        "verbatim": [],
+        "safety": [],
+        "pressure": [],
+        "stacked": [
+          "η ερώτηση της ρίζας ακριβώς κάτω από: «Ο φόβος του άγνωστου — και ταυτόχρονα κάτι σε κάνει να σκέφτεσαι την αλλαγή.\n\nΤι είναι αυτό που σε κρατά δυσαρεστημένο εκεί που είσαι;»"
+        ],
+        "advice": [],
+        "telemetry": [],
+        "voice": []
+      },
+      "applies": {
+        "safety": false,
+        "verbatim": true,
+        "telemetry": true
+      },
+      "tsCards": [
+        {
+          "typed": 4,
+          "afterLine": "3",
+          "retry": false,
+          "ask": true,
+          "rootCard": false,
+          "list": false,
+          "none": false,
+          "sentences": [],
+          "text": "Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;\nΔΕΝ ΤΟ ΒΡΗΚΑ ΑΚΟΜΑ, ΣΥΝΕΧΙΣΕ"
+        },
+        {
+          "typed": 5,
+          "afterLine": "4",
+          "retry": false,
+          "ask": false,
+          "rootCard": true,
+          "list": false,
+          "none": false,
+          "sentences": [],
+          "text": "ΤΙ ΗΞΕΡΕΣ\n«Δεν ξέρω αν πρέπει να αλλάξω δουλειά»\nΤΙ ΒΡΗΚΕΣ\n«Στο είπα ήδη»\nΑυτά είναι δικά σου λόγια, όχι δικά μου. Είναι αυτό που πραγματικά σε απασχολεί;\nΜε το \"Ναι\" κλείνει αυτό το κομμάτι και σου δείχνω τι ακολουθεί.\nΔΙΟΡΘΩΣΕ\nΝΑΙ, ΑΥΤΟ ΕΙΝΑΙ\nΔΕΝ ΤΟ ΒΡΗΚΑ ΑΚΟΜΑ, ΣΥΝΕΧΙΣΕ"
+        }
+      ],
+      "tsMethodLine": "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.",
+      "afterCrisis": [],
+      "otherDetectors": [],
+      "events": [
+        {
+          "ev": "session_started",
+          "t": 1795293450227
+        },
+        {
+          "ev": "root_card_shown",
+          "t": 1795293465331,
+          "door": 1
+        }
+      ],
+      "quotes": [],
+      "genderSuspicions": [],
+      "refusals": 0,
+      "voice": [
+        {
+          "n": 1,
+          "turn": {
+            "who": "aura",
+            "text": "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.\nΤι σε κάνει να το σκέφτεσαι τώρα;"
+          },
+          "text": "Τι σε κάνει να το σκέφτεσαι τώρα;",
+          "method": true,
+          "app": false,
+          "numbers": []
+        },
+        {
+          "n": 2,
+          "turn": {
+            "who": "aura",
+            "text": "Κουρασμένος από τι ακριβώς — το αντικείμενο, τους ανθρώπους, ή κάτι άλλο;"
+          },
+          "text": "Κουρασμένος από τι ακριβώς — το αντικείμενο, τους ανθρώπους, ή κάτι άλλο;",
+          "method": false,
+          "app": false,
+          "numbers": []
+        },
+        {
+          "n": 3,
+          "turn": {
+            "who": "aura",
+            "text": "Αυτό που λες έχει δύο μέρη: η κούραση από τη δουλειά, και η σταθερότητα του μισθού που μετράει.\n\nΤι είναι αυτό που σε κουράζει πιο συγκεκριμένα;"
+          },
+          "text": "Αυτό που λες έχει δύο μέρη: η κούραση από τη δουλειά, και η σταθερότητα του μισθού που μετράει.\n\nΤι είναι αυτό που σε κουράζει πιο συγκεκριμένα;",
+          "method": false,
+          "app": false,
+          "numbers": [
+            "δυο"
+          ]
+        },
+        {
+          "n": 4,
+          "turn": {
+            "who": "aura",
+            "text": "Ο φόβος του άγνωστου — και ταυτόχρονα κάτι σε κάνει να σκέφτεσαι την αλλαγή.\n\nΤι είναι αυτό που σε κρατά δυσαρεστημένο εκεί που είσαι;"
+          },
+          "text": "Ο φόβος του άγνωστου — και ταυτόχρονα κάτι σε κάνει να σκέφτεσαι την αλλαγή.\n\nΤι είναι αυτό που σε κρατά δυσαρεστημένο εκεί που είσαι;",
+          "method": false,
+          "app": false,
+          "numbers": []
+        }
+      ],
+      "rounds": [
+        {
+          "k": 1,
+          "user": "Δεν ξέρω αν πρέπει να αλλάξω δουλειά",
+          "aura": [
+            "Τι σε κάνει να το σκέφτεσαι τώρα;"
+          ],
+          "app": [],
+          "stage": "OPENING",
+          "called": true
+        },
+        {
+          "k": 2,
+          "user": "Είμαι κουρασμένος από τη δουλειά τον τελευταίο καιρό.",
+          "aura": [
+            "Κουρασμένος από τι ακριβώς — το αντικείμενο, τους ανθρώπους, ή κάτι άλλο;"
+          ],
+          "app": [],
+          "stage": "PERSPECTIVE_SWAP",
+          "called": true
+        },
+        {
+          "k": 3,
+          "user": "Τα λεφτά μετράνε, ο μισθός εδώ είναι σταθερός.",
+          "aura": [
+            "Αυτό που λες έχει δύο μέρη: η κούραση από τη δουλειά, και η σταθερότητα του μισθού που μετράει.\n\nΤι είναι αυτό που σε κουράζει πιο συγκεκριμένα;"
+          ],
+          "app": [],
+          "stage": "PERSPECTIVE_SWAP",
+          "called": true
+        },
+        {
+          "k": 4,
+          "user": "Φοβάμαι το άγνωστο, δεν ξέρω τι θα βρω αλλού.",
+          "aura": [
+            "Ο φόβος του άγνωστου — και ταυτόχρονα κάτι σε κάνει να σκέφτεσαι την αλλαγή.\n\nΤι είναι αυτό που σε κρατά δυσαρεστημένο εκεί που είσαι;",
+            "Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;"
+          ],
+          "app": [
+            "[πάτησε «Νομίζω βρήκα τι με απασχολεί»]",
+            "[οθόνη της εφαρμογής μετά τη γραμμή 3 — οι κάρτες όπως φαίνονται]\nΠες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;\nΔΕΝ ΤΟ ΒΡΗΚΑ ΑΚΟΜΑ, ΣΥΝΕΧΙΣΕ",
+            "[ερώτηση της ρίζας] Πες το με μία φράση: τι είναι αυτό που πραγματικά σε απασχολεί;"
+          ],
+          "stage": "PERSPECTIVE_SWAP",
+          "called": true
+        },
+        {
+          "k": 5,
+          "user": "Στο είπα ήδη",
+          "aura": [],
+          "app": [
+            "[οθόνη της εφαρμογής μετά τη γραμμή 4 — οι κάρτες όπως φαίνονται]\nΤΙ ΗΞΕΡΕΣ\n«Δεν ξέρω αν πρέπει να αλλάξω δουλειά»\nΤΙ ΒΡΗΚΕΣ\n«Στο είπα ήδη»\nΑυτά είναι δικά σου λόγια, όχι δικά μου. Είναι αυτό που πραγματικά σε απασχολεί;\nΜε το \"Ναι\" κλείνει αυτό το κομμάτι και σου δείχνω τι ακολουθεί.\nΔΙΟΡΘΩΣΕ\nΝΑΙ, ΑΥΤΟ ΕΙΝΑΙ\nΔΕΝ ΤΟ ΒΡΗΚΑ ΑΚΟΜΑ, ΣΥΝΕΧΙΣΕ"
+          ],
+          "stage": null,
+          "called": false
+        }
+      ],
+      "founder": {
+        "stops": 0,
+        "gentle": 0,
+        "riskChecks": 0,
+        "choice": 1,
+        "bareGoodbye": 0,
+        "rootClaims": 0,
+        "stepTime": 0,
+        "foreignHelp": 0,
+        "stopExamples": [],
+        "choiceExamples": [
+          "Κουρασμένος από τι ακριβώς — το αντικείμενο, τους ανθρώπους, ή κάτι άλλο;"
+        ],
+        "riskExamples": []
+      },
+      "acts": {
+        "card": 0,
+        "yes": 0,
+        "correct": 0,
+        "back": 0,
+        "offerShown": false,
+        "want": false,
+        "notNow": false,
+        "help": null,
+        "clarity": null,
+        "completed": false,
+        "risk": null,
+        "stepShown": false,
+        "stepEnd": null,
+        "stepWritten": null,
+        "fits": null,
+        "smaller": null,
+        "whenWritten": null
+      },
+      "orgFlags": [],
+      "filterChanges": []
+    },
+    {
+      "label": "9202",
+      "persona": {
+        "id": 9202,
+        "key": "two_s1b",
+        "name": "Εκδοχή 2 · συνεδρία 1 με τη γραμμή 3 ως μήνυμα της συνομιλίας και «Στο είπα ήδη»",
+        "hiddenRoot": "—",
+        "fixed": true,
+        "risk": null,
+        "short": false,
+        "firstWhyType": false,
+        "loop": false,
+        "tier": null,
+        "rehearsal": false,
+        "mechanism": false,
+        "kind": null,
+        "sign": null,
+        "signFrom": null,
+        "expect": null,
+        "twoSessions": true,
+        "noJudge": true,
+        "lines": [
+          "1",
+          "2α",
+          "2β",
+          "2γ",
+          "3",
+          "4"
+        ],
+        "lineKinds": [
+          "type",
+          "type",
+          "type",
+          "type",
+          "type",
+          "type"
+        ]
+      },
+      "turns": [
+        {
+          "who": "user",
+          "text": "Δεν ξέρω αν πρέπει να αλλάξω δουλειά"
+        },
+        {
+          "who": "aura",
+          "text": "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.\nΤι σε κάνει να το σκέφτεσαι τώρα;"
+        },
+        {
+          "who": "user",
+          "text": "Είμαι κουρασμένος από τη δουλειά τον τελευταίο καιρό."
+        },
+        {
+          "who": "aura",
+          "text": "Κουρασμένος από τη δουλειά αυτή συγκεκριμένα, ή κουρασμένος γενικά;"
+        },
+        {
+          "who": "user",
+          "text": "Τα λεφτά μετράνε, ο μισθός εδώ είναι σταθερός."
+        },
+        {
+          "who": "aura",
+          "text": "Και τι σε κουράζει πιο πολύ — η δουλειά καθαυτή, ή κάτι άλλο γύρω από αυτή;"
+        },
+        {
+          "who": "user",
+          "text": "Φοβάμαι το άγνωστο, δεν ξέρω τι θα βρω αλλού."
+        },
+        {
+          "who": "aura",
+          "text": "Τι είναι αυτό που σε κουράζει συγκεκριμένα;"
+        },
+        {
+          "who": "user",
+          "text": "Νομίζω βρήκα τι με απασχολεί"
+        },
+        {
+          "who": "aura",
+          "text": "Πες το."
+        },
+        {
+          "who": "user",
+          "text": "Στο είπα ήδη"
+        },
+        {
+          "who": "aura",
+          "text": "Ναι — φόβος για το άγνωστο, ή η κούραση από τη δουλειά;"
+        }
+      ],
+      "typed": [
+        "Δεν ξέρω αν πρέπει να αλλάξω δουλειά",
+        "Είμαι κουρασμένος από τη δουλειά τον τελευταίο καιρό.",
+        "Τα λεφτά μετράνε, ο μισθός εδώ είναι σταθερός.",
+        "Φοβάμαι το άγνωστο, δεν ξέρω τι θα βρω αλλού.",
+        "Νομίζω βρήκα τι με απασχολεί",
+        "Στο είπα ήδη"
+      ],
+      "notes": [
+        "τέλος των γραμμών του σεναρίου — δεν πατήθηκε τίποτα άλλο"
+      ],
+      "cost": 0.17268839999999996,
+      "calls": [
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 84333,
+          "typed": 1,
+          "stage": "OPENING",
+          "notes": [
+            "LENS:reduce and simplify",
+            "GOAL_OBSTACLE_STAKES",
+            "STAGE:OPENING",
+            "STAGE_A_FIRST",
+            "FIRST_REPLY_FLOOR",
+            "STAGE_A_MARKER"
+          ],
+          "cost": 0.028203899999999997,
+          "hold": 0.4,
+          "charged": false,
+          "ms": 1291,
+          "inTok": 828,
+          "outTok": 28
+        },
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 84333,
+          "typed": 2,
+          "stage": "PERSPECTIVE_SWAP",
+          "notes": [
+            "LENS:reduce and simplify",
+            "GOAL_OBSTACLE_STAKES",
+            "STAGE:PERSPECTIVE_SWAP",
+            "STAGE_A_MARKER"
+          ],
+          "cost": 0.028089899999999998,
+          "hold": 0.4,
+          "charged": false,
+          "ms": 3227,
+          "inTok": 695,
+          "outTok": 47
+        },
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 84333,
+          "typed": 3,
+          "stage": "PERSPECTIVE_SWAP",
+          "notes": [
+            "LENS:reduce and simplify",
+            "GOAL_OBSTACLE_STAKES",
+            "STAGE:PERSPECTIVE_SWAP",
+            "STAGE_A_MARKER"
+          ],
+          "cost": 0.0284589,
+          "hold": 0.4,
+          "charged": false,
+          "ms": 3407,
+          "inTok": 778,
+          "outTok": 55
+        },
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 84333,
+          "typed": 4,
+          "stage": "PERSPECTIVE_SWAP",
+          "notes": [
+            "LENS:reduce and simplify",
+            "GOAL_OBSTACLE_STAKES",
+            "STAGE:PERSPECTIVE_SWAP",
+            "COVERAGE",
+            "STAGE_A_MARKER"
+          ],
+          "cost": 0.029997899999999997,
+          "hold": 0.4,
+          "charged": false,
+          "ms": 3857,
+          "inTok": 1046,
+          "outTok": 104
+        },
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 84333,
+          "typed": 5,
+          "stage": "PERSPECTIVE_SWAP",
+          "notes": [
+            "LENS:reduce and simplify",
+            "GOAL_OBSTACLE_STAKES",
+            "STAGE:PERSPECTIVE_SWAP",
+            "COVERAGE",
+            "STAGE_A_MARKER"
+          ],
+          "cost": 0.028719899999999996,
+          "hold": 0.4,
+          "charged": false,
+          "ms": 852,
+          "inTok": 1100,
+          "outTok": 8
+        },
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 84333,
+          "typed": 6,
+          "stage": "PERSPECTIVE_SWAP",
+          "notes": [
+            "LENS:reduce and simplify",
+            "GOAL_OBSTACLE_STAKES",
+            "STAGE:PERSPECTIVE_SWAP",
+            "COVERAGE",
+            "STAGE_A_MARKER"
+          ],
+          "cost": 0.029217899999999998,
+          "hold": 0.4,
+          "charged": false,
+          "ms": 3445,
+          "inTok": 1121,
+          "outTok": 37
+        }
+      ],
+      "modelTexts": [
+        {
+          "kind": "main",
+          "typed": 1,
+          "text": "Τι σε κάνει να το σκέφτεσαι τώρα;",
+          "filtered": "Τι σε κάνει να το σκέφτεσαι τώρα;"
+        },
+        {
+          "kind": "main",
+          "typed": 2,
+          "text": "Κουρασμένος από τη δουλειά αυτή συγκεκριμένα, ή κουρασμένος γενικά;",
+          "filtered": "Κουρασμένος από τη δουλειά αυτή συγκεκριμένα, ή κουρασμένος γενικά;"
+        },
+        {
+          "kind": "main",
+          "typed": 3,
+          "text": "Και τι σε κουράζει πιο πολύ — η δουλειά καθαυτή, ή κάτι άλλο γύρω από αυτή;",
+          "filtered": "Και τι σε κουράζει πιο πολύ — η δουλειά καθαυτή, ή κάτι άλλο γύρω από αυτή;"
+        },
+        {
+          "kind": "main",
+          "typed": 4,
+          "text": "Άρα έχεις δύο πράγματα που τραβάνε αντίθετα: κούραση που σε σπρώχνει να φύγεις, και φόβος του άγνωστου που σε κρατάει.\n\nΤι είναι αυτό που σε κουράζει συγκεκριμένα;",
+          "filtered": "Τι είναι αυτό που σε κουράζει συγκεκριμένα;"
+        },
+        {
+          "kind": "main",
+          "typed": 5,
+          "text": "Πες το.",
+          "filtered": "Πες το."
+        },
+        {
+          "kind": "main",
+          "typed": 6,
+          "text": "Ναι — φόβος για το άγνωστο, ή η κούραση από τη δουλειά;",
+          "filtered": "Ναι — φόβος για το άγνωστο, ή η κούραση από τη δουλειά;"
+        }
+      ],
+      "crisisTurns": [],
+      "rootConfirmed": false,
+      "root": null,
+      "cardAt": null,
+      "yesAt": null,
+      "clarity": null,
+      "violations": [],
+      "checks": {
+        "labels": [],
+        "closing": [],
+        "verbatim": [],
+        "safety": [],
+        "pressure": [],
+        "stacked": [],
+        "advice": [],
+        "telemetry": [],
+        "voice": []
+      },
+      "applies": {
+        "safety": false,
+        "verbatim": true,
+        "telemetry": true
+      },
+      "tsCards": [],
+      "tsMethodLine": "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.",
+      "afterCrisis": [],
+      "otherDetectors": [],
+      "events": [
+        {
+          "ev": "session_started",
+          "t": 1795293466526
+        }
+      ],
+      "quotes": [],
+      "genderSuspicions": [],
+      "refusals": 0,
+      "voice": [
+        {
+          "n": 1,
+          "turn": {
+            "who": "aura",
+            "text": "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.\nΤι σε κάνει να το σκέφτεσαι τώρα;"
+          },
+          "text": "Τι σε κάνει να το σκέφτεσαι τώρα;",
+          "method": true,
+          "app": false,
+          "numbers": []
+        },
+        {
+          "n": 2,
+          "turn": {
+            "who": "aura",
+            "text": "Κουρασμένος από τη δουλειά αυτή συγκεκριμένα, ή κουρασμένος γενικά;"
+          },
+          "text": "Κουρασμένος από τη δουλειά αυτή συγκεκριμένα, ή κουρασμένος γενικά;",
+          "method": false,
+          "app": false,
+          "numbers": []
+        },
+        {
+          "n": 3,
+          "turn": {
+            "who": "aura",
+            "text": "Και τι σε κουράζει πιο πολύ — η δουλειά καθαυτή, ή κάτι άλλο γύρω από αυτή;"
+          },
+          "text": "Και τι σε κουράζει πιο πολύ — η δουλειά καθαυτή, ή κάτι άλλο γύρω από αυτή;",
+          "method": false,
+          "app": false,
+          "numbers": []
+        },
+        {
+          "n": 4,
+          "turn": {
+            "who": "aura",
+            "text": "Τι είναι αυτό που σε κουράζει συγκεκριμένα;"
+          },
+          "text": "Τι είναι αυτό που σε κουράζει συγκεκριμένα;",
+          "method": false,
+          "app": false,
+          "numbers": []
+        },
+        {
+          "n": 5,
+          "turn": {
+            "who": "aura",
+            "text": "Πες το."
+          },
+          "text": "Πες το.",
+          "method": false,
+          "app": false,
+          "numbers": []
+        },
+        {
+          "n": 6,
+          "turn": {
+            "who": "aura",
+            "text": "Ναι — φόβος για το άγνωστο, ή η κούραση από τη δουλειά;"
+          },
+          "text": "Ναι — φόβος για το άγνωστο, ή η κούραση από τη δουλειά;",
+          "method": false,
+          "app": false,
+          "numbers": []
+        }
+      ],
+      "rounds": [
+        {
+          "k": 1,
+          "user": "Δεν ξέρω αν πρέπει να αλλάξω δουλειά",
+          "aura": [
+            "Τι σε κάνει να το σκέφτεσαι τώρα;"
+          ],
+          "app": [],
+          "stage": "OPENING",
+          "called": true
+        },
+        {
+          "k": 2,
+          "user": "Είμαι κουρασμένος από τη δουλειά τον τελευταίο καιρό.",
+          "aura": [
+            "Κουρασμένος από τη δουλειά αυτή συγκεκριμένα, ή κουρασμένος γενικά;"
+          ],
+          "app": [],
+          "stage": "PERSPECTIVE_SWAP",
+          "called": true
+        },
+        {
+          "k": 3,
+          "user": "Τα λεφτά μετράνε, ο μισθός εδώ είναι σταθερός.",
+          "aura": [
+            "Και τι σε κουράζει πιο πολύ — η δουλειά καθαυτή, ή κάτι άλλο γύρω από αυτή;"
+          ],
+          "app": [],
+          "stage": "PERSPECTIVE_SWAP",
+          "called": true
+        },
+        {
+          "k": 4,
+          "user": "Φοβάμαι το άγνωστο, δεν ξέρω τι θα βρω αλλού.",
+          "aura": [
+            "Τι είναι αυτό που σε κουράζει συγκεκριμένα;"
+          ],
+          "app": [],
+          "stage": "PERSPECTIVE_SWAP",
+          "called": true
+        },
+        {
+          "k": 5,
+          "user": "Νομίζω βρήκα τι με απασχολεί",
+          "aura": [
+            "Πες το."
+          ],
+          "app": [],
+          "stage": "PERSPECTIVE_SWAP",
+          "called": true
+        },
+        {
+          "k": 6,
+          "user": "Στο είπα ήδη",
+          "aura": [
+            "Ναι — φόβος για το άγνωστο, ή η κούραση από τη δουλειά;"
+          ],
+          "app": [],
+          "stage": "PERSPECTIVE_SWAP",
+          "called": true
+        }
+      ],
+      "founder": {
+        "stops": 0,
+        "gentle": 0,
+        "riskChecks": 0,
+        "choice": 0,
+        "bareGoodbye": 0,
+        "rootClaims": 0,
+        "stepTime": 0,
+        "foreignHelp": 0,
+        "stopExamples": [],
+        "choiceExamples": [],
+        "riskExamples": []
+      },
+      "acts": {
+        "card": 0,
+        "yes": 0,
+        "correct": 0,
+        "back": 0,
+        "offerShown": false,
+        "want": false,
+        "notNow": false,
+        "help": null,
+        "clarity": null,
+        "completed": false,
+        "risk": null,
+        "stepShown": false,
+        "stepEnd": null,
+        "stepWritten": null,
+        "fits": null,
+        "smaller": null,
+        "whenWritten": null
+      },
+      "orgFlags": [],
+      "filterChanges": [
+        {
+          "kind": "main",
+          "typed": 4,
+          "filteredFrom": "run",
+          "removed": [
+            "Άρα έχεις δύο πράγματα που τραβάνε αντίθετα: κούραση που σε σπρώχνει να φύγεις, και φόβος του άγνωστου που σε κρατάει."
+          ],
+          "added": []
+        }
+      ]
+    },
+    {
+      "label": "9203",
+      "persona": {
+        "id": 9203,
+        "key": "two_s2",
+        "name": "Εκδοχή 3 · συνεδρία 2 · «τι να κάνω;» και «δεν κατάλαβα»",
+        "hiddenRoot": "—",
+        "fixed": true,
+        "risk": null,
+        "short": false,
+        "firstWhyType": false,
+        "loop": false,
+        "tier": null,
+        "rehearsal": false,
+        "mechanism": false,
+        "kind": null,
+        "sign": null,
+        "signFrom": null,
+        "expect": null,
+        "twoSessions": true,
+        "noJudge": true,
+        "lines": [
+          "1",
+          "2"
+        ],
+        "lineKinds": [
+          "type",
+          "type"
+        ]
+      },
+      "turns": [
+        {
+          "who": "user",
+          "text": "τι να κάνω;"
+        },
+        {
+          "who": "aura",
+          "text": "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.\nΤι γυρίζει στο μυαλό σου τώρα;"
+        },
+        {
+          "who": "user",
+          "text": "δεν κατάλαβα"
+        },
+        {
+          "who": "aura",
+          "text": "Τι σε έφερε εδώ αυτή τη στιγμή;"
+        }
+      ],
+      "typed": [
+        "τι να κάνω;",
+        "δεν κατάλαβα"
+      ],
+      "notes": [
+        "τέλος των γραμμών του σεναρίου — δεν πατήθηκε τίποτα άλλο"
+      ],
+      "cost": 0.055783799999999995,
+      "calls": [
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 84333,
+          "typed": 1,
+          "stage": "OPENING",
+          "notes": [
+            "LENS:reduce and simplify",
+            "GOAL_OBSTACLE_STAKES",
+            "STAGE:OPENING",
+            "STAGE_A_FIRST",
+            "FIRST_REPLY_FLOOR",
+            "STAGE_A_MARKER"
+          ],
+          "cost": 0.028113899999999997,
+          "hold": 0.4,
+          "charged": false,
+          "ms": 1499,
+          "inTok": 808,
+          "outTok": 26
+        },
+        {
+          "kind": "main",
+          "status": 200,
+          "cacheWrite": 0,
+          "cacheRead": 84333,
+          "typed": 2,
+          "stage": "PERSPECTIVE_SWAP",
+          "notes": [
+            "LENS:reduce and simplify",
+            "GOAL_OBSTACLE_STAKES",
+            "STAGE:PERSPECTIVE_SWAP",
+            "STAGE_A_MARKER"
+          ],
+          "cost": 0.027669899999999997,
+          "hold": 0.4,
+          "charged": false,
+          "ms": 2563,
+          "inTok": 650,
+          "outTok": 28
+        }
+      ],
+      "modelTexts": [
+        {
+          "kind": "main",
+          "typed": 1,
+          "text": "Τι γυρίζει στο μυαλό σου τώρα;",
+          "filtered": "Τι γυρίζει στο μυαλό σου τώρα;"
+        },
+        {
+          "kind": "main",
+          "typed": 2,
+          "text": "Τι σε έφερε εδώ αυτή τη στιγμή;",
+          "filtered": "Τι σε έφερε εδώ αυτή τη στιγμή;"
+        }
+      ],
+      "crisisTurns": [],
+      "rootConfirmed": false,
+      "root": null,
+      "cardAt": null,
+      "yesAt": null,
+      "clarity": null,
+      "violations": [],
+      "checks": {
+        "labels": [],
+        "closing": [],
+        "verbatim": [],
+        "safety": [],
+        "pressure": [],
+        "stacked": [],
+        "advice": [],
+        "telemetry": [],
+        "voice": []
+      },
+      "applies": {
+        "safety": false,
+        "verbatim": true,
+        "telemetry": true
+      },
+      "tsCards": [],
+      "tsMethodLine": "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.",
+      "afterCrisis": [],
+      "otherDetectors": [],
+      "events": [
+        {
+          "ev": "session_started",
+          "t": 1795293486559
+        }
+      ],
+      "quotes": [],
+      "genderSuspicions": [],
+      "refusals": 0,
+      "voice": [
+        {
+          "n": 1,
+          "turn": {
+            "who": "aura",
+            "text": "Δεν θα σου δώσω λίστα με αιτίες και λύσεις. Θα σε ρωτάω ένα πράγμα τη φορά, ώστε να το βρεις εσύ.\nΤι γυρίζει στο μυαλό σου τώρα;"
+          },
+          "text": "Τι γυρίζει στο μυαλό σου τώρα;",
+          "method": true,
+          "app": false,
+          "numbers": []
+        },
+        {
+          "n": 2,
+          "turn": {
+            "who": "aura",
+            "text": "Τι σε έφερε εδώ αυτή τη στιγμή;"
+          },
+          "text": "Τι σε έφερε εδώ αυτή τη στιγμή;",
+          "method": false,
+          "app": false,
+          "numbers": []
+        }
+      ],
+      "rounds": [
+        {
+          "k": 1,
+          "user": "τι να κάνω;",
+          "aura": [
+            "Τι γυρίζει στο μυαλό σου τώρα;"
+          ],
+          "app": [],
+          "stage": "OPENING",
+          "called": true
+        },
+        {
+          "k": 2,
+          "user": "δεν κατάλαβα",
+          "aura": [
+            "Τι σε έφερε εδώ αυτή τη στιγμή;"
+          ],
+          "app": [],
+          "stage": "PERSPECTIVE_SWAP",
+          "called": true
+        }
+      ],
+      "founder": {
+        "stops": 0,
+        "gentle": 0,
+        "riskChecks": 0,
+        "choice": 0,
+        "bareGoodbye": 0,
+        "rootClaims": 0,
+        "stepTime": 0,
+        "foreignHelp": 0,
+        "stopExamples": [],
+        "choiceExamples": [],
+        "riskExamples": []
+      },
+      "acts": {
+        "card": 0,
+        "yes": 0,
+        "correct": 0,
+        "back": 0,
+        "offerShown": false,
+        "want": false,
+        "notNow": false,
+        "help": null,
+        "clarity": null,
+        "completed": false,
+        "risk": null,
+        "stepShown": false,
+        "stepEnd": null,
+        "stepWritten": null,
+        "fits": null,
+        "smaller": null,
+        "whenWritten": null
+      },
+      "orgFlags": [],
+      "filterChanges": []
+    }
+  ]
+}
