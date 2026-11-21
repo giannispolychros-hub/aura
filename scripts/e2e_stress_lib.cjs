@@ -933,6 +933,133 @@ function twoSessionsReport(S, meta) {
   if (m.version) L.push('Έκδοση που έτρεξε: ' + cell(JSON.stringify(m.version), 400), '');
   return L;
 }
+// 21/11/2026 (John, a second paid run on branch test-two-sessions — «Α. ΠΛΗΡΗΣ ΣΥΝΕΔΡΙΑ»): ONE whole session whose user lines are written word for word by us — no simulated user, no judge.
+// His lines 1–4 (typed), 5 (the app's button «Νομίζω βρήκα τι με απασχολεί»), 6 (the root, typed under the root question), 7 (the card's «Ναι, αυτό είναι», then short natural answers to the
+// app's own questions of the step) — until the step card shows (or the free part ends: the Coach screen is closed and the tool never goes past it). The three step answers (7β, 7γ, 7δ) are
+// ours, not his: the app's questions are fixed texts («Ποιο είναι το πιο μικρό πράγμα που μπορείς να κάνεις γι' αυτό;», «Είναι τόσο μικρό που χωράει σε μία μέρα;» with its button «Ναι»,
+// «Πότε;»), and the answers are shown on the screen only — they are not sent to the model. `lines` are John's own numbers (7α the card, 7β the step, 7γ «χωράει σε μία μέρα», 7δ «Πότε»).
+// A separate list, so that the three versions of the first run stay exactly three. It runs only when asked by number (--sessions 9204).
+const FULL_SESSION_PERSONAS = [
+  { id: 9204, key: 'full_s1', runs: 1, fullSession: true, noJudge: true, name: 'Πλήρης συνεδρία · από την 1η γραμμή ως την κάρτα βήματος',
+    hiddenRoot: '—', situation: 'Συνθετικό σενάριο με σταθερά μηνύματα μόνο.', behavior: 'Fixed messages only.',
+    lines: ['1', '2', '3', '4', '5', '6', '7α', '7β', '7γ', '7δ'],
+    fixed: [
+      { say: 'Δεν ξέρω αν πρέπει να αλλάξω δουλειά' },
+      { say: 'Είμαι κουρασμένος από τη δουλειά τον τελευταίο καιρό.' },
+      { say: 'Τα λεφτά μετράνε, ο μισθός εδώ είναι σταθερός.' },
+      { say: 'Φοβάμαι το άγνωστο, δεν ξέρω τι θα βρω αλλού.' },
+      { press: true },
+      { root: 'Φοβάμαι ότι θα φύγω και θα το μετανιώσω.' },
+      { card: 'yes' },
+      { step: 'Να μιλήσω με έναν φίλο που έχει αλλάξει δουλειά.' },
+      { fits: 'yes' },
+      { when: 'Αύριο το απόγευμα.' } ] },
+];
+// 21/11/2026 (John, the same run): his report — every line of the user, every reply of AURA and every text of the app (bubbles, cards, buttons), word for word, in ONE numbered
+// sequence; which replies of the model were a question (the last visible character is a question mark, or there is one inside); whether a step was written and with which words;
+// the real cost and the calls. What the code can know it says as ΝΑΙ / ΟΧΙ; the report gives no verdict on the quality of the replies.
+function fullSessionReport(S, meta) {
+  const FS = (S || []).filter(s => s && s.persona && s.persona.fullSession);
+  if (!FS.length) return [];
+  const m = meta || {};
+  const br = t => String(t == null ? '' : t).replace(/\n/g, '  \n');
+  const norm = t => String(t == null ? '' : t).replace(/\s+/g, ' ').trim();
+  const anyQ = t => /[;?;]/.test(String(t || ''));
+  const sentences = t => String(t || '').split(/(?<=[.;?!;…])\s+/).map(x => x.trim()).filter(Boolean);
+  const L = ['## Η πλήρης συνεδρία — η αναφορά του John (αυτούσια, με αρίθμηση)', '',
+    'Οι γραμμές του χρήστη είναι γραμμένες από εμάς, όχι από προσομοιωμένο χρήστη, με τους δικούς του αριθμούς: 1–4 γράφονται, 5 είναι το κουμπί «Νομίζω βρήκα τι με απασχολεί», 6 η ρίζα στην ερώτηση της ρίζας, ' +
+    '7α το κουμπί «Ναι, αυτό είναι» στην κάρτα, 7β–7δ οι σύντομες απαντήσεις στις ερωτήσεις του βήματος (7β το βήμα, 7γ το «χωράει σε μία μέρα;», 7δ το «Πότε;») — αυτές τις τρεις τις διαλέξαμε εμείς, δεν τις είχε ορίσει ο John. ' +
+    '«AURA (μοντέλο)» = απάντηση του πραγματικού μοντέλου, όπως φάνηκε στην οθόνη. «ΕΦΑΡΜΟΓΗ» = κείμενο που γράφει η ίδια η εφαρμογή (φυσαλίδες, κάρτες, κουμπιά), όχι το μοντέλο. ' +
+    'Σε αυτή τη συνεδρία το στυλ της σελίδας που γράφει μερικές ετικέτες με κεφαλαία είναι κλειστό, ώστε τα κείμενα να βγαίνουν όπως είναι γραμμένα στην εφαρμογή.', ''];
+  for (const s of FS) {
+    const P = s.persona, lines = P.lines || [], kinds = P.lineKinds || [];
+    const typedLabels = lines.filter((_, i) => kinds[i] === 'type'), pressLabels = lines.filter((_, i) => kinds[i] === 'press');
+    const typed = s.typed || [];
+    const ml = s.fsMethodLine ? String(s.fsMethodLine).trim() : '';
+    // a bubble of AURA is the model's only when a typed line made a model call that came back 200 and it is the first bubble after that line; every other bubble is the app's own text
+    const called = new Set((s.calls || []).filter(c => c.status === 200).map(c => c.typed));
+    L.push('### ' + P.name + ' — συνεδρία ' + s.label, '');
+    let n = 0, ti = 0, pr = 0, a = 0, expectModel = false, stepKind = null, lastCards = '', stepCardShown = false;
+    const replies = [], stepWords = [], pressed = [], matched = new Set();
+    const row = (kind, text, extra) => { n++; L.push('**' + n + '. ' + kind + '**' + (extra ? ' — ' + extra : ''), '', br(text), ''); return n; };
+    for (const t of (s.turns || [])) {
+      if (t.who === 'user') {
+        // the typed line this bubble is: the next typed text that reads the same (the order of the bubbles is the order of the typing)
+        let k = typed.findIndex((x, i) => i >= ti && norm(x) === norm(t.text));
+        if (k < 0 && ti < typed.length) k = ti;
+        if (k >= 0) { ti = k + 1; matched.add(k); }
+        const idx = k < 0 ? 0 : k + 1, label = idx ? (typedLabels[idx - 1] || '#' + idx) : '?';
+        expectModel = idx > 0 && called.has(idx);
+        row('ΧΡΗΣΤΗΣ · γραμμή ' + label + ' (γράφει)', t.text, stepKind ? 'απάντηση στην ερώτηση «' + stepKind + '» του βήματος' : '');
+        if (stepKind) stepWords.push({ kind: stepKind, line: label, text: String(t.text || '') });
+        stepKind = null;
+      } else if (t.who === 'aura') {
+        const raw = String(t.text || '');
+        if (expectModel) {
+          expectModel = false; a++;
+          let body = raw;
+          if (ml && raw.startsWith(ml)) { row('ΕΦΑΡΜΟΓΗ · η πρώτη γραμμή της (την προσθέτει μόνη της στην αρχή της 1ης απάντησης)', ml); body = raw.slice(ml.length).trim(); }
+          const end = qMarkEnd(body), any = anyQ(body), r = { n: a, text: body, end, any };
+          r.row = row('AURA (μοντέλο) · απάντηση Α' + a, body, end ? '**ΕΡΩΤΗΣΗ** (τελειώνει με ερωτηματικό)' : any ? '**περιέχει ερώτηση** (δεν τελειώνει με ερωτηματικό)' : 'όχι ερώτηση');
+          replies.push(r);
+        } else {
+          const stepBubble = !!s.stepCard && norm(raw).includes(norm(s.stepCard));
+          row('ΕΦΑΡΜΟΓΗ · ' + (stepBubble ? 'κάρτα βήματος (η φυσαλίδα της οθόνης)' : 'φυσαλίδα της AURA — τη γράφει η εφαρμογή, όχι το μοντέλο'), raw, !stepBubble && qMarkEnd(raw) ? 'τελειώνει με ερωτηματικό' : '');
+          if (stepBubble) stepCardShown = true;
+        }
+      } else {
+        const x = String(t.text || ''), body = x.replace(/^\[[^\]]*\]:?\s*/, ''), after0 = (x.match(/μετά τη γραμμή ([^\]\s:]+)/) || [])[1] || '—', after = after0 === '—' ? 'στην αρχή, πριν από κάθε γραμμή' : 'μετά τη γραμμή ' + after0;
+        let mk;
+        if (/^\[πάτησε «/.test(x)) { const name = x.replace(/^\[πάτησε «/, '').replace(/»\]$/, ''), line = pressLabels[pr++] || '#' + pr; pressed.push({ line, name }); row('ΧΡΗΣΤΗΣ · γραμμή ' + line + ' (πατά κουμπί)', '«' + name + '»'); }
+        else if (/^\[κάρτες στην οθόνη μετά τη γραμμή /.test(x)) { lastCards = norm(body); row('ΕΦΑΡΜΟΓΗ · κάρτες στην οθόνη (' + after + ')', x.replace(/^\[[^\]]*\]\n?/, '')); }
+        else if (/^\[κουμπιά στην οθόνη μετά τη γραμμή /.test(x)) row('ΕΦΑΡΜΟΓΗ · κουμπιά στην οθόνη (' + after + ')', body);
+        else if (/^\[κάρτα βήματος\]/.test(x)) { stepCardShown = true; const cardBody = x.replace(/^\[[^\]]*\]\n?/, ''); if (!lastCards.includes(norm(cardBody))) row('ΕΦΑΡΜΟΓΗ · κάρτα βήματος', cardBody); }
+        else if ((mk = x.match(/^\[(βήμα|μικρό κομμάτι|πότε) — φαίνεται μόνο/))) stepKind = mk[1];
+        else if (/^\[κάρτα ρίζας:/.test(x) || /^\[ερώτηση της ρίζας\]/.test(x)) { /* the tool's own marks that repeat what the screen shows — the card and the app's bubble are written in their place */ }
+        else row('σημείωση του εργαλείου', x);
+      }
+    }
+    const lost = typed.filter((_, i) => !matched.has(i));
+    if (lost.length) L.push('*Γραμμές που γράφτηκαν αλλά δεν φάνηκαν ως φυσαλίδα του χρήστη στην οθόνη:* ' + lost.map(x => '«' + x + '»').join(' · '), '');
+    L.push('Σημειώσεις του εργαλείου: ' + ((s.notes || []).length ? (s.notes || []).map(x => cell(x, 260)).join(' | ') : 'καμία'), '');
+    // what the model sent before the app's filters, only where the app changed it (the same rule as the other reports)
+    for (const x of (s.modelTexts || []).filter(x => typeof x.filtered === 'string' && x.filtered !== String(x.text || '').replace(/\s*\[\[[^\]]*\]\]\s*/g, ' ').trim()))
+      L.push('*Η εφαρμογή άλλαξε την απάντηση του μοντέλου μετά το μήνυμα ' + x.typed + ' — ακατέργαστο:* ' + br(x.text), '');
+
+    L.push('#### Ποιες απαντήσεις της AURA (μοντέλο) ήταν ερώτηση', '');
+    if (!replies.length) L.push('- Δεν υπήρξε καμία απάντηση του μοντέλου.', '');
+    else {
+      for (const r of replies) {
+        const qs = sentences(r.text).filter(x => qMarkEnd(x));
+        L.push('- Α' + r.n + ' (αριθμός ' + r.row + ' παραπάνω): ' + (r.end ? '**ΕΡΩΤΗΣΗ**' : r.any ? '**περιέχει ερώτηση**, δεν τελειώνει με ερωτηματικό' : 'όχι ερώτηση') + (qs.length ? ' — «' + qs.join('» · «') + '»' : ''));
+      }
+      L.push('', 'Σύνολο: ' + replies.filter(r => r.end).length + ' από ' + replies.length + ' τελειώνουν με ερωτηματικό · ' + replies.filter(r => r.any).length + ' από ' + replies.length + ' έχουν ερωτηματικό (μέσα ή στο τέλος).', '');
+    }
+
+    const sw = k => stepWords.find(w => w.kind === k), w1 = sw('βήμα'), w2 = sw('μικρό κομμάτι'), w3 = sw('πότε');
+    L.push('#### Βήμα', '',
+      '- Εμφανίστηκε η κάρτα βήματος: **' + (s.stepCard || stepCardShown ? 'ΝΑΙ' : 'ΟΧΙ') + '**' + (s.stepCard ? ' — «' + String(s.stepCard).replace(/\s*\n+\s*/g, ' ⏎ ') + '»' : ''),
+      '- Γράφτηκε βήμα (απάντηση στην ερώτηση «Ποιο είναι το πιο μικρό πράγμα…»): ' + (w1 ? '**ΝΑΙ** — γραμμή ' + w1.line + ': «' + w1.text + '»' : '**ΟΧΙ**'),
+      '- Μικρότερο κομμάτι (ερώτηση που έρχεται μόνο αν το βήμα δεν χωράει σε μία μέρα): ' + (w2 ? 'γραμμή ' + w2.line + ': «' + w2.text + '»' : 'δεν ζητήθηκε'),
+      '- «Πότε»: ' + (w3 ? 'γραμμή ' + w3.line + ': «' + w3.text + '»' : 'δεν γράφτηκε'),
+      '- Κουμπιά που πάτησε ο χρήστης: ' + (pressed.length ? pressed.map(x => 'γραμμή ' + x.line + ' «' + x.name + '»').join(' · ') : 'κανένα'),
+      '- Γραμμές χρήστη που γράφτηκαν: ' + typed.length + ' · κουμπιά: ' + pressed.length + ' · σύνολο ' + (typed.length + pressed.length) + ' (όριο 14).', '');
+    L.push('#### Πραγματικό κόστος και κλήσεις αυτής της συνεδρίας', '',
+      '- Κόστος: $' + (s.cost || 0).toFixed(4) + ' · κλήσεις AURA: ' + (s.calls || []).length + ' · κωδικοί HTTP: ' + ((s.calls || []).map(c => c.status).join(', ') || '—') + ' · κλήσεις Haiku: 0',
+      '- Γεγονότα τηλεμετρίας της συσκευής (μόνο ονόματα): ' + ((s.events || []).map(r => r && r.ev).filter(Boolean).join(', ') || 'κανένα'), '');
+    if (s.fsFinal) L.push('#### Η οθόνη στο τέλος — όλο το ορατό κείμενο της σελίδας', '', '```', String(s.fsFinal).replace(/```/g, "'''"), '```', '');
+  }
+  const tl = callTally(FS), by = m.by || {};
+  L.push('### Σύνολο του τρεξίματος', '',
+    '**Πραγματικό κόστος:** $' + (m.spent || 0).toFixed(4) + ' (AURA $' + (by.aura || 0).toFixed(4) + ', Haiku $' + (by.user || 0).toFixed(4) + ') από όριο $' + (m.budget || 0).toFixed(2) +
+    ' · **κλήσεις AURA:** ' + tl.calls + ' · κωδικοί HTTP: ' + (Object.keys(tl.codes).sort().map(k => k + ' ×' + tl.codes[k]).join(', ') || '—') + ' · **κλήσεις Haiku:** ' + ((m.userCalls || []).length) +
+    ' · εγγραφές cache: ' + tl.cacheWrites + ' (' + tl.cacheWriteTokens + ' tokens) · αναγνώσεις cache: ' + tl.cacheReads + (m.stopped ? ' · ΣΤΑΜΑΤΗΣΕ: ' + m.stopped : ''), '');
+  const perCall = [];
+  for (const x of FS) (x.calls || []).forEach((c, i) => perCall.push('κλήση ' + (i + 1) + ': HTTP ' + c.status + ', μετά το μήνυμα ' + c.typed + ', $' + (c.cost || 0).toFixed(4) + ', cache γράφτηκε ' + (c.cacheWrite || 0) + ' / διαβάστηκε ' + (c.cacheRead || 0) + ' tokens, ' + (c.ms || 0) + ' ms'));
+  if (perCall.length) L.push('Ανά κλήση:', '', ...perCall.map(x => '- ' + x), '');
+  if (m.version) L.push('Έκδοση που έτρεξε: ' + cell(JSON.stringify(m.version), 400), '');
+  return L;
+}
 // 9/11/2026 (John, round 11): the RIGHT line for this danger, on AURA's part of the screen. `want` is the app's own line for it
 // (buildDangerLine of src/App.jsx, built from HELPLINES), `other` the line of the other kind. Every sentence of `want` must be there
 // — the «112» one may be the model's own (the app then leaves it out, so only «112» itself is required) — and no sentence of `other`
@@ -2555,6 +2682,7 @@ function buildStressReport(sessions, meta) {
     if (lines.length) L.push('### ' + s.label + ' — ' + s.persona.name, ...lines, '');
   }
   L.push(...twoSessionsReport(S, m)); // 21/11 (John, test-two-sessions): nothing unless a session of that test ran
+  L.push(...fullSessionReport(S, m)); // 21/11 (John, test-two-sessions, the whole session): nothing unless session 9204 ran
   L.push(...voiceReport(S));
   L.push(...loopReport(S));
   L.push(...rehearsalReport(S));
@@ -2583,3 +2711,6 @@ module.exports = {
   REHEARSAL_PERSONAS, REHEARSAL_REAL, TARGETED_PERSONAS, FINAL_PERSONAS, P3_PERSONAS, P3_BRAKE_IDS, P3_SIGNS, p3BrakeFindings, p3SignFindings, COMPOSITE_PERSONAS, DANGER_FIXED_PERSONAS, TWO_SESSIONS_PERSONAS, twoSessionsReport, qMarkEnd, phraseRef, dangerLineExactFindings, benchSafetyFirst, DANGER_PROMISE_TEXT, screenAfter, feminineToManFindings, DOSE_SIGN, doseFindings, dangerLineFindings, compositeReport, PROMISE_SIGNS, promiseSentences, dangerReport, capsDictation, finalBrakeFindings, friendSafetyQuestion, crisisReplies, riskFoundByCode, sessionEstimate, finalReport, FINAL_HELPLINES, inventedNumbers, quoteFindings, genderWords, genderSuspicions, isRefusal, NUMBER_WORDS, rehearsalRow, rehearsalReport,
   LOOP_PERSONAS, MECHANISM_PERSONAS, noteLabels, STRATEGY_NOTES, SUPPRESSED_NOTES, mechanismRounds, mechanismCheck, mechanismMarks, MECH_JUDGE_SCHEMA, MECH_JUDGE_SYSTEM, mechanismJudgePrompt, mechanismReport, masterStage, loopRounds, stageOrderFindings, LOOP_JUDGE_SCHEMA, LOOP_JUDGE_SYSTEM, loopJudgePrompt, CRISIS_JUDGE_SCHEMA, CRISIS_JUDGE_SYSTEM, crisisJudgePrompt, politePlural, genericWhy, loopReport,
 };
+// 21/11/2026 (John, test-two-sessions, the whole session): added after the list above, which stays as it was
+module.exports.FULL_SESSION_PERSONAS = FULL_SESSION_PERSONAS;
+module.exports.fullSessionReport = fullSessionReport;

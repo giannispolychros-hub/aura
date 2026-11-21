@@ -7352,6 +7352,9 @@ async function runStressSession(item, aura, user, budget) {
     checks: { labels: [], closing: [], verbatim: [], safety: [], pressure: [], stacked: [], advice: [], telemetry: [], voice: [] },
     applies: { safety: !!p.risk && p.risk !== 'leak', verbatim: !p.closed && !p.short, telemetry: !p.short } };
   if (p.bench) sess.persona.bench = p.bench.id; // 31/10: the benchmark scenario
+  // 21/11/2026 (John, test-two-sessions, the whole session): as for the three versions — his own numbers for the lines, what each step is (typed, or a button pressed: the root button, the card's «Ναι», the size question's «Ναι»), no judge
+  if (p.fullSession) Object.assign(sess.persona, { fullSession: true, noJudge: true, lines: p.lines || null,
+    lineKinds: Array.isArray(p.fixed) ? p.fixed.map(st => (st && (st.press || st.card || st.fits)) ? 'press' : 'type') : null });
   if (p.final) { sess.errorsSeen = []; sess.brake = []; sess.stuck = []; sess.riskHold = []; sess.riskSince = 0; sess.dangerAt = 0; sess.persona.final = true; sess.persona.composite = !!p.composite; sess.persona.gender = p.gender || null; sess.persona.steps = p.steps || null; sess.persona.third = !!p.third; sess.persona.caps = !!p.caps; }
   // risk: a signal known BEFORE the offer (14, 15) — the offer must not appear. 16 meets its crisis after the offer.
   const acts = { card: 0, yes: 0, correct: 0, back: 0, offerShown: false, want: false, notNow: false, help: null, clarity: null, completed: false, risk: p.offerRisk ? p.risk : null,
@@ -7505,6 +7508,16 @@ async function runStressSession(item, aura, user, budget) {
   const labelsSeen = new Set(), farewellsSeen = new Set();
   let askSeen = false, lastCardRoot = null, tsLastCard = null;
   if (p.twoSessions) { sess.tsCards = []; sess.tsMethodLine = T.methodLine || null; }
+  // 21/11/2026 (John, test-two-sessions, the whole session): what the app itself puts on the screen — the cards, and the buttons that can be pressed with the box's own hint — written down word for word each time it changes
+  // (see `check`). The page draws some labels in capitals by its style; in THIS session that one style is switched off (the text itself is not touched), so the words come as they are written in the app.
+  let fsLastSig = null, fsLastCards = null;
+  const fsUi = () => page.evaluate(() => {
+    const shown = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+    const buttons = [...document.querySelectorAll('button')].filter(shown).map(b => ((b.textContent || '').replace(/\s+/g, ' ').trim() || (b.getAttribute('aria-label') || '').trim()) + (b.disabled ? ' (ανενεργό)' : '')).filter(x => x && x !== ' (ανενεργό)');
+    const ta = document.querySelector('textarea.textarea');
+    return { buttons, placeholder: ta ? (ta.getAttribute('placeholder') || '') : null };
+  });
+  if (p.fullSession) { sess.fsMethodLine = T.methodLine || null; await page.addStyleTag({ content: '*{text-transform:none !important}' }).catch(() => {}); }
   const check = async s => {
     // 21/11/2026 (John, test-two-sessions): what the app itself puts on its card under the root question — the question, its own «ζητά ξανά» line and the list of the
     // user's own sentences with «Καμία από αυτές» (Package 1) — word for word as the screen shows it, each time the card changes. The tool only writes it down; only for
@@ -7523,6 +7536,18 @@ async function runStressSession(item, aura, user, budget) {
         }
         sess.tsCards.push({ typed: sess.typed.length, afterLine, retry: SL.fold(all).includes(SL.fold(T.retry)), ask: !!s.ask, rootCard: !!s.rootCard, list, none: list, sentences, text: all });
         app('[οθόνη της εφαρμογής μετά τη γραμμή ' + (afterLine || '—') + ' — οι κάρτες όπως φαίνονται]\n' + all);
+      }
+    }
+    // 21/11/2026 (John, test-two-sessions, the whole session): the cards and the buttons on the screen, word for word, each time they change — the tool only writes them down
+    if (p.fullSession) {
+      const cardsAll = (s.cards || []).join('\n— — —\n'), ui = await fsUi(), sig = JSON.stringify([cardsAll, ui.buttons, ui.placeholder]);
+      if (sig !== fsLastSig) {
+        fsLastSig = sig;
+        const afterLine = (p.lines || [])[fixedIdx - 1] || '—';
+        if (cardsAll && cardsAll !== fsLastCards) app('[κάρτες στην οθόνη μετά τη γραμμή ' + afterLine + ']\n' + cardsAll);
+        fsLastCards = cardsAll;
+        app('[κουμπιά στην οθόνη μετά τη γραμμή ' + afterLine + ']: ' + (ui.buttons.length ? ui.buttons.map(b => '«' + b + '»').join(' · ') : 'κανένα') +
+          (ui.placeholder !== null ? ' · πεδίο γραφής, υπόδειξη: «' + ui.placeholder + '»' : ' · πεδίο γραφής: δεν φαίνεται'));
       }
     }
     for (const l of SL.auraLabelFindings(s.feed)) if (!labelsSeen.has(l)) { labelsSeen.add(l); sess.checks.labels.push('«' + l + '» μετά από ' + sess.typed.length + ' μηνύματα'); }
@@ -7594,6 +7619,16 @@ async function runStressSession(item, aura, user, budget) {
       const done = fixedIdx >= p.fixed.length, own = !!(s.rootCard || s.warningCard || s.closureCard || s.memCard || s.offer || s.help || s.stepPhase || s.clarity || s.ended);
       if (done || own) { sess.notes.push(done ? 'τέλος των γραμμών του σεναρίου — δεν πατήθηκε τίποτα άλλο'
         : 'η εφαρμογή έδειξε κάρτα ή ερώτηση δική της μετά τη γραμμή ' + ((p.lines || [])[fixedIdx - 1] || '—') + ', πριν από το τέλος των γραμμών — το σενάριο σταμάτησε εδώ, δεν πατήθηκε τίποτα'); break; }
+    }
+    // 21/11/2026 (John, test-two-sessions, the whole session): the script is John's lines and the short answers to the app's own questions, and nothing else. It ends at the step card (written down first), or when
+    // the last line is done — or the moment the app puts up something the script has no line for (a closing card, the Coach offer, a question of the step the script does not answer…): the tool then presses nothing.
+    if (p.fullSession && Array.isArray(p.fixed)) {
+      if (s.stepCard && !sess.stepCard) { sess.stepCard = s.stepCard; app('[κάρτα βήματος]\n' + s.stepCard); }
+      const st0 = p.fixed[fixedIdx], sp = s.stepPhase;
+      const unscripted = sp ? !(st0 && (sp === 'fits' ? 'fits' in st0 : sp in st0)) : s.rootCard ? !(st0 && st0.card) : s.ask ? !(st0 && st0.root !== undefined) : false;
+      const own = !!(s.warningCard || s.closureCard || s.memCard || s.offer || s.help || s.clarity || s.ended || s.firstWhy || unscripted), done = fixedIdx >= p.fixed.length;
+      if (s.stepCard || done || own) { sess.notes.push(s.stepCard ? 'εμφανίστηκε η κάρτα βήματος — τέλος του σεναρίου, δεν πατήθηκε τίποτα άλλο' : done ? 'τέλος των γραμμών του σεναρίου — η κάρτα βήματος δεν εμφανίστηκε' :
+        'η εφαρμογή έδειξε κάτι που το σενάριο δεν έχει γραμμή για αυτό, μετά τη γραμμή ' + ((p.lines || [])[fixedIdx - 1] || '—') + ' — το σενάριο σταμάτησε εδώ, δεν πατήθηκε τίποτα'); break; }
     }
     if (crisisAt >= 0) {
       // after a crisis message: the crisis line, no root card, no offer
@@ -7750,6 +7785,7 @@ async function runStressSession(item, aura, user, budget) {
     if (p.leaveText && String(text).includes(p.leaveText)) { sess.left = sess.typed.length; sess.notes.push('ο χρήστης έφυγε: «' + p.leaveText + '» μετά από ' + sess.typed.length + ' μηνύματα'); break; }
   }
   await sync();
+  if (p.fullSession) sess.fsFinal = await page.locator('body').innerText().catch(() => null); // 21/11 (John, the whole session): all the text the page shows at the end, for the report
   if (stopped) sess.notes.push('ΣΤΑΜΑΤΗΣΕ: ' + stopped);
   // ── ανιχνευτές συμβουλής της εφαρμογής, πριν από τη ρίζα ──
   for (const v of sess.violations) if (v.beforeRoot && SL.ADVICE_VIOLATIONS.includes(v.type)) sess.checks.advice.push(v.type + ' (μετά από ' + v.at + ' μηνύματα)');
@@ -7779,6 +7815,7 @@ async function runStressSession(item, aura, user, budget) {
   sess.events = SL.lastSessionEvents(log);
   if (!p.closed && !p.short) for (const x of SL.telemetryIssues(sess.events, acts)) sess.checks.telemetry.push(x);
   if (p.twoSessions) sess.checks.telemetry = []; // 21/11 (test-two-sessions): the script ends early on purpose — the counts of a whole session do not apply (the events stay in sess.events)
+  if (p.fullSession) sess.checks.telemetry = []; // 21/11 (John, the whole session): the script ends at the step card on purpose — the counts of a whole session do not apply (the events stay in sess.events)
   // ADR «17 Οκτωβρίου» — ΦΩΝΗ ΤΗΣ AURA, automatic: the model's replies in the free part (before the root, outside the safety path)
   // John, 22/10 (the run on 8c6bed4): (α) a quote not word for word in any earlier message of the user, (β) a word with a gender that may be
   // about the user before the user shows one (SUSPICIONS, for a human), and the replies that refuse in so many words — every reply of the
@@ -8006,6 +8043,7 @@ async function mainStress() {
   if (only.length && !has('--hard')) PEOPLE.push(...(SL.COMPOSITE_PERSONAS || [])); // 24/10 (John): the composite session (171), tool only
   if (only.length && !has('--hard')) PEOPLE.splice(PEOPLE.length - (SL.COMPOSITE_PERSONAS || []).length, 0, ...(SL.DANGER_FIXED_PERSONAS || [])); // 9/11 (round 11): 173, 174, before 171–172
   if (only.length && !has('--hard')) PEOPLE.push(...(SL.TWO_SESSIONS_PERSONAS || [])); // 21/11 (John, test-two-sessions): 9201–9203 — tool only, asked by number
+  if (only.length && !has('--hard')) PEOPLE.push(...(SL.FULL_SESSION_PERSONAS || [])); // 21/11 (John, test-two-sessions, the whole session): 9204 — tool only, asked by number
   // 31/10 (John, ADR «31 Οκτωβρίου (ε)» / «(η)»): numbers 9001–9199 are the benchmark (benchmark/scenarios.json) — on their own, never mixed
   const BENCH = only.length > 0 && only.every(x => BL.isBenchAlias(x));
   // 9/11/2026 (John, round 11, ADR «9 Νοεμβρίου»): the benchmark's SAFETY scenarios S1–S9 (9001–9009: fixed messages only, no simulator,
