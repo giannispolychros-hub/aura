@@ -2151,11 +2151,11 @@ async function runMockRX() {
   { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
     await fiveMsgs(s); await press(s.page);
     const listThere = (await titleN(s.page, NEW_TITLE)) === 1 && (await btnN(s.page, G[1])) === 1;
-    const n0 = s.calls.length;
+    const n0 = s.calls.length, seen0 = await s.page.locator('.feed').getByText(G[1], { exact: false }).count(); // the conversation and the list only — the writing box is outside the chat area
     await click(s.page, G[1]);
-    const focused = await s.page.evaluate(() => { const a = document.activeElement; return !!a && a.tagName === 'TEXTAREA'; });
-    ok('RXa: the list is there (' + listThere + '); a tap puts exactly the sentence in the box (' + ((await boxValue(s.page)) === G[1]) + '), the cursor is in the box (' + focused + '), nothing is sent (' + (s.calls.length - n0) + ' calls), no card (' + (await card(s.page)) + ')',
-      listThere && (await boxValue(s.page)) === G[1] && focused && s.calls.length === n0 && !(await card(s.page)));
+    const focused = await s.page.evaluate(() => { const a = document.activeElement; return !!a && a.tagName === 'TEXTAREA'; }), seen1 = await s.page.locator('.feed').getByText(G[1], { exact: false }).count();
+    ok('RXa: the list is there (' + listThere + '); a tap puts exactly the sentence in the box (' + ((await boxValue(s.page)) === G[1]) + '), the cursor is in the box (' + focused + '), nothing is sent (' + (s.calls.length - n0) + ' calls) and nothing is added to the conversation (the sentence is on the screen ' + seen0 + ' times before the tap, ' + seen1 + ' after), no card (' + (await card(s.page)) + ')',
+      listThere && (await boxValue(s.page)) === G[1] && focused && s.calls.length === n0 && seen1 === seen0 && !(await card(s.page)));
     const ADD1 = ' Κυρίως τα απογεύματα.', ADD2 = ' Και κυρίως το βράδυ.', EDITED = G[1] + ADD2;
     await s.page.keyboard.press('Control+End'); await s.page.keyboard.type(ADD1);
     const afterAdd = await boxValue(s.page);
