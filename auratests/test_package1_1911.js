@@ -296,8 +296,8 @@ const view = (m, over) => call('rootPickView', Object.assign({}, SAFE, { message
     && !/ρίζα|βρήκες|αυτό είναι|σωστ|λάθος|πρέπει/i.test(F.ROOT_PICK_TEXTS.title));
   // found with a screenshot at 390×844: the list makes the card taller AFTER the scroll of the phase effect ran, so its buttons sat below the fold, behind the sticky box
   const scrollEff = (() => { const a = raw.indexOf('// the list makes the root question\'s card taller'); return a < 0 ? '' : raw.slice(a, raw.indexOf('\n', raw.indexOf('}, [rootPick]);', a)) + 1); })();
-  assert('NEW — (6.13) when the list appears the chat scrolls to the bottom again (an effect on rootPick): the buttons must not stay hidden behind the sticky box on a phone',
-    scrollEff.length > 0 && /useEffect\(\(\) => \{ if \(rootPick && rootPick\.length\) bottomRef\.current\?\.scrollIntoView\(\{ behavior: "smooth", block: "end" \}\); \}, \[rootPick\]\);/.test(scrollEff));
+  assert('NEW — (6.13) UPDATED (John, 22/11/2026, decision 15 of the root-list branch): when the list appears the chat scrolls again (an effect on rootPick) — to its END, as before, so the buttons do not stay hidden behind the sticky box on a phone — except when the card is taller than the screen: then it is shown from its TOP (rootListScrollPlan), so that on a phone the heading is always in view; an empty list does nothing',
+    scrollEff.length > 0 && /useEffect\(\(\) => \{\s*if \(!\(rootPick && rootPick\.length\)\) return;/.test(scrollEff) && /rootListScrollPlan\(/.test(scrollEff) && /end\?\.scrollIntoView\(\{ behavior: "smooth", block: "end" \}\)/.test(scrollEff) && /card\.scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/.test(scrollEff) && /\}, \[rootPick\]\);/.test(scrollEff));
   const pure = ['rootAskNumber', 'rootPickSentences', 'rootPickView', 'rootNewWordCount', 'repeatedElementsForRound'].map(fnSrc).join('\n');
   assert('NEW — (6.12) the new pure functions store nothing, send nothing, log nothing', pure.length > 100 && !/\b(?:window|localStorage|sessionStorage|fetch|XMLHttpRequest|navigator|document)\b|console\.|recordTelemetry/.test(pure));
 }

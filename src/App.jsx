@@ -2821,6 +2821,8 @@ const ROOT_PICK_TEXTS = { title: "Δικά σου λόγια από πριν. Π
 const ROOT_LIST_MIN = 3;
 const ROOT_LIST_MAX = 8;
 const ROOT_LIST_TEXTS = { title: "Ποιο από αυτά νομίζεις ότι τραβάει τα άλλα; Ή κάτι που δεν έχεις πει ακόμα;" };
+// Λ1, decision 15 (John, 22/11/2026): the line under the heading of the 3-or-more list — what a tap does. A statement, in its own constant; the list of two has the same instruction inside its own title.
+const ROOT_LIST_HINT = "Πάτα ό,τι ταιριάζει, θα μπει στο πεδίο και μπορείς να το αλλάξεις.";
 // Which ask is this? `appAsksBefore` = how many times the app has put the root question to the user before this one (counted by the screen's effect); `door2Asks` =
 // how many asks so far (this one included) opened with the user's «Ναι» to the readiness question. Always an integer ≥ 1.
 function rootAskNumber(messages, appAsksBefore, door2Asks) {
@@ -2916,6 +2918,14 @@ function rootPickRecord(kind, value) {
   if (kind === "picked") return { event: "list_picked", fields: { pos: whole(value) } };
   if (kind === "none") return { event: "list_none", fields: {} };
   return null;
+}
+// Λ1, decision 15 (John, 22/11/2026) — where the chat goes when a list appears, so that on a phone the heading is ALWAYS in view. Two numbers, both in the chat's own scrolling space: `cardTop`, where the root question's card begins,
+// and `endTop`, how far the chat scrolls to reach its end. Scrolled to the end, as always, as long as the card's top stays on the screen; when the card is taller than the screen the end would push its top — the question, the heading, the line
+// under it — above the screen: then "card", the card shown from its top (its bottom is reached by scrolling). Anything that is not a finite number → "end", what the screen always did. Pure; never throws.
+function rootListScrollPlan(cardTop, endTop) {
+  const a = typeof cardTop === "number" ? cardTop : NaN, b = typeof endTop === "number" ? endTop : NaN;
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return "end";
+  return a < b ? "card" : "end";
 }
 // PACKAGE 1, item 2 (John, 19/11/2026) — «ρίζα χωρίς νέα λόγια»: a PASSIVE COUNTER, two integers for the device log (event root_new_words), read by nothing. Of the confirmed
 // root's words (no accents, lower case, 4+ letters, minus the same small words as rootAuraShare), how many appear in NO earlier message of the user. The root's own message is
@@ -8029,6 +8039,7 @@ export default function AURAv2() {
   const rootAsksBefore = useRef(0);                             // how many times the app has put the root question to the user so far
   const rootDoor2Asks = useRef(0);                              // how many of those opened with the user's «Ναι» to the readiness question (door 2)
   const rootPickDone = useRef(false);                           // the list was shown once this session — never again
+  const rootCardRef = useRef(null);                             // the root question's card on the screen (decision 15: the list is shown from its top when the card is taller than the screen)
   const rootNewWordsLogged = useRef(false);                     // item 2: the counter «ρίζα χωρίς νέα λόγια» is written once per session
   // THOUGHT MAP (John, 2/11/2026): the map's one record (branchCount, ?rec=1 only) is written once per session — reset with the session
   const thoughtMapLogged = useRef(false);
@@ -10615,8 +10626,14 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     if (v) { rootPickDone.current = true; setRootPick(v.sentences.map(s => s.text)); const _r = rootPickRecord("shown", v.sentences.length); if (_r) recordTelemetry(_r.event, _r.fields); }
   }, [stageAPhase, rootRetryNow]); // eslint-disable-line react-hooks/exhaustive-deps
   // ROOT PICK EFFECT — END
-  // the list makes the root question's card taller AFTER the scroll of the phase effect (above) ran: on a phone its buttons stayed below the fold, behind the sticky box — scroll again, once the list is there
-  useEffect(() => { if (rootPick && rootPick.length) bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [rootPick]);
+  // the list makes the root question's card taller AFTER the scroll of the phase effect (above) ran: on a phone its buttons stayed below the fold, behind the sticky box — scroll again, once the list is there.
+  // Decision 15 (John, 22/11/2026): and the heading is always in view — when the card is too tall for the screen, scrolled to the end its top would be above the screen, so rootListScrollPlan says «card» and it is shown from its top
+  useEffect(() => {
+    if (!(rootPick && rootPick.length)) return;
+    const end = bottomRef.current, card = rootCardRef.current, feed = end ? end.parentElement : null;
+    const plan = feed && card ? rootListScrollPlan(card.getBoundingClientRect().top - feed.getBoundingClientRect().top + feed.scrollTop, feed.scrollHeight - feed.clientHeight) : "end";
+    if (plan === "card") card.scrollIntoView({ behavior: "smooth", block: "start" }); else end?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [rootPick]);
   const handleRootPickTap = (t, i) => { setInput(t); const _r = rootPickRecord("picked", i + 1); if (_r) recordTelemetry(_r.event, _r.fields); setTimeout(() => textareaRef.current?.focus(), 0); };
   const handleRootPickNone = () => { setRootPick(null); const _r = rootPickRecord("none"); if (_r) recordTelemetry(_r.event, _r.fields); setTimeout(() => textareaRef.current?.focus(), 0); };
   // PACKAGE 1, item 2 (John, 19/11/2026) — «ρίζα χωρίς νέα λόγια»: PASSIVE. Once the root is confirmed, ONE record of two integers (event root_new_words): how many of the root's words are new, and how many it has. Nothing reads it; no text.
@@ -11497,12 +11514,13 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
           {stageAActive.current && (
             <>
               {stageAPhase === "ask" && (
-                <div className="warning-card">
+                <div className="warning-card" ref={rootCardRef} style={{scrollMarginTop:"4px"}}>
                   <div className="warning-text">{stageAView.leaving ? STAGE_A_TEXTS.askLeaving : STAGE_A_TEXTS.ask}</div>
                   {stageAView.retry && <div className="warning-text" style={{opacity:0.85}}>{STAGE_A_TEXTS.retry}</div>}
                   {rootPick && rootPick.length > 0 && (
                     <div style={{marginBottom:"14px"}}>
                       <div className="warning-text" style={{opacity:0.85,marginBottom:"8px"}}>{rootPick.length >= ROOT_LIST_MIN ? ROOT_LIST_TEXTS.title : ROOT_PICK_TEXTS.title}</div>
+                      {rootPick.length >= ROOT_LIST_MIN && <div className="warning-text" style={{opacity:0.7,marginBottom:"8px",fontSize:"11px"}}>{ROOT_LIST_HINT}</div>}
                       <div className="choice-btns" style={{flexDirection:"column",alignItems:"stretch"}}>
                         {rootPick.map((t, i) => (
                           <button key={i} className="choice-btn" style={{textTransform:"none",letterSpacing:"normal",fontFamily:"inherit",fontSize:"12px",textAlign:"left",whiteSpace:"normal",lineHeight:1.5}} onClick={() => handleRootPickTap(t, i)}>{t}</button>

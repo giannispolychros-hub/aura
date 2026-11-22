@@ -1968,9 +1968,13 @@ async function runMockRL() {
     await s.page.screenshot({ path: path.join(OUT, 'RL-list8-full.png'), fullPage: true });
     // the bottom of the card (the same check as P1a with three sentences): «Καμία από αυτές» and «Δεν το βρήκα ακόμα» above the sticky box, not behind it
     const above = async t => { const loc = btn(s.page, t); if ((await loc.count()) !== 1) return false; const bb = await loc.boundingBox(), tb = await boxOf(s.page).boundingBox(); return !!bb && !!tb && bb.y >= 0 && bb.y + bb.height <= tb.y + 1; };
-    ok('RLb (screen, 390×844): the bottom of the card is in view — «' + NONE + '» (' + await above(NONE) + ') and «' + T.back + '» (' + await above(T.back) + ') sit above the input box, not behind it', (await above(NONE)) && (await above(T.back)));
-    { const hy = await yOf(s.page.getByText(NEW_TITLE, { exact: true })), ty = await yOf(boxOf(s.page));
-      results.push('INFO — RLb (screen, 390×844, eight sentences, after the app scrolled to the bottom): the top of John\'s heading is at y=' + (hy === null ? '—' : Math.round(hy)) + ' (negative = scrolled above the screen), the input box starts at y=' + (ty === null ? '—' : Math.round(ty)) + ' — see RL-list8.png'); }
+    // UPDATED (John, 22/11/2026, decision 15): with eight sentences the card is taller than the phone's screen, and the app now shows it from its TOP, so that the heading is always in view (before: from its bottom, and the heading
+    // was above the screen). The bottom is reached by scrolling the chat to its end — then the two buttons sit above the input box, not behind it.
+    { const feedY = await yOf(s.page.locator('.feed')), headY = await yOf(s.page.getByText(NEW_TITLE, { exact: true }));
+      ok('RLb (screen, 390×844) [decision 15]: right after the list appears the heading is IN VIEW (its top y=' + (headY === null ? '—' : Math.round(headY)) + ', the chat area starts at y=' + (feedY === null ? '—' : Math.round(feedY)) + ')', headY !== null && feedY !== null && headY >= feedY - 1);
+      results.push('INFO — RLb (screen, 390×844, eight sentences, right after the list appeared): the top of John\'s heading is at y=' + (headY === null ? '—' : Math.round(headY)) + ' (negative = above the screen), the chat area starts at y=' + (feedY === null ? '—' : Math.round(feedY)) + ', the input box at y=' + Math.round((await yOf(boxOf(s.page))) || 0) + ' — see RL-list8.png'); }
+    await s.page.locator('.feed').evaluate(el => { el.scrollTop = el.scrollHeight; }); await s.page.waitForTimeout(500);
+    ok('RLb (screen, 390×844): the chat scrolled to its end — «' + NONE + '» (' + await above(NONE) + ') and «' + T.back + '» (' + await above(T.back) + ') sit above the input box, not behind it', (await above(NONE)) && (await above(T.back)));
     const n1 = s.calls.length;
     await click(s.page, G[9]);
     ok('RLb: a tap on the last of the eight copies it (' + ((await boxValue(s.page)) === G[9]) + '), sends nothing (' + (s.calls.length - n1) + '), and records its PLACE among the eight',
@@ -1989,6 +1993,9 @@ async function runMockRL() {
     await send(s.page, 'ok'); await s.page.waitForTimeout(300);
     ok('RLc: a too-short answer → the app asks again = the 2nd ask → the 19/11 list of the two, with its own title (' + (await bothTitles(s.page)).join('/') + ' — new/old), the two sentences ' + (await btnN(s.page, G[0])) + '/' + (await btnN(s.page, G[1])) + ' — unchanged',
       (await titleN(s.page, OLD_TITLE)) === 1 && (await titleN(s.page, NEW_TITLE)) === 0 && (await btnN(s.page, G[0])) === 1 && (await btnN(s.page, G[1])) === 1 && (await btnN(s.page, NONE)) === 1 && s.calls.length === n0);
+    // decision 15 (22/11/2026): the line «Πάτα ό,τι ταιριάζει…» is under John's heading only; the 19/11 list of two carries its instruction in its own title
+    ok('RLc: the list of two has NO line under its title (the hint line of the 3-or-more list is not there: ' + (await s.page.getByText('Πάτα ό,τι ταιριάζει, θα μπει στο πεδίο και μπορείς να το αλλάξεις.', { exact: true }).count()) + ')',
+      (await s.page.getByText('Πάτα ό,τι ταιριάζει, θα μπει στο πεδίο και μπορείς να το αλλάξεις.', { exact: true }).count()) === 0 && (await titleN(s.page, OLD_TITLE)) === 1);
     { const r = await listRecs(s.page); ok('RLc (device log): the one record is list_shown with n 2 (' + r.map(x => x.ev + ':' + (x.n !== undefined ? x.n : '')).join(', ') + ')', r.length === 1 && r[0].ev === 'list_shown' && r[0].n === 2); }
     await s.browser.close();
   }
@@ -2295,6 +2302,7 @@ async function runMockRX() {
       results.push('INFO — RXp ' + tag + ' (390×844, the chat area is y ' + R0(fTop) + '…' + R0(fBottom) + '; y of the top, negative = above the screen; right after the list appeared): the model\'s last reply ' + R0(rBub && rBub.y) + '…' + R0(rBub && rBub.y + rBub.height) + ' (' + (longModel ? 'long' : 'short') + ') · the root question ' + R0(rAsk && rAsk.y) + ' · heading ' + R0(rHead && rHead.y) + '…' + R0(rHead && rHead.y + rHead.height) + ' · hint ' + R0(rHint && rHint.y) + ' · first sentence ' + R0(rFirst && rFirst.y) + ' · last sentence bottom ' + R0(rLast && rLast.y + rLast.height) + ' · «' + NONE + '» ' + R0(rNone && rNone.y) + ' · «' + T.back + '» bottom ' + R0(rBack && rBack.y + rBack.height) + ' · box top ' + R0(rBox && rBox.y) + ' → in view without scrolling: the model\'s question ' + yn(inView(rBub)) + ', the bottom buttons ' + yn(bottomWasInView));
       await s.page.screenshot({ path: path.join(OUT, 'RX-phone-' + tag + '.png'), fullPage: false });
       if (!longUser) ok('RXp ' + tag + ' (390×844): a list of three short sentences fits the screen with its two bottom buttons («' + NONE + '», «' + T.back + '») in view, right away, without scrolling (' + yn(inView(rNone)) + ', ' + yn(inView(rBack)) + ')', bottomWasInView);
+      if (!longUser && !longModel) ok('RXp ' + tag + ' (390×844): when the whole card fits, the model\'s last reply stays in view above it (' + yn(inView(rBub)) + ') — the app does not scroll past it', inView(rBub) === true);
       // the bottom is always reachable: scroll the chat to its end → the two buttons sit above the input box, not behind it
       await s.page.locator('.feed').evaluate(el => { el.scrollTop = el.scrollHeight; }); await s.page.waitForTimeout(500);
       { const n2 = await rect(btn(s.page, NONE)), b2 = await rect(btn(s.page, T.back)), bx = await rect(boxOf(s.page)), above = r => !!r && !!bx && r.y >= 0 && r.y + r.height <= bx.y + 1;

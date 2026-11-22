@@ -89,6 +89,8 @@ const EXCEPTIONS = {
   // They hold a DOM node, never conversation state, so there is nothing session-scoped to reset.
   bottomRef: 'DOM ref (scroll anchor), managed by React\'s ref={} attribute — never manually reset',
   textareaRef: 'DOM ref (input element), managed by React\'s ref={} attribute — never manually reset',
+  // ADDED (22/11/2026, root-list branch, John's decision 15): the root question\'s card, a plain DOM ref like the two above — React attaches it when the card appears and detaches it when it goes, it holds no session state
+  rootCardRef: 'DOM ref (the root question\'s card, read once to place the scroll), managed by React\'s ref={} attribute — never manually reset',
 };
 
 const missing = [];
