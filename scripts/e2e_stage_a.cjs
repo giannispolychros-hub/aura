@@ -1897,9 +1897,16 @@ async function runMockMU() {
 // only in the device log. RLa the button, 1st ask, three sentences, a tap, the card · RLb ten sentences → eight, on a phone (390×844) · RLc two sentences → today's question, the 19/11 list at the 2nd ask · RLd once per
 // session · RLe the safety path · RLf John's session (the readiness question unopened, the user leaves) · RLg the readiness question and a clean «Ναι» · RLh a 2nd ask with three sentences. Unit tests:
 // auratests/test_root_list_2111.js. Screenshots RL-list3.png, RL-list8.png, RL-list8-full.png. Alone: --only RL.
+// UPDATED (John's corrections, 22/11/2026): ⚑1 the heading is now ONE block of instruction (no question, no «;», no separate line under it) and the card carries ONE question — the root question's own; ⚑2 a tap never deletes what the user
+// had typed (RX: RXb, RXd, RXg); ⚑3 «Μία λίστα ανά συνεδρία μένει» — RLi (decision 14) stays exactly as it is.
 async function runMockRL() {
   const T = APP.texts;
-  const NEW_TITLE = 'Ποιο από αυτά νομίζεις ότι τραβάει τα άλλα; Ή κάτι που δεν έχεις πει ακόμα;';
+  // UPDATED (22/11/2026, John's correction ⚑1): the heading of the 3-or-more list is now John's block of instruction; it replaces the question «Ποιο από αυτά νομίζεις ότι τραβάει τα άλλα; Ή κάτι που δεν έχεις πει ακόμα;» AND decision 15's separate line under it.
+  // Why: the old question ranked the user's own sentences («τραβάει τα άλλα» presupposes that one of them pulls the rest — a leading question, Constitution §17) and carried two question marks next to the root question's own.
+  const NEW_TITLE = 'Δικά σου λόγια από πριν. Αν κάποιο λέει αυτό που σε απασχολεί πραγματικά, πάτα το — θα μπει στο πεδίο και μπορείς να το αλλάξεις. Αν όχι, γράψε κάτι που δεν έχεις πει ακόμα.';
+  const OLD_HINT = 'Πάτα ό,τι ταιριάζει, θα μπει στο πεδίο και μπορείς να το αλλάξεις.'; // decision 15's separate line — gone since ⚑1 (the instruction is inside the heading block)
+  const qMarks = x => (String(x).match(/[;\u037e?]/g) || []).length; // the Latin and the Greek question mark, and the semicolon that Greek uses as one
+  const cardOf = page => page.locator('.warning-card').filter({ hasText: T.ask });
   const OLD_TITLE = 'Δικά σου λόγια από πριν. Πάτα μία για να τη βάλεις στο πεδίο και να τη διορθώσεις όπως θες:', NONE = 'Καμία από αυτές';
   const E = 'Δεν ξέρω αν πρέπει να αλλάξω γραφείο, με πιέζει το πρόγραμμα.';
   const G = ['Το ωράριο είναι βαρύ και δεν αφήνει χρόνο για τίποτα άλλο.', 'Θέλω περισσότερο χρόνο για την οικογένειά μου.', 'Η μετακίνηση παίρνει δύο ώρες κάθε μέρα.',
@@ -1932,6 +1939,10 @@ async function runMockRL() {
     const [tn, to] = await bothTitles(s.page), bs = [await btnN(s.page, G[0]), await btnN(s.page, G[1]), await btnN(s.page, G[2])], none = await btnN(s.page, NONE), q = await askN(s.page);
     ok('RLa: the root button → the root question at its FIRST ask (' + q + '), 0 model calls (' + (s.calls.length - n0) + '), John\'s heading (' + tn + '), not the 19/11 title (' + to + '), the user\'s own three sentences ' + bs.join('/') + ', «' + NONE + '» (' + none + '), no card',
       q === 1 && s.calls.length === n0 && tn === 1 && to === 0 && bs.every(n => n === 1) && none === 1 && !(await card(s.page)));
+    // NEW (22/11/2026, ⚑1): the heading is ONE block — decision 15's separate line is not on the screen — and the root question's card carries exactly ONE question mark: the root question's own
+    { const c = cardOf(s.page), has = (await c.count()) === 1, txt = has ? await c.textContent() : '', q1 = qMarks(txt), hint = await s.page.getByText(OLD_HINT, { exact: true }).count();
+      ok('RLa [⚑1]: the heading is ONE block — the separate line «' + OLD_HINT.slice(0, 18) + '…» is not on the screen (' + hint + ') — and the card carries exactly ONE question mark, the root question\'s own (' + q1 + ' in ' + txt.length + ' characters)',
+        has && hint === 0 && q1 === 1 && txt.includes(T.ask) && txt.includes(NEW_TITLE)); }
     await s.page.waitForTimeout(800); // the smooth scroll that follows the list
     await s.page.screenshot({ path: path.join(OUT, 'RL-list3.png'), fullPage: false });
     const ys = [await yOf(s.page.getByText(NEW_TITLE, { exact: true })), await yOf(btn(s.page, G[0])), await yOf(btn(s.page, G[1])), await yOf(btn(s.page, G[2])), await yOf(btn(s.page, NONE)), await yOf(btn(s.page, T.back))];
@@ -1993,9 +2004,10 @@ async function runMockRL() {
     await send(s.page, 'ok'); await s.page.waitForTimeout(300);
     ok('RLc: a too-short answer → the app asks again = the 2nd ask → the 19/11 list of the two, with its own title (' + (await bothTitles(s.page)).join('/') + ' — new/old), the two sentences ' + (await btnN(s.page, G[0])) + '/' + (await btnN(s.page, G[1])) + ' — unchanged',
       (await titleN(s.page, OLD_TITLE)) === 1 && (await titleN(s.page, NEW_TITLE)) === 0 && (await btnN(s.page, G[0])) === 1 && (await btnN(s.page, G[1])) === 1 && (await btnN(s.page, NONE)) === 1 && s.calls.length === n0);
-    // decision 15 (22/11/2026): the line «Πάτα ό,τι ταιριάζει…» is under John's heading only; the 19/11 list of two carries its instruction in its own title
-    ok('RLc: the list of two has NO line under its title (the hint line of the 3-or-more list is not there: ' + (await s.page.getByText('Πάτα ό,τι ταιριάζει, θα μπει στο πεδίο και μπορείς να το αλλάξεις.', { exact: true }).count()) + ')',
-      (await s.page.getByText('Πάτα ό,τι ταιριάζει, θα μπει στο πεδίο και μπορείς να το αλλάξεις.', { exact: true }).count()) === 0 && (await titleN(s.page, OLD_TITLE)) === 1);
+    // UPDATED (22/11/2026, ⚑1): decision 15's separate line «Πάτα ό,τι ταιριάζει…» is gone from EVERY list now — John's block carries its instruction inside the heading. Why this check stays: it is a guard that the 19/11 list of two did not get
+    // the old line either, and that its own 19/11 title is unchanged (John's correction names only the heading of the 3-or-more list).
+    ok('RLc: the list of two has NO separate line under its title (' + (await s.page.getByText(OLD_HINT, { exact: true }).count()) + '), and its own 19/11 title is unchanged (' + (await titleN(s.page, OLD_TITLE)) + ')',
+      (await s.page.getByText(OLD_HINT, { exact: true }).count()) === 0 && (await titleN(s.page, OLD_TITLE)) === 1);
     { const r = await listRecs(s.page); ok('RLc (device log): the one record is list_shown with n 2 (' + r.map(x => x.ev + ':' + (x.n !== undefined ? x.n : '')).join(', ') + ')', r.length === 1 && r[0].ev === 'list_shown' && r[0].n === 2); }
     await s.browser.close();
   }
@@ -2110,16 +2122,20 @@ async function runMockRL() {
 
 // ── RX: MORE CHECKS ON THE ROOT LIST (John, 22/11/2026, branch root-list; $0, fake model, the real app in Chromium). Nothing here changes the app. Five more questions about the list of 21/11 (RL):
 // RXa a tap puts the sentence in the box, the user changes it with the keys alone, the app sends nothing, the card holds exactly the changed words, and NOTHING of a confirmed root happens before the user's
-// own «Ναι, αυτό είναι» (none of the five records of a confirmed root, no step question) — and after it, it does · RXb two taps replace each other (and what was typed is replaced — an observation) ·
+// own «Ναι, αυτό είναι» (none of the five records of a confirmed root, no step question) — and after it, it does · RXb UPDATED (⚑2): two taps do NOT replace each other — the second goes on a new line — and what the user typed is kept ·
 // RXc «Καμία από αυτές», then «Δεν το βρήκα ακόμα, συνέχισε»: the chat goes on, the model answers, the root question comes again WITHOUT a list, a new root → card → «Ναι» → the step · RXd «Δεν το βρήκα
-// ακόμα» straight from the list (and after a tap), and from the card of a picked sentence · RXe «Διόρθωσε» on the card of a picked sentence · RXp the phone, 390×844: 3 short or 8 long sentences of the
+// ακόμα» straight from the list (and after a tap — UPDATED (⚑2): the unchanged tapped sentence is cleared), and from the card of a picked sentence · RXe «Διόρθωσε» on the card of a picked sentence · RXg NEW (⚑2): never a silent deletion
+// of the user's words — «Δεν το βρήκα ακόμα» clears the box ONLY when it holds exactly the unchanged sentence the app put in (10 cases) · RXp the phone, 390×844: 3 short or 8 long sentences of the
 // user (up to 200 characters) × a short or a long reply of the model above them — measures, no horizontal scroll, no cut button, the bottom of the card above the box · RXs the safety path with the list on the
 // screen: a crisis sentence and a danger from another person typed at the root question → the list is gone, the app's line, the safety request, no card · RXt the device log of four small sessions
 // (picked and not changed · picked and reworded with the same words · picked and new words added · typed by hand): can the log tell «picked and did not change» from «picked and changed»?
 // (the danger sentence below is written in two pieces on purpose, as in RLe). Alone: --only RX. Screenshots RX-phone-*.png.
 async function runMockRX() {
   const T = APP.texts;
-  const NEW_TITLE = 'Ποιο από αυτά νομίζεις ότι τραβάει τα άλλα; Ή κάτι που δεν έχεις πει ακόμα;', NONE = 'Καμία από αυτές';
+  // UPDATED (22/11/2026, John's correction ⚑1): the heading is John's block of instruction (it replaces the question «Ποιο από αυτά νομίζεις ότι τραβάει τα άλλα; Ή κάτι που δεν έχεις πει ακόμα;» and decision 15's separate line) — see RL for why
+  const NEW_TITLE = 'Δικά σου λόγια από πριν. Αν κάποιο λέει αυτό που σε απασχολεί πραγματικά, πάτα το — θα μπει στο πεδίο και μπορείς να το αλλάξεις. Αν όχι, γράψε κάτι που δεν έχεις πει ακόμα.', NONE = 'Καμία από αυτές';
+  const OLD_HINT = 'Πάτα ό,τι ταιριάζει, θα μπει στο πεδίο και μπορείς να το αλλάξεις.';
+  const MINE = 'Κάτι που έγραφα μόνος μου.';
   const L1018 = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
   const SELF = 'Σε άμεσο κίνδυνο, 112. Για βία στο σπίτι, 15900, γραμμή SOS για τη βία κατά των γυναικών.';
   const E = 'Δεν ξέρω αν πρέπει να αλλάξω γραφείο, με πιέζει το πρόγραμμα.';
@@ -2176,15 +2192,19 @@ async function runMockRX() {
         L('root_answer').filter(r => r.answer === 1 && r.from === 2).length === 1 && L('step_shown').length === 1 && L('root_new_words').length === 1 && nw.newWords > 0 && (await bodyText(s.page)).includes(T.stepQ)); }
     await s.browser.close();
   }
-  // ── RXb — two taps replace each other; what the user had typed is replaced too (an observation: the 19/11 list did the same)
+  // ── RXb — UPDATED (22/11/2026, John's correction ⚑2: «Ποτέ σιωπηλή διαγραφή λόγων του χρήστη. Αν το πεδίο έχει κείμενο, η πρόταση προστίθεται σε νέα γραμμή.»). Before: «a second tap REPLACES the first» and an INFO line that said the
+  // typed draft was gone after a tap — that is exactly the silent deletion ⚑2 forbids. Now: the second tap goes on a NEW line under the first, and what the user typed is kept, the sentence is added under it.
   { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
     await fiveMsgs(s); await press(s.page);
+    const n0 = s.calls.length;
     await click(s.page, G[0]); const a = await boxValue(s.page);
     await click(s.page, G[2]); const b = await boxValue(s.page);
     const picks = (await evs(s.page, 'list_picked')).map(r => r.pos).join();
-    ok('RXb: a second tap REPLACES the first (box: ' + (a === G[0]) + ' then ' + (b === G[2]) + '), one sentence at a time, the places recorded as numbers (' + picks + ')', a === G[0] && b === G[2] && picks === '1,3');
-    await boxOf(s.page).fill('Κάτι που έγραφα μόνος μου.'); await click(s.page, G[1]);
-    results.push('INFO — RXb: a tap REPLACES what the user had typed in the box (typed «Κάτι που έγραφα μόνος μου.», after the tap the box holds the tapped sentence: ' + ((await boxValue(s.page)) === G[1]) + ') — the typed draft is gone; the 19/11 list behaved the same');
+    ok('RXb [⚑2]: a second tap goes on a NEW line under the first, the first is kept (box: ' + (a === G[0]) + ' then ' + (b === G[0] + '\n' + G[2]) + '), the places recorded as numbers (' + picks + '), nothing sent (' + (s.calls.length - n0) + ' calls)',
+      a === G[0] && b === G[0] + '\n' + G[2] && picks === '1,3' && s.calls.length === n0);
+    await boxOf(s.page).fill(MINE); await click(s.page, G[1]);
+    ok('RXb [⚑2]: a tap on a box that holds the user\'s own typed words KEEPS them and adds the sentence on a new line (box: ' + JSON.stringify(await boxValue(s.page)) + '), the list stays (' + (await titleN(s.page, NEW_TITLE)) + '), no card (' + (await card(s.page)) + ')',
+      (await boxValue(s.page)) === MINE + '\n' + G[1] && (await titleN(s.page, NEW_TITLE)) === 1 && !(await card(s.page)));
     await s.browser.close();
   }
   // ── RXc — «Καμία από αυτές», then «Δεν το βρήκα ακόμα, συνέχισε»: the flow goes on
@@ -2226,8 +2246,11 @@ async function runMockRX() {
   }
   { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
     await fiveMsgs(s); await press(s.page);
-    await click(s.page, G[2]); await click(s.page, T.back);
-    results.push('INFO — RXd: a sentence tapped and then «' + T.back + '» → the chat is back and the tapped sentence STAYS in the box (' + ((await boxValue(s.page)) === G[2]) + '): if the user sends it, it goes to the model as an ordinary message — his own words, already said');
+    await click(s.page, G[2]); const c0 = s.calls.length; await click(s.page, T.back);
+    // UPDATED (22/11/2026, ⚑2): before, the tapped sentence STAYED in the box after «Δεν το βρήκα ακόμα» (an INFO line said so, and that a send would have gone to the model as an ordinary message). John's rule now:
+    // «Μετά το «Δεν το βρήκα ακόμα», το πεδίο καθαρίζει ΜΟΝΟ αν περιέχει ακριβώς την αμετάβλητη πρόταση που μπήκε από την εφαρμογή.» — the box holds exactly that, so it is cleared (the user's words are not lost: they are in the chat).
+    ok('RXd [⚑2]: a sentence tapped and then «' + T.back + '» → the chat is back (button ' + (await btnN(s.page, T.button)) + ') and the box is EMPTY — it held exactly the unchanged sentence the app had put in (' + JSON.stringify(await boxValue(s.page)) + '), no model call (' + (s.calls.length - c0) + ')',
+      (await btnN(s.page, T.button)) === 1 && (await boxValue(s.page)) === '' && s.calls.length === c0);
     await s.browser.close();
   }
   { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
@@ -2258,9 +2281,75 @@ async function runMockRX() {
     ok('RXe: «' + T.yes + '» → the step question (' + (await bodyText(s.page)).includes(T.stepQ) + '), root_answer ' + (await evs(s.page, 'root_answer')).map(r => r.answer + '/' + r.from).join(' '), (await bodyText(s.page)).includes(T.stepQ) && (await evs(s.page, 'root_answer')).map(r => r.answer + '/' + r.from).join(' ') === '2/2 1/2');
     await s.browser.close();
   }
+  // ── RXg — NEW (22/11/2026, John's correction ⚑2): NEVER a silent deletion of the user's words. «Δεν το βρήκα ακόμα» clears the box ONLY when it holds exactly the unchanged sentence the app put in. Every case below is one way a box can differ
+  // from that; in each the user's text must come back byte for byte. (The unit test auratests/test_root_list_2111.js, section 11, proves the two decisions as pure functions; here the real app does it with real keys.)
+  { const fresh = async () => { const s = await session('?stageA=1&rec=1', QS); watch(s.page); await fiveMsgs(s); await press(s.page); return s; };
+    // g1 — a tap, then a word typed after it → «Δεν το βρήκα»: the whole text is kept
+    { const s = await fresh(); await click(s.page, G[2]); await s.page.keyboard.press('Control+End'); await s.page.keyboard.type(' και κάτι ακόμα'); const was = await boxValue(s.page); const c0 = s.calls.length;
+      await click(s.page, T.back);
+      ok('RXg1: a tap, then a few words typed after it → «' + T.back + '» → the chat is back (button ' + (await btnN(s.page, T.button)) + ') and the box keeps EVERY character (' + JSON.stringify(await boxValue(s.page)) + '), no model call (' + (s.calls.length - c0) + ')',
+        was === G[2] + ' και κάτι ακόμα' && (await boxValue(s.page)) === was && (await btnN(s.page, T.button)) === 1 && s.calls.length === c0);
+      await s.browser.close(); }
+    // g2 — two taps (the box holds two lines) → «Δεν το βρήκα»: both lines are kept (the literal reading: only the ONE unchanged sentence is cleared)
+    { const s = await fresh(); await click(s.page, G[0]); await click(s.page, G[2]); const was = await boxValue(s.page);
+      await click(s.page, T.back);
+      ok('RXg2: two taps (' + JSON.stringify(was) + ') → «' + T.back + '» → both lines are kept (' + JSON.stringify(await boxValue(s.page)) + ')', was === G[0] + '\n' + G[2] && (await boxValue(s.page)) === was);
+      await s.browser.close(); }
+    // g3 — the user's own typed words, then a tap (the sentence goes on a new line) → «Δεν το βρήκα»: all kept
+    { const s = await fresh(); await boxOf(s.page).fill(MINE); await click(s.page, G[1]); const was = await boxValue(s.page);
+      await click(s.page, T.back);
+      ok('RXg3: typed words + a tap (' + JSON.stringify(was) + ') → «' + T.back + '» → everything is kept (' + JSON.stringify(await boxValue(s.page)) + ')', was === MINE + '\n' + G[1] && (await boxValue(s.page)) === was);
+      await s.browser.close(); }
+    // g4 — a tap, everything deleted by the user, the SAME sentence typed by hand → the app did not put it there → kept
+    { const s = await fresh(); await click(s.page, G[1]); await boxOf(s.page).fill(''); await boxOf(s.page).fill(G[1]);
+      await click(s.page, T.back);
+      ok('RXg4: a tap, everything deleted, the same sentence typed by hand → «' + T.back + '» → it is kept (' + JSON.stringify(await boxValue(s.page)) + ') — the app clears only what IT put in',
+        (await boxValue(s.page)) === G[1] && (await btnN(s.page, T.button)) === 1);
+      await s.browser.close(); }
+    // g5 — a tap, a letter typed and deleted again (the box is identical to the sentence again, but the user touched it) → kept: the app forgets at the FIRST change (nothing is ever cleared when in doubt)
+    { const s = await fresh(); await click(s.page, G[1]); await s.page.keyboard.press('Control+End'); await s.page.keyboard.type('x'); await s.page.keyboard.press('Backspace'); const was = await boxValue(s.page);
+      await click(s.page, T.back);
+      ok('RXg5: a tap, a letter typed and deleted (the box is the sentence again: ' + (was === G[1]) + ') → «' + T.back + '» → kept (' + JSON.stringify(await boxValue(s.page)) + ') — the app forgets at the first change by the user',
+        was === G[1] && (await boxValue(s.page)) === G[1]);
+      await s.browser.close(); }
+    // g6 — a tap, then «Καμία από αυτές» (it does not touch the box), then «Δεν το βρήκα»: the box still holds exactly the unchanged sentence → cleared
+    { const s = await fresh(); await click(s.page, G[1]); await click(s.page, NONE); const afterNone = await boxValue(s.page), listGone = (await lists(s.page)).every(n => n === 0);
+      await click(s.page, T.back);
+      ok('RXg6: a tap, «' + NONE + '» (the box is not touched by it: ' + (afterNone === G[1]) + ', the list is gone: ' + listGone + ') → «' + T.back + '» → the box held exactly the unchanged sentence → cleared (' + JSON.stringify(await boxValue(s.page)) + ')',
+        afterNone === G[1] && listGone && (await boxValue(s.page)) === '' && (await btnN(s.page, T.button)) === 1);
+      await s.browser.close(); }
+    // g7 — the user's typed words, then «Καμία από αυτές», then «Δεν το βρήκα»: kept
+    { const s = await fresh(); await boxOf(s.page).fill(MINE); await click(s.page, NONE); const afterNone = await boxValue(s.page);
+      await click(s.page, T.back);
+      ok('RXg7: typed words, «' + NONE + '» (the box is not touched: ' + (afterNone === MINE) + ') → «' + T.back + '» → kept (' + JSON.stringify(await boxValue(s.page)) + ')', afterNone === MINE && (await boxValue(s.page)) === MINE);
+      await s.browser.close(); }
+    // g8 — a box of spaces and line breaks only holds no word of the user's: the tap puts the sentence in as it is (no stray blank lines), and the app remembers it put it there → «Δεν το βρήκα» clears
+    { const s = await fresh(); await boxOf(s.page).fill('  \n  '); await click(s.page, G[0]); const was = await boxValue(s.page);
+      await click(s.page, T.back);
+      ok('RXg8: a box with only spaces and a line break + a tap → exactly the sentence (' + (was === G[0]) + ', no blank line before it) → «' + T.back + '» → cleared (' + JSON.stringify(await boxValue(s.page)) + ')', was === G[0] && (await boxValue(s.page)) === '');
+      await s.browser.close(); }
+    // g9 — a tap on the 19/11 list of TWO (the same handler): the user's typed words are kept there too, the sentence on a new line; «Δεν το βρήκα» keeps it all
+    { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+      for (const m of [E, G[0], G[1]]) await send(s.page, m);
+      await press(s.page); await send(s.page, 'ok'); await s.page.waitForTimeout(300);
+      const OLD_TITLE = 'Δικά σου λόγια από πριν. Πάτα μία για να τη βάλεις στο πεδίο και να τη διορθώσεις όπως θες:';
+      const isTwo = (await titleN(s.page, OLD_TITLE)) === 1;
+      await boxOf(s.page).fill(MINE); await click(s.page, G[0]); const was = await boxValue(s.page);
+      await click(s.page, T.back);
+      ok('RXg9: the 19/11 list of two (' + isTwo + '): typed words + a tap → on a new line (' + JSON.stringify(was) + '), and «' + T.back + '» keeps it all (' + JSON.stringify(await boxValue(s.page)) + ')',
+        isTwo && was === MINE + '\n' + G[0] && (await boxValue(s.page)) === was);
+      await s.browser.close(); }
+    // g10 — what a user can do with two taps: send both. The app does not decide anything: the card shows exactly those words and NOTHING of a confirmed root happens before the user's own «Ναι» (an observation — what the app does with a two-sentence root)
+    { const s = await fresh(); await click(s.page, G[0]); await click(s.page, G[2]); const two = await boxValue(s.page), n0 = s.calls.length; await sendBox(s.page);
+      const cardUp = await card(s.page), bothShown = (await bodyText(s.page)).includes(G[0]) && (await bodyText(s.page)).includes(G[2]);
+      ok('RXg10: two taps and the user sends the box (' + JSON.stringify(two) + ') → the app shows the card (' + cardUp + ') with both sentences on the screen (' + bothShown + '), 0 model calls (' + (s.calls.length - n0) + '), and nothing of a confirmed root before the user\'s own «' + T.yes + '» (' + confirmedSeen(await telLog(s.page)).length + ' records)',
+        two === G[0] + '\n' + G[2] && cardUp && bothShown && s.calls.length === n0 && confirmedSeen(await telLog(s.page)).length === 0);
+      await s.browser.close(); }
+  }
   // ── RXp — the phone (390×844): 3 short or 8 long sentences of the user × a short or a long reply of the model right above the root question. John's decision 15 (22/11/2026): on the phone the
-  // heading is ALWAYS in view when the list appears, with the line «Πάτα ό,τι ταιριάζει…» under it; the bottom of a card that is too tall for the screen is reached by scrolling.
-  { const HINT = 'Πάτα ό,τι ταιριάζει, θα μπει στο πεδίο και μπορείς να το αλλάξεις.';
+  // heading is ALWAYS in view when the list appears; the bottom of a card that is too tall for the screen is reached by scrolling. UPDATED (22/11/2026, ⚑1): decision 15 also asked for a line «Πάτα ό,τι ταιριάζει…» under the heading;
+  // John's correction folds that instruction INTO the heading block, so there is no separate line any more — the check below is now «the whole heading block is in view, and the old line is not on the screen».
+  {
     const SHORT3 = ['Με πιέζει το ωράριο.', 'Φοβάμαι την αλλαγή.', 'Θέλω ησυχία.'];
     const LONG8 = [
       'Το ωράριο στο γραφείο έχει γίνει τόσο βαρύ που τα βράδια δεν έχω δύναμη ούτε να μαγειρέψω, και τα Σαββατοκύριακα τα περνάω προσπαθώντας να συνέλθω για την επόμενη εβδομάδα.',
@@ -2283,7 +2372,7 @@ async function runMockRX() {
       await press(s.page);
       await s.page.waitForTimeout(900); // the smooth scroll that follows the list
       const bub = s.page.locator('.turn-aura').filter({ hasText: lastQ }).last();
-      const rBub = await rect(bub), rAsk = await rect(s.page.getByText(T.ask, { exact: true })), rHead = await rect(s.page.getByText(NEW_TITLE, { exact: true })), rHint = await rect(s.page.getByText(HINT, { exact: true })),
+      const rBub = await rect(bub), rAsk = await rect(s.page.getByText(T.ask, { exact: true })), rHead = await rect(s.page.getByText(NEW_TITLE, { exact: true })), oldHint = await s.page.getByText(OLD_HINT, { exact: true }).count(),
         rFirst = await rect(btn(s.page, users[0])), rLast = await rect(btn(s.page, users[users.length - 1])), rNone = await rect(btn(s.page, NONE)), rBack = await rect(btn(s.page, T.back)), rBox = await rect(boxOf(s.page)), rFeed = await rect(s.page.locator('.feed'));
       const geo = await s.page.evaluate(({ users }) => {
         const bs = [...document.querySelectorAll('button')].filter(b => users.includes(b.textContent.trim()));
@@ -2297,9 +2386,9 @@ async function runMockRX() {
       const bottomWasInView = inView(rNone) === true && inView(rBack) === true;
       ok('RXp ' + tag + ' (390×844): the list shows ' + geo.n + ' sentences (' + users.length + ' expected) under John\'s heading (' + (await titleN(s.page, NEW_TITLE)) + '); no horizontal scroll (' + geo.sw + ' ≤ ' + geo.iw + '), no button cut (' + geo.clipped + ') or outside the screen (' + geo.outside + '), the tallest button ' + geo.tallest + 'px',
         geo.n === users.length && (await titleN(s.page, NEW_TITLE)) === 1 && geo.sw <= geo.iw && geo.clipped === 0 && geo.outside === 0);
-      ok('RXp ' + tag + ' (390×844) [decision 15]: right after the list appears the heading is IN VIEW, whole (' + yn(inView(rHead)) + '), with the line «' + HINT + '» under it (' + (rHint ? 'there, in view: ' + yn(inView(rHint)) : 'not there') + ', under the heading: ' + yn(rHead && rHint ? rHint.y >= rHead.y + rHead.height - 1 && rHint.y - (rHead.y + rHead.height) < 30 : null) + '), the root question above it in view (' + yn(inView(rAsk)) + '), and the first sentence starts in view (' + yn(startsInView(rFirst)) + ')',
-        inView(rHead) === true && inView(rHint) === true && !!rHead && !!rHint && rHint.y >= rHead.y + rHead.height - 1 && rHint.y - (rHead.y + rHead.height) < 30 && inView(rAsk) === true && startsInView(rFirst) === true);
-      results.push('INFO — RXp ' + tag + ' (390×844, the chat area is y ' + R0(fTop) + '…' + R0(fBottom) + '; y of the top, negative = above the screen; right after the list appeared): the model\'s last reply ' + R0(rBub && rBub.y) + '…' + R0(rBub && rBub.y + rBub.height) + ' (' + (longModel ? 'long' : 'short') + ') · the root question ' + R0(rAsk && rAsk.y) + ' · heading ' + R0(rHead && rHead.y) + '…' + R0(rHead && rHead.y + rHead.height) + ' · hint ' + R0(rHint && rHint.y) + ' · first sentence ' + R0(rFirst && rFirst.y) + ' · last sentence bottom ' + R0(rLast && rLast.y + rLast.height) + ' · «' + NONE + '» ' + R0(rNone && rNone.y) + ' · «' + T.back + '» bottom ' + R0(rBack && rBack.y + rBack.height) + ' · box top ' + R0(rBox && rBox.y) + ' → in view without scrolling: the model\'s question ' + yn(inView(rBub)) + ', the bottom buttons ' + yn(bottomWasInView));
+      ok('RXp ' + tag + ' (390×844) [decision 15, ⚑1]: right after the list appears the heading BLOCK is IN VIEW, whole (' + yn(inView(rHead)) + ', ' + R0(rHead && rHead.height) + 'px high), the old separate line is not on the screen (' + oldHint + '), the root question above it in view (' + yn(inView(rAsk)) + '), and the first sentence starts in view (' + yn(startsInView(rFirst)) + ')',
+        inView(rHead) === true && oldHint === 0 && inView(rAsk) === true && startsInView(rFirst) === true);
+      results.push('INFO — RXp ' + tag + ' (390×844, the chat area is y ' + R0(fTop) + '…' + R0(fBottom) + '; y of the top, negative = above the screen; right after the list appeared): the model\'s last reply ' + R0(rBub && rBub.y) + '…' + R0(rBub && rBub.y + rBub.height) + ' (' + (longModel ? 'long' : 'short') + ') · the root question ' + R0(rAsk && rAsk.y) + ' · heading ' + R0(rHead && rHead.y) + '…' + R0(rHead && rHead.y + rHead.height) + ' · first sentence ' + R0(rFirst && rFirst.y) + ' · last sentence bottom ' + R0(rLast && rLast.y + rLast.height) + ' · «' + NONE + '» ' + R0(rNone && rNone.y) + ' · «' + T.back + '» bottom ' + R0(rBack && rBack.y + rBack.height) + ' · box top ' + R0(rBox && rBox.y) + ' → in view without scrolling: the model\'s question ' + yn(inView(rBub)) + ', the bottom buttons ' + yn(bottomWasInView));
       await s.page.screenshot({ path: path.join(OUT, 'RX-phone-' + tag + '.png'), fullPage: false });
       if (!longUser) ok('RXp ' + tag + ' (390×844): a list of three short sentences fits the screen with its two bottom buttons («' + NONE + '», «' + T.back + '») in view, right away, without scrolling (' + yn(inView(rNone)) + ', ' + yn(inView(rBack)) + ')', bottomWasInView);
       if (!longUser && !longModel) ok('RXp ' + tag + ' (390×844): when the whole card fits, the model\'s last reply stays in view above it (' + yn(inView(rBub)) + ') — the app does not scroll past it', inView(rBub) === true);
@@ -2360,7 +2449,8 @@ async function runMockRX() {
 async function runMockP1() {
   const T = APP.texts;
   const TITLE = 'Δικά σου λόγια από πριν. Πάτα μία για να τη βάλεις στο πεδίο και να τη διορθώσεις όπως θες:', NONE = 'Καμία από αυτές';
-  const NEW_TITLE = 'Ποιο από αυτά νομίζεις ότι τραβάει τα άλλα; Ή κάτι που δεν έχεις πει ακόμα;'; // Λ1 (21/11, root-list): with 3 or more sentences the list at the root question carries John's heading, not the 19/11 title
+  // UPDATED (22/11/2026, ⚑1): John's heading is now the block of instruction (it replaced the question «Ποιο από αυτά νομίζεις ότι τραβάει τα άλλα; Ή κάτι που δεν έχεις πει ακόμα;») — see RL for why
+  const NEW_TITLE = 'Δικά σου λόγια από πριν. Αν κάποιο λέει αυτό που σε απασχολεί πραγματικά, πάτα το — θα μπει στο πεδίο και μπορείς να το αλλάξεις. Αν όχι, γράψε κάτι που δεν έχεις πει ακόμα.'; // Λ1 (21/11, root-list): with 3 or more sentences the list at the root question carries John's heading, not the 19/11 title
   const E = 'Δεν ξέρω αν πρέπει να αλλάξω γραφείο, με πιέζει το πρόγραμμα.';
   const G1 = 'Το ωράριο είναι βαρύ και δεν αφήνει χρόνο για τίποτα άλλο.', G2 = 'Θέλω περισσότερο χρόνο για την οικογένειά μου.', G3 = 'Η μετακίνηση παίρνει δύο ώρες κάθε μέρα.';
   const RQ = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';

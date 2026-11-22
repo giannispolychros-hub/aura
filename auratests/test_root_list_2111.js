@@ -7,6 +7,11 @@
 //   is today. The user chooses or writes; AURA proposes no root of its own. Code only: the core prompt does not change (fingerprint 7e52268b…). Never on the safety path.
 //   Once per session. Numbers only in the device log (list_shown / list_picked / list_none).
 //
+// UPDATED (22/11/2026, John's correction ⚑1–⚑2): the heading became ONE block of instruction with no question mark («Δικά σου λόγια από πριν. Αν κάποιο λέει αυτό που σε απασχολεί
+// πραγματικά, πάτα το — θα μπει στο πεδίο και μπορείς να το αλλάξεις. Αν όχι, γράψε κάτι που δεν έχεις πει ακόμα.») — the card has ONE question, the root's — and the separate line of decision 15 is part of
+// it; and the tap NEVER deletes the user's words (a box with text keeps it, the sentence comes on a new line; «Δεν το βρήκα ακόμα» clears the box only when it holds exactly the unchanged sentence the app put in).
+// Every assertion whose text or condition changed for that carries its own «UPDATED (22/11/2026 …)» note with the reason.
+//
 // Test-first (John): every assertion labelled NEW fails on 6202c34 (the code before this change) and passes after; GUARD assertions are green before and after on purpose
 // (they pin what must not move). All text here is synthetic: no word of any real session.
 
@@ -27,11 +32,11 @@ const CONSTS = ['HELPLINES', 'KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_MIN_SUBSTANCE_WOR
   'SPEAK_RIGHT_DISMISS_START', 'SPEAK_RIGHT_HEAVY_WORDS', 'SPEAK_RIGHT_CONTENT_WORDS',
   'ROOT_PICK_MAX', 'ROOT_PICK_MAX_CHARS', 'ROOT_PICK_TRIM_YES', 'ROOT_PICK_TRIM_DK', 'ROOT_PICK_NO_START', 'ROOT_PICK_DEICTIC', 'ROOT_PICK_SELF_LABEL',
   'ROOT_PICK_SELF_BLAME', 'ROOT_PICK_ADDRESSED', 'ROOT_PICK_FILLER', 'ROOT_PICK_CONNECTOR', 'ROOT_PICK_TEXTS',
-  'ROOT_LIST_MIN', 'ROOT_LIST_MAX', 'ROOT_LIST_TEXTS', 'ROOT_LIST_HINT'];
+  'ROOT_LIST_MIN', 'ROOT_LIST_MAX', 'ROOT_LIST_TEXTS'];  // UPDATED (22/11/2026, ⚑1): 'ROOT_LIST_HINT' is no longer lifted — the separate line of decision 15 is part of the heading block now
 const FNS = ['lookBehind', 'detectSafetySignal', 'classifyCrisisTier', 'detectsDangerFromOther', 'detectsMentalHealthReferral', 'mergeRiskKind',
   'stageASafetyHold', 'rootAnswerIsDismissal', 'rootAnswerIsUnsure', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord',
   'substanceOfSentence', 'splitSentences', 'rootTextHasSubstance', 'speakRightSpans', 'speakRightEndsWithQuestion', 'speakRightJaccard',
-  'branchSessionSafe', 'detectsCoreReadinessAsked', 'rootAskNumber', 'rootPickSentences', 'rootPickView', 'recordTelemetry', 'buildTesterExport', 'rootPickRecord', 'rootListScrollPlan'];
+  'branchSessionSafe', 'detectsCoreReadinessAsked', 'rootAskNumber', 'rootPickSentences', 'rootPickView', 'recordTelemetry', 'buildTesterExport', 'rootPickRecord', 'rootListScrollPlan', 'rootPickTapBox', 'rootPickBackBox'];  // UPDATED (22/11/2026, ⚑2): + the two pure functions of the writing box
 let F = {};
 try {
   F = new Function([...CONSTS.map(n => constSrc(n) || `const ${n} = undefined;`),
@@ -74,14 +79,20 @@ const viewTexts = (m, over) => { const v = view(m, over); return v && isArr(v.se
 // 1. John's words — the constants
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 {
-  assert('NEW — (1.1) the heading is John\'s sentence, word for word, in its own constant (kept apart from the 19/11 title and from STAGE_A_TEXTS)',
-    !!F.ROOT_LIST_TEXTS && F.ROOT_LIST_TEXTS.title === 'Ποιο από αυτά νομίζεις ότι τραβάει τα άλλα; Ή κάτι που δεν έχεις πει ακόμα;' && Object.keys(F.ROOT_LIST_TEXTS).join() === 'title');
+  // UPDATED (22/11/2026, John's correction ⚑1): the heading text is John's NEW block, word for word (it replaced the question «Ποιο από αυτά νομίζεις ότι τραβάει τα άλλα; Ή κάτι που δεν έχεις πει ακόμα;»)
+  assert('NEW — (1.1) UPDATED (22/11/2026, ⚑1): the heading is John\'s block of instruction, word for word, in its own constant (kept apart from the 19/11 title and from STAGE_A_TEXTS)',
+    !!F.ROOT_LIST_TEXTS && F.ROOT_LIST_TEXTS.title === 'Δικά σου λόγια από πριν. Αν κάποιο λέει αυτό που σε απασχολεί πραγματικά, πάτα το — θα μπει στο πεδίο και μπορείς να το αλλάξεις. Αν όχι, γράψε κάτι που δεν έχεις πει ακόμα.' && Object.keys(F.ROOT_LIST_TEXTS).join() === 'title');
   assert('NEW — (1.2) the rule\'s two numbers are named in one place each: at least 3 sentences (ROOT_LIST_MIN), at most 8 (ROOT_LIST_MAX)', F.ROOT_LIST_MIN === 3 && F.ROOT_LIST_MAX === 8);
   assert('GUARD — (1.3) the 19/11 texts did not move: the title of the 2-sentence list and «Καμία από αυτές» (the one «none» button is shared), and the old limit of 3',
     !!F.ROOT_PICK_TEXTS && F.ROOT_PICK_TEXTS.none === 'Καμία από αυτές' && F.ROOT_PICK_TEXTS.title === 'Δικά σου λόγια από πριν. Πάτα μία για να τη βάλεις στο πεδίο και να τη διορθώσεις όπως θες:'
     && Object.keys(F.ROOT_PICK_TEXTS).sort().join() === 'none,title' && F.ROOT_PICK_MAX === 3);
-  assert('NEW — (1.4) the heading says nothing the user did not say: no word about a root, a cause, a feeling, a judgement («ρίζα», «φόβος», «σωστό», «πρέπει»…) — and it is a question for the user, not a statement of AURA',
-    !!F.ROOT_LIST_TEXTS && typeof F.ROOT_LIST_TEXTS.title === 'string' && !/ρίζα|φοβ|σωστ|λάθος|πρέπει|πρόβλημα|αιτία|ξέρω|βρήκα/i.test(F.ROOT_LIST_TEXTS.title) && (F.ROOT_LIST_TEXTS.title.match(/;/g) || []).length === 2);
+  // UPDATED (22/11/2026, ⚑1): the old condition «a question for the user: exactly two question marks» is turned round — the new heading is NOT a question (no question mark of either kind) and presupposes no hierarchy among the user's words
+  assert('NEW — (1.4) UPDATED (22/11/2026, ⚑1): the heading says nothing the user did not say: no word about a root, a cause, a feeling, a judgement («ρίζα», «φόβος», «σωστό», «πρέπει»…), no ranking or hierarchy («τραβάει», «κέντρο», «πιο σημαντικό») — and it is NOT a question: no question mark of either kind (the Greek one included)',
+    !!F.ROOT_LIST_TEXTS && typeof F.ROOT_LIST_TEXTS.title === 'string' && !/ρίζα|φοβ|σωστ|λάθος|πρέπει|πρόβλημα|αιτία|ξέρω|βρήκα|τραβάει|κέντρο|σημαντικ/i.test(F.ROOT_LIST_TEXTS.title) && !/[;\u037e?]/.test(F.ROOT_LIST_TEXTS.title));
+  assert('NEW — (1.5) the heading is ONE block that does three things in the user\'s own frame — «Δικά σου λόγια από πριν.» (what they are) · «πάτα το — θα μπει στο πεδίο και μπορείς να το αλλάξεις» (what a tap does; the box, and it can be changed) · «Αν όχι, γράψε κάτι που δεν έχεις πει ακόμα.» (the way out) — and the whole app never shows the old question again',
+    !!F.ROOT_LIST_TEXTS && typeof F.ROOT_LIST_TEXTS.title === 'string' && /^Δικά σου λόγια από πριν\. Αν κάποιο λέει αυτό που σε απασχολεί πραγματικά, πάτα το — θα μπει στο πεδίο και μπορείς να το αλλάξεις\. Αν όχι, γράψε κάτι που δεν έχεις πει ακόμα\.$/.test(F.ROOT_LIST_TEXTS.title) && raw.indexOf('Ποιο από αυτά νομίζεις') === -1);
+  assert('NEW — (1.6) ONE question on the card: the app\'s texts of the root question\'s card — its question, the heading, the retry line, «Καμία από αυτές», «Δεν το βρήκα ακόμα» — hold exactly ONE question mark, the root question\'s own (John, ⚑1: «Μόνο ΜΙΑ ερώτηση (της ρίζας) και το μπλοκ χωρίς «;»»)',
+    (() => { try { const ST = Function(objSrc('STAGE_A_TEXTS') + '\nreturn STAGE_A_TEXTS;')(); const all = [ST.ask, F.ROOT_LIST_TEXTS.title, ST.retry, F.ROOT_PICK_TEXTS.none, ST.back].join(' '); return (all.match(/[;\u037e?]/g) || []).length === 1 && /[;\u037e?]/.test(ST.ask); } catch (e) { return false; } })());
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -194,7 +205,9 @@ const viewTexts = (m, over) => { const v = view(m, over); return v && isArr(v.se
     ask.length > 0 && ask.indexOf('handleRootPickTap') > ask.indexOf('rootPick.length') && ask.indexOf('ROOT_PICK_TEXTS.none') > ask.indexOf('handleRootPickTap') && ask.indexOf('handleStageABack') > ask.indexOf('ROOT_PICK_TEXTS.none')
     && /onClick=\{\(\) => handleRootPickTap\(t, i\)\}/.test(ask));
   assert('GUARD — (7.3) the user\'s words are shown as typed (the capital letters of the button style are switched off) and every sentence is its own button (map over rootPick)', /textTransform:\s*"none"/.test(ask) && /rootPick\.map\(\(t, i\) =>/.test(ask));
-  assert('NEW — (7.4) John\'s heading is written once in the whole file (its constant): no second copy in a text, a prompt or a test double', raw.split('Ποιο από αυτά νομίζεις ότι τραβάει τα άλλα;').length === 2);
+  // UPDATED (22/11/2026, ⚑1): the same rule for the NEW heading — written once in the whole file; and the old question, replaced by John, is nowhere any more
+  assert('NEW — (7.4) UPDATED (22/11/2026, ⚑1): John\'s heading is written once in the whole file (its constant): no second copy in a text, a prompt or a test double — and the question it replaced is gone',
+    raw.split('Αν κάποιο λέει αυτό που σε απασχολεί πραγματικά, πάτα το').length === 2 && raw.indexOf('Ποιο από αυτά νομίζεις') === -1);
   assert('GUARD — (7.5) the writing box is the app\'s own box, untouched: a tap copies into it (setInput), nothing is sent, no bubble, no card; «Καμία από αυτές» only closes the list',
     (() => { const a = raw.indexOf('const handleRootPickTap = '), tap = raw.slice(a, raw.indexOf('\n  ', raw.indexOf(';', a)) + 1), b = raw.indexOf('const handleRootPickNone = '), none = raw.slice(b, raw.indexOf('\n  ', raw.indexOf(';', b)) + 1);
       return /setInput\(/.test(tap) && !/handleSubmit|generateResponse|stageADispatch|stageAOpen|addUiBubble|setMessages|setRootPick/.test(tap) && /setRootPick\(null\)/.test(none) && !/handleSubmit|generateResponse|stageADispatch|stageAOpen|addUiBubble|setMessages|setInput/.test(none); })());
@@ -245,16 +258,18 @@ const viewTexts = (m, over) => { const v = view(m, over); return v && isArr(v.se
 }
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════
-// 10. THE PHONE (John, 22/11/2026, decision 15): the heading is ALWAYS in view when the list appears, and a line under it says what a tap does
+// 10. THE PHONE (John, 22/11/2026, decision 15): the heading is ALWAYS in view when the list appears (and, UPDATED 22/11/2026 ⚑1, it is the ONE block that says what a tap does — the separate line of decision 15 is gone)
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════
 {
-  const HINT = 'Πάτα ό,τι ταιριάζει, θα μπει στο πεδίο και μπορείς να το αλλάξεις.';
-  assert('NEW — (10.1) the line under the heading is John\'s sentence, word for word, in its own constant (ROOT_LIST_HINT); a statement, not a question; written once in the whole file; the heading\'s own constant keeps only the heading',
-    F.ROOT_LIST_HINT === HINT && !/[;?]/.test(F.ROOT_LIST_HINT || ';') && raw.split(HINT).length === 2 && Object.keys(F.ROOT_LIST_TEXTS).join() === 'title');
-  assert('NEW — (10.2) it says nothing the user did not say and offers nothing of its own: no root, cause, feeling, judgement, no advice («πρέπει», «καλύτερα»…)', typeof F.ROOT_LIST_HINT === 'string' && !/ρίζα|φοβ|σωστ|λάθος|πρέπει|καλύτερα|πρόβλημα|αιτία|βρήκα/i.test(F.ROOT_LIST_HINT));
+  // UPDATED (22/11/2026, John's correction ⚑1): decision 15's separate line «Πάτα ό,τι ταιριάζει, θα μπει στο πεδίο και μπορείς να το αλλάξεις.» is gone — the new heading block says the same thing («πάτα το — θα μπει στο
+  // πεδίο και μπορείς να το αλλάξεις»), and John asked for ONE block. (10.1)–(10.3) below were written for the separate line and are turned to the block: the same three questions, asked of the heading.
   const ask = (() => { const a = raw.indexOf('{stageAPhase === "ask" && ('); return a < 0 ? '' : raw.slice(a, raw.indexOf('{(stageAPhase === "card"', a)); })();
-  assert('NEW — (10.3) on the card the line comes right under the heading and above the first button, and only for the 3-or-more list (the list of two has its instruction in its own title)',
-    ask.length > 0 && /rootPick\.length\s*>=\s*ROOT_LIST_MIN\s*&&[^]*?ROOT_LIST_HINT/.test(ask) && ask.indexOf('ROOT_LIST_TEXTS.title') > 0 && ask.indexOf('ROOT_LIST_HINT') > ask.indexOf('ROOT_LIST_TEXTS.title') && ask.indexOf('ROOT_LIST_HINT') < ask.indexOf('rootPick.map') && (ask.match(/ROOT_LIST_HINT/g) || []).length === 1);
+  assert('NEW — (10.1) UPDATED (22/11/2026, ⚑1): the separate line of decision 15 is gone — no ROOT_LIST_HINT constant, no second text under the heading, and the sentence «Πάτα ό,τι ταιριάζει…» is written nowhere in the app (its instruction lives in the heading block)',
+    raw.indexOf('ROOT_LIST_HINT') === -1 && raw.indexOf('Πάτα ό,τι ταιριάζει') === -1 && Object.keys(F.ROOT_LIST_TEXTS).join() === 'title');
+  assert('NEW — (10.2) UPDATED (22/11/2026, ⚑1): the heading block offers nothing of its own: no advice («πρέπει», «καλύτερα»), no ranking («τραβάει», «κέντρο»), and it names what a tap does (the box, and that it can be changed) and the way out (to write something not said yet)',
+    typeof F.ROOT_LIST_TEXTS.title === 'string' && !/πρέπει|καλύτερα|τραβάει|κέντρο|σημαντικ/i.test(F.ROOT_LIST_TEXTS.title) && /πάτα το — θα μπει στο πεδίο και μπορείς να το αλλάξεις/.test(F.ROOT_LIST_TEXTS.title) && /Αν όχι, γράψε κάτι που δεν έχεις πει ακόμα\./.test(F.ROOT_LIST_TEXTS.title));
+  assert('NEW — (10.3) UPDATED (22/11/2026, ⚑1): on the card the heading block is the ONLY text between the root question and the first button (nothing is added under it), and only for the 3-or-more list (the list of two has its instruction in its own title)',
+    ask.length > 0 && /rootPick\.length\s*>=\s*ROOT_LIST_MIN\s*\?\s*ROOT_LIST_TEXTS\.title\s*:\s*ROOT_PICK_TEXTS\.title/.test(ask) && ask.indexOf('ROOT_LIST_TEXTS.title') > 0 && ask.indexOf('rootPick.map') > ask.indexOf('ROOT_LIST_TEXTS.title') && !/warning-text/.test(ask.slice(ask.indexOf('ROOT_LIST_TEXTS.title'), ask.indexOf('rootPick.map'))));
   const plan = (c, e) => call('rootListScrollPlan', c, e);
   assert('NEW — (10.4) rootListScrollPlan: the end, as always, while the card\'s top stays on the screen when the chat is scrolled to its end ((300, 200), (200, 200), (0, 0), (5, 0)) — and the card from its top when it would not ((150, 400), (0, 1), (-3, 0))',
     [[300, 200], [200, 200], [0, 0], [5, 0], [1000, 999.5]].every(([c, e]) => plan(c, e) === 'end') && [[150, 400], [0, 1], [-3, 0], [199.5, 200]].every(([c, e]) => plan(c, e) === 'card'));
@@ -265,8 +280,54 @@ const viewTexts = (m, over) => { const v = view(m, over); return v && isArr(v.se
   assert('NEW — (10.7) the screen\'s effect on rootPick asks the plan: it reads the card\'s top and how far the chat scrolls (the two numbers), shows the card from its top (block "start") when the plan says «card», and otherwise still scrolls to the end (block "end"); it does nothing for an empty list',
     eff.length > 0 && /rootListScrollPlan\(/.test(eff) && /rootCardRef\.current/.test(eff) && /scrollHeight\s*-\s*\w+\.clientHeight/.test(eff) && /plan === "card"/.test(eff) && /scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/.test(eff) && /scrollIntoView\(\{ behavior: "smooth", block: "end" \}\)/.test(eff) && /rootPick && rootPick\.length/.test(eff) && /\}, \[rootPick\]\);/.test(eff));
   assert('NEW — (10.8) the root question\'s card carries the reference (ref={rootCardRef}) and the reference is declared with useRef — and only that card', ask.length > 0 && /<div className="warning-card"[^>]*ref=\{rootCardRef\}/.test(ask) && /const rootCardRef\s*=\s*useRef\(null\)/.test(raw) && (raw.match(/ref=\{rootCardRef\}/g) || []).length === 1);
-  assert('GUARD — (10.9) the effect and handlers of the tap are as they were: a tap still only copies the sentence into the box; «Καμία από αυτές» still only closes the list (the new scroll touches neither)',
-    (() => { const a = raw.indexOf('const handleRootPickTap = '), tap = raw.slice(a, raw.indexOf('\n  ', raw.indexOf(';', a)) + 1); return /setInput\(t\)/.test(tap) && !/scrollIntoView|rootListScrollPlan/.test(tap); })());
+  // UPDATED (22/11/2026, ⚑2): the tap no longer calls setInput(t) with the bare sentence — the box is decided by rootPickTapBox (a box with text keeps it); the rest of the condition is as it was: the tap only writes to the box, the new scroll touches it not
+  assert('GUARD — (10.9) UPDATED (22/11/2026, ⚑2): a tap still only writes into the box (setInput, now with the value rootPickTapBox decides); «Καμία από αυτές» still only closes the list (the new scroll touches neither)',
+    (() => { const a = raw.indexOf('const handleRootPickTap = '), tap = raw.slice(a, raw.indexOf('\n  ', raw.indexOf(';', a)) + 1); return /setInput\(/.test(tap) && /rootPickTapBox\(/.test(tap) && !/scrollIntoView|rootListScrollPlan/.test(tap); })());
+}
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// 11. NEVER A SILENT DELETION OF THE USER'S WORDS (John, 22/11/2026, correction ⚑2): «Ποτέ σιωπηλή διαγραφή λόγων του χρήστη. Αν το πεδίο έχει κείμενο, η πρόταση προστίθεται σε νέα γραμμή. Μετά το «Δεν το
+// βρήκα ακόμα», το πεδίο καθαρίζει ΜΟΝΟ αν περιέχει ακριβώς την αμετάβλητη πρόταση που μπήκε από την εφαρμογή.» The two decisions are two pure functions of the writing box, and the screen only asks them.
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════════
+{
+  const tap = (c, a, s) => call('rootPickTapBox', c, a, s);
+  const back = (c, a) => call('rootPickBackBox', c, a);
+  const A = 'Το ωράριο είναι βαρύ και δεν αφήνει χρόνο για τίποτα άλλο.', B = 'Θέλω περισσότερο χρόνο για την οικογένειά μου.';
+  const MINE = 'Σκέφτομαι κάτι που δεν το έχω πει ακόμα';
+  assert('NEW — (11.1) a tap on an EMPTY box puts exactly the sentence in it, and the app remembers that it put it there (appBox is the sentence)', j(tap('', null, A)) === j({ value: A, appBox: A }));
+  assert('NEW — (11.2) a box with only spaces or line breaks counts as empty — there is no word of the user\'s in it — so the sentence is put in as it is', ['   ', '\n', ' \n \t', ' '].every(c => j(tap(c, null, A)) === j({ value: A, appBox: A })));
+  assert('NEW — (11.3) a box WITH text keeps every character of it: the sentence comes on a NEW line, and the box is no longer «the app\'s» (appBox is null)', j(tap(MINE, null, A)) === j({ value: MINE + '\n' + A, appBox: null }));
+  assert('NEW — (11.4) a text that already ends with a line break gets the sentence right after it — no blank line is made — and nothing is trimmed away', j(tap(MINE + '\n', null, A)) === j({ value: MINE + '\n' + A, appBox: null }) && j(tap(MINE + '  \n', null, A)) === j({ value: MINE + '  \n' + A, appBox: null }));
+  assert('NEW — (11.5) a second tap on a box that holds only the app\'s sentence adds the second on a new line, and the box is no longer «exactly the sentence» (appBox is null)', j(tap(A, A, B)) === j({ value: A + '\n' + B, appBox: null }));
+  assert('NEW — (11.6) a tap on a box where the user changed what the app put in keeps the user\'s change; the sentence comes after it; appBox is null', j(tap(A + ' και κάτι ακόμα', A, B)) === j({ value: A + ' και κάτι ακόμα\n' + B, appBox: null }));
+  // a small seeded generator — the same boxes on every run
+  let seed = 22112026; const rnd = n => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  const ALPHA = ['α', 'β', 'ά', 'έ', 'ώ', 'ς', 'Ω', ' ', ' ', '\n', '\t', '.', ',', ';', '—', '«', '»', '1', 'x', '😀', ' '];
+  const randStr = max => { let s = ''; const n = rnd(max + 1); for (let i = 0; i < n; i++) s += ALPHA[rnd(ALPHA.length)]; return s; };
+  assert('NEW — (11.7) NEVER a silent deletion: for 2000 boxes with some text (letters, accents, spaces, line breaks, symbols) and any app sentence, the value after a tap STARTS WITH the box exactly as it was and ENDS WITH the sentence — and appBox is null; for a box with no text it is exactly the sentence',
+    (() => { try { for (let k = 0; k < 2000; k++) { const c = randStr(40), a = rnd(3) === 0 ? null : randStr(20), s = 'Πρόταση ' + randStr(12) + 'τέλος'; const r = tap(c, a, s); if (!r || typeof r.value !== 'string') return false;
+      if (c.trim() === '') { if (r.value !== s || r.appBox !== s) return false; } else if (!(r.value.startsWith(c) && r.value.endsWith(s) && r.value.length > c.length && r.appBox === null)) return false; } return true; } catch (e) { return false; } })());
+  assert('NEW — (11.8) bad input never throws and never loses the box: a sentence that is not text or is empty leaves the box as it is; a box that is not text counts as empty; the result always has a text value',
+    [[MINE, null, ''], [MINE, null, undefined], [MINE, null, null], [MINE, null, 5], [MINE, null, {}]].every(([c, a, s]) => { const r = tap(c, a, s); return r && r.value === MINE && r.appBox === null; })
+    && [undefined, null, 5, {}, []].every(c => { const r = tap(c, null, A); return r && r.value === A && r.appBox === A; }));
+  assert('NEW — (11.9) «Δεν το βρήκα ακόμα» clears the box ONLY when it holds exactly the unchanged sentence the app put in: the box is the sentence and the app remembers the same sentence → empty', back(A, A) === '' && back(B, B) === '');
+  assert('NEW — (11.10) …and never anything else: a space typed after it, a word before it, a letter changed, a second sentence, text of the user\'s with the sentence on a new line, a box the app did not fill (nothing remembered) — all stay exactly as they were',
+    [[A + ' ', A], [' ' + A, A], [A.slice(0, -1), A], [A + '\n' + B, A], [MINE + '\n' + A, A], [A, null], [A, undefined], [A, ''], [A, B], [MINE, null], ['', null], ['', A]].every(([c, a]) => back(c, a) === c));
+  assert('NEW — (11.11) NEVER a silent deletion, as a property (2000 boxes): what comes back is the box as it was, or an empty box — and an empty box only when the box was exactly what the app remembered (and that is not empty)',
+    (() => { try { for (let k = 0; k < 2000; k++) { const c = randStr(30), a = rnd(2) === 0 ? null : (rnd(3) === 0 ? c : randStr(30)); const r = back(c, a); if (r !== c && !(r === '' && typeof a === 'string' && a !== '' && c === a)) return false; if (c === a && a !== '' && r !== '') return false; } return true; } catch (e) { return false; } })());
+  assert('NEW — (11.12) bad input never throws: a box that is not text comes back as an empty text, and nothing is cleared', [undefined, null, 5, {}, []].every(c => back(c, A) === '' && back(c, null) === ''));
+  // the screen only asks the two functions
+  const tapSrc = (() => { const a = raw.indexOf('const handleRootPickTap = '); return a < 0 ? '' : raw.slice(a, raw.indexOf('\n  ', raw.indexOf(';', a)) + 1); })();
+  const backSrc = (() => { const a = raw.indexOf('const handleStageABack = useCallback('); const e = raw.indexOf('}, [messages, mode, generateResponse, stageADispatch]);', a); return a < 0 || e < 0 ? '' : raw.slice(a, e); })();
+  assert('NEW — (11.13) the tap asks rootPickTapBox with the box as it is NOW (input) and what the app remembers, writes the box (setInput) with the value it gets back, keeps the returned appBox in the ref — and sends, opens, records nothing more than before (its one record is still list_picked with the place)',
+    tapSrc.length > 0 && /const _b = rootPickTapBox\(input, rootPickAppBox\.current, t\);/.test(tapSrc) && /setInput\(_b\.value\);/.test(tapSrc) && /rootPickAppBox\.current = _b\.appBox;/.test(tapSrc) && !/handleSubmit|generateResponse|stageADispatch|stageAOpen|addUiBubble|setMessages|setRootPick/.test(tapSrc) && (tapSrc.match(/recordTelemetry\(/g) || []).length === 1);
+  assert('NEW — (11.14) «Δεν το βρήκα ακόμα» (handleStageABack) clears the box through rootPickBackBox — at the root question only (phase "ask"), reading what the app remembers FIRST and forgetting it, with an update that sees the box as it is at that moment — and the rest of the handler is as it was (the dispatch of «back», the model\'s reply after the card of door 2)',
+    backSrc.length > 0 && /if \(_ph === "ask"\) \{ const _app = rootPickAppBox\.current; rootPickAppBox\.current = null; setInput\(prev => rootPickBackBox\(prev, _app\)\); \}/.test(backSrc) && /stageADispatch\(\{ type: "back" \}\);/.test(backSrc) && /if \(_ph === "card" && _door === 2\) \{/.test(backSrc) && /generateResponse\(messages, mode\);/.test(backSrc));
+  const resetSrc = (() => { const r = raw.indexOf('const resetSession = () => {'); return r < 0 ? '' : raw.slice(r, raw.indexOf('\n  };', r)); })();
+  assert('NEW — (11.15) what the app remembers is forgotten at the FIRST change of the box (an effect on the box: a word typed, the box sent or emptied) — so a text the user types later that happens to equal the sentence is never cleared — the ref starts as null and a new session starts clean',
+    /const rootPickAppBox = useRef\(null\);/.test(raw) && /useEffect\(\(\) => \{ if \(rootPickAppBox\.current !== null && rootPickAppBox\.current !== input\) rootPickAppBox\.current = null; \}, \[input\]\);/.test(raw) && /rootPickAppBox\.current = null;/.test(resetSrc));
+  assert('GUARD — (11.16) «Καμία από αυτές» is untouched: it closes the list and does not read or change the box (the rule of ⚑2 names only «Δεν το βρήκα ακόμα»)',
+    (() => { const b = raw.indexOf('const handleRootPickNone = '), none = raw.slice(b, raw.indexOf('\n  ', raw.indexOf(';', b)) + 1); return /setRootPick\(null\)/.test(none) && !/setInput|rootPickAppBox|rootPickBackBox|rootPickTapBox/.test(none); })());
 }
 
 console.log(passed + ' passed, ' + failed + ' failed');
