@@ -29,7 +29,8 @@ const objSrc = n => { const a = raw.indexOf('\nconst ' + n + ' = {'); return a <
 const CONSTS = ['HELPLINES', 'KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_MIN_SUBSTANCE_WORDS', 'ROOT_FILLER_WORDS', 'ROOT_DISMISSALS', 'SPEAK_RIGHT_JACCARD', 'SPEAK_RIGHT_ABBR',
   'SPEAK_RIGHT_DISMISS_START', 'SPEAK_RIGHT_HEAVY_WORDS', 'SPEAK_RIGHT_CONTENT_WORDS',
   'ROOT_PICK_MAX', 'ROOT_PICK_MAX_CHARS', 'ROOT_PICK_TRIM_YES', 'ROOT_PICK_TRIM_DK', 'ROOT_PICK_NO_START', 'ROOT_PICK_DEICTIC', 'ROOT_PICK_SELF_LABEL',
-  'ROOT_PICK_SELF_BLAME', 'ROOT_PICK_ADDRESSED', 'ROOT_PICK_FILLER', 'ROOT_PICK_CONNECTOR', 'ROOT_PICK_TEXTS'];
+  'ROOT_PICK_SELF_BLAME', 'ROOT_PICK_ADDRESSED', 'ROOT_PICK_FILLER', 'ROOT_PICK_CONNECTOR', 'ROOT_PICK_TEXTS',
+  'ROOT_LIST_MIN', 'ROOT_LIST_MAX', 'ROOT_LIST_TEXTS']; // UPDATED 21/11/2026 (Λ1, John): rootPickView reads the two numbers of the new rule
 const FNS = ['lookBehind', 'detectSafetySignal', 'classifyCrisisTier', 'detectsDangerFromOther', 'detectsMentalHealthReferral', 'mergeRiskKind',
   'stageASafetyHold', 'rootAnswerIsDismissal', 'rootAnswerIsUnsure', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord',
   'substanceOfSentence', 'splitSentences', 'rootTextHasSubstance', 'speakRightSpans', 'speakRightEndsWithQuestion', 'speakRightJaccard',
@@ -162,7 +163,9 @@ const view = (m, over) => call('rootPickView', Object.assign({}, SAFE, { message
   const good = conv(G1, G2, G3);
   const v = view(good);
   assert('NEW — (3.1) second ask, nothing wrong → the list (3 sentences)', v && isArr(v.sentences) && v.sentences.length === 3);
-  assert('NEW — (3.2) the first ask shows nothing', view(good, { askNo: 1 }) === null && view(good, { askNo: 0 }) === null);
+  // UPDATED 21/11/2026 (Λ1, John, branch root-list — a decision that CHANGES the 19/11 one): the first ask no longer shows nothing in every case. With fewer than 3 sentences it still shows
+  // nothing (two sentences: only from the 2nd ask, the 19/11 list); with 3 or more the list is John's (auratests/test_root_list_2111.js). askNo 0 shows nothing at any size.
+  assert('NEW — (3.2) the first ask shows nothing when fewer than 3 sentences pass the filter (the 19/11 rule, narrowed by Λ1)', view(conv(G1, G2), { askNo: 1 }) === null && view(conv(G1), { askNo: 1 }) === null && view(good, { askNo: 0 }) === null);
   assert('NEW — (3.3) once per session: when it was shown before (done), never again', view(good, { done: true }) === null);
   assert('NEW — (3.4) only at the root question (phase "ask")', ['card', 'correct', 'offer', 'step', 'clarity', 'done', null, undefined].every(p => view(good, { phase: p }) === null));
   assert('NEW — (3.5) NEVER on the safety path — the app\'s latch: crisis A, crisis B, DISTRESS, danger from another person, safety mode, the failed-call crisis line',
