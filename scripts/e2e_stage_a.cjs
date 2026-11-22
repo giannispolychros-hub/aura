@@ -1027,6 +1027,7 @@ async function runMock() {
   await runMockMU(); // 17/11: «Δεν κατάλαβα την ερώτηση» is not a root — the app's own root question, John's exception to the freeze
   await runMockP1(); // 19/11: PACKAGE 1 — «2η φορά», the passive counter, one note per round, the prompt's three lines
   await runMockRL(); // 21/11: «λίστα στην ερώτηση της ρίζας» (Λ1) — 3 or more of the user's own sentences at the root question, at most 8 (root-list)
+  await runMockRX(); // 22/11: more checks on the root list (John) — a tap and a change, «Καμία» / «Δεν το βρήκα ακόμα», the phone (heading always in view, the hint line), the safety path with the list on the screen, what the device log can tell
 }
 
 // ── SD: ADR «31 Οκτωβρίου (ζ)» (John, a safety fix (α)) — the gaps of the two safety detectors, on the screen. Stage A (?stageA=1&rec=1),
@@ -2053,6 +2054,291 @@ async function runMockRL() {
       first.every(n => n === 0) && tn === 1 && to === 0 && bs.every(n => n === 1) && (await listRecs(s.page)).length === 1 && (await listRecs(s.page))[0].n === 3);
     await s.browser.close();
   }
+  // ── RLi — ONE list per session in TOTAL (John, 22/11/2026, decision 14: «Η λίστα της 2ης φοράς μένει, αλλά ΣΥΝΟΛΙΚΑ ΜΙΑ λίστα ανά συνεδρία»): the 3-or-more list and the 19/11 list of two never both
+  // (1) the 3-or-more list first: the 1st ask shows it → back → two more sentences → the 2nd ask: nothing; back → the 3rd ask: nothing
+  { const s = await session('?stageA=1&rec=1', QS);
+    for (const m of [E, G[0], G[1], G[2]]) await send(s.page, m);
+    await press(s.page);
+    const t1 = await bothTitles(s.page);
+    await click(s.page, T.back);
+    for (const m of [G[3], G[4]]) await send(s.page, m);
+    await press(s.page);
+    const t2 = await bothTitles(s.page), b2 = [await btnN(s.page, G[0]), await btnN(s.page, G[3]), await btnN(s.page, NONE)];
+    await click(s.page, T.back);
+    await send(s.page, G[5]); await press(s.page);
+    const t3 = await bothTitles(s.page), b3 = [await btnN(s.page, G[0]), await btnN(s.page, G[5]), await btnN(s.page, NONE)];
+    const recs = (await listRecs(s.page)).filter(r => r.ev === 'list_shown');
+    ok('RLi (1): the 3-or-more list at the 1st ask (' + t1.join('/') + ' — new/old title), then NO list at the 2nd ask (' + t2.join('/') + ', sentences ' + b2.join('/') + ') and none at the 3rd (' + t3.join('/') + ', ' + b3.join('/') + '); the device log holds ONE list_shown (' + recs.length + ', n ' + (recs[0] && recs[0].n) + ')',
+      t1[0] === 1 && t1[1] === 0 && t2.every(n => n === 0) && b2.every(n => n === 0) && t3.every(n => n === 0) && b3.every(n => n === 0) && recs.length === 1 && recs[0].n === 3);
+    await s.browser.close();
+  }
+  // (2) the 19/11 list first: two sentences → the 1st ask shows nothing; a too-short answer → the 2nd ask → the list of two; back → two more sentences (four would now qualify) → the 3rd ask: nothing, NOT the 3-or-more list
+  { const s = await session('?stageA=1&rec=1', QS);
+    for (const m of [E, G[0], G[1]]) await send(s.page, m);
+    await press(s.page);
+    const t1 = await bothTitles(s.page);
+    await send(s.page, 'ok'); await s.page.waitForTimeout(300);
+    const t2 = await bothTitles(s.page);
+    await click(s.page, T.back);
+    for (const m of [G[2], G[3]]) await send(s.page, m);
+    await press(s.page);
+    const t3 = await bothTitles(s.page), b3 = [await btnN(s.page, G[0]), await btnN(s.page, G[3]), await btnN(s.page, NONE)];
+    const recs = (await listRecs(s.page)).filter(r => r.ev === 'list_shown');
+    ok('RLi (2): two sentences → nothing at the 1st ask (' + t1.join('/') + '), the 19/11 list of two at the 2nd (' + t2.join('/') + ' — new/old title), and at the 3rd ask — with four sentences that would qualify — NO list at all, not John\'s (' + t3.join('/') + ', sentences ' + b3.join('/') + '); ONE list_shown (' + recs.length + ', n ' + (recs[0] && recs[0].n) + ')',
+      t1.every(n => n === 0) && t2[0] === 0 && t2[1] === 1 && t3.every(n => n === 0) && b3.every(n => n === 0) && recs.length === 1 && recs[0].n === 2);
+    await s.browser.close();
+  }
+  // (3) a too-short answer typed UNDER the 3-or-more list (the app asks again — the 2nd ask): the SAME list stays, and no second one comes
+  { const s = await session('?stageA=1&rec=1', QS);
+    for (const m of [E, G[0], G[1], G[2]]) await send(s.page, m);
+    await press(s.page);
+    const t1 = await bothTitles(s.page);
+    await send(s.page, 'ok'); await s.page.waitForTimeout(300);
+    const t2 = await bothTitles(s.page), retry = await s.page.getByText(T.retry, { exact: true }).count(), recs = (await listRecs(s.page)).filter(r => r.ev === 'list_shown');
+    ok('RLi (3): a too-short answer under the 3-or-more list (' + t1.join('/') + ') → the app\'s retry line (' + retry + '), the SAME list stays (' + t2.join('/') + ' — never the 19/11 title as well or instead), the three sentences ' + [await btnN(s.page, G[0]), await btnN(s.page, G[1]), await btnN(s.page, G[2])].join('/') + '; ONE list_shown (' + recs.length + ')',
+      t1[0] === 1 && t1[1] === 0 && retry === 1 && t2[0] === 1 && t2[1] === 0 && (await btnN(s.page, G[0])) === 1 && (await btnN(s.page, G[2])) === 1 && recs.length === 1);
+    await s.browser.close();
+  }
+}
+
+// ── RX: MORE CHECKS ON THE ROOT LIST (John, 22/11/2026, branch root-list; $0, fake model, the real app in Chromium). Nothing here changes the app. Five more questions about the list of 21/11 (RL):
+// RXa a tap puts the sentence in the box, the user changes it with the keys alone, the app sends nothing, the card holds exactly the changed words, and NOTHING of a confirmed root happens before the user's
+// own «Ναι, αυτό είναι» (none of the five records of a confirmed root, no step question) — and after it, it does · RXb two taps replace each other (and what was typed is replaced — an observation) ·
+// RXc «Καμία από αυτές», then «Δεν το βρήκα ακόμα, συνέχισε»: the chat goes on, the model answers, the root question comes again WITHOUT a list, a new root → card → «Ναι» → the step · RXd «Δεν το βρήκα
+// ακόμα» straight from the list (and after a tap), and from the card of a picked sentence · RXe «Διόρθωσε» on the card of a picked sentence · RXp the phone, 390×844: 3 short or 8 long sentences of the
+// user (up to 200 characters) × a short or a long reply of the model above them — measures, no horizontal scroll, no cut button, the bottom of the card above the box · RXs the safety path with the list on the
+// screen: a crisis sentence and a danger from another person typed at the root question → the list is gone, the app's line, the safety request, no card · RXt the device log of four small sessions
+// (picked and not changed · picked and reworded with the same words · picked and new words added · typed by hand): can the log tell «picked and did not change» from «picked and changed»?
+// (the danger sentence below is written in two pieces on purpose, as in RLe). Alone: --only RX. Screenshots RX-phone-*.png.
+async function runMockRX() {
+  const T = APP.texts;
+  const NEW_TITLE = 'Ποιο από αυτά νομίζεις ότι τραβάει τα άλλα; Ή κάτι που δεν έχεις πει ακόμα;', NONE = 'Καμία από αυτές';
+  const L1018 = 'Υπάρχει η γραμμή παρέμβασης για την αυτοκτονία, 1018. Σε άμεσο κίνδυνο, 112.';
+  const SELF = 'Σε άμεσο κίνδυνο, 112. Για βία στο σπίτι, 15900, γραμμή SOS για τη βία κατά των γυναικών.';
+  const E = 'Δεν ξέρω αν πρέπει να αλλάξω γραφείο, με πιέζει το πρόγραμμα.';
+  const G = ['Το ωράριο είναι βαρύ και δεν αφήνει χρόνο για τίποτα άλλο.', 'Θέλω περισσότερο χρόνο για την οικογένειά μου.', 'Η μετακίνηση παίρνει δύο ώρες κάθε μέρα.', 'Ο μισθός είναι καλός και με κρατά εκεί.'];
+  const QS = ['Τι σε κρατά σε αυτή τη σκέψη τώρα;', 'Και τι θα άλλαζε με αυτό;', 'Τι έχει σημασία εδώ;', 'Τι κρατά το πράγμα στη θέση του;', 'Τι άλλο υπάρχει;', 'Τι λείπει ακόμα;'];
+  const ALLERR = [];
+  const watch = page => { page.on('pageerror', e => ALLERR.push(e.message)); };
+  const btn = (page, t) => page.getByRole('button', { name: t, exact: true });
+  const btnN = (page, t) => btn(page, t).count();
+  const titleN = (page, t) => page.getByText(t, { exact: true }).count();
+  const askN = page => page.getByText(T.ask, { exact: true }).count();
+  const boxOf = page => page.locator('textarea.textarea');
+  const boxValue = async page => ((await boxOf(page).count()) ? boxOf(page).inputValue() : null);
+  const card = async page => (await btnN(page, T.yes)) > 0;
+  const shown = async (page, t) => (await page.getByText('«' + t + '»', { exact: false }).count()) > 0;
+  const bodyText = page => page.locator('body').innerText();
+  const click = async (page, t) => { const b = btn(page, t); if (!(await b.count())) return false; await b.click(); await page.waitForTimeout(300); return true; };
+  const press = async page => { await page.getByRole('button', { name: T.button }).click(); await page.waitForTimeout(400); };
+  const sendBox = async page => { await page.getByRole('button', { name: 'Go' }).click(); await page.waitForTimeout(700); };
+  const telLog = page => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
+  const evs = async (page, ...names) => (await telLog(page)).filter(r => names.includes(r.ev));
+  const CONFIRMED = ['step_shown', 'root_provenance', 'root_unclear_candidate', 'root_new_words'];
+  const confirmedSeen = log => log.filter(r => CONFIRMED.includes(r.ev) || (r.ev === 'root_answer' && r.answer === 1));
+  const rect = async loc => { try { if (!(await loc.count())) return null; return await loc.first().boundingBox({ timeout: 2000 }); } catch (e) { return null; } };
+  const R0 = v => (v === null || v === undefined ? '—' : String(Math.round(v)));
+  const lists = async page => [await titleN(page, NEW_TITLE), await btnN(page, G[0]), await btnN(page, NONE)];
+  const fiveMsgs = async s => { for (const m of [E, G[0], G[1], G[2]]) await send(s.page, m); };
+  // ── RXa — a tap, a change with the keys alone, the user sends it, the card; and nothing of a confirmed root until the user's own «Ναι»
+  { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+    await fiveMsgs(s); await press(s.page);
+    const listThere = (await titleN(s.page, NEW_TITLE)) === 1 && (await btnN(s.page, G[1])) === 1;
+    const n0 = s.calls.length;
+    await click(s.page, G[1]);
+    const focused = await s.page.evaluate(() => { const a = document.activeElement; return !!a && a.tagName === 'TEXTAREA'; });
+    ok('RXa: the list is there (' + listThere + '); a tap puts exactly the sentence in the box (' + ((await boxValue(s.page)) === G[1]) + '), the cursor is in the box (' + focused + '), nothing is sent (' + (s.calls.length - n0) + ' calls), no card (' + (await card(s.page)) + ')',
+      listThere && (await boxValue(s.page)) === G[1] && focused && s.calls.length === n0 && !(await card(s.page)));
+    const ADD1 = ' Κυρίως τα απογεύματα.', ADD2 = ' Και κυρίως το βράδυ.', EDITED = G[1] + ADD2;
+    await s.page.keyboard.press('Control+End'); await s.page.keyboard.type(ADD1);
+    const afterAdd = await boxValue(s.page);
+    for (let i = 0; i < ADD1.length; i++) await s.page.keyboard.press('Backspace');
+    const afterDel = await boxValue(s.page);
+    await s.page.keyboard.type(ADD2);
+    ok('RXa: the user changes it with the keys alone — typing at the end adds (' + (afterAdd === G[1] + ADD1) + '), deleting goes back to the original (' + (afterDel === G[1]) + '), a second addition is the text to send (' + ((await boxValue(s.page)) === EDITED) + '); still no model call (' + (s.calls.length - n0) + '), no card (' + (await card(s.page)) + ')',
+      afterAdd === G[1] + ADD1 && afterDel === G[1] && (await boxValue(s.page)) === EDITED && s.calls.length === n0 && !(await card(s.page)));
+    await sendBox(s.page);
+    ok('RXa: the user sends it → the card holds exactly the changed words (' + (await shown(s.page, EDITED)) + ') and not the original alone (' + (await shown(s.page, G[1])) + '), no model call (' + (s.calls.length - n0) + '), the list is gone (' + (await lists(s.page)).join('/') + ')',
+      (await card(s.page)) && (await shown(s.page, EDITED)) && !(await shown(s.page, G[1])) && s.calls.length === n0 && (await lists(s.page)).every(n => n === 0));
+    { const log = await telLog(s.page), cardRecs = log.filter(r => r.ev === 'root_card_shown');
+      ok('RXa: the root is NOT confirmed before the user\'s «' + T.yes + '»: the device log holds the card (root_card_shown ×' + cardRecs.length + ') and none of the five records of a confirmed root (' + confirmedSeen(log).length + ' found), the step question is not on the screen (' + (await bodyText(s.page)).includes(T.stepQ) + '), the button «' + T.yes + '» is waiting (' + (await btnN(s.page, T.yes)) + ')',
+        cardRecs.length === 1 && confirmedSeen(log).length === 0 && !(await bodyText(s.page)).includes(T.stepQ) && (await btnN(s.page, T.yes)) === 1); }
+    await click(s.page, T.yes);
+    { const log = await telLog(s.page), L = e => log.filter(r => r.ev === e), nw = L('root_new_words')[0];
+      ok('RXa: only the user\'s own «' + T.yes + '» confirms: root_answer {answer 1, from 2} ×' + L('root_answer').filter(r => r.answer === 1 && r.from === 2).length + ', step_shown ×' + L('step_shown').length + ', root_new_words ×' + L('root_new_words').length + ' (newWords ' + (nw && nw.newWords) + ' of ' + (nw && nw.rootWords) + '), and the step question appears (' + (await bodyText(s.page)).includes(T.stepQ) + ')',
+        L('root_answer').filter(r => r.answer === 1 && r.from === 2).length === 1 && L('step_shown').length === 1 && L('root_new_words').length === 1 && nw.newWords > 0 && (await bodyText(s.page)).includes(T.stepQ)); }
+    await s.browser.close();
+  }
+  // ── RXb — two taps replace each other; what the user had typed is replaced too (an observation: the 19/11 list did the same)
+  { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+    await fiveMsgs(s); await press(s.page);
+    await click(s.page, G[0]); const a = await boxValue(s.page);
+    await click(s.page, G[2]); const b = await boxValue(s.page);
+    const picks = (await evs(s.page, 'list_picked')).map(r => r.pos).join();
+    ok('RXb: a second tap REPLACES the first (box: ' + (a === G[0]) + ' then ' + (b === G[2]) + '), one sentence at a time, the places recorded as numbers (' + picks + ')', a === G[0] && b === G[2] && picks === '1,3');
+    await boxOf(s.page).fill('Κάτι που έγραφα μόνος μου.'); await click(s.page, G[1]);
+    results.push('INFO — RXb: a tap REPLACES what the user had typed in the box (typed «Κάτι που έγραφα μόνος μου.», after the tap the box holds the tapped sentence: ' + ((await boxValue(s.page)) === G[1]) + ') — the typed draft is gone; the 19/11 list behaved the same');
+    await s.browser.close();
+  }
+  // ── RXc — «Καμία από αυτές», then «Δεν το βρήκα ακόμα, συνέχισε»: the flow goes on
+  { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+    await fiveMsgs(s); await press(s.page);
+    const was = await lists(s.page);
+    await click(s.page, NONE);
+    const afterNone = [await askN(s.page), ...(await lists(s.page)), await boxValue(s.page)];
+    ok('RXc: «' + NONE + '» → the list is gone (' + afterNone.slice(1, 4).join('/') + ' — was ' + was.join('/') + '), the root question stays (' + afterNone[0] + '), the box is empty (' + JSON.stringify(afterNone[4]) + ')', was[0] === 1 && afterNone[0] === 1 && afterNone.slice(1, 4).every(n => n === 0) && afterNone[4] === '');
+    const c0 = s.calls.length;
+    await click(s.page, T.back);
+    const backState = [await askN(s.page), await btnN(s.page, T.button), await card(s.page), (await boxOf(s.page).count()) === 1 && (await boxOf(s.page).isEnabled())];
+    ok('RXc: «' + T.back + '» → back to the chat: the root question is gone (' + backState[0] + '), the button «' + T.button + '» is back (' + backState[1] + '), no card (' + backState[2] + '), no list (' + (await lists(s.page)).join('/') + '), the box is there and writable (' + backState[3] + '), no model call (' + (s.calls.length - c0) + ')',
+      backState[0] === 0 && backState[1] === 1 && backState[2] === false && (await lists(s.page)).every(n => n === 0) && backState[3] === true && s.calls.length === c0);
+    await send(s.page, G[3]);
+    ok('RXc: the chat goes on — a new sentence → one model call (' + (s.calls.length - c0) + '), its reply is on the screen (' + (await bodyText(s.page)).includes(QS[4]) + ')', s.calls.length === c0 + 1 && (await bodyText(s.page)).includes(QS[4]));
+    await press(s.page);
+    ok('RXc: the root question again (' + (await askN(s.page)) + '), now WITHOUT a list — it was shown once (' + (await lists(s.page)).join('/') + ')', (await askN(s.page)) === 1 && (await lists(s.page)).every(n => n === 0));
+    const ROOT2 = 'Δεν χωράνε μαζί το ωράριο και ο χρόνος με την οικογένειά μου.';
+    await boxOf(s.page).fill(ROOT2); await sendBox(s.page);
+    ok('RXc: a root typed by the user → the card with exactly those words (' + (await shown(s.page, ROOT2)) + '), still no confirmed root (' + confirmedSeen(await telLog(s.page)).length + ' records)', (await card(s.page)) && (await shown(s.page, ROOT2)) && confirmedSeen(await telLog(s.page)).length === 0);
+    await click(s.page, T.yes);
+    { const log = await telLog(s.page), L = e => log.filter(r => r.ev === e), ans = L('root_answer').map(r => r.answer + '/' + r.from).join(' ');
+      ok('RXc: «' + T.yes + '» → the step question (' + (await bodyText(s.page)).includes(T.stepQ) + '); the device log: list_shown ×' + L('list_shown').length + ', list_none ×' + L('list_none').length + ', list_picked ×' + L('list_picked').length + ', root_answer (answer/from) ' + ans,
+        (await bodyText(s.page)).includes(T.stepQ) && L('list_shown').length === 1 && L('list_none').length === 1 && L('list_picked').length === 0 && ans === '3/1 1/2'); }
+    await s.browser.close();
+  }
+  // ── RXd — «Δεν το βρήκα ακόμα» straight from the list (no «Καμία»), after a tap, and from the card of a picked sentence
+  { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+    await fiveMsgs(s); await press(s.page);
+    await click(s.page, T.back);
+    const st = [await askN(s.page), await btnN(s.page, T.button), ...(await lists(s.page))];
+    ok('RXd: «' + T.back + '» straight from the list → back to the chat (the question ' + st[0] + ', the button ' + st[1] + '), the list is gone (' + st.slice(2).join('/') + ')', st[0] === 0 && st[1] === 1 && st.slice(2).every(n => n === 0));
+    await send(s.page, G[3]); await press(s.page);
+    ok('RXd: the list was shown once and left unused → the root question again comes WITHOUT a list (' + (await askN(s.page)) + ', ' + (await lists(s.page)).join('/') + ') — the once-per-session rule', (await askN(s.page)) === 1 && (await lists(s.page)).every(n => n === 0));
+    { const L = e => evs(s.page, e).then(r => r.length);
+      ok('RXd (device log): list_shown ×' + await L('list_shown') + ', list_none ×' + await L('list_none') + ', list_picked ×' + await L('list_picked') + ', root_answer ' + (await evs(s.page, 'root_answer')).map(r => r.answer + '/' + r.from).join(' '), (await L('list_shown')) === 1 && (await L('list_none')) === 0 && (await L('list_picked')) === 0 && (await evs(s.page, 'root_answer')).map(r => r.answer + '/' + r.from).join(' ') === '3/1'); }
+    await s.browser.close();
+  }
+  { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+    await fiveMsgs(s); await press(s.page);
+    await click(s.page, G[2]); await click(s.page, T.back);
+    results.push('INFO — RXd: a sentence tapped and then «' + T.back + '» → the chat is back and the tapped sentence STAYS in the box (' + ((await boxValue(s.page)) === G[2]) + '): if the user sends it, it goes to the model as an ordinary message — his own words, already said');
+    await s.browser.close();
+  }
+  { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+    await fiveMsgs(s); await press(s.page);
+    await click(s.page, G[0]); await sendBox(s.page);
+    const c0 = s.calls.length, wasCard = await card(s.page);
+    await click(s.page, T.back);
+    ok('RXd: the card of a picked sentence (' + wasCard + ') → «' + T.back + '» → the chat (button ' + (await btnN(s.page, T.button)) + ', no card ' + !(await card(s.page)) + ', no list ' + (await lists(s.page)).join('/') + '), no model call (' + (s.calls.length - c0) + '), the root not confirmed (' + confirmedSeen(await telLog(s.page)).length + ')',
+      wasCard && (await btnN(s.page, T.button)) === 1 && !(await card(s.page)) && (await lists(s.page)).every(n => n === 0) && s.calls.length === c0 && confirmedSeen(await telLog(s.page)).length === 0);
+    await send(s.page, G[3]); await press(s.page);
+    const ROOT3 = 'Το ωράριο μου παίρνει τον χρόνο που θέλω για την οικογένειά μου.';
+    await boxOf(s.page).fill(ROOT3); await sendBox(s.page); await click(s.page, T.yes);
+    ok('RXd: the chat went on (a model call ' + (s.calls.length - c0) + '), the root asked again without a list, a new root → card → «' + T.yes + '» → the step question (' + (await bodyText(s.page)).includes(T.stepQ) + '); root_answer ' + (await evs(s.page, 'root_answer')).map(r => r.answer + '/' + r.from).join(' '),
+      s.calls.length === c0 + 1 && (await bodyText(s.page)).includes(T.stepQ) && (await evs(s.page, 'root_answer')).map(r => r.answer + '/' + r.from).join(' ') === '3/2 1/2');
+    await s.browser.close();
+  }
+  // ── RXe — «Διόρθωσε» on the card of a picked sentence: the user writes it again, then «Ναι»
+  { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+    await fiveMsgs(s); await press(s.page);
+    await click(s.page, G[1]); await sendBox(s.page);
+    await click(s.page, T.correct);
+    const askedAgain = (await bodyText(s.page)).includes(T.correctAsk);
+    const FIX = 'Θέλω χρόνο για την οικογένειά μου, όχι άλλη δουλειά.';
+    await boxOf(s.page).fill(FIX); await sendBox(s.page);
+    ok('RXe: «' + T.correct + '» on the card of a picked sentence → the user is asked to write it whole (' + askedAgain + '), writes it → the card holds exactly the new words (' + (await shown(s.page, FIX)) + '), not yet confirmed (' + confirmedSeen(await telLog(s.page)).length + ' records)',
+      askedAgain && (await card(s.page)) && (await shown(s.page, FIX)) && confirmedSeen(await telLog(s.page)).length === 0);
+    await click(s.page, T.yes);
+    ok('RXe: «' + T.yes + '» → the step question (' + (await bodyText(s.page)).includes(T.stepQ) + '), root_answer ' + (await evs(s.page, 'root_answer')).map(r => r.answer + '/' + r.from).join(' '), (await bodyText(s.page)).includes(T.stepQ) && (await evs(s.page, 'root_answer')).map(r => r.answer + '/' + r.from).join(' ') === '2/2 1/2');
+    await s.browser.close();
+  }
+  // ── RXp — the phone (390×844): 3 short or 8 long sentences of the user × a short or a long reply of the model right above the root question. John's decision 15 (22/11/2026): on the phone the
+  // heading is ALWAYS in view when the list appears, with the line «Πάτα ό,τι ταιριάζει…» under it; the bottom of a card that is too tall for the screen is reached by scrolling.
+  { const HINT = 'Πάτα ό,τι ταιριάζει, θα μπει στο πεδίο και μπορείς να το αλλάξεις.';
+    const SHORT3 = ['Με πιέζει το ωράριο.', 'Φοβάμαι την αλλαγή.', 'Θέλω ησυχία.'];
+    const LONG8 = [
+      'Το ωράριο στο γραφείο έχει γίνει τόσο βαρύ που τα βράδια δεν έχω δύναμη ούτε να μαγειρέψω, και τα Σαββατοκύριακα τα περνάω προσπαθώντας να συνέλθω για την επόμενη εβδομάδα.',
+      'Η μητέρα μου μένει μόνη της στην επαρχία και κάθε φορά που τηλεφωνώ μου λέει ότι όλα είναι μια χαρά, αλλά ξέρω ότι δεν θα μου το έλεγε ποτέ αν κάτι την δυσκόλευε στην καθημερινότητά της.',
+      'Ο μισθός που παίρνω σήμερα είναι ο καλύτερος που είχα ποτέ και μου επιτρέπει να πληρώνω το δάνειο του διαμερίσματος χωρίς άγχος, και αυτό με κρατά εκεί παρά όσα με βαραίνουν στη δουλειά.',
+      'Οι συνάδελφοί μου με στηρίζουν στις δύσκολες μέρες και με καλύπτουν όταν χρειάζεται να φύγω νωρίτερα, κάτι που δεν είμαι σίγουρος ότι θα βρω ξανά σε οποιαδήποτε άλλη ομάδα στο μέλλον.',
+      'Η μετακίνηση προς το γραφείο παίρνει σχεδόν δύο ώρες κάθε μέρα, και τον χρόνο αυτό τον περνάω σε ένα γεμάτο λεωφορείο χωρίς να μπορώ να διαβάσω ή να σκεφτώ τίποτα ήρεμα για τον εαυτό μου.',
+      'Η καινούργια θέση που μου πρότειναν βρίσκεται σε άλλη πόλη, και το σκέφτομαι κάθε βράδυ χωρίς να καταλήγω πουθενά, γιατί όποτε φαντάζομαι τη μετακόμιση βλέπω πρώτα τα παιδιά να αλλάζουν σχολείο.',
+      'Ο φίλος μου που άλλαξε δουλειά πέρσι λέει ότι δεν μετάνιωσε ούτε μια μέρα, αλλά εκείνος δεν είχε σπίτι με δάνειο ούτε παιδιά στο σχολείο, οπότε δεν είμαι σίγουρος ότι μπορώ να τον ακολουθήσω.',
+      'Η προϊσταμένη μου εμπιστεύεται τις αποφάσεις μου περισσότερο από όσο τις εμπιστεύομαι εγώ ο ίδιος, και φοβάμαι ότι αν φύγω θα χάσω την πρώτη δουλειά όπου κάποιος με πήρε πραγματικά στα σοβαρά.'];
+    const LONG_REPLY = 'Ακούω τρία πράγματα να τραβούν προς διαφορετικές κατευθύνσεις: από τη μία το πρόγραμμα που σε πιέζει και σου παίρνει τον χρόνο, από την άλλη ο μισθός και οι άνθρωποι που σε στηρίζουν, και ανάμεσά τους η σκέψη της αλλαγής, που δεν ξέρεις αν ανήκει σε σένα ή σε όσα ακούς γύρω σου. Δεν θα σου πω εγώ τι από όλα αυτά μετράει περισσότερο. Θέλω απλώς να δω τι μένει όρθιο όταν τα κοιτάς ένα ένα, χωρίς να βιαστείς να τα λύσεις. ' + QS[3];
+    for (const [tag, longModel, longUser] of [['short-short', false, false], ['short-long', false, true], ['long-short', true, false], ['long-long', true, true]]) {
+      const users = longUser ? LONG8 : SHORT3;
+      const script = []; for (let i = 0; i <= users.length; i++) script.push(QS[i % QS.length]);
+      if (longModel) script[users.length] = LONG_REPLY;
+      const lastQ = longModel ? QS[3] : script[users.length];
+      const s = await session('?stageA=1&rec=1', script); watch(s.page);
+      await s.page.setViewportSize({ width: 390, height: 844 });
+      for (const m of [E, ...users]) await send(s.page, m);
+      await press(s.page);
+      await s.page.waitForTimeout(900); // the smooth scroll that follows the list
+      const bub = s.page.locator('.turn-aura').filter({ hasText: lastQ }).last();
+      const rBub = await rect(bub), rAsk = await rect(s.page.getByText(T.ask, { exact: true })), rHead = await rect(s.page.getByText(NEW_TITLE, { exact: true })), rHint = await rect(s.page.getByText(HINT, { exact: true })),
+        rFirst = await rect(btn(s.page, users[0])), rLast = await rect(btn(s.page, users[users.length - 1])), rNone = await rect(btn(s.page, NONE)), rBack = await rect(btn(s.page, T.back)), rBox = await rect(boxOf(s.page)), rFeed = await rect(s.page.locator('.feed'));
+      const geo = await s.page.evaluate(({ users }) => {
+        const bs = [...document.querySelectorAll('button')].filter(b => users.includes(b.textContent.trim()));
+        return { sw: document.documentElement.scrollWidth, iw: window.innerWidth, n: bs.length,
+          clipped: bs.filter(b => b.scrollWidth > b.clientWidth + 1 || b.scrollHeight > b.clientHeight + 1).length,
+          outside: bs.filter(b => { const r = b.getBoundingClientRect(); return r.left < 0 || r.right > window.innerWidth + 0.5; }).length,
+          tallest: Math.round(Math.max(0, ...bs.map(b => b.getBoundingClientRect().height))) };
+      }, { users });
+      const boxTop = rBox ? rBox.y : 844, fTop = rFeed ? rFeed.y : 0, fBottom = rFeed ? Math.min(rFeed.y + rFeed.height, boxTop) : boxTop;
+      const inView = r => (r ? r.y >= fTop - 1 && r.y + r.height <= fBottom + 1 : null), startsInView = r => (r ? r.y >= fTop - 1 && r.y < fBottom : null), yn = v => (v === null ? '—' : v ? 'yes' : 'no');
+      const bottomWasInView = inView(rNone) === true && inView(rBack) === true;
+      ok('RXp ' + tag + ' (390×844): the list shows ' + geo.n + ' sentences (' + users.length + ' expected) under John\'s heading (' + (await titleN(s.page, NEW_TITLE)) + '); no horizontal scroll (' + geo.sw + ' ≤ ' + geo.iw + '), no button cut (' + geo.clipped + ') or outside the screen (' + geo.outside + '), the tallest button ' + geo.tallest + 'px',
+        geo.n === users.length && (await titleN(s.page, NEW_TITLE)) === 1 && geo.sw <= geo.iw && geo.clipped === 0 && geo.outside === 0);
+      ok('RXp ' + tag + ' (390×844) [decision 15]: right after the list appears the heading is IN VIEW, whole (' + yn(inView(rHead)) + '), with the line «' + HINT + '» under it (' + (rHint ? 'there, in view: ' + yn(inView(rHint)) : 'not there') + ', under the heading: ' + yn(rHead && rHint ? rHint.y >= rHead.y + rHead.height - 1 && rHint.y - (rHead.y + rHead.height) < 30 : null) + '), the root question above it in view (' + yn(inView(rAsk)) + '), and the first sentence starts in view (' + yn(startsInView(rFirst)) + ')',
+        inView(rHead) === true && inView(rHint) === true && !!rHead && !!rHint && rHint.y >= rHead.y + rHead.height - 1 && rHint.y - (rHead.y + rHead.height) < 30 && inView(rAsk) === true && startsInView(rFirst) === true);
+      results.push('INFO — RXp ' + tag + ' (390×844, the chat area is y ' + R0(fTop) + '…' + R0(fBottom) + '; y of the top, negative = above the screen; right after the list appeared): the model\'s last reply ' + R0(rBub && rBub.y) + '…' + R0(rBub && rBub.y + rBub.height) + ' (' + (longModel ? 'long' : 'short') + ') · the root question ' + R0(rAsk && rAsk.y) + ' · heading ' + R0(rHead && rHead.y) + '…' + R0(rHead && rHead.y + rHead.height) + ' · hint ' + R0(rHint && rHint.y) + ' · first sentence ' + R0(rFirst && rFirst.y) + ' · last sentence bottom ' + R0(rLast && rLast.y + rLast.height) + ' · «' + NONE + '» ' + R0(rNone && rNone.y) + ' · «' + T.back + '» bottom ' + R0(rBack && rBack.y + rBack.height) + ' · box top ' + R0(rBox && rBox.y) + ' → in view without scrolling: the model\'s question ' + yn(inView(rBub)) + ', the bottom buttons ' + yn(bottomWasInView));
+      await s.page.screenshot({ path: path.join(OUT, 'RX-phone-' + tag + '.png'), fullPage: false });
+      if (!longUser) ok('RXp ' + tag + ' (390×844): a list of three short sentences fits the screen with its two bottom buttons («' + NONE + '», «' + T.back + '») in view, right away, without scrolling (' + yn(inView(rNone)) + ', ' + yn(inView(rBack)) + ')', bottomWasInView);
+      // the bottom is always reachable: scroll the chat to its end → the two buttons sit above the input box, not behind it
+      await s.page.locator('.feed').evaluate(el => { el.scrollTop = el.scrollHeight; }); await s.page.waitForTimeout(500);
+      { const n2 = await rect(btn(s.page, NONE)), b2 = await rect(btn(s.page, T.back)), bx = await rect(boxOf(s.page)), above = r => !!r && !!bx && r.y >= 0 && r.y + r.height <= bx.y + 1;
+        ok('RXp ' + tag + ' (390×844): the chat scrolled to its end → «' + NONE + '» and «' + T.back + '» are above the input box, not behind it (' + yn(above(n2)) + ', ' + yn(above(b2)) + ')', above(n2) && above(b2));
+        await s.page.screenshot({ path: path.join(OUT, 'RX-phone-' + tag + '-end.png'), fullPage: false }); }
+      await s.browser.close();
+    }
+  }
+  // ── RXs — the safety path with the list ON the screen: a crisis sentence / danger from another person typed at the root question
+  for (const [kind, line, expect] of [['crisis', 'Θέλω να πεθάνω.', L1018], ['danger from another person', 'Με χτυπ' + 'άει ο άντρας μου.', SELF]]) {
+    const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+    await fiveMsgs(s); await press(s.page);
+    const was = await lists(s.page), nBefore = s.calls.length, recsBefore = (await telLog(s.page)).filter(r => /^list_/.test(r.ev)).length;
+    await send(s.page, line); await s.page.waitForTimeout(600);
+    const body = await bodyText(s.page), last = s.calls[s.calls.length - 1], lastStr = last ? JSON.stringify(last) : '';
+    const recsAfter = (await telLog(s.page)).filter(r => /^list_/.test(r.ev)).length;
+    ok('RXs ' + kind + ': the list was on the screen (' + was.join('/') + '); the sentence typed at the root question → the list is gone (' + (await lists(s.page)).join('/') + '), no card (' + (await card(s.page)) + '), no root button (' + (await btnN(s.page, T.button)) + '), the app\'s own line once (' + (body.split(expect).length - 1) + '), no new list record (' + (recsAfter - recsBefore) + ')',
+      was[0] === 1 && (await lists(s.page)).every(n => n === 0) && !(await card(s.page)) && (await btnN(s.page, T.button)) === 0 && body.split(expect).length - 1 === 1 && recsAfter === recsBefore);
+    ok('RXs ' + kind + ': the request of that turn is the safety request (' + (s.calls.length - nBefore) + ' call, STAGE: SAFETY ' + lastStr.includes('STAGE: SAFETY') + '), the root is not confirmed (' + confirmedSeen(await telLog(s.page)).length + ' records)', s.calls.length === nBefore + 1 && lastStr.includes('STAGE: SAFETY') && confirmedSeen(await telLog(s.page)).length === 0);
+    await s.browser.close();
+  }
+  // ── RXt — the device log of four small sessions: can it tell «picked and did not change» from «picked and changed»?
+  { const runTel = async mode => {
+      const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+      await fiveMsgs(s); await press(s.page);
+      if (mode !== 'typed') await click(s.page, G[1]);
+      const TXT = { unchanged: G[1], reworded: 'Για την οικογένειά μου θέλω περισσότερο χρόνο.', newwords: G[1] + ' Και κυρίως το βράδυ.', typed: G[1] }[mode];
+      if (mode !== 'unchanged') await boxOf(s.page).fill(TXT);
+      await sendBox(s.page); await click(s.page, T.yes);
+      const log = (await telLog(s.page)).map(r => { const o = Object.assign({}, r); delete o.t; return o; });
+      await s.browser.close(); return log;
+    };
+    const LOG = {}; for (const m of ['unchanged', 'reworded', 'newwords', 'typed']) LOG[m] = await runTel(m);
+    const J = x => JSON.stringify(x), numbersOnly = log => log.every(r => Object.entries(r).every(([k, v]) => (k === 'ev' ? typeof v === 'string' : typeof v === 'number')));
+    const picked = m => LOG[m].filter(r => r.ev === 'list_picked').map(r => r.pos).join(), nw = m => { const r = LOG[m].find(x => x.ev === 'root_new_words'); return r ? r.newWords + '/' + r.rootWords : '—'; };
+    ok('RXt (device log): the four sessions leave only records of numbers (no word of the user) — picked place: unchanged ' + picked('unchanged') + ', reworded ' + picked('reworded') + ', new words ' + picked('newwords') + ', typed by hand «' + picked('typed') + '»; newWords/rootWords: ' + ['unchanged', 'reworded', 'newwords', 'typed'].map(m => m + ' ' + nw(m)).join(', '),
+      ['unchanged', 'reworded', 'newwords', 'typed'].every(m => numbersOnly(LOG[m])) && picked('unchanged') === '2' && picked('reworded') === '2' && picked('newwords') === '2' && picked('typed') === ''
+      && nw('unchanged').startsWith('0/') && nw('reworded').startsWith('0/') && !nw('newwords').startsWith('0/') && nw('typed').startsWith('0/'));
+    const same = J(LOG.unchanged) === J(LOG.reworded);
+    results.push('INFO — RXt: «picked and NOT changed» vs «picked and reworded with the SAME words»: ' + (same ? 'the records are IDENTICAL — the log cannot tell them apart' : 'the records differ: ' + J(LOG.unchanged) + ' vs ' + J(LOG.reworded)));
+    results.push('INFO — RXt: «picked and NOT changed» vs «picked and NEW words added»: ' + (J(LOG.unchanged) === J(LOG.newwords) ? 'IDENTICAL' : 'they differ only in root_new_words (newWords ' + nw('unchanged') + ' vs ' + nw('newwords') + ')') + ' — so «changed by adding words that were never said before» shows, «changed in any other way» does not');
+    results.push('INFO — RXt: «picked» vs «typed by hand with the same words»: ' + (picked('typed') === '' && picked('unchanged') !== '' ? 'they differ — list_picked is only there when the list was used' : 'no difference'));
+  }
+  ok('RX: no page error in any of the sessions above (' + ALLERR.length + ')', ALLERR.length === 0);
 }
 
 // ── P1: PACKAGE 1 (John, 19/11/2026; an exception to the freeze for this package only; branch conversation-v1). Fake model, cost $0; every word below is synthetic (the shape of John's
@@ -8419,7 +8705,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else if (opt('--only', '') === 'RX') await runMockRX(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

@@ -27,11 +27,11 @@ const CONSTS = ['HELPLINES', 'KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_MIN_SUBSTANCE_WOR
   'SPEAK_RIGHT_DISMISS_START', 'SPEAK_RIGHT_HEAVY_WORDS', 'SPEAK_RIGHT_CONTENT_WORDS',
   'ROOT_PICK_MAX', 'ROOT_PICK_MAX_CHARS', 'ROOT_PICK_TRIM_YES', 'ROOT_PICK_TRIM_DK', 'ROOT_PICK_NO_START', 'ROOT_PICK_DEICTIC', 'ROOT_PICK_SELF_LABEL',
   'ROOT_PICK_SELF_BLAME', 'ROOT_PICK_ADDRESSED', 'ROOT_PICK_FILLER', 'ROOT_PICK_CONNECTOR', 'ROOT_PICK_TEXTS',
-  'ROOT_LIST_MIN', 'ROOT_LIST_MAX', 'ROOT_LIST_TEXTS'];
+  'ROOT_LIST_MIN', 'ROOT_LIST_MAX', 'ROOT_LIST_TEXTS', 'ROOT_LIST_HINT'];
 const FNS = ['lookBehind', 'detectSafetySignal', 'classifyCrisisTier', 'detectsDangerFromOther', 'detectsMentalHealthReferral', 'mergeRiskKind',
   'stageASafetyHold', 'rootAnswerIsDismissal', 'rootAnswerIsUnsure', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord',
   'substanceOfSentence', 'splitSentences', 'rootTextHasSubstance', 'speakRightSpans', 'speakRightEndsWithQuestion', 'speakRightJaccard',
-  'branchSessionSafe', 'detectsCoreReadinessAsked', 'rootAskNumber', 'rootPickSentences', 'rootPickView', 'recordTelemetry', 'buildTesterExport', 'rootPickRecord'];
+  'branchSessionSafe', 'detectsCoreReadinessAsked', 'rootAskNumber', 'rootPickSentences', 'rootPickView', 'recordTelemetry', 'buildTesterExport', 'rootPickRecord', 'rootListScrollPlan'];
 let F = {};
 try {
   F = new Function([...CONSTS.map(n => constSrc(n) || `const ${n} = undefined;`),
@@ -221,6 +221,52 @@ const viewTexts = (m, over) => { const v = view(m, over); return v && isArr(v.se
   assert('GUARD — (8) STAGE_A_TEXTS (the reducer\'s fixed texts) are byte for byte as before (9f64812e…)', sha(objSrc('STAGE_A_TEXTS')).startsWith('9f64812e26b48d3d'));
   assert('GUARD — (8) the app\'s own count of asks (rootAskNumber), the list\'s three records (rootPickRecord) and the passive counter (rootNewWordCount) are the 19/11 functions, not touched by this change',
     sha(fnSrc('rootAskNumber')).startsWith('96d2f1ee3eaa97e3') && sha(fnSrc('rootPickRecord')).startsWith('1c0bde473197124e') && sha(fnSrc('rootNewWordCount')).startsWith('edd503f0c9a44412'));
+}
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// 9. ONE list per session in TOTAL — the 3-or-more list (Λ1) and the 19/11 list of two never both (John, 22/11/2026, decision 14: «Η λίστα της 2ης φοράς μένει, αλλά ΣΥΝΟΛΙΚΑ ΜΙΑ λίστα ανά συνεδρία»)
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════════
+{
+  // the screen's effect, as this test can run it: at every ask the gate is asked with the latch, and where it shows a list the latch is set — the same two lines that (4.2) pins in the screen's effect
+  const runSession = sizes => { let latch = false; const shown = []; sizes.forEach((n, i) => { const v = view(convN(n), { askNo: i + 1, done: latch }); if (v) { latch = true; shown.push({ ask: i + 1, n: v.sentences.length }); } }); return shown; };
+  const VALUES = [0, 2, 3, 4, 8, 9];
+  let seqs = 0; const bad = [];
+  const walk = (seq, len) => { if (seq.length === len) { seqs++; const r = runSession(seq); if (r.length > 1) bad.push(seq.join(',') + ' → ' + JSON.stringify(r)); return; } for (const v of VALUES) if (!seq.length || v >= seq[seq.length - 1]) walk(seq.concat(v), len); };
+  walk([], 5);
+  assert('GUARD — (9.1) at most ONE list in a whole session: in each of the ' + seqs + ' sessions of 5 asks whose earlier sentences only grow (0, 2, 3, 4, 8 or 9 of them at each ask) the list is shown at most once — never the 3-or-more list and the list of two in the same session' + (bad.length ? ' [' + bad.slice(0, 3).join(' | ') + ']' : ''),
+    seqs > 100 && bad.length === 0);
+  const ex = sizes => JSON.stringify(runSession(sizes));
+  assert('GUARD — (9.2) which list, when: 3 or more at the 1st ask → John\'s list at once, nothing at the 2nd or 3rd · two at the 1st ask → nothing; two at the 2nd → the 19/11 list, and the 3-or-more list that comes later (4 sentences at the 3rd ask) is NOT shown · none, then 3 at the 2nd ask → John\'s list, once',
+    ex([3, 3, 3]) === '[{"ask":1,"n":3}]' && ex([8, 9, 9]) === '[{"ask":1,"n":8}]' && ex([2, 2, 2]) === '[{"ask":2,"n":2}]' && ex([2, 2, 4]) === '[{"ask":2,"n":2}]' && ex([2, 3, 3]) === '[{"ask":2,"n":3}]' && ex([0, 3, 4]) === '[{"ask":2,"n":3}]');
+  const effA = raw.indexOf('// ROOT PICK EFFECT — BEGIN'), effB = raw.indexOf('// ROOT PICK EFFECT — END');
+  const sets = raw.match(/setRootPick\((?!null\))/g) || [], at = raw.search(/setRootPick\((?!null\))/);
+  assert('GUARD — (9.3) the structure behind it: a list can be put on the screen from ONE place only — the only setRootPick(…) with a value is in the screen\'s effect, in the same statement that sets the latch (so no second route to a second list)',
+    sets.length === 1 && effA > 0 && at > effA && at < effB && raw.slice(raw.lastIndexOf('if (v) {', at), at).includes('rootPickDone.current = true'));
+}
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// 10. THE PHONE (John, 22/11/2026, decision 15): the heading is ALWAYS in view when the list appears, and a line under it says what a tap does
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════════
+{
+  const HINT = 'Πάτα ό,τι ταιριάζει, θα μπει στο πεδίο και μπορείς να το αλλάξεις.';
+  assert('NEW — (10.1) the line under the heading is John\'s sentence, word for word, in its own constant (ROOT_LIST_HINT); a statement, not a question; written once in the whole file; the heading\'s own constant keeps only the heading',
+    F.ROOT_LIST_HINT === HINT && !/[;?]/.test(F.ROOT_LIST_HINT || ';') && raw.split(HINT).length === 2 && Object.keys(F.ROOT_LIST_TEXTS).join() === 'title');
+  assert('NEW — (10.2) it says nothing the user did not say and offers nothing of its own: no root, cause, feeling, judgement, no advice («πρέπει», «καλύτερα»…)', typeof F.ROOT_LIST_HINT === 'string' && !/ρίζα|φοβ|σωστ|λάθος|πρέπει|καλύτερα|πρόβλημα|αιτία|βρήκα/i.test(F.ROOT_LIST_HINT));
+  const ask = (() => { const a = raw.indexOf('{stageAPhase === "ask" && ('); return a < 0 ? '' : raw.slice(a, raw.indexOf('{(stageAPhase === "card"', a)); })();
+  assert('NEW — (10.3) on the card the line comes right under the heading and above the first button, and only for the 3-or-more list (the list of two has its instruction in its own title)',
+    ask.length > 0 && /rootPick\.length\s*>=\s*ROOT_LIST_MIN\s*&&[^]*?ROOT_LIST_HINT/.test(ask) && ask.indexOf('ROOT_LIST_TEXTS.title') > 0 && ask.indexOf('ROOT_LIST_HINT') > ask.indexOf('ROOT_LIST_TEXTS.title') && ask.indexOf('ROOT_LIST_HINT') < ask.indexOf('rootPick.map') && (ask.match(/ROOT_LIST_HINT/g) || []).length === 1);
+  const plan = (c, e) => call('rootListScrollPlan', c, e);
+  assert('NEW — (10.4) rootListScrollPlan: the end, as always, while the card\'s top stays on the screen when the chat is scrolled to its end ((300, 200), (200, 200), (0, 0), (5, 0)) — and the card from its top when it would not ((150, 400), (0, 1), (-3, 0))',
+    [[300, 200], [200, 200], [0, 0], [5, 0], [1000, 999.5]].every(([c, e]) => plan(c, e) === 'end') && [[150, 400], [0, 1], [-3, 0], [199.5, 200]].every(([c, e]) => plan(c, e) === 'card'));
+  assert('NEW — (10.5) anything that is not a finite number gives the end — what the screen always did — and nothing throws (undefined, null, NaN, Infinity, strings, objects)',
+    [[undefined, 5], [5, undefined], [null, 5], [5, null], [NaN, 5], [5, NaN], [Infinity, 5], [5, -Infinity], ['10', 20], [10, '20'], [{}, []], [undefined, undefined]].every(([c, e]) => plan(c, e) === 'end'));
+  assert('NEW — (10.6) rootListScrollPlan is pure: two calls with the same two numbers give the same answer, and it returns one of two words only', ['end', 'card'].includes(plan(1, 2)) && ['end', 'card'].includes(plan(2, 1)) && plan(7, 9) === plan(7, 9) && plan(9, 7) === plan(9, 7));
+  const eff = (() => { const a = raw.indexOf('// the list makes the root question\'s card taller'); return a < 0 ? '' : raw.slice(a, raw.indexOf('\n', raw.indexOf('}, [rootPick]);', a)) + 1); })();
+  assert('NEW — (10.7) the screen\'s effect on rootPick asks the plan: it reads the card\'s top and how far the chat scrolls (the two numbers), shows the card from its top (block "start") when the plan says «card», and otherwise still scrolls to the end (block "end"); it does nothing for an empty list',
+    eff.length > 0 && /rootListScrollPlan\(/.test(eff) && /rootCardRef\.current/.test(eff) && /scrollHeight\s*-\s*\w+\.clientHeight/.test(eff) && /plan === "card"/.test(eff) && /scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/.test(eff) && /scrollIntoView\(\{ behavior: "smooth", block: "end" \}\)/.test(eff) && /rootPick && rootPick\.length/.test(eff) && /\}, \[rootPick\]\);/.test(eff));
+  assert('NEW — (10.8) the root question\'s card carries the reference (ref={rootCardRef}) and the reference is declared with useRef — and only that card', ask.length > 0 && /<div className="warning-card"[^>]*ref=\{rootCardRef\}/.test(ask) && /const rootCardRef\s*=\s*useRef\(null\)/.test(raw) && (raw.match(/ref=\{rootCardRef\}/g) || []).length === 1);
+  assert('GUARD — (10.9) the effect and handlers of the tap are as they were: a tap still only copies the sentence into the box; «Καμία από αυτές» still only closes the list (the new scroll touches neither)',
+    (() => { const a = raw.indexOf('const handleRootPickTap = '), tap = raw.slice(a, raw.indexOf('\n  ', raw.indexOf(';', a)) + 1); return /setInput\(t\)/.test(tap) && !/scrollIntoView|rootListScrollPlan/.test(tap); })());
 }
 
 console.log(passed + ' passed, ' + failed + ' failed');
