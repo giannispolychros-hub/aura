@@ -1026,6 +1026,7 @@ async function runMock() {
   await runMockDBG(); // 16/11: the round trace in the ?debug=1 panel — passive, numbers and yes/no only
   await runMockMU(); // 17/11: «Δεν κατάλαβα την ερώτηση» is not a root — the app's own root question, John's exception to the freeze
   await runMockP1(); // 19/11: PACKAGE 1 — «2η φορά», the passive counter, one note per round, the prompt's three lines
+  await runMockRL(); // 21/11: «λίστα στην ερώτηση της ρίζας» (Λ1) — 3 or more of the user's own sentences at the root question, at most 8 (root-list)
 }
 
 // ── SD: ADR «31 Οκτωβρίου (ζ)» (John, a safety fix (α)) — the gaps of the two safety detectors, on the screen. Stage A (?stageA=1&rec=1),
@@ -1885,6 +1886,171 @@ async function runMockMU() {
   }
   { const { s, yesCalls, nextCalls } = await armed(REAL);
     ok('MU5 (control, unchanged): the same sequence with a real root as the next message → the card opens at once with those words, 0 model calls (' + nextCalls + '; the «Ναι» itself made ' + yesCalls + ')', yesCalls === 1 && nextCalls === 0 && (await card(s.page)) && (await shown(s.page, REAL)));
+    await s.browser.close();
+  }
+}
+
+// ── RL: «ΛΙΣΤΑ ΣΤΗΝ ΕΡΩΤΗΣΗ ΤΗΣ ΡΙΖΑΣ» (Λ1) — John, 21/11/2026, branch root-list; it CHANGES the decision of 19/11/2026 (Package 1: the list only at the root question's 2nd ask). Fake model, cost $0;
+// every word below is synthetic. At the root question, 3 or more of the user's own sentences (the filter of Package 1) → the list: at most 8, in the order they were written, under John's heading, with «Καμία
+// από αυτές» and the writing box; fewer than 3 → the question as it is today (and the 19/11 list of two at a later ask, which John's rule leaves alone). Once per session, never on the safety path, numbers
+// only in the device log. RLa the button, 1st ask, three sentences, a tap, the card · RLb ten sentences → eight, on a phone (390×844) · RLc two sentences → today's question, the 19/11 list at the 2nd ask · RLd once per
+// session · RLe the safety path · RLf John's session (the readiness question unopened, the user leaves) · RLg the readiness question and a clean «Ναι» · RLh a 2nd ask with three sentences. Unit tests:
+// auratests/test_root_list_2111.js. Screenshots RL-list3.png, RL-list8.png, RL-list8-full.png. Alone: --only RL.
+async function runMockRL() {
+  const T = APP.texts;
+  const NEW_TITLE = 'Ποιο από αυτά νομίζεις ότι τραβάει τα άλλα; Ή κάτι που δεν έχεις πει ακόμα;';
+  const OLD_TITLE = 'Δικά σου λόγια από πριν. Πάτα μία για να τη βάλεις στο πεδίο και να τη διορθώσεις όπως θες:', NONE = 'Καμία από αυτές';
+  const E = 'Δεν ξέρω αν πρέπει να αλλάξω γραφείο, με πιέζει το πρόγραμμα.';
+  const G = ['Το ωράριο είναι βαρύ και δεν αφήνει χρόνο για τίποτα άλλο.', 'Θέλω περισσότερο χρόνο για την οικογένειά μου.', 'Η μετακίνηση παίρνει δύο ώρες κάθε μέρα.',
+    'Ο μισθός είναι καλός και με κρατά εκεί.', 'Οι συνάδελφοι με στηρίζουν στις δύσκολες μέρες.', 'Το σπίτι μου είναι κοντά στο σχολείο των παιδιών.',
+    'Η προϊσταμένη μου εμπιστεύεται τις αποφάσεις μου.', 'Τα Σαββατοκύριακα δουλεύω σχεδόν πάντα στον υπολογιστή.', 'Η καινούργια θέση είναι σε άλλη πόλη.',
+    'Το δάνειο του διαμερίσματος τελειώνει σε τέσσερα χρόνια.', 'Ο φίλος μου άλλαξε δουλειά πέρσι και είναι ευχαριστημένος.', 'Η μητέρα μου μένει μόνη της στην επαρχία.'];
+  const RQ = 'Από όσα είπαμε, νιώθεις ότι έχει αρχίσει να ξεκαθαρίζει τι είναι αυτό που πραγματικά σε απασχολεί;';
+  const QS = ['Τι σε κρατά σε αυτή τη σκέψη τώρα;', 'Και τι θα άλλαζε με αυτό;', 'Τι έχει σημασία εδώ;', 'Τι κρατά το πράγμα στη θέση του;', 'Τι άλλο υπάρχει;', 'Τι λείπει ακόμα;']; // every reply ends in a question, no readiness question
+  const card = async page => (await page.getByRole('button', { name: T.yes, exact: true }).count()) > 0;
+  const boxOf = page => page.locator('textarea.textarea');
+  const boxValue = async page => ((await boxOf(page).count()) ? boxOf(page).inputValue() : null);
+  const titleN = (page, t) => page.getByText(t, { exact: true }).count();
+  const btn = (page, t) => page.getByRole('button', { name: t, exact: true });
+  const btnN = (page, t) => btn(page, t).count();
+  const shown = async (page, t) => (await page.getByText('«' + t + '»', { exact: false }).count()) > 0;
+  const askN = page => page.getByText(T.ask, { exact: true }).count();
+  const click = async (page, t) => { const b = btn(page, t); if (!(await b.count())) return false; await b.click(); await page.waitForTimeout(300); return true; };
+  const press = async page => { await page.getByRole('button', { name: T.button }).click(); await page.waitForTimeout(400); };
+  const telLog = page => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
+  const listRecs = async page => (await telLog(page)).filter(r => /^list_/.test(r.ev));
+  const keys = r => (r ? Object.keys(r).sort().join(',') : '');
+  // (a missing element is "not there" — null at once, never a 30-second wait: the same section runs on the code before this change)
+  const yOf = async loc => { try { if (!(await loc.count())) return null; const b = await loc.first().boundingBox({ timeout: 2000 }); return b ? b.y : null; } catch (e) { return null; } };
+  const bothTitles = async page => [await titleN(page, NEW_TITLE), await titleN(page, OLD_TITLE)];
+  // ── RLa — the button, the FIRST ask, three sentences → John's list; a tap copies, the user sends it himself, the card holds exactly those words
+  { const s = await session('?stageA=1&rec=1', QS);
+    for (const m of [E, G[0], G[1], G[2]]) await send(s.page, m);
+    const n0 = s.calls.length;
+    await press(s.page);
+    const [tn, to] = await bothTitles(s.page), bs = [await btnN(s.page, G[0]), await btnN(s.page, G[1]), await btnN(s.page, G[2])], none = await btnN(s.page, NONE), q = await askN(s.page);
+    ok('RLa: the root button → the root question at its FIRST ask (' + q + '), 0 model calls (' + (s.calls.length - n0) + '), John\'s heading (' + tn + '), not the 19/11 title (' + to + '), the user\'s own three sentences ' + bs.join('/') + ', «' + NONE + '» (' + none + '), no card',
+      q === 1 && s.calls.length === n0 && tn === 1 && to === 0 && bs.every(n => n === 1) && none === 1 && !(await card(s.page)));
+    await s.page.waitForTimeout(800); // the smooth scroll that follows the list
+    await s.page.screenshot({ path: path.join(OUT, 'RL-list3.png'), fullPage: false });
+    const ys = [await yOf(s.page.getByText(NEW_TITLE, { exact: true })), await yOf(btn(s.page, G[0])), await yOf(btn(s.page, G[1])), await yOf(btn(s.page, G[2])), await yOf(btn(s.page, NONE)), await yOf(btn(s.page, T.back))];
+    ok('RLa: on the card, top to bottom: the heading, the three sentences in the order they were written, «' + NONE + '», then «' + T.back + '» (' + ys.map(v => (v === null ? '—' : Math.round(v))).join(' < ') + ')',
+      ys.every(v => v !== null) && ys.every((v, i, a) => i === 0 || a[i - 1] < v));
+    ok('RLa: the writing box is there, empty (' + JSON.stringify(await boxValue(s.page)) + ')', (await boxValue(s.page)) === '');
+    const n1 = s.calls.length;
+    await click(s.page, G[1]);
+    ok('RLa: a tap COPIES the sentence into the box exactly (' + ((await boxValue(s.page)) === G[1]) + '), sends nothing (' + (s.calls.length - n1) + ' calls), opens no card, the list stays (' + (await titleN(s.page, NEW_TITLE)) + ')',
+      (await boxValue(s.page)) === G[1] && s.calls.length === n1 && !(await card(s.page)) && (await titleN(s.page, NEW_TITLE)) === 1);
+    { const log = await telLog(s.page), L = e => log.filter(r => r.ev === e);
+      ok('RLa (device log): list_shown ×' + L('list_shown').length + ' (' + keys(L('list_shown')[0]) + '; n ' + (L('list_shown')[0] && L('list_shown')[0].n) + '), list_picked ×' + L('list_picked').length + ' (' + keys(L('list_picked')[0]) + '; pos ' + (L('list_picked')[0] && L('list_picked')[0].pos) + '), list_none ×' + L('list_none').length + '; numbers only, no word of the user in any record',
+        L('list_shown').length === 1 && keys(L('list_shown')[0]) === 'ev,n,t' && L('list_shown')[0].n === 3 && L('list_picked').length === 1 && keys(L('list_picked')[0]) === 'ev,pos,t' && L('list_picked')[0].pos === 2 && L('list_none').length === 0
+        && !log.some(r => JSON.stringify(r).includes(G[1]) || JSON.stringify(r).includes('οικογένεια')) && log.filter(r => /^list_/.test(r.ev)).every(r => Object.entries(r).every(([k, v]) => (k === 'ev' ? typeof v === 'string' : typeof v === 'number')))); }
+    { const go = s.page.getByRole('button', { name: 'Go' }); if (await go.isEnabled()) { await go.click(); await s.page.waitForTimeout(700); } }
+    ok('RLa: the user sends it himself → the card «Τι βρήκες» with exactly those words, 0 model calls (' + (s.calls.length - n1) + '), the list is gone (' + (await bothTitles(s.page)).join('/') + ')',
+      (await card(s.page)) && (await shown(s.page, G[1])) && s.calls.length === n1 && (await bothTitles(s.page)).every(n => n === 0));
+    await s.browser.close();
+  }
+  // ── RLb — ten sentences → eight (the first, the last, the rest spread by position), in the order they were written; on a phone
+  { const s = await session('?stageA=1&rec=1', QS);
+    await s.page.setViewportSize({ width: 390, height: 844 });
+    for (const m of [E, ...G.slice(0, 10)]) await send(s.page, m);
+    await press(s.page);
+    const inList = [0, 1, 3, 4, 5, 6, 8, 9], notIn = [2, 7];
+    const have = []; for (let i = 0; i < 10; i++) have.push(await btnN(s.page, G[i]));
+    const [tn, to] = await bothTitles(s.page), none = await btnN(s.page, NONE);
+    ok('RLb: ten sentences → exactly eight buttons — the 1st, 2nd, 4th, 5th, 6th, 7th, 9th and 10th (' + inList.map(i => have[i]).join('') + '), not the 3rd and the 8th (' + notIn.map(i => have[i]).join('') + '), John\'s heading (' + tn + '), not the 19/11 title (' + to + '), «' + NONE + '» (' + none + ')',
+      inList.every(i => have[i] === 1) && notIn.every(i => have[i] === 0) && tn === 1 && to === 0 && none === 1);
+    const ys = []; for (const i of inList) ys.push(await yOf(btn(s.page, G[i])));
+    ok('RLb: the eight in the order they were written, one under the other (' + ys.map(v => (v === null ? '—' : Math.round(v))).join(' < ') + ')', ys.every(v => v !== null) && ys.every((v, i, a) => i === 0 || a[i - 1] < v));
+    await s.page.waitForTimeout(800);
+    await s.page.screenshot({ path: path.join(OUT, 'RL-list8.png'), fullPage: false });
+    await s.page.screenshot({ path: path.join(OUT, 'RL-list8-full.png'), fullPage: true });
+    // the bottom of the card (the same check as P1a with three sentences): «Καμία από αυτές» and «Δεν το βρήκα ακόμα» above the sticky box, not behind it
+    const above = async t => { const loc = btn(s.page, t); if ((await loc.count()) !== 1) return false; const bb = await loc.boundingBox(), tb = await boxOf(s.page).boundingBox(); return !!bb && !!tb && bb.y >= 0 && bb.y + bb.height <= tb.y + 1; };
+    ok('RLb (screen, 390×844): the bottom of the card is in view — «' + NONE + '» (' + await above(NONE) + ') and «' + T.back + '» (' + await above(T.back) + ') sit above the input box, not behind it', (await above(NONE)) && (await above(T.back)));
+    { const hy = await yOf(s.page.getByText(NEW_TITLE, { exact: true })), ty = await yOf(boxOf(s.page));
+      results.push('INFO — RLb (screen, 390×844, eight sentences, after the app scrolled to the bottom): the top of John\'s heading is at y=' + (hy === null ? '—' : Math.round(hy)) + ' (negative = scrolled above the screen), the input box starts at y=' + (ty === null ? '—' : Math.round(ty)) + ' — see RL-list8.png'); }
+    const n1 = s.calls.length;
+    await click(s.page, G[9]);
+    ok('RLb: a tap on the last of the eight copies it (' + ((await boxValue(s.page)) === G[9]) + '), sends nothing (' + (s.calls.length - n1) + '), and records its PLACE among the eight',
+      (await boxValue(s.page)) === G[9] && s.calls.length === n1 && (await telLog(s.page)).filter(r => r.ev === 'list_picked').map(r => r.pos).join() === '8');
+    { const log = await telLog(s.page), L = e => log.filter(r => r.ev === e);
+      ok('RLb (device log): list_shown ×' + L('list_shown').length + ' with n ' + (L('list_shown')[0] && L('list_shown')[0].n) + ' (a number: the eight), no text', L('list_shown').length === 1 && keys(L('list_shown')[0]) === 'ev,n,t' && L('list_shown')[0].n === 8 && !log.some(r => JSON.stringify(r).includes('Το σπίτι'))); }
+    await s.browser.close();
+  }
+  // ── RLc — two sentences → the question as it is today at the 1st ask; the 19/11 list of two at the 2nd ask (John's rule leaves it alone)
+  { const s = await session('?stageA=1&rec=1', QS);
+    for (const m of [E, G[0], G[1]]) await send(s.page, m);
+    const n0 = s.calls.length;
+    await press(s.page);
+    ok('RLc: two sentences, the 1st ask → the root question as it is today (' + (await askN(s.page)) + '), no heading, no list (' + (await bothTitles(s.page)).join('/') + ' · ' + (await btnN(s.page, G[0])) + '/' + (await btnN(s.page, G[1])) + '/' + (await btnN(s.page, NONE)) + '), nothing in the log (' + (await listRecs(s.page)).length + ')',
+      (await askN(s.page)) === 1 && (await bothTitles(s.page)).every(n => n === 0) && (await btnN(s.page, G[0])) === 0 && (await btnN(s.page, G[1])) === 0 && (await btnN(s.page, NONE)) === 0 && (await listRecs(s.page)).length === 0 && s.calls.length === n0);
+    await send(s.page, 'ok'); await s.page.waitForTimeout(300);
+    ok('RLc: a too-short answer → the app asks again = the 2nd ask → the 19/11 list of the two, with its own title (' + (await bothTitles(s.page)).join('/') + ' — new/old), the two sentences ' + (await btnN(s.page, G[0])) + '/' + (await btnN(s.page, G[1])) + ' — unchanged',
+      (await titleN(s.page, OLD_TITLE)) === 1 && (await titleN(s.page, NEW_TITLE)) === 0 && (await btnN(s.page, G[0])) === 1 && (await btnN(s.page, G[1])) === 1 && (await btnN(s.page, NONE)) === 1 && s.calls.length === n0);
+    { const r = await listRecs(s.page); ok('RLc (device log): the one record is list_shown with n 2 (' + r.map(x => x.ev + ':' + (x.n !== undefined ? x.n : '')).join(', ') + ')', r.length === 1 && r[0].ev === 'list_shown' && r[0].n === 2); }
+    await s.browser.close();
+  }
+  // ── RLd — once per session: «Καμία από αυτές» closes it, «Δεν το βρήκα ακόμα» and the button again → the question without any list
+  { const s = await session('?stageA=1&rec=1', QS);
+    for (const m of [E, G[0], G[1], G[2]]) await send(s.page, m);
+    await press(s.page);
+    const n1 = s.calls.length, was = await bothTitles(s.page), wasBtn = await btnN(s.page, G[0]);
+    await click(s.page, NONE);
+    ok('RLd: the list was there (' + was.join('/') + ', ' + wasBtn + ' sentence) and «' + NONE + '» closes it (' + (await bothTitles(s.page)).join('/') + ' titles, ' + (await btnN(s.page, G[0])) + ' sentences), the box is empty (' + JSON.stringify(await boxValue(s.page)) + '), the root question is still there (' + (await askN(s.page)) + '), nothing was sent (' + (s.calls.length - n1) + ')',
+      was[0] === 1 && wasBtn === 1 && (await bothTitles(s.page)).every(n => n === 0) && (await btnN(s.page, G[0])) === 0 && (await boxValue(s.page)) === '' && (await askN(s.page)) === 1 && s.calls.length === n1);
+    await click(s.page, T.back);
+    const hasBtn = (await s.page.getByRole('button', { name: T.button }).count()) === 1;
+    if (hasBtn) await press(s.page);
+    ok('RLd: once per session — the root question asked again later (' + hasBtn + ', the question: ' + (await askN(s.page)) + ') comes WITHOUT a list (' + (await bothTitles(s.page)).join('/') + ')', hasBtn && (await askN(s.page)) === 1 && (await bothTitles(s.page)).every(n => n === 0) && (await btnN(s.page, G[0])) === 0);
+    { const L = e => listRecs(s.page).then(r => r.filter(x => x.ev === e).length); ok('RLd (device log): list_shown ×' + await L('list_shown') + ', list_none ×' + await L('list_none') + ', list_picked ×' + await L('list_picked'), (await L('list_shown')) === 1 && (await L('list_none')) === 1 && (await L('list_picked')) === 0); }
+    await s.browser.close();
+  }
+  // (the danger sentence below is written in two pieces on purpose: auratests/test_danger_from_other_2310.js (Λ) reads every string of this script outside the sections that hold danger messages by design)
+  // ── RLe — the safety path: the control shows the list; a help-line number in an AURA reply, a crisis sentence, danger from another person → no list, nothing recorded
+  for (const kind of ['control', 'number', 'crisis', 'danger']) {
+    const replies = kind === 'number' ? [QS[0], 'Αν χρειαστείς άμεση βοήθεια, καλέσε το 112. Και τι θα άλλαζε με αυτό;', QS[2], QS[3]] : QS;
+    const s = await session('?stageA=1&rec=1', replies);
+    const lines = kind === 'crisis' ? [E, G[0], 'Θέλω να πεθάνω.', G[1], G[2]] : kind === 'danger' ? [E, G[0], 'Με χτυπ' + 'άει ο άντρας μου.', G[1], G[2]] : [E, G[0], G[1], G[2]];
+    for (const m of lines) await send(s.page, m);
+    const hasBtn = (await s.page.getByRole('button', { name: T.button }).count()) === 1;
+    if (hasBtn) await press(s.page);
+    const body = await s.page.locator('body').innerText();
+    const t = await bothTitles(s.page), recs = await listRecs(s.page);
+    ok('RLe: ' + ({ control: 'control (nothing wrong) → the list (' + t[0] + '), recorded once (' + recs.length + ')', number: 'an AURA reply carries the number 112 (on screen: ' + body.includes('112') + ') → NO list (' + t.join('/') + '), nothing recorded (' + recs.length + ')',
+      crisis: 'a crisis sentence typed (button on screen: ' + hasBtn + ') → NO list (' + t.join('/') + '), nothing recorded (' + recs.length + ')', danger: 'danger from another person typed (button on screen: ' + hasBtn + ') → NO list (' + t.join('/') + '), nothing recorded (' + recs.length + ')' })[kind],
+      kind === 'control' ? t[0] === 1 && recs.length === 1 && recs[0].ev === 'list_shown' && recs[0].n === 3 : t.every(n => n === 0) && (await btnN(s.page, G[0])) === 0 && recs.length === 0);
+    await s.browser.close();
+  }
+  // ── RLf — John's own session (synthetic): the readiness question is asked and not opened by a «Ναι»; the user leaves → the root question (its «leaving» form) with the list of three
+  { const s = await session('?stageA=1&rec=1', [QS[0], QS[1], RQ, QS[2], QS[3], QS[4]]);
+    for (const m of [E, G[0], G[1], 'Ναι στο είπα ήδη', G[2]]) await send(s.page, m);
+    const c0 = s.calls.length; await send(s.page, 'Ευχαριστώ.'); await s.page.waitForTimeout(300);
+    const [tn, to] = await bothTitles(s.page), bs = [await btnN(s.page, G[0]), await btnN(s.page, G[1]), await btnN(s.page, G[2])];
+    ok('RLf: the user leaves after the readiness question was left unopened → the app\'s root question (' + (await s.page.getByText(T.askLeaving, { exact: true }).count()) + '), no model call for it (' + (s.calls.length - c0) + '), John\'s heading (' + tn + '), not the 19/11 title (' + to + '), the three sentences ' + bs.join('/') + ' (the reply to the readiness question is not one of them), «' + NONE + '» (' + (await btnN(s.page, NONE)) + ')',
+      (await s.page.getByText(T.askLeaving, { exact: true }).count()) === 1 && s.calls.length === c0 && tn === 1 && to === 0 && bs.every(n => n === 1) && (await btnN(s.page, NONE)) === 1 && (await btnN(s.page, 'Ναι στο είπα ήδη')) === 0);
+    await s.browser.close();
+  }
+  // ── RLg — the normal path: the readiness question after three answers, a clean «Ναι» → the root question (1st ask) WITH the list, no model call
+  { const s = await session('?stageA=1&rec=1', [QS[0], QS[1], QS[2], RQ, QS[3]]);
+    for (const m of [E, G[0], G[1], G[2]]) await send(s.page, m);
+    const n0 = s.calls.length; await send(s.page, 'Ναι'); await s.page.waitForTimeout(300);
+    const [tn, to] = await bothTitles(s.page), bs = [await btnN(s.page, G[0]), await btnN(s.page, G[1]), await btnN(s.page, G[2])];
+    ok('RLg: the readiness question and a clean «Ναι» → the root question (' + (await askN(s.page)) + '), 0 model calls (' + (s.calls.length - n0) + '), John\'s heading (' + tn + '), the three sentences ' + bs.join('/') + ', «' + NONE + '» (' + (await btnN(s.page, NONE)) + ')',
+      (await askN(s.page)) === 1 && s.calls.length === n0 && tn === 1 && to === 0 && bs.every(n => n === 1) && (await btnN(s.page, NONE)) === 1);
+    await s.browser.close();
+  }
+  // ── RLh — the 1st ask had only two sentences (no list); the user goes back, says a third, presses the button again → the 2nd ask → John's list (three), once
+  { const s = await session('?stageA=1&rec=1', QS);
+    for (const m of [E, G[0], G[1]]) await send(s.page, m);
+    await press(s.page);
+    const first = await bothTitles(s.page);
+    await click(s.page, T.back);
+    await send(s.page, G[2]);
+    await press(s.page);
+    const [tn, to] = await bothTitles(s.page), bs = [await btnN(s.page, G[0]), await btnN(s.page, G[1]), await btnN(s.page, G[2])];
+    ok('RLh: the 1st ask with two sentences → no list (' + first.join('/') + '); after a third sentence the 2nd ask → John\'s heading (' + tn + '), not the 19/11 title (' + to + '), the three sentences ' + bs.join('/') + '; recorded once with n 3',
+      first.every(n => n === 0) && tn === 1 && to === 0 && bs.every(n => n === 1) && (await listRecs(s.page)).length === 1 && (await listRecs(s.page))[0].n === 3);
     await s.browser.close();
   }
 }
@@ -8251,7 +8417,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
