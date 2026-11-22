@@ -2813,6 +2813,14 @@ const ROOT_PICK_ADDRESSED = /(?:^|[^α-ω])(?:σου|εσυ|εσενα|πεσ μ
 const ROOT_PICK_FILLER = /^(?:hmm+|χμ+|μμ+|εεε+|ωραια|οκ)(?![α-ω])/;
 const ROOT_PICK_CONNECTOR = /^(?:και|αλλα|ομωσ|μετα|ισωσ|μαλλον|δεν ξερω|απλα|ετσι|ουτε|επισησ|δηλαδη|λοιπον|ναι|οχι|ωραια|οκ|hmm+|χμ+|μμ+|εεε+|απο την αλλη)(?![α-ω])/;
 const ROOT_PICK_TEXTS = { title: "Δικά σου λόγια από πριν. Πάτα μία για να τη βάλεις στο πεδίο και να τη διορθώσεις όπως θες:", none: "Καμία από αυτές" };
+// Λ1 (John, 21/11/2026 — branch root-list) CHANGES the 19/11 decision «the list only at the 2nd ask»: at the root question, from the FIRST ask on, when 3 or more of the user's own
+// sentences pass the filter below (ROOT_LIST_MIN), the list is John's: at most 8 (ROOT_LIST_MAX), in the order they were written (more than 8 → the first, the last and the rest
+// spread by position — never by a weight of what they say), under his heading, with «Καμία από αυτές» and the writing box. Fewer than 3 → the question as it is today; exactly two at
+// the 2nd ask or later → the 19/11 list of two, unchanged. So a list of 3 or more is always John's and a list of two always the 19/11 one: the screen tells them apart by the number.
+// The same gate, the same filter, the same once-per-session latch and the same three number-only records; the app proposes no root of its own.
+const ROOT_LIST_MIN = 3;
+const ROOT_LIST_MAX = 8;
+const ROOT_LIST_TEXTS = { title: "Ποιο από αυτά νομίζεις ότι τραβάει τα άλλα; Ή κάτι που δεν έχεις πει ακόμα;" };
 // Which ask is this? `appAsksBefore` = how many times the app has put the root question to the user before this one (counted by the screen's effect); `door2Asks` =
 // how many asks so far (this one included) opened with the user's «Ναι» to the readiness question. Always an integer ≥ 1.
 function rootAskNumber(messages, appAsksBefore, door2Asks) {
@@ -2821,7 +2829,8 @@ function rootAskNumber(messages, appAsksBefore, door2Asks) {
   const readiness = list.filter(m => m && m.role === "assistant" && m.msgMode !== "STAGE_A" && typeof m.content === "string" && detectsCoreReadinessAsked(m.content)).length;
   return Math.max(0, readiness - whole(door2Asks)) + whole(appAsksBefore) + 1;
 }
-// The sentences → [{ text, msg, start, end }], in time order: 0, or 2–3 (more than 3 → the first, the middle and the last). `text` === messages[msg].content.slice(start, end):
+// The sentences → [{ text, msg, start, end }], in time order: 0, or 2 up to `max` (default ROOT_PICK_MAX = 3; Λ1 asks for ROOT_LIST_MAX = 8). More than `max` → the first, the last and the
+// rest spread by position (with 3: the first, the middle and the last). `text` === messages[msg].content.slice(start, end):
 // an exact, continuous piece of what the user typed. One sentence per message; a rejected sentence is replaced by the next sentence of the same message. The chain is the
 // Thought Map's, through its frozen copy in the speak-right block (speakRight*; proved identical, test_speak_right.js (2.12)): every user message but the first (the entrance), only as an answer to a question of AURA (msgMode ANSWER, ending in a question), and not the answer to
 // the readiness question (it is about the process, not the topic — by its place, no words). Left out: safety, a dismissal or «I don't know», a goodbye, heavy words
@@ -2829,8 +2838,9 @@ function rootAskNumber(messages, appAsksBefore, door2Asks) {
 // («ισχύει», «όπως είπες»), a self-label or self-blame, a sentence over 200 characters, a near copy of one already chosen, and one identical to the question it answers.
 // A leading «Ναι, ακριβώς,» or «Δεν ξέρω…» (with the dots) is cut off — what is left is still an exact piece. Every sentence passes rootTextHasSubstance as it is, so sent
 // unchanged it becomes the root card, not the «say it more fully» line. Never throws; never changes its input.
-function rootPickSentences(messages) {
+function rootPickSentences(messages, max) {
   try {
+    const cap = Number.isInteger(max) && max >= 2 ? max : ROOT_PICK_MAX;
     const list = Array.isArray(messages) ? messages : [];
     const userIdx = [];
     list.forEach((m, i) => { if (m && m.role === "user" && typeof m.content === "string") userIdx.push(i); });
@@ -2871,26 +2881,28 @@ function rootPickSentences(messages) {
       }
     }
     if (kept.length < 2) return [];
-    if (kept.length <= ROOT_PICK_MAX) return kept;
+    if (kept.length <= cap) return kept;
     const pick = [];
-    for (let k = 0; k < ROOT_PICK_MAX; k++) pick.push(kept[Math.round(k * (kept.length - 1) / (ROOT_PICK_MAX - 1))]);
+    for (let k = 0; k < cap; k++) pick.push(kept[Math.round(k * (kept.length - 1) / (cap - 1))]);
     return pick;
   } catch (e) {
     return [];
   }
 }
-// The gate → { sentences } or null. Only at the root question (phase "ask"), from the 2nd ask on, once per session (`done`), and NEVER on the safety path — the app's latch
+// The gate → { sentences } or null. Only at the root question (phase "ask"), once per session (`done`), and NEVER on the safety path — the app's latch
 // (crisis A or B, DISTRESS, danger from another person, safety mode, the failed-call crisis line) and the whole session checked again (branchSessionSafe), exactly the
-// check of the Thought Map. Fewer than two sentences → null: the user is never offered "the" sentence. Never throws.
+// check of the Thought Map. CHANGED 21/11/2026 (Λ1, John): from the FIRST ask on — 3 or more sentences (ROOT_LIST_MIN) → John's list, up to ROOT_LIST_MAX; exactly two → still only
+// from the 2nd ask on (the 19/11 list, unchanged); fewer than two → null: the user is never offered "the" sentence. Never throws.
 function rootPickView(o) {
   try {
     const x = o || {};
-    if (x.phase !== "ask" || x.done === true || !(Number.isInteger(x.askNo) && x.askNo >= 2)) return null;
+    if (x.phase !== "ask" || x.done === true || !(Number.isInteger(x.askNo) && x.askNo >= 1)) return null;
     const risk = { riskKind: typeof x.riskKind === "number" ? x.riskKind : 0, dangerFromOther: x.dangerFromOther === true, safetyMode: x.safetyMode === true };
     if (risk.riskKind !== 0 || risk.dangerFromOther || risk.safetyMode || x.crisisFallback) return null;
     if (!branchSessionSafe(x.messages, risk)) return null;
-    const sentences = rootPickSentences(x.messages);
-    return sentences.length >= 2 ? { sentences } : null;
+    const sentences = rootPickSentences(x.messages, ROOT_LIST_MAX);
+    if (sentences.length >= ROOT_LIST_MIN) return { sentences };
+    return x.askNo >= 2 && sentences.length >= 2 ? { sentences } : null;
   } catch (e) {
     return null;
   }
@@ -10584,8 +10596,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
   const thoughtMapShown = thoughtMap !== null;
   useEffect(() => { if (thoughtMapShown) logThoughtMapOnce(thoughtMap); }, [thoughtMapShown]); // eslint-disable-line react-hooks/exhaustive-deps
   // ROOT PICK EFFECT — BEGIN
-  // PACKAGE 1 (John, 19/11/2026): when the app puts the root question to the user (the phase becomes "ask", or its re-ask line appears), count the ask; from the 2nd on, once per
-  // session and never on the safety path, show the user's own earlier sentences (rootPickView decides). It reads the phase, the counters, the session's flags and the earlier
+  // PACKAGE 1 (John, 19/11/2026): when the app puts the root question to the user (the phase becomes "ask", or its re-ask line appears), count the ask and let the gate decide at EVERY ask
+  // (Λ1, John, 21/11/2026: the first one too — before, from the 2nd on): once per session and never on the safety path, show the user's own earlier sentences (rootPickView decides which
+  // list, or none). It reads the phase, the counters, the session's flags and the earlier
   // messages — nothing the user types, nothing about how an answer was understood. It stores and sends nothing; its one record is list_shown, a number (how many sentences), written
   // where the list is set — so never on the safety path, where the gate says no (John's addition, 20/11/2026).
   const rootRetryNow = stageAView.retry === true;
@@ -11489,7 +11502,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                   {stageAView.retry && <div className="warning-text" style={{opacity:0.85}}>{STAGE_A_TEXTS.retry}</div>}
                   {rootPick && rootPick.length > 0 && (
                     <div style={{marginBottom:"14px"}}>
-                      <div className="warning-text" style={{opacity:0.85,marginBottom:"8px"}}>{ROOT_PICK_TEXTS.title}</div>
+                      <div className="warning-text" style={{opacity:0.85,marginBottom:"8px"}}>{rootPick.length >= ROOT_LIST_MIN ? ROOT_LIST_TEXTS.title : ROOT_PICK_TEXTS.title}</div>
                       <div className="choice-btns" style={{flexDirection:"column",alignItems:"stretch"}}>
                         {rootPick.map((t, i) => (
                           <button key={i} className="choice-btn" style={{textTransform:"none",letterSpacing:"normal",fontFamily:"inherit",fontSize:"12px",textAlign:"left",whiteSpace:"normal",lineHeight:1.5}} onClick={() => handleRootPickTap(t, i)}>{t}</button>
