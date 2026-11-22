@@ -2442,6 +2442,122 @@ async function runMockRX() {
   ok('RX: no page error in any of the sessions above (' + ALLERR.length + ')', ALLERR.length === 0);
 }
 
+// ── LP: LONG MESSAGES IN THE LIST OF THE ROOT QUESTION (John, 22/11/2026, item Ε; branch root-list; $0, fake model, the real app in Chromium). Nothing here changes the app; every word below is synthetic.
+// The rule: a sentence over 200 characters is NOT left out of the list any more — it is shown cut at the last whole word that fits, with «…» on the SCREEN only; a tap puts into the box the same text that is shown,
+// WITHOUT the «…»; every other rule of the filter stays. LPa the list at the 1st ask: whole items as they are, cut items end with «…», the tail is not on a button · LPb a tap on a cut item: the box holds exactly the piece,
+// no «…», nothing is sent · LPc the piece sent unchanged becomes the card, word for word, with no model call · LPd «Δεν το βρήκα ακόμα» after a tap clears exactly what the app put in; a word added keeps the box ·
+// LPe the 19/11 list of two at the 2nd ask: the same · LPf the device log: numbers only — no word, no «…» · LPg the phone, 390×844 and 360×640: no horizontal scroll, no cut button, the heading in view. Alone: --only LP.
+// Screenshots LP-phone-*.png.
+async function runMockLP() {
+  const T = APP.texts;
+  const TITLE = 'Δικά σου λόγια από πριν. Αν κάποιο λέει αυτό που σε απασχολεί πραγματικά, πάτα το — θα μπει στο πεδίο και μπορείς να το αλλάξεις. Αν όχι, γράψε κάτι που δεν έχεις πει ακόμα.';
+  const TITLE2 = 'Δικά σου λόγια από πριν. Πάτα μία για να τη βάλεις στο πεδίο και να τη διορθώσεις όπως θες:', NONE = 'Καμία από αυτές';
+  const E = 'Δεν ξέρω αν πρέπει να αλλάξω γραφείο, με πιέζει το πρόγραμμα.';
+  const S1 = 'Το ωράριο είναι βαρύ και δεν αφήνει χρόνο για τίποτα άλλο.', S2 = 'Θέλω περισσότερο χρόνο για την οικογένειά μου.';
+  const L1 = 'Το ωράριο είναι βαρύ και δεν αφήνει χρόνο για τίποτα άλλο ούτε για την οικογένειά μου ούτε για τα παιδιά και κάθε βράδυ γυρνάω τόσο κουρασμένος που δεν έχω δύναμη να μιλήσω με κανέναν στο σπίτι και αυτό με πιέζει πάρα πολύ τελευταία.';
+  const P1 = 'Το ωράριο είναι βαρύ και δεν αφήνει χρόνο για τίποτα άλλο ούτε για την οικογένειά μου ούτε για τα παιδιά και κάθε βράδυ γυρνάω τόσο κουρασμένος που δεν έχω δύναμη να μιλήσω με κανέναν στο σπίτι και';
+  const L2 = 'Η μετακίνηση παίρνει δύο ώρες κάθε μέρα, και όταν γυρίζω σπίτι το βράδυ τα παιδιά κοιμούνται ήδη, οπότε σχεδόν δεν τα βλέπω τις καθημερινές, ενώ τα Σαββατοκύριακα δουλεύω στον υπολογιστή και δεν προλαβαίνω να μείνω μαζί τους όσο θα ήθελα.';
+  const P2 = 'Η μετακίνηση παίρνει δύο ώρες κάθε μέρα, και όταν γυρίζω σπίτι το βράδυ τα παιδιά κοιμούνται ήδη, οπότε σχεδόν δεν τα βλέπω τις καθημερινές, ενώ τα Σαββατοκύριακα δουλεύω στον υπολογιστή και δεν';
+  const L4 = 'Στην καινούργια θέση ο μισθός θα ήταν μεγαλύτερος, αλλά θα έπρεπε να μετακομίσουμε σε άλλη πόλη μακριά από τους γονείς μου και από τους φίλους που έχω χτίσει εδώ τα τελευταία δεκαπέντε χρόνια, κι αυτό είναι μεγάλη αλλαγή για όλη την οικογένεια.';
+  const P4 = 'Στην καινούργια θέση ο μισθός θα ήταν μεγαλύτερος, αλλά θα έπρεπε να μετακομίσουμε σε άλλη πόλη μακριά από τους γονείς μου και από τους φίλους που έχω χτίσει εδώ τα τελευταία δεκαπέντε χρόνια, κι αυτό';
+  const TAIL1 = 'αυτό με πιέζει πάρα πολύ τελευταία', TAIL2 = 'προλαβαίνω να μείνω μαζί τους', TAIL4 = 'μεγάλη αλλαγή για όλη την οικογένεια';
+  const QS = ['Τι σε κρατά σε αυτή τη σκέψη τώρα;', 'Και τι θα άλλαζε με αυτό;', 'Τι έχει σημασία εδώ;', 'Τι κρατά το πράγμα στη θέση του;', 'Τι άλλο υπάρχει;', 'Τι λείπει ακόμα;'];
+  const ALLERR = [];
+  const watch = page => { page.on('pageerror', e => ALLERR.push(e.message)); };
+  const btn = (page, t) => page.getByRole('button', { name: t, exact: true });
+  const btnN = (page, t) => btn(page, t).count();
+  const titleN = (page, t) => page.getByText(t, { exact: true }).count();
+  const boxOf = page => page.locator('textarea.textarea');
+  const boxValue = async page => ((await boxOf(page).count()) ? boxOf(page).inputValue() : null);
+  const card = async page => (await btnN(page, T.yes)) > 0;
+  const shown = async (page, t) => (await page.getByText('«' + t + '»', { exact: false }).count()) > 0;
+  const press = async page => { await page.getByRole('button', { name: T.button }).click(); await page.waitForTimeout(400); };
+  const sendBox = async page => { await page.getByRole('button', { name: 'Go' }).click(); await page.waitForTimeout(700); };
+  const click = async (page, t) => { const b = btn(page, t); if (!(await b.count())) return false; await b.click(); await page.waitForTimeout(300); return true; };
+  const telLog = page => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
+  const rect = async loc => { try { if (!(await loc.count())) return null; return await loc.first().boundingBox({ timeout: 2000 }); } catch (e) { return null; } };
+  const feedCount = page => page.locator('.feed .turn-aura, .feed .turn-user').count();
+  const listButtons = page => page.evaluate(() => [...document.querySelectorAll('.warning-card button.choice-btn')].map(b => b.textContent.trim()));
+  const five = async s => { for (const m of [E, S1, L1, S2, L2, L4]) await send(s.page, m); };
+  // ── LPa — the 1st ask, five sentences, three of them long: the list holds all five; the cut ones end with «…», the whole ones do not; the cut-off tail is on no button
+  { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+    await five(s); const n0 = s.calls.length; await press(s.page);
+    const bs = await listButtons(s.page), want = [S1, P1 + '…', S2, P2 + '…', P4 + '…'];
+    const inList = bs.filter(b => want.includes(b));
+    ok('LPa: the list is at the 1st ask under John\'s heading (' + (await titleN(s.page, TITLE)) + '), with all five sentences in the order they were written — the two whole ones as they are, the three long ones cut at the last whole word and ending with «…» (' + inList.length + '/5 found, in order ' + (JSON.stringify(inList) === JSON.stringify(want)) + ')',
+      (await titleN(s.page, TITLE)) === 1 && JSON.stringify(inList) === JSON.stringify(want) && (await btnN(s.page, NONE)) === 1);
+    ok('LPa: «…» is drawn on the cut ones only — the whole ones hold none (' + bs.filter(b => b === S1 || b === S2).every(b => !b.includes('…')) + '), each cut one is the piece + «…» and the piece is no longer than 200 characters (' + [P1, P2, P4].map(p => p.length).join('/') + ')',
+      bs.filter(b => b === S1 || b === S2).every(b => !b.includes('…')) && [P1, P2, P4].every(p => p.length <= 200) && L1.startsWith(P1 + ' ') && L2.startsWith(P2 + ' ') && L4.startsWith(P4 + ' '));
+    ok('LPa: the cut-off tail of a long sentence is on no button of the list (' + [TAIL1, TAIL2, TAIL4].map(t => bs.some(b => b.includes(t))).join('/') + ') — the whole message stays in the chat above, as the user wrote it',
+      [TAIL1, TAIL2, TAIL4].every(t => !bs.some(b => b.includes(t))) && (await s.page.locator('.feed').getByText(TAIL1, { exact: false }).count()) >= 1);
+    ok('LPa: the list is made of the user\'s words only — no model call to make it (' + (s.calls.length - n0) + '), no card yet (' + (await card(s.page)) + '), no page error (' + ALLERR.length + ')', s.calls.length === n0 && !(await card(s.page)) && ALLERR.length === 0);
+    await s.browser.close(); }
+  // ── LPb + LPc + LPf — a tap on a cut item: the box gets exactly the piece (no «…»), nothing is sent; sent unchanged it is the card, word for word; the device log holds numbers only
+  { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+    await five(s); await press(s.page);
+    const n0 = s.calls.length, feed0 = await feedCount(s.page);
+    await click(s.page, P1 + '…');
+    const v = await boxValue(s.page);
+    ok('LPb: a tap on the cut item puts into the box exactly the shown text WITHOUT the «…» (' + (v === P1) + ', ' + (v ? v.length : '—') + ' characters, «…» in the box: ' + (v ? v.includes('…') : '—') + '), nothing is sent (' + (s.calls.length - n0) + ' calls) and nothing is added to the chat (' + ((await feedCount(s.page)) - feed0) + ')',
+      v === P1 && !v.includes('…') && s.calls.length === n0 && (await feedCount(s.page)) === feed0 && !(await card(s.page)));
+    if (v) await sendBox(s.page); // (on the old code the tap gave an empty box: a FAIL line below, not a 30-second wait)
+    ok('LPc: the piece sent unchanged becomes the root card, word for word (' + (await shown(s.page, P1)) + '), with the user\'s own «' + T.yes + '» to answer (' + (await card(s.page)) + '), no model call for it (' + (s.calls.length - n0) + '), the list is gone (' + (await btnN(s.page, NONE)) + ')',
+      (await shown(s.page, P1)) && (await card(s.page)) && s.calls.length === n0 && (await btnN(s.page, NONE)) === 0 && !(await shown(s.page, P1 + '…')));
+    const log = await telLog(s.page), listRecs = log.filter(r => /^list_/.test(r.ev)), allText = JSON.stringify(log);
+    ok('LPf: the device log of the list is numbers only: shown ' + JSON.stringify(listRecs.filter(r => r.ev === 'list_shown').map(r => r.n)) + ', picked at place ' + JSON.stringify(listRecs.filter(r => r.ev === 'list_picked').map(r => r.pos)) + ' — no word of the user, no «…», no cut flag in the whole log (' + (!allText.includes('…') && ![P1, P2, P4, S1].some(p => allText.includes(p.slice(0, 12)))) + ')',
+      listRecs.filter(r => r.ev === 'list_shown').length === 1 && listRecs.filter(r => r.ev === 'list_shown')[0].n === 5 && listRecs.filter(r => r.ev === 'list_picked').length === 1 && listRecs.filter(r => r.ev === 'list_picked')[0].pos === 2 &&
+      !allText.includes('…') && ![P1, P2, P4, S1].some(p => allText.includes(p.slice(0, 12))) && !/cut/i.test(JSON.stringify(listRecs)));
+    await s.browser.close(); }
+  // ── LPd — «Δεν το βρήκα ακόμα» after a tap on a cut item clears exactly what the app put in (so the box never held the «…»); a word added by the user keeps the box
+  for (const [label, add, expectCleared] of [['unchanged', '', true], ['with a word added', ' κι άλλη μία λέξη', false]]) {
+    const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+    await five(s); await press(s.page);
+    await click(s.page, P2 + '…');
+    if (add) { await s.page.keyboard.press('Control+End'); await s.page.keyboard.type(add); }
+    const before = await boxValue(s.page);
+    await click(s.page, T.back);
+    const after = await boxValue(s.page);
+    ok('LPd (' + label + '): the box after the tap held ' + JSON.stringify(before && before.slice(-24)) + '; «' + T.back + '» → ' + (expectCleared ? 'cleared (' + JSON.stringify(after) + ') — the app remembered exactly the piece, with no «…»' : 'kept as it was (' + (after === before) + ') — never a word of the user\'s deleted'),
+      before === (P2 + add) && (expectCleared ? after === '' : after === before));
+    await s.browser.close(); }
+  // ── LPe — the 19/11 list of two at the 2nd ask: a short sentence and a long one → the long one is cut there too
+  { const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+    for (const m of [E, S1, L1]) await send(s.page, m);
+    const n0 = s.calls.length; await press(s.page);
+    const first = [await titleN(s.page, TITLE), await titleN(s.page, TITLE2), await btnN(s.page, S1), await btnN(s.page, P1 + '…')];
+    await send(s.page, 'ok'); await s.page.waitForTimeout(300);
+    const bs = await listButtons(s.page);
+    ok('LPe: two sentences at the 1st ask → no list (' + first.join('/') + '); a too-short answer → the 2nd ask → the 19/11 list of two with its own title (' + (await titleN(s.page, TITLE2)) + '): the short one as it is and the long one cut, ending with «…» (' + JSON.stringify(bs.filter(b => b === S1 || b === P1 + '…')) + ')',
+      first.every(n => n === 0) && (await titleN(s.page, TITLE2)) === 1 && (await titleN(s.page, TITLE)) === 0 && bs.includes(S1) && bs.includes(P1 + '…') && s.calls.length === n0);
+    await click(s.page, P1 + '…');
+    ok('LPe: a tap there too gives the box exactly the piece, without «…» (' + ((await boxValue(s.page)) === P1) + ')', (await boxValue(s.page)) === P1);
+    await s.browser.close(); }
+  // ── LPg — the phone: five sentences, three long, at 390×844 and 360×640 — no horizontal scroll, no cut button, the whole heading in view when the list appears, the bottom buttons reachable
+  for (const [W, H] of [[390, 844], [360, 640]]) {
+    const s = await session('?stageA=1&rec=1', QS); watch(s.page);
+    await s.page.setViewportSize({ width: W, height: H });
+    await five(s); await press(s.page); await s.page.waitForTimeout(900);
+    const rHead = await rect(s.page.getByText(TITLE, { exact: true })), rBox = await rect(boxOf(s.page)), rFeed = await rect(s.page.locator('.feed'));
+    const geo = await s.page.evaluate(({ items }) => {
+      const bs = [...document.querySelectorAll('button')].filter(b => items.includes(b.textContent.trim()));
+      return { sw: document.documentElement.scrollWidth, iw: window.innerWidth, n: bs.length,
+        clipped: bs.filter(b => b.scrollWidth > b.clientWidth + 1 || b.scrollHeight > b.clientHeight + 1).length,
+        outside: bs.filter(b => { const r = b.getBoundingClientRect(); return r.left < 0 || r.right > window.innerWidth + 0.5; }).length,
+        tallest: Math.round(Math.max(0, ...bs.map(b => b.getBoundingClientRect().height))) };
+    }, { items: [S1, P1 + '…', S2, P2 + '…', P4 + '…'] });
+    const fTop = rFeed ? rFeed.y : 0, fBottom = rFeed && rBox ? Math.min(rFeed.y + rFeed.height, rBox.y) : H;
+    const headInView = !!rHead && rHead.y >= fTop - 1 && rHead.y + rHead.height <= fBottom + 1;
+    ok('LPg (' + W + '×' + H + '): the five items are there (' + geo.n + '), no horizontal scroll (' + geo.sw + ' ≤ ' + geo.iw + '), no button cut (' + geo.clipped + ') or outside the screen (' + geo.outside + '), the tallest is ' + geo.tallest + 'px; the whole heading is in view when the list appears (' + headInView + ')',
+      geo.n === 5 && geo.sw <= geo.iw && geo.clipped === 0 && geo.outside === 0 && headInView);
+    await s.page.screenshot({ path: path.join(OUT, 'LP-phone-' + W + 'x' + H + '.png'), fullPage: false });
+    await s.page.locator('.feed').evaluate(el => { el.scrollTop = el.scrollHeight; }); await s.page.waitForTimeout(500);
+    { const n2 = await rect(btn(s.page, NONE)), b2 = await rect(btn(s.page, T.back)), bx = await rect(boxOf(s.page)), above = r => !!r && !!bx && r.y >= 0 && r.y + r.height <= bx.y + 1;
+      ok('LPg (' + W + '×' + H + '): the chat scrolled to its end → «' + NONE + '» and «' + T.back + '» are above the input box, not behind it (' + above(n2) + ', ' + above(b2) + ')', above(n2) && above(b2));
+      await s.page.screenshot({ path: path.join(OUT, 'LP-phone-' + W + 'x' + H + '-end.png'), fullPage: false }); }
+    await s.browser.close(); }
+  ok('LP: no page error in any session of the section (' + ALLERR.length + ')', ALLERR.length === 0);
+}
+
 // ── P1: PACKAGE 1 (John, 19/11/2026; an exception to the freeze for this package only; branch conversation-v1). Fake model, cost $0; every word below is synthetic (the shape of John's
 // session of 18/11, not his words). P1a «2η φορά»: the readiness question was asked and not opened by a «Ναι», the user leaves («Ευχαριστώ.») → the app's root question comes, and with it
 // the user's own earlier sentences (3) and «Καμία από αυτές»; a tap COPIES one into the box (nothing is sent), the user sends it himself → the card with exactly those words; «Καμία από αυτές»
@@ -8809,7 +8925,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else if (opt('--only', '') === 'RX') await runMockRX(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else if (opt('--only', '') === 'RX') await runMockRX(); else if (opt('--only', '') === 'LP') await runMockLP(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
