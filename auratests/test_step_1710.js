@@ -79,7 +79,9 @@ const ROOT = 'Ότι φοβάμαι να απογοητεύσω τον πατέ�
 const ALPHA = '«' + ROOT + '»\n' +
   'Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή. Τώρα ξέρεις τι γίνεται.\n' +
   '\n' +
-  'Το πρώτο βήμα είναι το πιο δύσκολο. Γι\' αυτό δεν θέλω το τέλειο ούτε το πιο γενναίο. Θέλω το πιο εύκολό σου.\n' +
+  // UPDATED (22/11/2026, Δ, John's order ⚑4): the two sentences in the middle are John's NEW text (they replace the three of 17/10: «Το πρώτο βήμα είναι το πιο δύσκολο. Γι' αυτό δεν θέλω το τέλειο ούτε το πιο γενναίο. Θέλω το πιο εύκολό σου.»).
+  // The rest of the message is as it was: the root whole in «», «Αυτό το βρήκες εσύ…», the blank line, the question. The new text itself is pinned word for word, with its own guards, in auratests/test_step_text_2211.js.
+  'Δεν θα σου πω τι να κάνεις\u00B7 θα σε ρωτήσω, ώστε να το βρεις εσύ. Δεν θέλω το τέλειο ούτε το πιο γενναίο \u2014 το πιο εύκολό σου.\n' +
   'Ποιο είναι το πιο μικρό πράγμα που μπορείς να κάνεις γι\' αυτό;';
 {
   const lines = T('buildRootStepLines', '  ' + ROOT + ' ');

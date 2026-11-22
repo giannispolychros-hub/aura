@@ -2461,7 +2461,8 @@ const STAGE_A_TEXTS = {
   download: "Κατέβασε την κάρτα",
   // ADR «17 Οκτωβρίου (δ)» (John's decision for the test of the 20): the step after «Ναι», John's texts word for word. «Κι αν όχι τώρα…» is endKeep.
   stepFound: "Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή. Τώρα ξέρεις τι γίνεται.",
-  stepWhy: "Το πρώτο βήμα είναι το πιο δύσκολο. Γι' αυτό δεν θέλω το τέλειο ούτε το πιο γενναίο. Θέλω το πιο εύκολό σου.",
+  // John, 22/11/2026 (item Δ / ⚑4): these two sentences replace the three of the 17/10 text (the old words are not kept anywhere in the app) — his words, no «μαζί»; the question below (stepQ) stays.
+  stepWhy: "Δεν θα σου πω τι να κάνεις· θα σε ρωτήσω, ώστε να το βρεις εσύ. Δεν θέλω το τέλειο ούτε το πιο γενναίο — το πιο εύκολό σου.",
   stepQ: "Ποιο είναι το πιο μικρό πράγμα που μπορείς να κάνεις γι' αυτό;",
   stepUnknown: "Δεν ξέρω ακόμα",
   fitsQ: "Είναι τόσο μικρό που χωράει σε μία μέρα;",

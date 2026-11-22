@@ -315,8 +315,9 @@ const view = (m, over) => call('rootPickView', Object.assign({}, SAFE, { message
     describeSpeakRightCtx: '14e279143014f328', repeatedUserElements: '56e06a1fe3e505cb',
   };
   for (const [n, h] of Object.entries(SH)) assert('GUARD — (8) ' + n + ' is byte for byte the function of 4ec72b0 (' + h + '…)', sha(fnSrc(n)).startsWith(h));
-  assert('GUARD — (8) STAGE_A_TEXTS (the reducer\'s fixed texts) are byte for byte as in 4ec72b0 (9f64812e…): the list\'s title and button live apart, in ROOT_PICK_TEXTS',
-    sha(objSrc('STAGE_A_TEXTS')).startsWith('9f64812e26b48d3d'));
+  // UPDATED (22/11/2026, Δ, John's order ⚑4): only this value moved — the one change of the item is STAGE_A_TEXTS.stepWhy, the app's text after «Ναι, αυτό είναι» (John's two new sentences replace the old three; one comment line above it). Proved first: auratests/test_conversation_v1.js (Ω1) — with all 28 changes of the branch taken out src/App.jsx is release-candidate e4b2ae6 byte for byte — and auratests/test_notes_card_1511.js (Ω); so no other text of the object moved. The prompt (7e52268becda7360) and api/aura.js (sha256 675564a7985438c8…) are unchanged.
+  assert('GUARD — (8) STAGE_A_TEXTS (the reducer\'s fixed texts) are byte for byte as in 4ec72b0 (9f64812e…) except the one text John changed on 22/11/2026, stepWhy (now 2fb1d130…): the list\'s title and button live apart, in ROOT_PICK_TEXTS',
+    sha(objSrc('STAGE_A_TEXTS')).startsWith('2fb1d130b4b8284c'));
   assert('GUARD — (8) the reducer is not asked for a new event: no "pick" / "list" case in stageAStep', !/case "(?:pick|list|rootPick|second)[^"]*"/.test(fnSrc('stageAStep')));
 }
 

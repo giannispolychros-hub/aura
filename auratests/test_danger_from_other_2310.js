@@ -361,7 +361,8 @@ const PIN = { detectSafetySignal: '838fe96cf161fcae' /* UPDATED (14/11/2026, Joh
 for (const [n, v] of Object.entries(PIN)) assert(`(Κ) UNCHANGED, byte for byte: ${n}`, h(fnSrc(n)) === v);
 assert('(Κ) UNCHANGED, byte for byte: HELPLINES', h(arr('HELPLINES')) === '392f594fe775a4cf');
 assert('(Κ) UNCHANGED: the prompt (AURA_CORE_PERSONALITY) and the crisis prompt', h(raw.slice(_s, _e)) === '7e52268becda7360' && h(lit('SYSTEM_SUPPORTIVE')) === 'ff063670f20343a7');
-assert('(Κ) UNCHANGED: the Stage A texts (no new text: the goodbye is the existing afterCrisis)', h(block('const STAGE_A_TEXTS = ')) === '6eb98181ff245492');
+// UPDATED (22/11/2026, Δ, John's order ⚑4): only this value moved — the one change of the item is STAGE_A_TEXTS.stepWhy, the app's text after «Ναι, αυτό είναι» (John's two new sentences replace the old three; one comment line above it). Proved first: auratests/test_conversation_v1.js (Ω1) — with all 28 changes of the branch taken out src/App.jsx is release-candidate e4b2ae6 byte for byte — and auratests/test_notes_card_1511.js (Ω); so no other text of the object moved. The prompt (7e52268becda7360) and api/aura.js (sha256 675564a7985438c8…) are unchanged. This item (Ο5) added no text; the one text that moved is not its own.
+assert('(Κ) UNCHANGED by this item: the Stage A texts (no new text: the goodbye is the existing afterCrisis; stepWhy moved on 22/11/2026, John, item Δ)', h(block('const STAGE_A_TEXTS = ')) === '0cd31e3b24ca006d');
 
 // ── (Λ) no existing flow moves ──────────────────────────────────────────────────────────────────────────────────────────────────
 {

@@ -3301,7 +3301,8 @@ async function runMockTX() {
     const lines = await page.evaluate(() => { const m = document.querySelector('[data-stage-a-end="1"] .msg-aura'); return m ? [...m.children].map(c => c.textContent) : null; });
     // UPDATED (17/10, ADR «17 Οκτωβρίου (δ)»): with the €6 screen closed, John's step text (written out here, word for word) and its fit
     const STEPTX = [`«${ROOT}»`, 'Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή. Τώρα ξέρεις τι γίνεται.', '',
-      'Το πρώτο βήμα είναι το πιο δύσκολο. Γι\' αυτό δεν θέλω το τέλειο ούτε το πιο γενναίο. Θέλω το πιο εύκολό σου.', 'Ποιο είναι το πιο μικρό πράγμα που μπορείς να κάνεις γι\' αυτό;'];
+      // UPDATED (22/11/2026, Δ, John's order ⚑4): the two sentences in the middle are John's NEW text — they replace the three of 17/10. Everything else of the message is as it was.
+      'Δεν θα σου πω τι να κάνεις\u00B7 θα σε ρωτήσω, ώστε να το βρεις εσύ. Δεν θέλω το τέλειο ούτε το πιο γενναίο \u2014 το πιο εύκολό σου.', 'Ποιο είναι το πιο μικρό πράγμα που μπορείς να κάνεις γι\' αυτό;'];
     if (!COACH_OFFER_OPEN) {
       ok(`TX4 (${tag}, offer closed): John's step text, line for line, with its blank line`, JSON.stringify(lines) === JSON.stringify(STEPTX));
       const g4 = await page.evaluate(() => { const m = document.querySelector('[data-stage-a-end="1"] .msg-aura'); if (!m) return null;
@@ -3730,7 +3731,8 @@ async function runMockNT() {
 async function runMockST() {
   // John's texts, written out here on purpose (so the old code fails, and never crashes the run); the first check: the app has them, word for word
   const JT = { stepFound: 'Αυτό το βρήκες εσύ — χωρίς καμία συμβουλή. Τώρα ξέρεις τι γίνεται.',
-    stepWhy: 'Το πρώτο βήμα είναι το πιο δύσκολο. Γι\' αυτό δεν θέλω το τέλειο ούτε το πιο γενναίο. Θέλω το πιο εύκολό σου.',
+    // UPDATED (22/11/2026, Δ, John's order ⚑4): stepWhy is John's NEW text (two sentences; they replace the three of 17/10).
+    stepWhy: 'Δεν θα σου πω τι να κάνεις\u00B7 θα σε ρωτήσω, ώστε να το βρεις εσύ. Δεν θέλω το τέλειο ούτε το πιο γενναίο \u2014 το πιο εύκολό σου.',
     stepQ: 'Ποιο είναι το πιο μικρό πράγμα που μπορείς να κάνεις γι\' αυτό;', stepUnknown: 'Δεν ξέρω ακόμα', fitsQ: 'Είναι τόσο μικρό που χωράει σε μία μέρα;',
     fitsYes: 'Ναι', fitsNo: 'Όχι, είναι μεγάλο', smallerQ: 'Τότε ποιο είναι το πρώτο μικρό κομμάτι του;', whenQ: 'Πότε;', doLabel: 'Τι θα κάνεις', whenLabel: 'Πότε',
     endKeep: 'Κι αν όχι τώρα, αυτό που βρήκες είναι ήδη δικό σου.', cardLine: 'Με το "Ναι" κλείνει αυτό το κομμάτι και σου δείχνω τι ακολουθεί.' };
