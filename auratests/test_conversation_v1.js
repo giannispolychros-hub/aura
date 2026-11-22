@@ -239,6 +239,9 @@ assert('(3.7) the collision logger and the families are not told about it (it ad
 // (7e52268becda7360), api/aura.js, the openings its guard accepts, the screen filter, and the safety code (the 19 functions below, as in e4b2ae6).
 {
   // the list (new → old, one entry per change of the branch) is the data file auratests/conversation_v1_undo.json; test_notes_card_1511.js (Ω2) reads the same file
+  // UPDATED (22/11/2026, Λ1, John's corrections ⚑1–⚑2): the data file holds one change more (27 now: the two lines of handleStageABack — «Δεν το βρήκα ακόμα» clears the writing box only when it holds exactly the sentence the app put in), and five entries are the regions as they are now:
+  // the list's constants and the two new pure functions (the pair that starts with the PACKAGE 1 comment), the state and the new reference, the effect and the handlers, the reset line, the screen block (without decision 15's separate line). The check is the same and its value is the same:
+  // with all of them taken out src/App.jsx is release-candidate e4b2ae6 byte for byte (sha256 1860c046…) — nothing else changed.
   const UNDO = JSON.parse(fs.readFileSync(path.join(__dirname, 'conversation_v1_undo.json'), 'utf8'));
   const present = UNDO.filter(([nw]) => raw.split(nw).length === 2).length;
   let back = raw; for (const [nw, old] of UNDO) back = back.split(nw).join(old);

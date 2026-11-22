@@ -2820,9 +2820,9 @@ const ROOT_PICK_TEXTS = { title: "Δικά σου λόγια από πριν. Π
 // The same gate, the same filter, the same once-per-session latch and the same three number-only records; the app proposes no root of its own.
 const ROOT_LIST_MIN = 3;
 const ROOT_LIST_MAX = 8;
-const ROOT_LIST_TEXTS = { title: "Ποιο από αυτά νομίζεις ότι τραβάει τα άλλα; Ή κάτι που δεν έχεις πει ακόμα;" };
-// Λ1, decision 15 (John, 22/11/2026): the line under the heading of the 3-or-more list — what a tap does. A statement, in its own constant; the list of two has the same instruction inside its own title.
-const ROOT_LIST_HINT = "Πάτα ό,τι ταιριάζει, θα μπει στο πεδίο και μπορείς να το αλλάξεις.";
+// Λ1, John's correction ⚑1 (22/11/2026): the heading is ONE block of instruction — what these sentences are, what a tap does, what to do when none fits — with no question mark of its own (the root question's is the only one on the card) and nothing that
+// ranks the user's sentences. It replaces the earlier heading — a question with two question marks that presupposed one of the sentences pulls the rest — AND decision 15's separate line under it. The wording and the punctuation are John's.
+const ROOT_LIST_TEXTS = { title: "Δικά σου λόγια από πριν. Αν κάποιο λέει αυτό που σε απασχολεί πραγματικά, πάτα το — θα μπει στο πεδίο και μπορείς να το αλλάξεις. Αν όχι, γράψε κάτι που δεν έχεις πει ακόμα." };
 // Which ask is this? `appAsksBefore` = how many times the app has put the root question to the user before this one (counted by the screen's effect); `door2Asks` =
 // how many asks so far (this one included) opened with the user's «Ναι» to the readiness question. Always an integer ≥ 1.
 function rootAskNumber(messages, appAsksBefore, door2Asks) {
@@ -2926,6 +2926,22 @@ function rootListScrollPlan(cardTop, endTop) {
   const a = typeof cardTop === "number" ? cardTop : NaN, b = typeof endTop === "number" ? endTop : NaN;
   if (!Number.isFinite(a) || !Number.isFinite(b)) return "end";
   return a < b ? "card" : "end";
+}
+// Λ1, John's correction ⚑2 (22/11/2026): «Ποτέ σιωπηλή διαγραφή λόγων του χρήστη.» The two decisions the app makes about the writing box at the root question's list, as pure functions of the box (the screen only asks them; nothing here reads
+// what a sentence means). rootPickTapBox — a tap: a box with no word of the user's in it (empty, or only spaces and line breaks) gets exactly the sentence, and the app remembers that IT put it there (appBox); a box with text KEEPS every
+// character of it and the sentence comes on a NEW line (no blank line when the text already ends with one), and the app remembers nothing (appBox null) — also when the text is only the app's own earlier sentence: a second tap ADDS, it never replaces.
+// rootPickBackBox — «Δεν το βρήκα ακόμα»: the box is cleared ONLY when it holds exactly the unchanged sentence the app put in (what it remembered); in every other case it comes back as it was. Never throws; a box that is not text counts as
+// empty; a sentence that is empty or only spaces adds nothing.
+function rootPickTapBox(current, sentence) {
+  const cur = typeof current === "string" ? current : "";
+  const s = typeof sentence === "string" ? sentence : "";
+  if (s.trim() === "") return { value: cur, appBox: null };
+  if (cur.trim() === "") return { value: s, appBox: s };
+  return { value: cur + (cur.endsWith("\n") ? "" : "\n") + s, appBox: null };
+}
+function rootPickBackBox(current, appBox) {
+  const cur = typeof current === "string" ? current : "";
+  return typeof appBox === "string" && appBox !== "" && cur === appBox ? "" : cur;
 }
 // PACKAGE 1, item 2 (John, 19/11/2026) — «ρίζα χωρίς νέα λόγια»: a PASSIVE COUNTER, two integers for the device log (event root_new_words), read by nothing. Of the confirmed
 // root's words (no accents, lower case, 4+ letters, minus the same small words as rootAuraShare), how many appear in NO earlier message of the user. The root's own message is
@@ -8040,6 +8056,7 @@ export default function AURAv2() {
   const rootDoor2Asks = useRef(0);                              // how many of those opened with the user's «Ναι» to the readiness question (door 2)
   const rootPickDone = useRef(false);                           // the list was shown once this session — never again
   const rootCardRef = useRef(null);                             // the root question's card on the screen (decision 15: the list is shown from its top when the card is taller than the screen)
+  const rootPickAppBox = useRef(null);                          // ⚑2 (22/11/2026): the sentence the APP put into the empty writing box with a tap — null as soon as the box differs from it (any word typed or deleted), the box is sent, or a second sentence is added
   const rootNewWordsLogged = useRef(false);                     // item 2: the counter «ρίζα χωρίς νέα λόγια» is written once per session
   // THOUGHT MAP (John, 2/11/2026): the map's one record (branchCount, ?rec=1 only) is written once per session — reset with the session
   const thoughtMapLogged = useRef(false);
@@ -10563,6 +10580,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
   }, [loading, stageADispatch]);
   const handleStageABack = useCallback(() => {
     const _ph = stageARef.current.phase, _door = stageARef.current.door;
+    // ⚑2 (John, 22/11/2026): at the root question the box is cleared ONLY when it holds exactly the unchanged sentence the app put in with a tap — never a word of the user's (rootPickBackBox decides, on the box as it is at that moment)
+    if (_ph === "ask") { const _app = rootPickAppBox.current; rootPickAppBox.current = null; setInput(prev => rootPickBackBox(prev, _app)); }
     stageADispatch({ type: "back" });
     if (_ph === "card" && _door === 2) {
       turnCount.current += 1;
@@ -10634,8 +10653,11 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     const plan = feed && card ? rootListScrollPlan(card.getBoundingClientRect().top - feed.getBoundingClientRect().top + feed.scrollTop, feed.scrollHeight - feed.clientHeight) : "end";
     if (plan === "card") card.scrollIntoView({ behavior: "smooth", block: "start" }); else end?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [rootPick]);
-  const handleRootPickTap = (t, i) => { setInput(t); const _r = rootPickRecord("picked", i + 1); if (_r) recordTelemetry(_r.event, _r.fields); setTimeout(() => textareaRef.current?.focus(), 0); };
+  // ⚑2 (John, 22/11/2026): a tap never deletes what the user typed — a box with text keeps it and the sentence comes on a new line (rootPickTapBox); what the app put in itself is remembered for «Δεν το βρήκα ακόμα»
+  const handleRootPickTap = (t, i) => { const _b = rootPickTapBox(input, t); setInput(_b.value); rootPickAppBox.current = _b.appBox; const _r = rootPickRecord("picked", i + 1); if (_r) recordTelemetry(_r.event, _r.fields); setTimeout(() => textareaRef.current?.focus(), 0); };
   const handleRootPickNone = () => { setRootPick(null); const _r = rootPickRecord("none"); if (_r) recordTelemetry(_r.event, _r.fields); setTimeout(() => textareaRef.current?.focus(), 0); };
+  // ⚑2: the app forgets what it put in the box at the FIRST change of the box — a word typed, one deleted, the box sent or emptied — so a text the user types later that happens to equal the sentence is never cleared (nothing is cleared when in doubt)
+  useEffect(() => { if (rootPickAppBox.current !== null && rootPickAppBox.current !== input) rootPickAppBox.current = null; }, [input]);
   // PACKAGE 1, item 2 (John, 19/11/2026) — «ρίζα χωρίς νέα λόγια»: PASSIVE. Once the root is confirmed, ONE record of two integers (event root_new_words): how many of the root's words are new, and how many it has. Nothing reads it; no text.
   useEffect(() => {
     if (!stageAActive.current || rootNewWordsLogged.current || stageARef.current.stats.rootConfirmed !== 1) return;
@@ -10760,7 +10782,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     setFinalDistillation(null);
     recentSurges.current = [];
     illuminAnimCancelled.current = true;
-    setRootPick(null); rootAskSeen.current = { ph: null, retry: false }; rootAsksBefore.current = 0; rootDoor2Asks.current = 0; rootPickDone.current = false; rootNewWordsLogged.current = false; // PACKAGE 1 (19/11/2026): the list, its counters and its once-per-session latches
+    setRootPick(null); rootAskSeen.current = { ph: null, retry: false }; rootAsksBefore.current = 0; rootDoor2Asks.current = 0; rootPickDone.current = false; rootPickAppBox.current = null; rootNewWordsLogged.current = false; // PACKAGE 1 (19/11/2026): the list, its counters and its once-per-session latches
   };
 
   // ── Memory Summary Card ──
@@ -11520,7 +11542,6 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                   {rootPick && rootPick.length > 0 && (
                     <div style={{marginBottom:"14px"}}>
                       <div className="warning-text" style={{opacity:0.85,marginBottom:"8px"}}>{rootPick.length >= ROOT_LIST_MIN ? ROOT_LIST_TEXTS.title : ROOT_PICK_TEXTS.title}</div>
-                      {rootPick.length >= ROOT_LIST_MIN && <div className="warning-text" style={{opacity:0.7,marginBottom:"8px",fontSize:"11px"}}>{ROOT_LIST_HINT}</div>}
                       <div className="choice-btns" style={{flexDirection:"column",alignItems:"stretch"}}>
                         {rootPick.map((t, i) => (
                           <button key={i} className="choice-btn" style={{textTransform:"none",letterSpacing:"normal",fontFamily:"inherit",fontSize:"12px",textAlign:"left",whiteSpace:"normal",lineHeight:1.5}} onClick={() => handleRootPickTap(t, i)}>{t}</button>

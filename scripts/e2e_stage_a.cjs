@@ -2125,7 +2125,7 @@ async function runMockRL() {
 // own «Ναι, αυτό είναι» (none of the five records of a confirmed root, no step question) — and after it, it does · RXb UPDATED (⚑2): two taps do NOT replace each other — the second goes on a new line — and what the user typed is kept ·
 // RXc «Καμία από αυτές», then «Δεν το βρήκα ακόμα, συνέχισε»: the chat goes on, the model answers, the root question comes again WITHOUT a list, a new root → card → «Ναι» → the step · RXd «Δεν το βρήκα
 // ακόμα» straight from the list (and after a tap — UPDATED (⚑2): the unchanged tapped sentence is cleared), and from the card of a picked sentence · RXe «Διόρθωσε» on the card of a picked sentence · RXg NEW (⚑2): never a silent deletion
-// of the user's words — «Δεν το βρήκα ακόμα» clears the box ONLY when it holds exactly the unchanged sentence the app put in (10 cases) · RXp the phone, 390×844: 3 short or 8 long sentences of the
+// of the user's words — «Δεν το βρήκα ακόμα» clears the box ONLY when it holds exactly the unchanged sentence the app put in (11 cases) · RXp the phone, 390×844: 3 short or 8 long sentences of the
 // user (up to 200 characters) × a short or a long reply of the model above them — measures, no horizontal scroll, no cut button, the bottom of the card above the box · RXs the safety path with the list on the
 // screen: a crisis sentence and a danger from another person typed at the root question → the list is gone, the app's line, the safety request, no card · RXt the device log of four small sessions
 // (picked and not changed · picked and reworded with the same words · picked and new words added · typed by hand): can the log tell «picked and did not change» from «picked and changed»?
@@ -2338,6 +2338,10 @@ async function runMockRX() {
       await click(s.page, T.back);
       ok('RXg9: the 19/11 list of two (' + isTwo + '): typed words + a tap → on a new line (' + JSON.stringify(was) + '), and «' + T.back + '» keeps it all (' + JSON.stringify(await boxValue(s.page)) + ')',
         isTwo && was === MINE + '\n' + G[0] && (await boxValue(s.page)) === was);
+      await s.browser.close(); }
+    // g11 — found by a mutation test (a mutant that always adds a line break survived the browser): the user typed a line and went down to a new one (the box ends with a line break) → the tap puts the sentence right after it, with NO blank line
+    { const s = await fresh(); await boxOf(s.page).fill(MINE + '\n'); await click(s.page, G[1]); const was = await boxValue(s.page);
+      ok('RXg11: typed words that end with a line break + a tap → the sentence comes right under them, no blank line (' + JSON.stringify(was) + ')', was === MINE + '\n' + G[1]);
       await s.browser.close(); }
     // g10 — what a user can do with two taps: send both. The app does not decide anything: the card shows exactly those words and NOTHING of a confirmed root happens before the user's own «Ναι» (an observation — what the app does with a two-sentence root)
     { const s = await fresh(); await click(s.page, G[0]); await click(s.page, G[2]); const two = await boxValue(s.page), n0 = s.calls.length; await sendBox(s.page);
