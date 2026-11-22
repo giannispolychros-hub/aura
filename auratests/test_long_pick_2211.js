@@ -60,6 +60,14 @@ const L4_PIECE = 'Στην καινούργια θέση ο μισθός θα ή
 // L3: the space after the comma is the last one within 200 — the piece must not end with the comma before «…» (it ends at «σπίτι»).
 const L3_HEAD = L1.slice(0, L1.indexOf(' και αυτό'));
 const L3 = L3_HEAD + ', χιλιομετρικήλέξηπουδενχωράειστοόριο και συνεχίζει.';
+// L5 and L6: near copies by what is SHOWN — the same first 197 characters (= L1_PIECE), then two different tails (neither has «το ίδιο» or any other pointing-back phrase: only the near-copy rule can leave one out).
+// As whole texts they are far apart (Jaccard under the threshold), as pieces they are the same line.
+const L5 = L1_PIECE + ' αυτό τα απογεύματα προσπαθώ να βρω λίγο χρόνο για τον εαυτό μου αλλά πάντα κάτι προλαβαίνει και τον παίρνει όσο κι αν το πολεμώ, και τα Σαββατοκύριακα ακόμη χειρότερα, γιατί υπάρχουν εργασίες που περιμένουν στον υπολογιστή και δεν τελειώνουν ποτέ, ούτε όταν κοιμούνται όλοι.';
+const L6 = L1_PIECE + ' τότε σκέφτομαι πως η καινούργια πόλη θα ήταν ίσως ένα φρέσκο ξεκίνημα με άλλο ρυθμό ζωής, μικρότερες αποστάσεις, γνωστούς γείτονες στο κτίριο, πάρκα κοντά στο σχολείο, αγορά την Κυριακή και λιγότερη κίνηση, αν και ο μισθός εκεί δεν είναι ακόμη σίγουρος.';
+// L7: a long sentence about the cold (271 characters) whose shown piece ends «… κάθε βράδυ με χτυπάει» (the two words are split in two literals on purpose): as a WHOLE it is not danger
+// from another person (what follows the verb is the cold), the piece alone is — so only the check on the piece that is shown can leave it out.
+const END7 = 'με χτυ' + 'πάει';
+const L7 = 'Το ωράριο είναι βαρύ και δεν αφήνει χρόνο για τίποτα άλλο ούτε για την οικογένειά μου ούτε για τα παιδιά και κάθε βράδυ γυρνάω τόσο κουρασμένος που δεν έχω δύναμη και κάθε βράδυ ' + END7 + ' χειμωνιάτικο κρύο όταν γυρίζω από τη δουλειά, και αυτό με κάνει να μισώ τα πρωινά.';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════
 // 1. the pure cut — rootPickCut(text): { text, cut } or null
@@ -146,6 +154,25 @@ const L3 = L3_HEAD + ', χιλιομετρικήλέξηπουδενχωράει
   assert('GUARD — (3.9) a long answer that does not answer a question of AURA (the previous message is not an AURA question) is not offered, as before',
     (() => { const m = [U(ENTRANCE), A('Ένα σχόλιο χωρίς ερώτηση.'), U(L1), A(Q[0]), U(P[0]), A(Q[1]), U(P[1]), A(Q[2]), U(P[2])]; const it = items(m); return !!it && it.length === 3 && !it.some(x => x.cut); })());
   assert('NEW — (3.10) two long answers that are near copies of each other give one item, the first (the duplicate rule works on what is shown)', (() => { const it = items(conv(L1, L1.replace('πάρα πολύ', 'πολύ πάρα'), P[0], P[1])); return !!it && it.length === 3 && it[0].text === L1_PIECE; })());
+  assert('NEW — (3.10b) two long answers with the SAME first 197 characters and different tails give ONE item, the first — the near-copy rule judges what is SHOWN (the fixture proves it: as whole texts they are far apart, as pieces they are the same line)', (() => {
+    const apart = F.speakRightJaccard(L6, L1_PIECE) < F.SPEAK_RIGHT_JACCARD && F.speakRightJaccard(L5, L1_PIECE) < F.SPEAK_RIGHT_JACCARD;
+    const it = items(conv(L5, L6, P[1], P[2]));
+    return L5.startsWith(L1_PIECE + ' ') && L6.startsWith(L1_PIECE + ' ') && apart && !!it && it.length === 3 && it[0].msg === 2 && it[0].cut === true && it[0].text === L1_PIECE && !it.some(x => x.msg === 4);
+  })());
+  {
+    const pc = F.rootPickCut(L7);
+    const ctrl = L7.replace(END7, 'με πιέζει'); // the same sentence without the danger-looking words: it IS shown, cut
+    const itc = items(conv(P[0], ctrl, P[1], P[2]));
+    assert('NEW — (3.11) SAFETY: the piece that is SHOWN is judged too — a long sentence about the cold whose cut falls right after «κάθε βράδυ ' + END7 + '» is left out although, as a whole, it is not danger from another person (the fixture proves both; the control with other words is shown, cut)',
+      L7.length === 271 && !!pc && pc.cut === true && pc.text.endsWith(END7) && !F.detectsDangerFromOther(L7) && !!F.detectsDangerFromOther(pc.text)
+      && left(L7) && !!itc && itc.length === 4 && itc[1].cut === true && itc[1].text.length <= 200 && !F.detectsDangerFromOther(itc[1].text));
+  }
+  {
+    const dangerEnd = L1.slice(0, -1) + ' και ο άντρας μου όταν γυρίζει με χτυ' + 'πάει συνέχεια. Μετά κάθομαι και σκέφτομαι τι να κάνω.'; // danger from another person at the END of a long sentence (beyond the cut), another sentence after it
+    const sd = conv(P[0], dangerEnd, P[1], P[2]);
+    assert('GUARD — (3.12) SAFETY: danger from another person in the part that is cut off, with another sentence after it in the same message — the session is not safe, so NO list at all; asked directly, the sentence function leaves that message out',
+      !!F.detectsDangerFromOther(dangerEnd) && !F.detectsDangerFromOther(F.rootPickCut(dangerEnd.slice(0, dangerEnd.indexOf('. ') + 1)).text) && view(sd) === null && !call('rootPickSentences', sd, 8).some(x => x.msg === 4));
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════
@@ -157,8 +184,8 @@ const L3 = L3_HEAD + ', χιλιομετρικήλέξηπουδενχωράει
   assert('NEW — (4.1) the list is still set from ONE place, the screen\'s effect, and the strings kept in `rootPick` are the pieces themselves — no «…» is added to the state, to the box or to a message',
     (raw.match(/setRootPick\((?!null\))/g) || []).length === 1 && /setRootPick\(v\.sentences\.map\(s => s\.text\)\)/.test(eff) && eff.indexOf('setRootPick(v.sentences') > 0 && !/…/.test(eff.slice(eff.indexOf('setRootPick(v.sentences'), eff.indexOf('setRootPick(v.sentences') + 200)));
   assert('NEW — (4.2) which items were cut is set in the same statement as the list, by the same function, from the item\'s own flag (s.cut === true) — never guessed on the screen from the text',
-    /setRootPick\(v\.sentences\.map\(s => s\.text\)\); setRootPickCut\(v\.sentences\.map\(s => s\.cut === true\)\);/.test(eff) && /const \[rootPickCut, setRootPickCut\] = useState\(\[\]\);/.test(raw));
-  assert('NEW — (4.3) on the screen a cut item ends with «…» — drawn after the text, in the button itself: {t}{rootPickCut[i] ? "…" : ""}', /onClick=\{\(\) => handleRootPickTap\(t, i\)\}>\{t\}\{rootPickCut\[i\] \? "…" : ""\}<\/button>/.test(ask));
+    /setRootPick\(v\.sentences\.map\(s => s\.text\)\); setRootPickIsCut\(v\.sentences\.map\(s => s\.cut === true\)\);/.test(eff) && /const \[rootPickIsCut, setRootPickIsCut\] = useState\(\[\]\);/.test(raw));
+  assert('NEW — (4.3) on the screen a cut item ends with «…» — drawn after the text, in the button itself: {t}{rootPickIsCut[i] ? "…" : ""}', /onClick=\{\(\) => handleRootPickTap\(t, i\)\}>\{t\}\{rootPickIsCut\[i\] \? "…" : ""\}<\/button>/.test(ask));
   assert('GUARD — (4.4) a tap gives the box the item\'s text itself (t, without the «…»), through the same function as before (rootPickTapBox) — the «…» is not in what the handler receives',
     /const handleRootPickTap = \(t, i\) => \{ const _b = rootPickTapBox\(input, t\);/.test(raw));
   const tapped = call('rootPickTapBox', '', L1_PIECE);

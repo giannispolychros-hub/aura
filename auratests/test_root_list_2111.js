@@ -36,7 +36,7 @@ const CONSTS = ['HELPLINES', 'KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_MIN_SUBSTANCE_WOR
 const FNS = ['lookBehind', 'detectSafetySignal', 'classifyCrisisTier', 'detectsDangerFromOther', 'detectsMentalHealthReferral', 'mergeRiskKind',
   'stageASafetyHold', 'rootAnswerIsDismissal', 'rootAnswerIsUnsure', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord',
   'substanceOfSentence', 'splitSentences', 'rootTextHasSubstance', 'speakRightSpans', 'speakRightEndsWithQuestion', 'speakRightJaccard',
-  'branchSessionSafe', 'detectsCoreReadinessAsked', 'rootAskNumber', 'rootPickSentences', 'rootPickView', 'recordTelemetry', 'buildTesterExport', 'rootPickRecord', 'rootListScrollPlan', 'rootPickTapBox', 'rootPickBackBox'];  // UPDATED (22/11/2026, ⚑2): + the two pure functions of the writing box
+  'branchSessionSafe', 'detectsCoreReadinessAsked', 'rootAskNumber', 'rootPickCut', 'rootPickSentences', 'rootPickView', 'recordTelemetry', 'buildTesterExport', 'rootPickRecord', 'rootListScrollPlan', 'rootPickTapBox', 'rootPickBackBox'];  // UPDATED (22/11/2026, ⚑2): + the two pure functions of the writing box  // UPDATED (22/11/2026, Ε, John's order): + rootPickCut — rootPickSentences now calls it (a long sentence is shown cut at the last whole word); this list is a loader (it copies the functions by name), no assertion changed by it
 let F = {};
 try {
   F = new Function([...CONSTS.map(n => constSrc(n) || `const ${n} = undefined;`),
@@ -114,7 +114,7 @@ const viewTexts = (m, over) => { const v = view(m, over); return v && isArr(v.se
     && w.sentences.every((x, i, a) => i === 0 || a[i - 1].msg < x.msg));
   assert('NEW — (2.6) the first message of the user (the entrance) is never in the list: three answers after it → three sentences, not four',
     !(viewTexts(m3) || []).includes(ENTRANCE) && (viewTexts(m3) || []).length === 3);
-  assert('NEW — (2.7) the filter is the one of the 19/11 package, not a new one: a question, a sentence addressed to AURA, «Όχι…», a dismissal and a sentence over 200 characters are not offered — with them in the session, three GOOD ones are still three',
+  assert('NEW — (2.7) the filter is the one of the 19/11 package, not a new one: a question, a sentence addressed to AURA, «Όχι…» and a dismissal are not offered (UPDATED 22/11/2026, Ε: a sentence over 200 characters is no longer on this list — it is offered cut, see test_long_pick_2211.js) — with them in the session, three GOOD ones are still three',
     j(viewTexts(conv(P[0], 'Μήπως ο χρόνος είναι το θέμα;', P[1], 'Σου είπα ότι το ωράριο με πιέζει.', 'Όχι, το ωράριο δεν είναι το πρόβλημα.', 'Άστο.', P[2]))) === j([P[0], P[1], P[2]]));
   assert('NEW — (2.8) the same session at the 2nd, 3rd, 7th ask (not shown before) → the same list: the rule has no ask number above the first',
     [2, 3, 7].every(a => j(viewTexts(convN(4), { askNo: a })) === j(P.slice(0, 4))));

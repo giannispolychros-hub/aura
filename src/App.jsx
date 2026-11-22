@@ -2832,13 +2832,28 @@ function rootAskNumber(messages, appAsksBefore, door2Asks) {
   const readiness = list.filter(m => m && m.role === "assistant" && m.msgMode !== "STAGE_A" && typeof m.content === "string" && detectsCoreReadinessAsked(m.content)).length;
   return Math.max(0, readiness - whole(door2Asks)) + whole(appAsksBefore) + 1;
 }
-// The sentences → [{ text, msg, start, end }], in time order: 0, or 2 up to `max` (default ROOT_PICK_MAX = 3; Λ1 asks for ROOT_LIST_MAX = 8). More than `max` → the first, the last and the
+// Ε (John, 22/11/2026, the order of the real session): a sentence over ROOT_PICK_MAX_CHARS is NOT left out any more — it is shown CUT at the last WHOLE word that fits in the limit (in John's real session 4 of 12
+// messages were over 200 characters, dictated, and the list did not come). Returns { text, cut }: `text` is an exact beginning of what was given, never longer than the limit, never ending in the middle of a word,
+// with no comma, dash, quote or space left hanging at its end; `cut` says whether anything was cut off. null when there is nothing to show (no text, or not even one whole word fits). A line break is a word boundary
+// like a space, and the cut falls on one, so a pair of surrogate characters is never split. The «…» is NOT part of the text: the screen draws it after a cut item, and a tap puts into the box exactly this text.
+// Pure; never throws.
+function rootPickCut(text) {
+  const t = typeof text === "string" ? text : "";
+  if (!t) return null;
+  if (t.length <= ROOT_PICK_MAX_CHARS) return { text: t, cut: false };
+  let k = ROOT_PICK_MAX_CHARS;
+  while (k > 0 && !/\s/.test(t[k])) k--;
+  while (k > 0 && /[\s,;:\u00B7\u037E«“"'(\[\-–—]/.test(t[k - 1])) k--;
+  return k > 0 ? { text: t.slice(0, k), cut: true } : null;
+}
+// The sentences → [{ text, msg, start, end, cut }], in time order: 0, or 2 up to `max` (default ROOT_PICK_MAX = 3; Λ1 asks for ROOT_LIST_MAX = 8). More than `max` → the first, the last and the
 // rest spread by position (with 3: the first, the middle and the last). `text` === messages[msg].content.slice(start, end):
 // an exact, continuous piece of what the user typed. One sentence per message; a rejected sentence is replaced by the next sentence of the same message. The chain is the
 // Thought Map's, through its frozen copy in the speak-right block (speakRight*; proved identical, test_speak_right.js (2.12)): every user message but the first (the entrance), only as an answer to a question of AURA (msgMode ANSWER, ending in a question), and not the answer to
 // the readiness question (it is about the process, not the topic — by its place, no words). Left out: safety, a dismissal or «I don't know», a goodbye, heavy words
 // of not coping, a question, a sentence addressed to AURA, an answer-particle or connector start («Όχι», «Και», «Αλλά», «Δεν ξέρω…»), something the list does not show
-// («ισχύει», «όπως είπες»), a self-label or self-blame, a sentence over 200 characters, a near copy of one already chosen, and one identical to the question it answers.
+// («ισχύει», «όπως είπες»), a self-label or self-blame, a near copy of one already chosen, and one identical to the question it answers. A sentence over 200 characters is NOT left out (Ε, John, 22/11/2026): it is shown
+// cut at the last whole word that fits (rootPickCut) and says so (`cut: true`); the rules above judge the WHOLE sentence, and the checks that follow (safety, substance, near copy, the question it answers) judge the piece that is shown too.
 // A leading «Ναι, ακριβώς,» or «Δεν ξέρω…» (with the dots) is cut off — what is left is still an exact piece. Every sentence passes rootTextHasSubstance as it is, so sent
 // unchanged it becomes the root card, not the «say it more fully» line. Never throws; never changes its input.
 function rootPickSentences(messages, max) {
@@ -2864,22 +2879,26 @@ function rootPickSentences(messages, max) {
       for (const [from, to] of spans) {
         let start = from;
         let text = content.slice(from, to);
-        if (text.length > ROOT_PICK_MAX_CHARS) continue;
         for (let k = 0; k < 3; k++) {
           const lead = ROOT_PICK_TRIM_YES.exec(text) || ROOT_PICK_TRIM_DK.exec(text);
           if (!lead || !lead[0].length) break;
           text = text.slice(lead[0].length); start += lead[0].length;
         }
         if (!text) continue;
+        // Ε: over the limit the sentence is shown CUT at the last whole word that fits; the rules below judge the WHOLE sentence, and the safety and dismissal checks judge the piece that is shown too
+        const piece = rootPickCut(text);
+        if (!piece) continue;
+        const shown = piece.text;
         const f = plain(text).trim(), folded = fold(text);
-        if (detectSafetySignal(text) || detectsDangerFromOther(text) || rootAnswerIsDismissal(text) || rootAnswerIsUnsure(text)) continue;
+        if ((piece.cut ? [text, shown] : [text]).some(t => detectSafetySignal(t) || detectsDangerFromOther(t) || rootAnswerIsDismissal(t) || rootAnswerIsUnsure(t))) continue;
         const dismissStart = folded.match(SPEAK_RIGHT_DISMISS_START);
         if (dismissStart && !SPEAK_RIGHT_CONTENT_WORDS.test(folded.slice(dismissStart[0].length))) continue;
         if (ROOT_PICK_NO_START.test(f) || ROOT_PICK_DEICTIC.test(f) || /[;?;]\s*$/.test(text) || ROOT_PICK_ADDRESSED.test(f)) continue;
         if (ROOT_PICK_FILLER.test(f) || ROOT_PICK_CONNECTOR.test(f) || ROOT_PICK_SELF_LABEL.test(f) || ROOT_PICK_SELF_BLAME.test(f)) continue;
-        if (!rootTextHasSubstance(text) || !folded || asked.includes(folded)) continue;
-        if (kept.some(k => speakRightJaccard(text, k.text) >= SPEAK_RIGHT_JACCARD)) continue;
-        kept.push({ text, msg: i, start, end: to });
+        const foldedShown = piece.cut ? fold(shown) : folded;
+        if (!rootTextHasSubstance(shown) || !foldedShown || asked.includes(folded) || asked.includes(foldedShown)) continue;
+        if (kept.some(k => speakRightJaccard(shown, k.text) >= SPEAK_RIGHT_JACCARD)) continue;
+        kept.push({ text: shown, msg: i, start, end: start + shown.length, cut: piece.cut });
         break;
       }
     }
@@ -8052,6 +8071,7 @@ export default function AURAv2() {
   const rootCardMsgCount = useRef(0);
   // PACKAGE 1 (John, 19/11/2026) — «2η φορά»: the user's own earlier sentences at the root question's second ask. Page memory only (never stored, sent or logged); all reset with the session.
   const [rootPick, setRootPick] = useState(null);              // null | string[] — the sentences on screen now
+  const [rootPickIsCut, setRootPickIsCut] = useState([]);       // Ε (22/11/2026): boolean[] — which of them were cut at the last whole word (the screen draws «…» after those; the text itself never holds it)
   const rootAskSeen = useRef({ ph: null, retry: false });       // what the effect saw last: the phase, and whether the app's re-ask line was showing
   const rootAsksBefore = useRef(0);                             // how many times the app has put the root question to the user so far
   const rootDoor2Asks = useRef(0);                              // how many of those opened with the user's «Ναι» to the readiness question (door 2)
@@ -10643,7 +10663,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     const askNo = rootAskNumber(messages, rootAsksBefore.current, rootDoor2Asks.current);
     rootAsksBefore.current += 1;
     const v = rootPickView({ phase: "ask", askNo, done: rootPickDone.current, messages, riskKind: riskSignalKind.current, dangerFromOther: dangerFromOther.current, safetyMode, crisisFallback });
-    if (v) { rootPickDone.current = true; setRootPick(v.sentences.map(s => s.text)); const _r = rootPickRecord("shown", v.sentences.length); if (_r) recordTelemetry(_r.event, _r.fields); }
+    if (v) { rootPickDone.current = true; setRootPick(v.sentences.map(s => s.text)); setRootPickIsCut(v.sentences.map(s => s.cut === true)); const _r = rootPickRecord("shown", v.sentences.length); if (_r) recordTelemetry(_r.event, _r.fields); }
   }, [stageAPhase, rootRetryNow]); // eslint-disable-line react-hooks/exhaustive-deps
   // ROOT PICK EFFECT — END
   // the list makes the root question's card taller AFTER the scroll of the phase effect (above) ran: on a phone its buttons stayed below the fold, behind the sticky box — scroll again, once the list is there.
@@ -11545,7 +11565,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                       <div className="warning-text" style={{opacity:0.85,marginBottom:"8px"}}>{rootPick.length >= ROOT_LIST_MIN ? ROOT_LIST_TEXTS.title : ROOT_PICK_TEXTS.title}</div>
                       <div className="choice-btns" style={{flexDirection:"column",alignItems:"stretch"}}>
                         {rootPick.map((t, i) => (
-                          <button key={i} className="choice-btn" style={{textTransform:"none",letterSpacing:"normal",fontFamily:"inherit",fontSize:"12px",textAlign:"left",whiteSpace:"normal",lineHeight:1.5}} onClick={() => handleRootPickTap(t, i)}>{t}</button>
+                          <button key={i} className="choice-btn" style={{textTransform:"none",letterSpacing:"normal",fontFamily:"inherit",fontSize:"12px",textAlign:"left",whiteSpace:"normal",lineHeight:1.5}} onClick={() => handleRootPickTap(t, i)}>{t}{rootPickIsCut[i] ? "…" : ""}</button>
                         ))}
                         <button className="choice-btn" onClick={handleRootPickNone}>{ROOT_PICK_TEXTS.none}</button>
                       </div>

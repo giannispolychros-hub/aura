@@ -244,6 +244,9 @@ assert('(3.7) the collision logger and the families are not told about it (it ad
   // with all of them taken out src/App.jsx is release-candidate e4b2ae6 byte for byte (sha256 1860c046…) — nothing else changed.
   // UPDATED (22/11/2026, Δ, John's order ⚑4): the data file holds one change more (28 now): the two lines of STAGE_A_TEXTS.stepWhy — the app's text after «Ναι, αυτό είναι» (the comment line and John's new two sentences; the old text is the line of e4b2ae6).
   // The check is the same and its value is the same: with all of them taken out src/App.jsx is release-candidate e4b2ae6 byte for byte (sha256 1860c046…) — nothing else changed, so the text is the only thing this item changed.
+  // UPDATED (22/11/2026, Ε, John's order): four entries of the data file are the regions as they are now — the pair that starts with the PACKAGE 1 comment (the list's constants and pure functions, now with rootPickCut and the cut of a long sentence in the loop of rootPickSentences),
+  // the state (+ the new reference that says which items were cut), the effect and the screen block (the button of an item draws «…» after a cut one). The old texts of the pairs are as they were; still 28 changes. The check and its value are the same:
+  // with all of them taken out src/App.jsx is release-candidate e4b2ae6 byte for byte (sha256 1860c046…) — nothing else changed, so these are the only changes of the item.
   const UNDO = JSON.parse(fs.readFileSync(path.join(__dirname, 'conversation_v1_undo.json'), 'utf8'));
   const present = UNDO.filter(([nw]) => raw.split(nw).length === 2).length;
   let back = raw; for (const [nw, old] of UNDO) back = back.split(nw).join(old);

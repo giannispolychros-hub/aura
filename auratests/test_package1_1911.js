@@ -34,7 +34,8 @@ const CONSTS = ['HELPLINES', 'KNEW_MIN_SUBSTANCE_WORDS', 'ROOT_MIN_SUBSTANCE_WOR
 const FNS = ['lookBehind', 'detectSafetySignal', 'classifyCrisisTier', 'detectsDangerFromOther', 'detectsMentalHealthReferral', 'mergeRiskKind',
   'stageASafetyHold', 'rootAnswerIsDismissal', 'rootAnswerIsUnsure', 'isExplicitClosure', 'declaresClosing', 'matchesClosingWord',
   'substanceOfSentence', 'splitSentences', 'rootTextHasSubstance', 'speakRightSpans', 'speakRightEndsWithQuestion', 'speakRightJaccard',
-  'branchSessionSafe', 'detectsCoreReadinessAsked', 'rootAskNumber', 'rootPickSentences', 'rootPickView', 'rootNewWordCount',
+  'branchSessionSafe', 'detectsCoreReadinessAsked', 'rootAskNumber', 'rootPickCut', 'rootPickSentences', 'rootPickView', 'rootNewWordCount', // UPDATED (22/11/2026, Ε, John's order): + rootPickCut — rootPickSentences now calls it (a long sentence is shown cut at the last whole word); this list is a loader (it copies the functions by name), no assertion changed by it
+  
   'repeatedElementsForRound', 'roundTypeNoteSent', 'describeRepeatedElementsCtx', 'describeRoundTypeCtx', 'trailingQuestionReplies',
   'userSaysDontKnowTwice', 'repeatedUserElements', 'recordTelemetry', 'buildTesterExport', 'rootPickRecord'];
 let F = {};
@@ -125,12 +126,17 @@ const view = (m, over) => call('rootPickView', Object.assign({}, SAFE, { message
     ['a dismissal («Άστο»)', 'Άστο.'],
     ['«I don\'t know» alone', 'Δεν ξέρω.'],
     ['a goodbye', 'Ευχαριστώ, τα λέμε.'],
-    ['longer than 200 characters', 'Το ωράριο είναι βαρύ ' + 'και δεν αφήνει καθόλου χρόνο ελεύθερο για τη ζωή μου '.repeat(5) + 'τελικά.'],
   ];
   for (const [why, bad] of BAD) {
     const r = texts(pick(conv(G1, bad, G2)));
     assert('NEW — (2.8) excluded: ' + why, isArr(r) && JSON.stringify(r) === JSON.stringify([G1, G2]));
   }
+  // UPDATED (22/11/2026, Ε, John's order): the row «longer than 200 characters» left the table above — such a sentence is NOT left out any more: it is offered cut at the last whole word that fits (rootPickCut), with its own flag `cut`.
+  // Same fixture as the old row, turned into its opposite; the new rule is pinned in auratests/test_long_pick_2211.js. Every other row of the table is as it was.
+  { const LONG = 'Το ωράριο είναι βαρύ ' + 'και δεν αφήνει καθόλου χρόνο ελεύθερο για τη ζωή μου '.repeat(5) + 'τελικά.';
+    const r = pick(conv(G1, LONG, G2));
+    assert('NEW — (2.8) UPDATED (22/11/2026, Ε): longer than 200 characters is NOT excluded any more — it is offered cut at the last whole word, an exact beginning of the sentence, 200 characters at most; the good ones around it are there, in order',
+      isArr(r) && r.length === 3 && r[0].text === G1 && r[2].text === G2 && r[1].cut === true && r[1].text.length <= 200 && LONG.startsWith(r[1].text) && /\s/.test(LONG[r[1].text.length]) && LONG.length > 200); }
   // a rejected sentence is replaced by the next sentence of the same message (A8: tryNext)
   assert('NEW — (2.9) a rejected first sentence is replaced by the next one of the same message',
     JSON.stringify(texts(pick(conv(G1, 'Και το ωράριο με πιέζει πολύ. ' + G3, G2)))) === JSON.stringify([G1, G3, G2]));
