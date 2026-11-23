@@ -13,7 +13,7 @@
 //   node scripts/e2e_stage_a.cjs --engine-check       ψεύτικο μοντέλο: τα 6 σενάρια της πραγματικής δοκιμής, χωρίς κόστος
 //   node scripts/e2e_stage_a.cjs --real --dry         δείχνει τι θα γίνει και το όριο δαπάνης — καμία κλήση, κανένα build
 //   node scripts/e2e_stage_a.cjs --real --yes         ΠΡΑΓΜΑΤΙΚΟ μοντέλο (ξοδεύει· σταματά στο --budget, προεπιλογή $6)
-// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only MAIN | ST | W | X | Y | Z | … | R4 | TX | VO | AP | CX | O5 | PI | SN | GL | FC | MF | CT | BX (μόνο μία ενότητα· MAIN = A–V)
+// Προαιρετικά: --budget 6   --url http://localhost:5199 (αντί για build)   --out <φάκελος μέσα στο %TEMP%>   --only MAIN | ST | W | X | Y | Z | … | R4 | TX | VO | AP | CX | O5 | PI | SN | GL | FC | MF | CT | BX | CC (μόνο μία ενότητα· MAIN = A–V)
 //   --viewport 390x844 | 360x640 (17/10 (δ): όλος ο έλεγχος σε αυτό το μέγεθος κινητού· οι ενότητες με δικά τους μεγέθη τα κρατούν)
 // ΣΤΡΕΣ ΤΕΣΤ (Μέρος Β, 10/10): --stress (ψεύτικα, κόστος 0) · --stress --real --dry (σχέδιο + εκτίμηση) · --stress --real --yes (ΠΡΑΓΜΑΤΙΚΟ,
 //   όριο --budget έως $25, προεπιλογή $25) · --sessions 14,15,1 (μόνο αυτοί) · --minutes 75 (καμία νέα συνεδρία μετά). Τρέχει και από το
@@ -1028,6 +1028,147 @@ async function runMock() {
   await runMockP1(); // 19/11: PACKAGE 1 — «2η φορά», the passive counter, one note per round, the prompt's three lines
   await runMockRL(); // 21/11: «λίστα στην ερώτηση της ρίζας» (Λ1) — 3 or more of the user's own sentences at the root question, at most 8 (root-list)
   await runMockRX(); // 22/11: more checks on the root list (John) — a tap and a change, «Καμία» / «Δεν το βρήκα ακόμα», the phone (heading always in view, the hint line), the safety path with the list on the screen, what the device log can tell
+  await runMockCC(); // 23/11: the closing from code in Stage A (John, order Α) — no model call after the word; the line, the card of the pattern, the map
+}
+
+// ── CC: «ΚΛΕΙΣΙΜΟ ΑΠΟ ΚΩΔΙΚΑ» (John, 23/11/2026, order Α, branch root-list) — Stage A (?stageA=1&rec=1), fake model, cost $0. After the user's «one word» the model is NOT called any more: only what the CODE builds from the
+// user's own data (the line «Η λέξη «X» έχει εμφανιστεί συνολικά N φορές στις καταγραφές σου.» when the word was kept before; the recognition card of the Κ4 gate, moved into one shared function), then the card of the map and its fixed
+// line «Ωραία, το πρώτο επόμενο βήμα είναι αυτό.». The fake model answers every request with ONE plain sentence (MODEL): if it ever shows on the screen, or any request goes out after the word, the closing came from the model.
+// CCa a whole session, no memory · CCb memory open, the same word kept once before → the line, the card, their order, the card's «Όχι» (stored) and today's word kept · CCc a word equal to the root → no line ·
+// CCd DISTRESS earlier in the session → the OLD closing stays (the model IS called, no map) · CCe the phone sizes. Unit tests: auratests/test_stagea_code_closing_2311.js. Screenshots CC-1-after-word.png, CC-2-memory.png. Alone: --only CC.
+async function runMockCC() {
+  const T = APP.texts;
+  const F1 = 'Θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει.', B1 = 'Ο μισθός είναι καλός και φοβάμαι την αλλαγή.';
+  const ROOT = 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.', STEP = 'Να στείλω μήνυμα στη Μαρία για καφέ.', WHEN = 'Αύριο το απόγευμα.', WORD = 'Ηρεμία';
+  const DISTRESS = 'Το πένθος για τη μητέρα μου με έχει παραλύσει.';
+  const Q1 = 'Τι είναι αυτό που σε κρατάει εκεί;';
+  const MODEL = 'Αυτό είναι το κείμενο του μοντέλου μετά τη λέξη.';
+  const MAPCLOSE = 'Ωραία, το πρώτο επόμενο βήμα είναι αυτό.';
+  const ECHO = (w, n) => 'Η λέξη «' + w + '» έχει εμφανιστεί συνολικά ' + n + ' φορές στις καταγραφές σου.';
+  const CARD = (w, n) => 'Διάλεξες «' + w + '» ως αυτό που κρατάς, σε ' + n + ' ξεχωριστές συνεδρίες.\nΤο αναγνωρίζεις;';
+  const seed = w => ({ schemaVersion: 2, storageEnabled: true, anchors: [{ id: 'a_seed_1', text: w, category: 'trajectory_word', status: 'resolved', createdAt: 1700000000000, closedAt: 1700000000000, before: null, shift: null, peak: null }] });
+  const sess = async (query, replies, mem) => {
+    const browser = await launch();
+    const ctx = await browser.newContext({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true });
+    const page = await ctx.newPage();
+    const calls = [];
+    let n = 0;
+    await page.route('**/api/aura', async route => {
+      calls.push(JSON.parse(route.request().postData() || '{}'));
+      const reply = replies[Math.min(n, replies.length - 1)]; n++;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: reply }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await ctx.addInitScript(m => { try { localStorage.setItem('aura_intro_seen', '1'); if (m) localStorage.setItem('aura_v2_memory', JSON.stringify(m)); } catch (e) {} }, mem || null);
+    await page.goto(BASE + '/' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    return { browser, ctx, page, calls };
+  };
+  const say = async (page, text) => { if (await page.locator('textarea.textarea').count()) await send(page, text); };
+  const btn = (page, name) => page.getByRole('button', { name, exact: true });
+  const tap = async (page, name) => { const b = btn(page, name); if (await b.count()) { await b.first().click({ timeout: 4000 }); await page.waitForTimeout(400); return true; } return false; };
+  const body = page => page.locator('body').innerText();
+  const aura = async page => (await page.locator('.turn-aura .msg-aura').allInnerTexts()).map(t => t.trim());
+  const y = async loc => ((await loc.first().boundingBox({ timeout: 2000 }).catch(() => null)) || {}).y;
+  const mem = page => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_v2_memory') || 'null'); } catch (e) { return null; } });
+  const log = page => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
+  const settle = async page => { for (let i = 0; i < 20 && (await page.locator('.typing').count()); i++) await page.waitForTimeout(250); await page.waitForTimeout(900); };
+  const shot = async (page, name) => { await page.screenshot({ path: path.join(OUT, name + (VP ? '-' + VP.width + 'x' + VP.height : '') + '.png'), fullPage: false }); };
+  // the whole way to the word question: the first message → the root → «Ναι» → the step and «Πότε» → the clarity number
+  const toWordQ = async (s, distress) => {
+    await say(s.page, F1);
+    if (distress) { await say(s.page, DISTRESS); await say(s.page, B1); }
+    await tap(s.page, T.button); await say(s.page, ROOT); await tap(s.page, T.yes);
+    if (!distress) { await say(s.page, STEP); await tap(s.page, 'Ναι'); await say(s.page, WHEN); }
+    await tap(s.page, '8');
+    return (await s.page.getByText(T.word).count()) >= 1 && (await s.page.locator('textarea.textarea').count()) === 1;
+  };
+  const kind = (c) => LIB.classifyRequest(c, APP).kind;
+
+  // ── CCa: a whole session, no memory ──
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, MODEL]);
+    const asked = await toWordQ(s, false);
+    const before = await aura(s.page), n0 = s.calls.length;
+    await say(s.page, WORD); await settle(s.page);
+    const after = await aura(s.page), b = await body(s.page);
+    ok('CCa: the way to the word question works (the question and the box are there)', asked);
+    ok('CCa: after the word NOT ONE request goes out — not a closing, not a «termination» (' + (s.calls.length - n0) + ' after the word)', s.calls.length === n0 && !s.calls.some(c => kind(c) === 'termination'));
+    ok('CCa: the model\'s text never shows (not even the app\'s fallback «Η σκέψη σου παραμένει δική σου.»), and no new bubble of AURA stands under the word question',
+      !b.includes(MODEL) && !b.includes('Η σκέψη σου παραμένει δική σου.') && after.length === before.length && after[after.length - 1] === T.word);
+    ok('CCa: the end is there once: «η συνομιλία σταμάτησε εδώ» + the button of a new session', (await s.page.getByText('η συνομιλία σταμάτησε εδώ').count()) === 1 && (await btn(s.page, 'Νέα συνεδρία').count()) === 1);
+    const tmClose = (await s.page.locator('[data-tm-closing="1"]').count()) ? await s.page.locator('[data-tm-closing="1"]').first().innerText() : null;
+    const tmRoot = (await s.page.locator('[data-tm-root-text="1"]').count()) ? await s.page.locator('[data-tm-root-text="1"]').first().innerText() : null;
+    ok('CCa: the map is on the screen at once — the root as the user wrote it, and John\'s fixed line «' + MAPCLOSE + '»', tmRoot === '«' + ROOT + '»' && tmClose === MAPCLOSE && (await s.page.locator('[data-thought-map="1"]').count()) === 1);
+    ok('CCa: no echo line (the word was never kept before), no recognition card', !b.includes('έχει εμφανιστεί συνολικά') && (await s.page.locator('.mem-card').count()) === 0);
+    ok('CCa: the copy and download of the card are there', (await btn(s.page, T.copy).count()) === 1 && (await btn(s.page, T.download).count()) === 1);
+    const L = await log(s.page);
+    ok('CCa: the session is recorded as completed once (counts only)', L.filter(r => r && r.ev === 'session_completed').length === 1);
+    ok('CCa: the word is not in ANY request of the session (before, the closing request carried it)', !JSON.stringify(s.calls).includes(WORD));
+    await shot(s.page, 'CC-1-after-word');
+    await s.browser.close();
+  }
+  // ── CCb: memory open, the same word kept once before → the line + the card, in this order, then the map ──
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, MODEL], seed(WORD));
+    await toWordQ(s, false);
+    const before = await aura(s.page), n0 = s.calls.length;
+    await say(s.page, WORD); await settle(s.page);
+    const after = await aura(s.page), b = await body(s.page);
+    ok('CCb: not one request after the word', s.calls.length === n0 && !b.includes(MODEL));
+    ok('CCb: ONE new bubble of AURA — the line the code writes, with today counted (2 times), word for word', after.length === before.length + 1 && after[after.length - 1] === ECHO(WORD, 2) && (await s.page.getByText(ECHO(WORD, 2), { exact: true }).count()) === 1);
+    const card = s.page.locator('.mem-card');
+    const ct = (await card.count()) === 1 ? (await card.first().locator('.mem-text').innerText()).trim() : null;
+    ok('CCb: the recognition card (Κ4) is armed with today\'s word counted: «' + CARD(WORD, 2).replace('\n', ' ') + '», with its three answers',
+      ct === CARD(WORD, 2) && (await btn(s.page, 'Όχι').count()) === 1 && (await btn(s.page, 'Μερικώς').count()) === 1 && (await btn(s.page, 'Ναι').count()) === 1);
+    const yE = await y(s.page.getByText(ECHO(WORD, 2), { exact: true })), yC = await y(card), yM = await y(s.page.locator('[data-thought-map="1"]'));
+    ok('CCb: the order on the screen — the line, then the card of the pattern, then the map (' + [yE, yC, yM].map(v => Math.round(v)).join(' < ') + ')', yE < yC && yC < yM);
+    ok('CCb: the map and its line follow', (await s.page.locator('[data-tm-closing="1"]').count()) === 1 && (await s.page.locator('[data-tm-closing="1"]').first().innerText()) === MAPCLOSE);
+    await shot(s.page, 'CC-2-memory');
+    const m1 = await mem(s.page);
+    const surfaced = (m1 && m1.patternsSurfaced || []).map(r => r.key + '@' + r.atCount);
+    ok('CCb: today\'s word is kept next to the earlier one (2 anchors), and the card is recorded as shown at count 2 (the memory the code armed WITH today\'s word was the one saved)',
+      !!m1 && m1.storageEnabled === true && (m1.anchors || []).length === 2 && (m1.anchors || [])[1].text === WORD && surfaced.join() === 'recurring:ηρεμία@2');
+    await tap(s.page, 'Όχι'); await s.page.waitForTimeout(900);
+    const m2 = await mem(s.page);
+    ok('CCb: «Όχι» removes the card for good (stored as a rejected pattern) and loses nothing of the memory (2 anchors, the record of the card)',
+      (await s.page.locator('.mem-card').count()) === 0 && !!m2 && (m2.rejectedPatterns || []).some(r => r.key === 'recurring:ηρεμία') && (m2.anchors || []).length === 2 && (m2.patternsSurfaced || []).length === 1);
+    await s.browser.close();
+  }
+  // ── CCc: a word equal to the root → no line even when it was kept before (it was shown once already, on the card) ──
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, MODEL], seed(ROOT));
+    await toWordQ(s, false);
+    const n0 = s.calls.length;
+    await say(s.page, ROOT); await settle(s.page);
+    const b = await body(s.page);
+    ok('CCc: the word is the root itself → no line «έχει εμφανιστεί συνολικά» (count 0), not one request, the model\'s text never shows', s.calls.length === n0 && !b.includes('έχει εμφανιστεί συνολικά') && !b.includes(MODEL));
+    ok('CCc: the map is there with its line', (await s.page.locator('[data-tm-closing="1"]').count()) === 1);
+    await s.browser.close();
+  }
+  // ── CCd: DISTRESS earlier in the session → the OLD closing: the model IS called once, no map ──
+  {
+    const s = await sess('?stageA=1&rec=1', [Q1, Q1, Q1, MODEL]);
+    const asked = await toWordQ(s, true);
+    const n0 = s.calls.length;
+    await say(s.page, WORD); await settle(s.page);
+    const b = await body(s.page);
+    ok('CCd: DISTRESS before the root — the way to the word question works (no step, the clarity number, the word question)', asked);
+    ok('CCd: the OLD closing — exactly ONE request after the word, of the kind «termination»', s.calls.length === n0 + 1 && kind(s.calls[n0]) === 'termination');
+    ok('CCd: the model\'s closing is shown (under the existing safety filters), the end is there once, and NO map (it never shows after a risk signal)', b.includes(MODEL) && (await s.page.getByText('η συνομιλία σταμάτησε εδώ').count()) === 1 && (await s.page.locator('[data-thought-map="1"]').count()) === 0);
+    await s.browser.close();
+  }
+  // ── CCe: the phone sizes — the map's line in view after the word, at both sizes ──
+  for (const [w, h] of [[390, 844], [360, 640]]) {
+    const s = await sess('?stageA=1&rec=1', [Q1, MODEL]);
+    await s.page.setViewportSize({ width: w, height: h });
+    await toWordQ(s, false);
+    await say(s.page, WORD); await settle(s.page);
+    const el = s.page.locator('[data-tm-closing="1"]');
+    await el.first().scrollIntoViewIfNeeded().catch(() => {});
+    const box = await el.first().boundingBox({ timeout: 2000 }).catch(() => null);
+    ok('CCe (' + w + '×' + h + '): the map\'s fixed line can be scrolled into view and is fully inside the width', !!box && box.x >= 0 && box.x + box.width <= w + 1 && (await el.first().innerText()) === MAPCLOSE);
+    await s.browser.close();
+  }
 }
 
 // ── SD: ADR «31 Οκτωβρίου (ζ)» (John, a safety fix (α)) — the gaps of the two safety detectors, on the screen. Stage A (?stageA=1&rec=1),
@@ -4023,7 +4164,10 @@ async function runMockST() {
     await tap(s.page, '8');
     ok('ST1 (ζ): the word question, as today', await s.page.getByText(T.word).count() >= 1 && await inputOn(s.page));
     await say(s.page, 'Μαρία'); await s.page.waitForTimeout(800);
-    ok('ST1 (ζ): the end, as today (one closing request)', await s.page.getByText('η συνομιλία σταμάτησε εδώ').count() === 1 && s.calls.length === n0 + 1 && LIB.classifyRequest(s.calls[n0], APP).kind === 'termination');
+    // UPDATED (23/11/2026, John's order Α): the closing after the word comes from CODE — the model is NOT called any more. BEFORE: one closing request (kind «termination») and the model's text. NOW: the end label once, not one request after the word
+    // (the calls stay at n0, none of the kind «termination») and the map's own fixed line on the card. The reason and the other cases: auratests/test_stagea_code_closing_2311.js and section CC.
+    ok('ST1 (ζ): the end, from CODE (UPDATED 23/11, John\'s order Α): the end label once, NOT one request after the word, the map\'s fixed line on the card', await s.page.getByText('η συνομιλία σταμάτησε εδώ').count() === 1 && s.calls.length === n0 &&
+      !s.calls.some(c => LIB.classifyRequest(c, APP).kind === 'termination') && await s.page.locator('[data-tm-closing="1"]').count() === 1);
     const rq = reqText(s.calls);
     ok('ST1 (ια): nothing of the step in ANY request — not the user\'s step, not «Πότε», not the step\'s questions or the card', ![STEP, WHEN, ...STEP_TEXTS].some(x => rq.includes(x)));
     ok('ST1 (θ): no €6 screen, no 4-option question, at any point', await noOffer(s.page));
@@ -8925,7 +9069,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else if (opt('--only', '') === 'RX') await runMockRX(); else if (opt('--only', '') === 'LP') await runMockLP(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else if (opt('--only', '') === 'RX') await runMockRX(); else if (opt('--only', '') === 'LP') await runMockLP(); else if (opt('--only', '') === 'CC') await runMockCC(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
