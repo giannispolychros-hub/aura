@@ -4194,6 +4194,22 @@ function countPriorWordEchoes(mem, word) {
     a.category === TRAJECTORY_WORD_CATEGORY && (a.text || "").trim().toLowerCase() === target
   ).length;
 }
+// STAGE A — THE CLOSING FROM CODE (John, 23/11/2026, order Α; ADR «23 Νοεμβρίου (β)»). After the user's «one word» the model is not called any more: what follows is only what the CODE
+// builds from the user's own data, then the map's card with its fixed line. The one line the code writes: how many times this word was kept (today counts). It is the SAME sentence the
+// model used to be told to write (deliverFinalClosure's echoNote): literal, a fact-count, never an interpretation. «» when the word was never kept before (count < 1) or is not text.
+function stageAEchoLine(word, count) {
+  const w = typeof word === "string" ? word.trim() : "";
+  if (!w || !Number.isInteger(count) || count < 1) return "";
+  const line = "Η λέξη «" + w + "» έχει εμφανιστεί συνολικά " + (count + 1) + " φορές στις καταγραφές σου.";
+  // the shape the final check asks of an app text (finalReplyCheck, kind "app"): not over FINAL_MAX_CHARS, no hidden tag — otherwise no line at all, never a line the bubble would have to replace
+  return line.length > FINAL_MAX_CHARS || /\[\[[A-Z_]+(?::[^\]]*)?\]\]/.test(line) ? "" : line;
+}
+// May the closing after the word come from code? ONLY when the whole session carried no risk signal: the latch of heaviness is exactly 0 (no crisis A or B, no distress). Anything else — a latch of
+// any kind, a value nobody expects — keeps the OLD closing: the model's text under the safety filters and the final check (§0.1). Danger from another person is not asked here again: the only
+// caller (the word of Stage A in handleSubmit) is inside a branch whose own condition already says «not (Stage A and the danger latch)».
+function stageAClosureFromCode(riskKind) {
+  return riskKind === 0;
+}
 // RECURRING SIGNAL — the same thing, kept twice, with the evidence attached.
 //
 // countPriorWordEchoes above returns the COUNT and discards which anchors produced it, so the
@@ -9784,6 +9800,83 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
 
   // Part 2 — delivered after the user gives their word, which is saved as a real anchor first (in handleSubmit)
   const deliverFinalClosure = useCallback(async (msgs, echoInfo) => {
+    // Κ4 — THE RECOGNITION CARDS of a closing (RECURRING, DIVERGENCE), written ONCE, here (John, 23/11/2026, order Α: the cards are MOVED, not removed — the model's closing, its failure path
+    // and the closing from code all arm them through this function; before, the same 60 lines stood twice). `memory` is the memory the CALLER gives: the model's closing passes the one of its
+    // own closure, exactly as before (that closure is the first render's — deps [applyTerminationIllumination] — so it does not carry today's anchor: a code-only finding of the 23/11, documented
+    // and not changed here); the closing from code passes the memory WITH today's word, so the count in the card and in the line includes today, as the comment below says.
+    const armRecognitionCards = (memory) => {
+      // Κ4 — arm the recognition gate. Only when a real pattern exists AND the person has not
+      // already refused it in a previous session: re-asking after someone answered reads as not
+      // having listened, which is the entry-door failure logged three times in this codebase.
+      // memory here already carries this session's anchor, so the count includes today.
+      try {
+        const _kw = getMostRecentWordAnchor(memory)?.text;
+        const _sig = _kw ? buildRecurringSignal(memory, _kw) : null;
+        const _key = _sig ? patternKey({ kind: "recurring", word: _sig.word }) : null;
+        let _gateArmed = false;
+        if (_sig && !isPatternRejected(memory, _key) && !wasPatternRecentlyShown(memory, _key, _sig.count)) {
+          setRecognitionPending({ kind: "recurring", word: _sig.word, count: _sig.count });
+          _gateArmed = true;
+          if (memory.storageEnabled) {
+            const _surfaced = recordPatternSurfaced(memory, _key, _sig.count);
+            setMemory(_surfaced);
+            saveMemory(_surfaced);
+          }
+        }
+        // ΑΠΟΚΛΙΣΗ (DIVERGENCE) — AURA_STAGE1_SPEC.md Stage 2. Only checked when RECURRING did
+        // not already arm the gate THIS closing (`recognitionPending` itself is React state and
+        // would not reflect the setRecognitionPending call above until the next render, so a
+        // local flag is required rather than reading the state back) — one Recognition Gate card
+        // per closing, never two stacked.
+        if (!_gateArmed && _kw) {
+          const _openFlag = (memory.anchors || []).find(a => a && a.category === "divergence_flag"
+            && a.status === "open" && (a.text || "").trim().toLowerCase() === _kw.trim().toLowerCase());
+          const _dFailure = (divergencePair.current && divergencePair.current.failure)
+            || (_openFlag ? { word: _openFlag.text, text: _openFlag.before } : null);
+          const _dContinuation = divergencePair.current && divergencePair.current.continuation;
+          const _dSig = buildDivergenceSignal(_dFailure, _dContinuation);
+          if (_dSig) {
+            const _dKey = patternKey({ kind: "divergence", word: _dSig.word });
+            const _dCount = (_sig && _sig.count) || 1;
+            if (!isPatternRejected(memory, _dKey) && !wasPatternRecentlyShown(memory, _dKey, _dCount)) {
+              setRecognitionPending({ kind: "divergence", word: _dSig.word,
+                failureText: _dSig.failureText, continuationText: _dSig.continuationText });
+              let _dMem = _openFlag ? closeAnchor(memory, _openFlag.id, "resolved") : memory;
+              if (memory.storageEnabled) {
+                _dMem = recordPatternSurfaced(_dMem, _dKey, _dCount);
+                setMemory(_dMem);
+                saveMemory(_dMem);
+              }
+            }
+          } else if (divergencePair.current && divergencePair.current.failure && !divergencePair.current.continuation
+                     && !_openFlag) {
+            // Only the failure half happened this session — persist it so a future session's
+            // continuation statement can find it. Never overwrite an already-open flag for the
+            // same word: the first declared failure is the one that pairs, not the latest.
+            // Same consent shape as every other anchor write in this file: setMemory always (the
+            // session's own UI reflects it), saveMemory to disk only behind consent.
+            const _withFlag = createAnchor({ ...memory }, divergencePair.current.failure.word,
+              "divergence_flag", "open", { before: divergencePair.current.failure.text });
+            setMemory(_withFlag);
+            if (memory.storageEnabled) saveMemory(_withFlag);
+          }
+        }
+      } catch (e) { /* the gate must never block a closing */ }
+    };
+    // STAGE A — THE CLOSING FROM CODE (John, 23/11/2026, order Α; ADR «23 Νοεμβρίου (β)»). The caller (the word of Stage A) asks for it (codeClosing) and the session's own latches allow it
+    // (stageAClosureFromCode — never after a risk signal). No model, no waiting: the one line the code writes from the user's data (when the word was kept before), the cards, the end. The map's
+    // card and its fixed line come from the screen itself once the session has ended. Every other closing — the old flow, a session with a risk signal — goes on below, as before.
+    if (echoInfo && echoInfo.codeClosing === true && stageAClosureFromCode(riskSignalKind.current)) {
+      const _echo = stageAEchoLine(echoInfo.word, echoInfo.count);
+      if (_echo) {
+        fkPassApp(_echo, { isTermination: true }); // the app's own text, recorded (final check) — its shape was checked in stageAEchoLine
+        appendClosingMessage(_echo); // the same helper as the word question: a closing message of the app, after the user's word
+      }
+      setSessionEnded(true);
+      armRecognitionCards(echoInfo.mem);
+      applyTerminationIllumination();
+      return;
+    }
     setLoading(true);
     try {
       const echoNote = (echoInfo && echoInfo.count >= 1)
@@ -9808,63 +9901,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: shownText, msgMode: "TERMINATION", isTermination: true }]);
       if (_fkClose.linesText) setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: _fkClose.linesText, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
-      // Κ4 — arm the recognition gate. Only when a real pattern exists AND the person has not
-      // already refused it in a previous session: re-asking after someone answered reads as not
-      // having listened, which is the entry-door failure logged three times in this codebase.
-      // memory here already carries this session's anchor, so the count includes today.
-      try {
-        const _kw = getMostRecentWordAnchor(memory)?.text;
-        const _sig = _kw ? buildRecurringSignal(memory, _kw) : null;
-        const _key = _sig ? patternKey({ kind: "recurring", word: _sig.word }) : null;
-        let _gateArmed = false;
-        if (_sig && !isPatternRejected(memory, _key) && !wasPatternRecentlyShown(memory, _key, _sig.count)) {
-          setRecognitionPending({ kind: "recurring", word: _sig.word, count: _sig.count });
-          _gateArmed = true;
-          if (memory.storageEnabled) {
-            const _surfaced = recordPatternSurfaced(memory, _key, _sig.count);
-            setMemory(_surfaced);
-            saveMemory(_surfaced);
-          }
-        }
-        // ΑΠΟΚΛΙΣΗ (DIVERGENCE) — AURA_STAGE1_SPEC.md Stage 2. Only checked when RECURRING did
-        // not already arm the gate THIS closing (`recognitionPending` itself is React state and
-        // would not reflect the setRecognitionPending call above until the next render, so a
-        // local flag is required rather than reading the state back) — one Recognition Gate card
-        // per closing, never two stacked.
-        if (!_gateArmed && _kw) {
-          const _openFlag = (memory.anchors || []).find(a => a && a.category === "divergence_flag"
-            && a.status === "open" && (a.text || "").trim().toLowerCase() === _kw.trim().toLowerCase());
-          const _dFailure = (divergencePair.current && divergencePair.current.failure)
-            || (_openFlag ? { word: _openFlag.text, text: _openFlag.before } : null);
-          const _dContinuation = divergencePair.current && divergencePair.current.continuation;
-          const _dSig = buildDivergenceSignal(_dFailure, _dContinuation);
-          if (_dSig) {
-            const _dKey = patternKey({ kind: "divergence", word: _dSig.word });
-            const _dCount = (_sig && _sig.count) || 1;
-            if (!isPatternRejected(memory, _dKey) && !wasPatternRecentlyShown(memory, _dKey, _dCount)) {
-              setRecognitionPending({ kind: "divergence", word: _dSig.word,
-                failureText: _dSig.failureText, continuationText: _dSig.continuationText });
-              let _dMem = _openFlag ? closeAnchor(memory, _openFlag.id, "resolved") : memory;
-              if (memory.storageEnabled) {
-                _dMem = recordPatternSurfaced(_dMem, _dKey, _dCount);
-                setMemory(_dMem);
-                saveMemory(_dMem);
-              }
-            }
-          } else if (divergencePair.current && divergencePair.current.failure && !divergencePair.current.continuation
-                     && !_openFlag) {
-            // Only the failure half happened this session — persist it so a future session's
-            // continuation statement can find it. Never overwrite an already-open flag for the
-            // same word: the first declared failure is the one that pairs, not the latest.
-            // Same consent shape as every other anchor write in this file: setMemory always (the
-            // session's own UI reflects it), saveMemory to disk only behind consent.
-            const _withFlag = createAnchor({ ...memory }, divergencePair.current.failure.word,
-              "divergence_flag", "open", { before: divergencePair.current.failure.text });
-            setMemory(_withFlag);
-            if (memory.storageEnabled) saveMemory(_withFlag);
-          }
-        }
-      } catch (e) { /* the gate must never block a closing */ }
+      armRecognitionCards(memory);
       applyTerminationIllumination();
       // READS shownText, NOT text: finalDistillation is the last sentence of Part 2 and
       // it gates the paywall block, the Blueprint download and the Νέα συνεδρία button.
@@ -9876,63 +9913,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       const fallback = fkPassApp("Η σκέψη σου παραμένει δική σου.", { isTermination: true }); // the app's own text, recorded (final check)
       setMessages(prev => [...prev, { id: nextMsgId(), role: "assistant", content: fallback, msgMode: "TERMINATION", isTermination: true }]);
       setSessionEnded(true);
-      // Κ4 — arm the recognition gate. Only when a real pattern exists AND the person has not
-      // already refused it in a previous session: re-asking after someone answered reads as not
-      // having listened, which is the entry-door failure logged three times in this codebase.
-      // memory here already carries this session's anchor, so the count includes today.
-      try {
-        const _kw = getMostRecentWordAnchor(memory)?.text;
-        const _sig = _kw ? buildRecurringSignal(memory, _kw) : null;
-        const _key = _sig ? patternKey({ kind: "recurring", word: _sig.word }) : null;
-        let _gateArmed = false;
-        if (_sig && !isPatternRejected(memory, _key) && !wasPatternRecentlyShown(memory, _key, _sig.count)) {
-          setRecognitionPending({ kind: "recurring", word: _sig.word, count: _sig.count });
-          _gateArmed = true;
-          if (memory.storageEnabled) {
-            const _surfaced = recordPatternSurfaced(memory, _key, _sig.count);
-            setMemory(_surfaced);
-            saveMemory(_surfaced);
-          }
-        }
-        // ΑΠΟΚΛΙΣΗ (DIVERGENCE) — AURA_STAGE1_SPEC.md Stage 2. Only checked when RECURRING did
-        // not already arm the gate THIS closing (`recognitionPending` itself is React state and
-        // would not reflect the setRecognitionPending call above until the next render, so a
-        // local flag is required rather than reading the state back) — one Recognition Gate card
-        // per closing, never two stacked.
-        if (!_gateArmed && _kw) {
-          const _openFlag = (memory.anchors || []).find(a => a && a.category === "divergence_flag"
-            && a.status === "open" && (a.text || "").trim().toLowerCase() === _kw.trim().toLowerCase());
-          const _dFailure = (divergencePair.current && divergencePair.current.failure)
-            || (_openFlag ? { word: _openFlag.text, text: _openFlag.before } : null);
-          const _dContinuation = divergencePair.current && divergencePair.current.continuation;
-          const _dSig = buildDivergenceSignal(_dFailure, _dContinuation);
-          if (_dSig) {
-            const _dKey = patternKey({ kind: "divergence", word: _dSig.word });
-            const _dCount = (_sig && _sig.count) || 1;
-            if (!isPatternRejected(memory, _dKey) && !wasPatternRecentlyShown(memory, _dKey, _dCount)) {
-              setRecognitionPending({ kind: "divergence", word: _dSig.word,
-                failureText: _dSig.failureText, continuationText: _dSig.continuationText });
-              let _dMem = _openFlag ? closeAnchor(memory, _openFlag.id, "resolved") : memory;
-              if (memory.storageEnabled) {
-                _dMem = recordPatternSurfaced(_dMem, _dKey, _dCount);
-                setMemory(_dMem);
-                saveMemory(_dMem);
-              }
-            }
-          } else if (divergencePair.current && divergencePair.current.failure && !divergencePair.current.continuation
-                     && !_openFlag) {
-            // Only the failure half happened this session — persist it so a future session's
-            // continuation statement can find it. Never overwrite an already-open flag for the
-            // same word: the first declared failure is the one that pairs, not the latest.
-            // Same consent shape as every other anchor write in this file: setMemory always (the
-            // session's own UI reflects it), saveMemory to disk only behind consent.
-            const _withFlag = createAnchor({ ...memory }, divergencePair.current.failure.word,
-              "divergence_flag", "open", { before: divergencePair.current.failure.text });
-            setMemory(_withFlag);
-            if (memory.storageEnabled) saveMemory(_withFlag);
-          }
-        }
-      } catch (e) { /* the gate must never block a closing */ }
+      armRecognitionCards(memory);
       applyTerminationIllumination();
       setFinalDistillation("Η σκέψη σου παραμένει δική σου.");
     } finally {
@@ -10285,11 +10266,14 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       if (willPersist) saveMemory(withAnchor, true);
       // STAGE A §2.1α step 5: a word equal to «Τι βρήκες» was already shown once, on the card — no echo of it.
       let _saSame = false;
+      // John, 23/11/2026, order Α: the Stage A phase is read BEFORE the dispatch below moves it to «done» — the closing after the word of Stage A comes from CODE (deliverFinalClosure, codeClosing),
+      // with the memory that already carries today's word (withAnchor). Not while a crisis line is on the screen; the session's own latches are checked there (stageAClosureFromCode).
+      const _saWord = stageAActive.current && stageARef.current.phase === "word";
       if (stageAActive.current && stageARef.current.phase === "word") {
         _saSame = sameAsRootText(userText, stageARef.current.found);
         stageADispatch({ type: "word", same: _saSame });
       }
-      await deliverFinalClosure([...messages, { role: "user", content: userText }], { word: userText, count: _saSame ? 0 : priorEchoCount });
+      await deliverFinalClosure([...messages, { role: "user", content: userText }], { word: userText, count: _saSame ? 0 : priorEchoCount, codeClosing: _saWord && !crisisFallback, mem: withAnchor });
       return;
     }
 

@@ -247,6 +247,10 @@ assert('(3.7) the collision logger and the families are not told about it (it ad
   // UPDATED (22/11/2026, Ε, John's order): four entries of the data file are the regions as they are now — the pair that starts with the PACKAGE 1 comment (the list's constants and pure functions, now with rootPickCut and the cut of a long sentence in the loop of rootPickSentences),
   // the state (+ the new reference that says which items were cut), the effect and the screen block (the button of an item draws «…» after a cut one). The old texts of the pairs are as they were; still 28 changes. The check and its value are the same:
   // with all of them taken out src/App.jsx is release-candidate e4b2ae6 byte for byte (sha256 1860c046…) — nothing else changed, so these are the only changes of the item.
+  // UPDATED (23/11/2026, Α, John's order): the data file holds five more entries (33 changes now) — the closing after the word of Stage A from CODE, new → old (the old text is HEAD's, 3e2a0e4): (1) the two pure functions
+  // stageAEchoLine and stageAClosureFromCode (a pure addition), (2) the head of deliverFinalClosure (the Κ4 cards written once as armRecognitionCards, the branch from code), (3) and (4) the two places where the same 60 lines of the arming stood
+  // (the model's closing, its failure path), told apart by what follows them, (5) the caller in handleSubmit (the phase read before the dispatch, the two new arguments). The check and its value are the same: with all of them taken out
+  // src/App.jsx is release-candidate e4b2ae6, byte for byte (sha256 1860c046…) — so these are the only changes of the item (proved first: applying only the five to the new file gives 3e2a0e4 byte for byte).
   const UNDO = JSON.parse(fs.readFileSync(path.join(__dirname, 'conversation_v1_undo.json'), 'utf8'));
   const present = UNDO.filter(([nw]) => raw.split(nw).length === 2).length;
   let back = raw; for (const [nw, old] of UNDO) back = back.split(nw).join(old);
