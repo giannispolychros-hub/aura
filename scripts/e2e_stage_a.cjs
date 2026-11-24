@@ -1029,6 +1029,7 @@ async function runMock() {
   await runMockRL(); // 21/11: «λίστα στην ερώτηση της ρίζας» (Λ1) — 3 or more of the user's own sentences at the root question, at most 8 (root-list)
   await runMockRX(); // 22/11: more checks on the root list (John) — a tap and a change, «Καμία» / «Δεν το βρήκα ακόμα», the phone (heading always in view, the hint line), the safety path with the list on the screen, what the device log can tell
   await runMockCC(); // 23/11: the closing from code in Stage A (John, order Α) — no model call after the word; the line, the card of the pattern, the map
+  await runMockEN(); // 24/11: the four fixed texts of the first screens (John, order Β) — the AI line, the privacy line, the microphone line, the 4th line of the old first screen
 }
 
 // ── CC: «ΚΛΕΙΣΙΜΟ ΑΠΟ ΚΩΔΙΚΑ» (John, 23/11/2026, order Α, branch root-list) — Stage A (?stageA=1&rec=1), fake model, cost $0. After the user's «one word» the model is NOT called any more: only what the CODE builds from the
@@ -1167,6 +1168,128 @@ async function runMockCC() {
     await el.first().scrollIntoViewIfNeeded().catch(() => {});
     const box = await el.first().boundingBox({ timeout: 2000 }).catch(() => null);
     ok('CCe (' + w + '×' + h + '): the map\'s fixed line can be scrolled into view and is fully inside the width', !!box && box.x >= 0 && box.x + box.width <= w + 1 && (await el.first().innerText()) === MAPCLOSE);
+    await s.browser.close();
+  }
+}
+
+// ── EN: «ΤΕΣΣΕΡΑ ΚΕΙΜΕΝΑ ΤΩΝ ΠΡΩΤΩΝ ΟΘΟΝΩΝ» (John, 24/11/2026, order Β, branch root-list) — ONLY fixed texts, Stage A (?stageA=1&rec=1), fake model, cost $0. Three phone sizes (320×568, 360×640, 390×844). The texts are written out here
+// word for word (not read from the app), so the old code fails: (1) the AI line «Είμαι τεχνητή νοημοσύνη. Δεν δίνω συμβουλές· ρωτάω για να βρεις εσύ.» (2) under the start button: «Τα μηνύματά σου στέλνονται στην Anthropic, την εταιρεία
+// του μοντέλου, για να απαντήσει η AURA.» (3) under it, ONLY where the browser has a speech API: «Το 🎙 γράφει στο πεδίο ό,τι αναγνωρίζει ο browser· η AURA δεν παίρνει ήχο.» (4) the 4th line of the OLD first screen: «Μετά βρίσκεις εσύ ένα μικρό βήμα και πότε θα το κάνεις.»
+// (the gold words «ένα μικρό βήμα»; it replaces the line about the options of the old flow). Each text must be on screen, whole (inside the screen and its box, nothing cut, no sideways scroll), in its place, and at most 3 lines (a sanity limit; the measured
+// numbers are in the label). ENa the entry screen at three sizes · ENb a browser WITHOUT a speech API: no microphone line and no 🎙 button; WITH the API: both · ENc the claim «η AURA δεν παίρνει ήχο» on the real app with a stand-in speech API:
+// the 🎙 puts the text into the box and NOTHING goes out until «Go», and what goes out is text only · ENd the old first screen at three sizes, then «Ξεκίνα» → the entry screen. Unit tests: auratests/test_entry_texts_2411.js. Alone: --only EN.
+async function runMockEN() {
+  const W = {
+    ai: 'Είμαι τεχνητή νοημοσύνη. Δεν δίνω συμβουλές· ρωτάω για να βρεις εσύ.',
+    invite: 'Γράψε ό,τι σε απασχολεί, όπως έρχεται. Μπερδεμένο είναι μια χαρά.',
+    privacy: 'Τα μηνύματά σου στέλνονται στην Anthropic, την εταιρεία του μοντέλου, για να απαντήσει η AURA.',
+    mic: 'Το \u{1F399} γράφει στο πεδίο ό,τι αναγνωρίζει ο browser· η AURA δεν παίρνει ήχο.',
+    line4: 'Μετά βρίσκεις εσύ ένα μικρό βήμα και πότε θα το κάνεις.',
+    button: 'Ξεκίνα με το πρόβλημά σου',
+    old: ['Δεν σου λέω τι να κάνεις', 'Μετά βλέπεις τις επιλογές', 'τι κερδίζεις, τι πληρώνεις', 'τι κρατάς και τι αφήνεις', 'Και αποφασίζεις'],
+  };
+  const SIZES = [{ width: 320, height: 568 }, { width: 360, height: 640 }, { width: 390, height: 844 }];
+  // the element that shows exactly this text: inside the screen and inside its own box, nothing cut, no sideways scroll; where it is, and how many lines it takes
+  const fit = async (page, text) => page.evaluate(t => {
+    const norm = x => x.replace(/\s+/g, ' ').trim();
+    const els = [...document.querySelectorAll('body *')].filter(e => e.offsetParent !== null || e.tagName === 'BODY');
+    const el = els.filter(e => norm(e.innerText || '') === norm(t)).pop();
+    if (!el) return null;
+    const r = el.getBoundingClientRect(), Wd = window.innerWidth, p = el.parentElement.getBoundingClientRect();
+    const cs = getComputedStyle(el), lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
+    return { inside: r.left >= 0 && r.right <= Wd + 0.5 && r.left >= p.left - 0.5 && r.right <= p.right + 0.5, notCut: el.scrollWidth <= el.clientWidth + 1 || el.clientWidth === 0,
+      noSideScroll: document.documentElement.scrollWidth <= Wd, top: Math.round(r.top), bottom: Math.round(r.bottom), h: window.innerHeight, lines: Math.round(r.height / lh), font: cs.fontSize, color: cs.color };
+  }, text);
+  const good = f => !!f && f.inside && f.notCut && f.noSideScroll;
+  const open = async (vp, query, init, intro) => {
+    const browser = await launch();
+    const ctx = await browser.newContext({ viewport: vp, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    const page = await ctx.newPage();
+    const calls = [], reqs = [];
+    page.on('request', r => { const t = r.resourceType(); if (t === 'fetch' || t === 'xhr' || t === 'websocket' || t === 'eventsource' || t === 'ping') reqs.push(t + ' ' + r.url()); });
+    await page.route('**/api/aura', route => { calls.push(JSON.parse(route.request().postData() || '{}'));
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: 'Τι σε απασχολεί περισσότερο;' }], usage: { input_tokens: 10, output_tokens: 10 } }) }); });
+    if (!intro) await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    if (init) await ctx.addInitScript(init);
+    await page.goto(BASE + '/' + query); await page.waitForTimeout(600);
+    return { browser, ctx, page, calls, reqs };
+  };
+  const body = page => page.locator('body').innerText();
+  const noOld = async page => { const b = await body(page); return W.old.every(t => !b.includes(t)); };
+
+  // ── ENa: the entry screen, three sizes ──
+  for (const vp of SIZES) {
+    const tag = `${vp.width}×${vp.height}`, sfx = '-' + vp.width;
+    const s = await open(vp, '?stageA=1&rec=1');
+    const ai = await fit(s.page, W.ai), inv = await fit(s.page, W.invite), pv = await fit(s.page, W.privacy), mc = await fit(s.page, W.mic);
+    const bb = await s.page.getByText(W.button).boundingBox().catch(() => null);
+    const nums = [ai, pv, mc].map(f => f ? f.lines : '?').join('/');
+    ok(`ENa (${tag}): the AI line «${W.ai}» and John's invitation under it — both whole, nothing cut`, good(ai) && good(inv) && ai.bottom <= inv.top && ai.font === '13px');
+    ok(`ENa (${tag}): the privacy line «${W.privacy.slice(0, 36)}…» is on the screen, whole, under the start button, in 11px, and at most 3 lines`,
+      good(pv) && !!bb && pv.top >= Math.round(bb.y + bb.height) - 1 && pv.font === '11px' && pv.lines >= 1 && pv.lines <= 3);
+    ok(`ENa (${tag}): the microphone line «${W.mic.slice(0, 30)}…» is on the screen (this Chromium has the speech API), whole, under the privacy line, in 11px, at most 3 lines`,
+      good(mc) && !!pv && mc.top >= pv.bottom - 1 && mc.font === '11px' && mc.lines >= 1 && mc.lines <= 3);
+    ok(`ENa (${tag}): the order on the screen is AI line → invitation → button → privacy → microphone, and the button is inside the screen (lines AI/privacy/mic = ${nums})`,
+      !!ai && !!inv && !!bb && !!pv && !!mc && ai.top < inv.top && inv.bottom <= Math.round(bb.y) + 1 && Math.round(bb.y + bb.height) <= pv.top + 1 && pv.bottom <= mc.top + 1 && Math.round(bb.y + bb.height) <= vp.height);
+    ok(`ENa (${tag}): the old words are gone from the screen («Δεν σου λέω τι να κάνεις…»; the options of the old first screen)`, await noOld(s.page));
+    await s.page.screenshot({ path: path.join(OUT, 'EN-1-entry' + sfx + '.png'), fullPage: false });
+    await s.browser.close();
+  }
+
+  // ── ENb: with and without a speech API — the microphone line and the 🎙 button are shown by the SAME condition ──
+  {
+    const noApi = () => { try { delete window.webkitSpeechRecognition; } catch (e) {} try { delete window.SpeechRecognition; } catch (e) {}
+      Object.defineProperty(window, 'webkitSpeechRecognition', { value: undefined, configurable: true }); Object.defineProperty(window, 'SpeechRecognition', { value: undefined, configurable: true }); };
+    const a = await open({ width: 390, height: 844 }, '?stageA=1&rec=1', noApi);
+    const pvA = await fit(a.page, W.privacy), bA = await body(a.page);
+    ok('ENb (a browser WITHOUT a speech API): the privacy line is there, the microphone line is NOT, and nothing on the screen says why', good(pvA) && !bA.includes('\u{1F399}') && !bA.includes('δεν παίρνει ήχο') && !bA.includes('αναγνωρίζει ο browser'));
+    await a.page.screenshot({ path: path.join(OUT, 'EN-2-entry-no-speech-api.png'), fullPage: false });
+    await a.page.getByText(W.button).click(); await a.page.waitForTimeout(400);
+    ok('ENb (without the API): after «Ξεκίνα με το πρόβλημά σου» the 🎙 button is not there either — the same condition', (await a.page.locator('.mic-btn').count()) === 0 && (await a.page.locator('textarea.textarea').count()) === 1);
+    await a.browser.close();
+    const b = await open({ width: 390, height: 844 }, '?stageA=1&rec=1');
+    const mcB = await fit(b.page, W.mic);
+    await b.page.getByText(W.button).click(); await b.page.waitForTimeout(400);
+    ok('ENb (a browser WITH the API): the microphone line is on the entry screen, and after «Ξεκίνα με το πρόβλημά σου» the 🎙 button is there', good(mcB) && (await b.page.locator('.mic-btn').count()) === 1 && (await b.page.locator('.mic-btn').innerText()).trim() === '\u{1F399}');
+    await b.browser.close();
+  }
+
+  // ── ENc: «η AURA δεν παίρνει ήχο» — with a stand-in for the browser's speech API the app only ever receives TEXT, puts it into the box, and sends nothing until «Go» ──
+  {
+    const FAKE = () => { window.__rec = { starts: 0, inst: [] }; class FakeSR { constructor() { this.lang = ''; this.continuous = false; this.interimResults = false; window.__rec.inst.push(this); }
+      start() { window.__rec.starts++; setTimeout(() => this.onstart && this.onstart(), 5); } stop() { setTimeout(() => this.onend && this.onend(), 5); } abort() {} } window.SpeechRecognition = FakeSR; window.webkitSpeechRecognition = FakeSR; };
+    const s = await open({ width: 390, height: 844 }, '?stageA=1&rec=1', FAKE);
+    const lineThere = good(await fit(s.page, W.mic));
+    await s.page.getByText(W.button).click(); await s.page.waitForTimeout(400);
+    const before = s.reqs.length;
+    await s.page.locator('.mic-btn').click(); await s.page.waitForTimeout(200);
+    await s.page.evaluate(() => window.__rec.inst[0].onresult({ results: [[{ transcript: 'καλημέρα' }]] })); await s.page.waitForTimeout(200);
+    const box = await s.page.locator('textarea.textarea').inputValue();
+    ok('ENc: with the API the line is on the entry screen; a click on 🎙 starts ONE recognition in Greek, and what the browser recognises lands in the box as text', lineThere && (await s.page.evaluate(() => window.__rec.starts)) === 1 &&
+      (await s.page.evaluate(() => window.__rec.inst[0].lang)) === 'el-GR' && box === 'καλημέρα');
+    ok('ENc: not one request goes out while the user speaks and the text is in the box (the app got text, not sound; nothing is sent until «Go»)', s.reqs.length === before && s.calls.length === 0);
+    await s.page.getByRole('button', { name: 'Go' }).click(); await s.page.waitForTimeout(900);
+    const sent = s.calls[0] || null;
+    ok('ENc: after «Go» exactly ONE request leaves, to /api/aura, and the user\'s message in it is the text (a string), nothing else of the recording',
+      s.calls.length === 1 && !!sent && Array.isArray(sent.messages) && sent.messages.length >= 1 && sent.messages.every(m => typeof m.content === 'string') && sent.messages[sent.messages.length - 1].content.includes('καλημέρα') &&
+      s.reqs.filter(r => !/\/api\/aura$/.test(r)).length === 0);
+    await s.browser.close();
+  }
+
+  // ── ENd: the OLD first screen (a first visit), three sizes: the 4th line, its gold words, then «Ξεκίνα» → the entry screen ──
+  for (const vp of SIZES) {
+    const tag = `${vp.width}×${vp.height}`, sfx = '-' + vp.width;
+    const s = await open(vp, '?stageA=1&rec=1', null, true);
+    const l4 = await fit(s.page, W.line4);
+    const col = await s.page.evaluate(() => { const sp = [...document.querySelectorAll('.intro-screen span')].find(x => x.textContent.trim() === 'ένα μικρό βήμα'); const d = sp && sp.parentElement; return { gold: sp ? getComputedStyle(sp).color : null, rest: d ? getComputedStyle(d).color : null }; });
+    const GOLD = 'rgb(255, 213, 96)', bright = c => { const v = (c || '').match(/\d+/g); return !!v && 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2] >= 200; };
+    ok(`ENd (${tag}): the 4th line of the old first screen reads «${W.line4}» — whole, nothing cut, at most 3 lines (measured: ${l4 ? l4.lines : '?'}); «ένα μικρό βήμα» in gold, the rest of the line bright`,
+      good(l4) && l4.lines >= 1 && l4.lines <= 3 && col.gold === GOLD && bright(col.rest) && col.rest !== GOLD);
+    ok(`ENd (${tag}): the old words are gone from the first screen («Μετά βλέπεις τις επιλογές σου καθαρά…»)`, await noOld(s.page));
+    await s.page.screenshot({ path: path.join(OUT, 'EN-3-old-first-screen' + sfx + '.png'), fullPage: false });
+    await s.page.getByRole('button', { name: 'Ξεκίνα', exact: true }).click(); await s.page.waitForTimeout(500);
+    const ai = await fit(s.page, W.ai), pv = await fit(s.page, W.privacy);
+    ok(`ENd (${tag}): «Ξεκίνα» of the first screen leads to the entry screen — the AI line and the privacy line are there`, good(ai) && good(pv));
     await s.browser.close();
   }
 }
@@ -3443,7 +3566,9 @@ async function runMockR4() {
 async function runMockTX() {
   const W = {
     head: 'Βρίσκουμε την ερώτηση που μετράει.\nΤίποτα άλλο.',
-    ai: 'Είμαι τεχνητή νοημοσύνη. Δεν σου λέω τι να κάνεις πριν βρεις τι πραγματικά ρωτάς.',
+    // UPDATED (24/11/2026, ADR «24 Νοεμβρίου», John's order Β): the second sentence of the AI line is John's «Δεν δίνω συμβουλές· ρωτάω για να βρεις εσύ.» (it was «Δεν σου λέω τι να κάνεις πριν βρεις τι πραγματικά ρωτάς.»).
+    // The first sentence, the disclosure, and the fit assertions below are exactly as before. The new lines of the same screen (privacy, microphone) and the 3-size check are in the section EN.
+    ai: 'Είμαι τεχνητή νοημοσύνη. Δεν δίνω συμβουλές· ρωτάω για να βρεις εσύ.',
     invite: 'Γράψε ό,τι σε απασχολεί, όπως έρχεται. Μπερδεμένο είναι μια χαρά.',
     placeholder: 'Γράψ\' το όπως έρχεται…',
     leaving: 'Αν κάτι ξεκαθάρισε, γράψ\' το σε μία φράση. Τι είναι αυτό που πραγματικά σε απασχολεί;', // UPDATED (17/10)
@@ -3508,10 +3633,12 @@ async function runMockTX() {
       ok(`TX0 (${tag}): the intro — «ΞΕΚΙΝΑ» lies on no line of text, at the top or scrolled to the end` + (top && top.length ? ' — over: ' + top.join(' | ') : '') + (end && end.length ? ' — over: ' + end.join(' | ') : ''),
         Array.isArray(top) && Array.isArray(end) && !top.length && !end.length);
       const col = await ip.evaluate(() => { const c = t => { const e = [...document.querySelectorAll('.intro-screen span, .intro-screen div')].find(x => x.textContent.trim() === t); return e ? getComputedStyle(e).color : null; };
-        return { root: c('άλλη ρίζα'), gain: c('τι κερδίζεις, τι πληρώνεις.'), goal: c('Στόχος είναι να βγεις από το χάος του μυαλού σου.'), plain: c('Στόχος δεν είναι η μασημένη λύση που δίνουν όλοι.') }; });
+        return { root: c('άλλη ρίζα'), step: c('ένα μικρό βήμα'), goal: c('Στόχος είναι να βγεις από το χάος του μυαλού σου.'), plain: c('Στόχος δεν είναι η μασημένη λύση που δίνουν όλοι.') }; });
       const GOLD = 'rgb(255, 213, 96)', bright = c => { const v = (c || '').match(/\d+/g); return !!v && 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2] >= 200; };
-      ok(`TX0 (${tag}): the emphasised words in gold («άλλη ρίζα», «τι κερδίζεις, τι πληρώνεις.», «Στόχος είναι να βγεις…»), the rest bright`,
-        col.root === GOLD && col.gain === GOLD && col.goal === GOLD && bright(col.plain) && col.plain !== GOLD);
+      // UPDATED (24/11/2026, ADR «24 Νοεμβρίου», John's order Β): the 4th line is now «Μετά βρίσκεις εσύ ένα μικρό βήμα και πότε θα το κάνεις.» — the gold words are «άλλη ρίζα», «ένα μικρό βήμα» (it was «τι κερδίζεις, τι πληρώνεις.», which
+      // described the options of the old flow) and «Στόχος είναι να βγεις…»; the gold is the same, the rest is still bright. The new line itself, its fit and the other texts: section EN.
+      ok(`TX0 (${tag}): the emphasised words in gold («άλλη ρίζα», «ένα μικρό βήμα», «Στόχος είναι να βγεις…»), the rest bright`,
+        col.root === GOLD && col.step === GOLD && col.goal === GOLD && bright(col.plain) && col.plain !== GOLD);
       await ip.evaluate(() => { const sc = document.querySelector('.intro-screen'); if (sc) sc.scrollTop = 0; }); await ip.waitForTimeout(200);
       await ip.screenshot({ path: path.join(OUT, 'TX-0-intro' + sfx + '.png'), fullPage: false });
       await ip.close();
@@ -3520,7 +3647,7 @@ async function runMockTX() {
     // ── TX1: the first screen ──
     const ai = await fit(page, W.ai), inv = await fit(page, W.invite);
     const startBtn = await page.getByText('Ξεκίνα με το πρόβλημά σου').boundingBox().catch(() => null);
-    ok(`TX1 (${tag}): the AI line, unchanged, and under it John's line «${W.invite}» — both whole, nothing cut`,
+    ok(`TX1 (${tag}): the AI line (John's words of 24/11), and under it John's line «${W.invite}» — both whole, nothing cut`,
       good(ai) && good(inv) && ai.bottom <= inv.top);
     ok(`TX1 (${tag}): the old line is gone; the two lines and the start button are on one screen`,
       await page.getByText("Δεν χρειάζεται να το έχεις καθαρό", { exact: false }).count() === 0 && !!startBtn && startBtn.y + startBtn.height <= vp.height);
@@ -9069,7 +9196,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else if (opt('--only', '') === 'RX') await runMockRX(); else if (opt('--only', '') === 'LP') await runMockLP(); else if (opt('--only', '') === 'CC') await runMockCC(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else if (opt('--only', '') === 'RX') await runMockRX(); else if (opt('--only', '') === 'LP') await runMockLP(); else if (opt('--only', '') === 'CC') await runMockCC(); else if (opt('--only', '') === 'EN') await runMockEN(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

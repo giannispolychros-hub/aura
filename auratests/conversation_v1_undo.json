@@ -130,5 +130,17 @@
  [
   "      // John, 23/11/2026, order Α: the Stage A phase is read BEFORE the dispatch below moves it to «done» — the closing after the word of Stage A comes from CODE (deliverFinalClosure, codeClosing),\n      // with the memory that already carries today's word (withAnchor). Not while a crisis line is on the screen; the session's own latches are checked there (stageAClosureFromCode).\n      const _saWord = stageAActive.current && stageARef.current.phase === \"word\";\n      if (stageAActive.current && stageARef.current.phase === \"word\") {\n        _saSame = sameAsRootText(userText, stageARef.current.found);\n        stageADispatch({ type: \"word\", same: _saSame });\n      }\n      await deliverFinalClosure([...messages, { role: \"user\", content: userText }], { word: userText, count: _saSame ? 0 : priorEchoCount, codeClosing: _saWord && !crisisFallback, mem: withAnchor });\n",
   "      if (stageAActive.current && stageARef.current.phase === \"word\") {\n        _saSame = sameAsRootText(userText, stageARef.current.found);\n        stageADispatch({ type: \"word\", same: _saSame });\n      }\n      await deliverFinalClosure([...messages, { role: \"user\", content: userText }], { word: userText, count: _saSame ? 0 : priorEchoCount });\n"
+ ],
+ [
+  "              <div style={{marginBottom:\"16px\",color:\"#f6f0e6\"}}>Μετά βρίσκεις εσύ <span style={{color:\"#ffd560\"}}>ένα μικρό βήμα</span> και πότε θα το κάνεις.</div>\n",
+  "              <div style={{marginBottom:\"16px\",color:\"#f6f0e6\"}}>Μετά βλέπεις τις επιλογές σου καθαρά: <span style={{color:\"#ffd560\"}}>τι κερδίζεις, τι πληρώνεις.</span> Και αποφασίζεις τι κρατάς και τι αφήνεις.</div>\n"
+ ],
+ [
+  "                Είμαι τεχνητή νοημοσύνη. Δεν δίνω συμβουλές· ρωτάω για να βρεις εσύ.\n",
+  "                Είμαι τεχνητή νοημοσύνη. Δεν σου λέω τι να κάνεις πριν βρεις τι πραγματικά ρωτάς.\n"
+ ],
+ [
+  "              <div style={{marginTop:\"14px\",fontSize:\"11px\",color:\"#ddd6cd\",lineHeight:1.5,textAlign:\"left\"}}>Τα μηνύματά σου στέλνονται στην Anthropic, την εταιρεία του μοντέλου, για να απαντήσει η AURA.</div>\n              {speechSupported && (<div style={{marginTop:\"8px\",fontSize:\"11px\",color:\"#ddd6cd\",lineHeight:1.5,textAlign:\"left\"}}>Το 🎙 γράφει στο πεδίο ό,τι αναγνωρίζει ο browser· η AURA δεν παίρνει ήχο.</div>)}\n",
+  ""
  ]
 ]

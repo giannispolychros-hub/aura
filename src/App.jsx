@@ -11053,7 +11053,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               <div style={{marginBottom:"16px",color:"#f6f0e6"}}>Πολλές φορές έχεις ένα πρόβλημα, ένα δίλημμα, ή κάτι που δεν μπορείς να εκφράσεις ακριβώς.</div>
               <div style={{marginBottom:"16px"}}>Κάθε ερώτηση της εφαρμογής είναι <span style={{color:"#ffd560"}}>δική σου ερώτηση</span> — μία που δεν έχεις κάνει ακόμα στον εαυτό σου, ή δεν σκέφτηκες να την κάνεις.</div>
               <div style={{marginBottom:"16px",color:"#f6f0e6"}}>Γιατί πολλές φορές το πρόβλημα έχει <span style={{color:"#ffd560"}}>άλλη ρίζα</span> από αυτό που ζούμε και εκφράζουμε.</div>
-              <div style={{marginBottom:"16px",color:"#f6f0e6"}}>Μετά βλέπεις τις επιλογές σου καθαρά: <span style={{color:"#ffd560"}}>τι κερδίζεις, τι πληρώνεις.</span> Και αποφασίζεις τι κρατάς και τι αφήνεις.</div>
+              <div style={{marginBottom:"16px",color:"#f6f0e6"}}>Μετά βρίσκεις εσύ <span style={{color:"#ffd560"}}>ένα μικρό βήμα</span> και πότε θα το κάνεις.</div>
               <div style={{marginBottom:"6px",color:"#f6f0e6"}}>Στόχος δεν είναι η μασημένη λύση που δίνουν όλοι.</div>
               <div style={{marginBottom:"18px",color:"#ffd560"}}>Στόχος είναι να βγεις από το χάος του μυαλού σου.</div>
               <div style={{color:"#ffd560",fontFamily:"'Cormorant Garamond',serif",fontSize:"20px",lineHeight:1.35,marginTop:"22px"}}>Εσύ στο τιμόνι,<br/>στα δικά σου προβλήματα.</div>
@@ -11093,7 +11093,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
               {/* AI DISCLOSURE (EU AI Act, Art. 50 — founder-approved wording, 2026-10-04). On the entry
                   screen because it is shown at the start of EVERY new session; the intro can be skipped. */}
               <div style={{fontSize:"13px",color:"#fffaef",lineHeight:1.6,marginBottom:"10px",textAlign:"left"}}>
-                Είμαι τεχνητή νοημοσύνη. Δεν σου λέω τι να κάνεις πριν βρεις τι πραγματικά ρωτάς.
+                Είμαι τεχνητή νοημοσύνη. Δεν δίνω συμβουλές· ρωτάω για να βρεις εσύ.
               </div>
               <div style={{fontSize:"13px",color:"#ddd6cd",lineHeight:1.6,marginBottom:"18px",textAlign:"left"}}>
                 Γράψε ό,τι σε απασχολεί, όπως έρχεται. Μπερδεμένο είναι μια χαρά.
@@ -11102,6 +11102,8 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
                 style={{display:"block",width:"100%",background:"rgba(10,9,8,0.5)",border:"1px solid rgba(201,168,76,0.35)",color:"rgba(255,213,96,0.85)",fontSize:"13px",lineHeight:1.5,textAlign:"left",padding:"12px 16px",cursor:"pointer",borderRadius:"4px"}}>
                 Ξεκίνα με το πρόβλημά σου
               </button>
+              <div style={{marginTop:"14px",fontSize:"11px",color:"#ddd6cd",lineHeight:1.5,textAlign:"left"}}>Τα μηνύματά σου στέλνονται στην Anthropic, την εταιρεία του μοντέλου, για να απαντήσει η AURA.</div>
+              {speechSupported && (<div style={{marginTop:"8px",fontSize:"11px",color:"#ddd6cd",lineHeight:1.5,textAlign:"left"}}>Το 🎙 γράφει στο πεδίο ό,τι αναγνωρίζει ο browser· η AURA δεν παίρνει ήχο.</div>)}
               {recMode.current && storedTelemetryCount() > 0 && (
                 <div style={{marginTop:"22px",textAlign:"left"}}>
                   <div style={{fontSize:"11px",color:"#ddd6cd",lineHeight:1.5,marginBottom:"6px"}}>{TESTER_TEXTS.line}</div>

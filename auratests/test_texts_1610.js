@@ -68,7 +68,9 @@ const visible = src => src.replace(/&nbsp;/g, ' ').replace(/\{\/\*[\s\S]*?\*\/\}
     HEAD.includes('Βρίσκουμε την ερώτηση που&nbsp;μετράει.') && (HEAD.match(/&nbsp;/g) || []).length === 1);
 
   const ENTRY = (() => { const a = CODE.indexOf('{messages.length === 0 && !sessionStarted && introChoice === null && ('); return a >= 0 ? visible(CODE.slice(a, CODE.indexOf('{recMode.current && storedTelemetryCount()', a))) : ''; })();
-  const AI_LINE = 'Είμαι τεχνητή νοημοσύνη. Δεν σου λέω τι να κάνεις πριν βρεις τι πραγματικά ρωτάς.';
+  // UPDATED (24/11/2026, ADR «24 Νοεμβρίου»): John's words of 24/11 replace the second sentence of the AI line («Δεν σου λέω τι να κάνεις πριν βρεις τι πραγματικά ρωτάς.» →
+  // «Δεν δίνω συμβουλές· ρωτάω για να βρεις εσύ.»); the first sentence (the disclosure), its place (first) and John's invitation right under it are asserted exactly as before.
+  const AI_LINE = 'Είμαι τεχνητή νοημοσύνη. Δεν δίνω συμβουλές· ρωτάω για να βρεις εσύ.';
   const INVITE = 'Γράψε ό,τι σε απασχολεί, όπως έρχεται. Μπερδεμένο είναι μια χαρά.';
   assert('ENTRY: the AI line is unchanged and comes first', ENTRY.indexOf(AI_LINE) >= 0 && ENTRY.indexOf(AI_LINE) < ENTRY.indexOf(INVITE));
   assert('ENTRY: John\'s line right under it', ENTRY.includes(AI_LINE + ' ' + INVITE));

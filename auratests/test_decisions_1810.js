@@ -127,8 +127,11 @@ assert('LABELS (3): the old labels are gone from the screen', !/"Αντίγρα�
 {
   const a = UI.indexOf('<div className="intro-screen">'), intro = a >= 0 ? UI.slice(a, UI.indexOf('<div className="intro-actions">', a)) : '';
   const gold = '#ffd560';
-  assert('INTRO (7): «άλλη ρίζα» and «τι κερδίζεις, τι πληρώνεις.» in gold', intro.includes(`<span style={{color:"${gold}"}}>άλλη ρίζα</span>`) &&
-    intro.includes(`<span style={{color:"${gold}"}}>τι κερδίζεις, τι πληρώνεις.</span>`));
+  // UPDATED (24/11/2026, ADR «24 Νοεμβρίου», John's order): the 4th line of the intro is now «Μετά βρίσκεις εσύ ένα μικρό βήμα και πότε θα το κάνεις.» — it replaces both sentences of the old
+  // line, which described the options of the old flow («τι κερδίζεις, τι πληρώνεις. Και αποφασίζεις τι κρατάς και τι αφήνεις.»), not the default flow (Stage A). This CHANGES decision 18/10 (7)
+  // on purpose, by John: the gold words of the intro are «άλλη ρίζα» and «ένα μικρό βήμα» (and the others below, unchanged). The gold itself, #ffd560, is the same; so is every other assertion of (7).
+  assert('INTRO (7): «άλλη ρίζα» and «ένα μικρό βήμα» in gold', intro.includes(`<span style={{color:"${gold}"}}>άλλη ρίζα</span>`) &&
+    intro.includes(`<span style={{color:"${gold}"}}>ένα μικρό βήμα</span>`) && !intro.includes('τι κερδίζεις, τι πληρώνεις'));
   assert('INTRO (7): «Στόχος είναι να βγεις από το χάος του μυαλού σου.» in gold', new RegExp(`color:"${gold}"\\}\\}>Στόχος είναι να βγεις από το χάος του μυαλού σου\\.`).test(intro));
   assert('INTRO (7): «δική σου ερώτηση» and the last line stay gold', intro.includes(`<span style={{color:"${gold}"}}>δική σου ερώτηση</span>`) && /color:"#ffd560",fontFamily:"'Cormorant Garamond',serif",fontSize:"20px"/.test(intro));
   const plain = (intro.match(/<div style=\{\{marginBottom:"\d+px",color:"(#[0-9a-f]{6})"\}\}>/g) || []).map(x => /#[0-9a-f]{6}/.exec(x)[0]);

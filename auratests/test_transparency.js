@@ -56,7 +56,10 @@ function region(startMarker, endMarker) {
 }
 
 // ── (α) ENTRY SCREEN: the AI disclosure ──────────────────────────────────────
-const AI_LINE = 'Είμαι τεχνητή νοημοσύνη. Δεν σου λέω τι να κάνεις πριν βρεις τι πραγματικά ρωτάς.';
+// UPDATED (24/11/2026, ADR «24 Νοεμβρίου»): John's words of 24/11 replace the second sentence of the AI line («Δεν σου λέω τι να κάνεις πριν βρεις τι πραγματικά ρωτάς.» →
+// «Δεν δίνω συμβουλές· ρωτάω για να βρεις εσύ.»). WHY the pin moves and does not weaken: the first sentence — the disclosure itself, «Είμαι τεχνητή νοημοσύνη.», EU AI Act Art. 50 — is
+// unchanged and every assertion below still demands it word for word, once, first on the screen, before the invitation.
+const AI_LINE = 'Είμαι τεχνητή νοημοσύνη. Δεν δίνω συμβουλές· ρωτάω για να βρεις εσύ.';
 // UPDATED (16/10, ADR «16 Οκτωβρίου (β)»): John's line of 16/10 in the place of the old one.
 const INVITE = 'Γράψε ό,τι σε απασχολεί, όπως έρχεται. Μπερδεμένο είναι μια χαρά.';
 const ENTRY = visible(region('{messages.length === 0 && !sessionStarted && introChoice === null && (', 'setIntroChoice("direct")'));

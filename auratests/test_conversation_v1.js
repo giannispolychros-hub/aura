@@ -251,6 +251,10 @@ assert('(3.7) the collision logger and the families are not told about it (it ad
   // stageAEchoLine and stageAClosureFromCode (a pure addition), (2) the head of deliverFinalClosure (the Κ4 cards written once as armRecognitionCards, the branch from code), (3) and (4) the two places where the same 60 lines of the arming stood
   // (the model's closing, its failure path), told apart by what follows them, (5) the caller in handleSubmit (the phase read before the dispatch, the two new arguments). The check and its value are the same: with all of them taken out
   // src/App.jsx is release-candidate e4b2ae6, byte for byte (sha256 1860c046…) — so these are the only changes of the item (proved first: applying only the five to the new file gives 3e2a0e4 byte for byte).
+  // UPDATED (24/11/2026, Β, John's order): the data file holds three more entries (36 changes now) — the four fixed texts of the first screens, new → old (the old text is HEAD's, 6ad4343): (1) the 4th line of the old first screen
+  // (both old sentences → «Μετά βρίσκεις εσύ ένα μικρό βήμα και πότε θα το κάνεις.»), (2) the second sentence of the AI line of the entry screen, (3) the two new lines under the start button (the privacy line and the microphone line — a pure addition,
+  // the old text is empty). The check and its value are the same: with all of them taken out src/App.jsx is release-candidate e4b2ae6, byte for byte (sha256 1860c046…) — so these are the only changes of the item (proved first: applying only
+  // the three to the new file gives 6ad4343 byte for byte).
   const UNDO = JSON.parse(fs.readFileSync(path.join(__dirname, 'conversation_v1_undo.json'), 'utf8'));
   const present = UNDO.filter(([nw]) => raw.split(nw).length === 2).length;
   let back = raw; for (const [nw, old] of UNDO) back = back.split(nw).join(old);
