@@ -262,6 +262,9 @@ assert('(3.7) the collision logger and the families are not told about it (it ad
   // UPDATED (27/11/2026, John's order, ADR «27 Νοεμβρίου» (2)): the data file holds seven more entries (45 changes now) — the record of the heaviness latch («gravity_latched», numbers only): the helper gravityLatchedFields, the ref submitRound, its increment and
   // its reset, and the two call sites (new → old: a pure addition, the old text is empty or the one line it was). The check and its value are the same: with all of them taken out src/App.jsx is release-candidate e4b2ae6, byte for byte (sha256 1860c046…) — so these
   // are the only changes of the item (proved first: applying only these seven to the new file gives fe46925 byte for byte).
+  // UPDATED (27/11/2026, John's order, ADR «27 Νοεμβρίου» (3)): the data file holds one more entry (46 changes now) — the counter of requests for advice (detectsExplicitProductionRequest): the block that sees «τι να κάνω», «πώς να το κάνω»,
+  // «τι μπορώ να κάνω» (new → old: a pure addition, the old text is empty). The check and its value are the same: with all of them taken out src/App.jsx is release-candidate e4b2ae6, byte for byte (sha256 1860c046…) — so these are the only changes of
+  // the item (proved first: applying only this one to the new file gives 55cc781 byte for byte).
   const UNDO = JSON.parse(fs.readFileSync(path.join(__dirname, 'conversation_v1_undo.json'), 'utf8'));
   const present = UNDO.filter(([nw]) => raw.split(nw).length === 2).length;
   let back = raw; for (const [nw, old] of UNDO) back = back.split(nw).join(old);

@@ -1031,6 +1031,7 @@ async function runMock() {
   await runMockCC(); // 23/11: the closing from code in Stage A (John, order Α) — no model call after the word; the line, the card of the pattern, the map
   await runMockEN(); // 24/11: the four fixed texts of the first screens (John, order Β) — the AI line, the privacy line, the microphone line, the 4th line of the old first screen
   await runMockGV(); // 27/11: the heaviness latch leaves a record — gravity_latched, numbers only (John, ADR «27 Νοεμβρίου» (2))
+  await runMockER(); // 27/11: the counter of requests for advice sees the questions of advice (John, ADR «27 Νοεμβρίου» (3))
 }
 
 // ── GV: THE HEAVINESS LATCH LEAVES A RECORD (John, 27/11/2026, ADR «27 Νοεμβρίου» (2), branch root-list) — Stage A (?stageA=1&rec=1), fake model, cost $0. One record «gravity_latched» when the latch lights for the first
@@ -1125,6 +1126,62 @@ async function runMockGV() {
     ok('GV5: the old flow (?stageA=0): DISTRESS in the first message → one record n 3, turn 1, by 1, in the device log', d.length === 1 && nt(d[0], 3, 1, 1) && shape(d[0]));
     await s.browser.close();
   }
+}
+
+// ── ER: THE COUNTER OF REQUESTS FOR ADVICE SEES THE QUESTIONS OF ADVICE (John, 27/11/2026, ADR «27 Νοεμβρίου» (3), branch root-list) — Stage A (?stageA=1&rec=1), fake model, cost $0. A whole session each (the first
+// message → the root → «Ναι» → the step and «Πότε» → the clarity number → the word), then the tester's record «session_completed»: explicitRequests (how many messages were counted as a request for advice) and
+// askedActionBeforeRoot (a request before the root card ever opened). ERa «…Τι να κάνω;» counts · ERb «…πώς να το κάνω;» counts · ERc «…μπορείς να με βοηθήσεις;» counts · ERd the bare «δεν ξέρω τι να κάνω» does NOT ·
+// ERe an ordinary first message does not · ERg «τι να πω;» does not · ERf the counter is observation only: the request to the model is the same, word for word, whether the message counted (ERa) or not (ERg). Unit tests: auratests/test_explicit_request_2711.js.
+// Alone: --only ER.
+async function runMockER() {
+  const T = APP.texts;
+  const ROOT = 'Ότι φοβάμαι να απογοητεύσω τον πατέρα μου.', STEP = 'Να στείλω μήνυμα στη Μαρία για καφέ.', WHEN = 'Αύριο το απόγευμα.', WORD = 'Ηρεμία';
+  const Q1 = 'Τι είναι αυτό που σε κρατάει εκεί;', MODEL = 'Αυτό είναι το κείμενο του μοντέλου μετά τη λέξη.';
+  const run = async first => {
+    const browser = await launch();
+    const ctx = await browser.newContext({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true });
+    const page = await ctx.newPage();
+    const calls = [];
+    let n = 0; const replies = [Q1, MODEL];
+    await page.route('**/api/aura', async route => {
+      calls.push(route.request().postData() || '');
+      const reply = replies[Math.min(n, replies.length - 1)]; n++;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: reply }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/?stageA=1&rec=1');
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    const say = async text => { if (await page.locator('textarea.textarea').count()) await send(page, text); };
+    const tap = async name => { const b = page.getByRole('button', { name, exact: true }); if (await b.count()) { await b.first().click({ timeout: 4000 }); await page.waitForTimeout(400); return true; } return false; };
+    await say(first); await tap(T.button); await say(ROOT); await tap(T.yes); await say(STEP); await tap('Ναι'); await say(WHEN); await tap('8'); await say(WORD);
+    for (let i = 0; i < 20 && (await page.locator('.typing').count()); i++) await page.waitForTimeout(250);
+    await page.waitForTimeout(900);
+    const L = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
+    const done = L.filter(r => r && r.ev === 'session_completed');
+    await browser.close();
+    return { done: done.length === 1 ? done[0] : null, doneCount: done.length, calls };
+  };
+  const cases = [
+    ['ERa', 'Θέλω να αλλάξω δουλειά. Τι να κάνω;', 1, 1],
+    ['ERb', 'Θέλω να αλλάξω δουλειά. Πώς να το κάνω;', 1, 1],
+    ['ERc', 'Δεν ξέρω τι να κάνω με τη δουλειά μου, μπορείς να με βοηθήσεις;', 1, 1],
+    ['ERd', 'Θέλω να αλλάξω δουλειά αλλά δεν ξέρω τι να κάνω.', 0, 0],
+    ['ERe', 'Θέλω να αλλάξω δουλειά αλλά δεν ξέρω αν πρέπει.', 0, 0],
+    ['ERg', 'Θέλω να αλλάξω δουλειά. Τι να πω;', 0, 0],
+  ];
+  const out = {};
+  for (const [code, first, want, wantBefore] of cases) {
+    const r = await run(first); out[code] = r;
+    ok(code + ': «' + first + '» — the session is recorded as completed once', r.doneCount === 1);
+    ok(code + ': explicitRequests is ' + want + (want ? ' (counted as a request for advice)' : ' (not a request)') + ', and askedActionBeforeRoot is ' + wantBefore, !!r.done && r.done.explicitRequests === want && r.done.askedActionBeforeRoot === wantBefore);
+  }
+  // ERf — observation only (a GUARD, green before and after): the first request to the model is the same, word for word, once the user's own words are taken out, for a message that counts («Τι να κάνω;», ERa) and one
+  // of the same shape that does not («Τι να πω;», ERg: also a statement and a question, also three words in the question) — nothing reads the counter to change what the model is told
+  const strip = (body, text) => body.split(JSON.stringify(text).slice(1, -1)).join('«USER»');
+  const a = out.ERa.calls[0] || '', g = out.ERg.calls[0] || '';
+  ok('ERf: the request to the model carries no trace of the counter — the same, word for word, whether the message counted (ERa) or not (ERg), once the user\'s words are taken out',
+    !!a && !!g && strip(a, cases[0][1]) === strip(g, cases[5][1]));
+  ok('ERf: …and it is one request in both sessions (the typed answers of Stage A are not sent)', out.ERa.calls.length === 1 && out.ERg.calls.length === 1);
 }
 
 // ── CC: «ΚΛΕΙΣΙΜΟ ΑΠΟ ΚΩΔΙΚΑ» (John, 23/11/2026, order Α, branch root-list) — Stage A (?stageA=1&rec=1), fake model, cost $0. After the user's «one word» the model is NOT called any more: only what the CODE builds from the
@@ -9291,7 +9348,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else if (opt('--only', '') === 'RX') await runMockRX(); else if (opt('--only', '') === 'LP') await runMockLP(); else if (opt('--only', '') === 'CC') await runMockCC(); else if (opt('--only', '') === 'EN') await runMockEN(); else if (opt('--only', '') === 'GV') await runMockGV(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else if (opt('--only', '') === 'RX') await runMockRX(); else if (opt('--only', '') === 'LP') await runMockLP(); else if (opt('--only', '') === 'CC') await runMockCC(); else if (opt('--only', '') === 'EN') await runMockEN(); else if (opt('--only', '') === 'GV') await runMockGV(); else if (opt('--only', '') === 'ER') await runMockER(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

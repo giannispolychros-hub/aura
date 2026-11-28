@@ -178,5 +178,9 @@
  [
   "    submitRound.current = 0; // ADR «27 Νοεμβρίου» (2): «Νέα συνεδρία» numbers the rounds again\n",
   ""
+ ],
+ [
+  "  // ADR «27 Νοεμβρίου» (3), John: the questions of advice the counter did not see — «τι να κάνω», «πώς να το κάνω / πώς θα το κάνω», «τι μπορώ να κάνω» (also «πώς μπορώ να το …», «τι πρέπει / οφείλω να κάνω»,\n  // and «τι κάνω;» ONLY as a question) — and the closed phrase «μπορείς να με βοηθήσεις». A closed list of phrases, read sentence by sentence; no semantic logic. «δεν ξέρω τι να κάνω» is a STATE, not a request: a\n  // phrase directly after a verb of knowing («(δεν) ξέρω / έχω ιδέα / είμαι σίγουρος / καταλαβαίνω / βρίσκω» and up to three words) is not counted — so «ξέρω τι να κάνω» is not either. Observation only, like the\n  // rest of this function: nothing reads the counter to change a reply. See auratests/test_explicit_request_2711.js.\n  if (/μπορεισ να με βοηθησεισ/.test(f)) return true;\n  const KNOW = /(^|[^α-ω])((δεν|δε|ουτε|μη)\\s+)?(ξερω|ξερουμε|ηξερα|εχω ιδεα|ειμαι σιγουρ[οη]σ?|καταλαβαινω|βρισκω)(\\s+[α-ω]+){0,3}\\s*$/;\n  const ASK = /(^|[^α-ω])(τι να κανω|τι να κανουμε|τι μπορω να κανω|τι μπορουμε να κανουμε|τι πρεπει να κανω|τι οφειλω να κανω|πωσ (να|θα|μπορω να) (το|τα|την|τον) [α-ω]+)/;\n  const parts = f.split(/([.;!?…\\n]+)/);\n  for (let i = 0; i < parts.length; i += 2) {\n    const s = parts[i], q = /[;?]/.test(parts[i + 1] || \"\");\n    for (const re of q ? [ASK, /(^|[^α-ω])τι κανω(?![α-ω])/] : [ASK]) {\n      const m = re.exec(s);\n      if (m && !KNOW.test(s.slice(0, m.index + m[1].length))) return true;\n    }\n  }\n",
+  ""
  ]
 ]
