@@ -3078,6 +3078,20 @@ function mergeRiskKind(prev, signal, tier) {
   if (!p) return now;
   return Math.min(p, now);
 }
+// ADR «27 Νοεμβρίου» (2), John: the latch leaves ONE record when it lights for the first time in a session and one more each time it gets HEAVIER — numbers only, so that a session where it lit can be told
+// from one that «reached the step» (until now it left no trace in the numbers). `prev` / `next` = the latch before and after a merge (0 none · 1 crisis A · 2 crisis B · 3 DISTRESS). mergeRiskKind keeps the
+// heaviest, so `next` differs from `prev` only on the first activation or on a heavier level: the same level again, or a lighter signal after a heavier one, leaves nothing. `round` = how many messages the
+// user has submitted in this session, the one in which the latch changed included. `by` = 1 the user's own words lit it · 2 AURA's own reply did (a referral to a mental-health professional). Returns the fields
+// for recordTelemetry — three whole numbers — or null. It reads no text. Where the record goes and when it reaches us: the comment of recordTelemetry (the page's memory; the device only with ?rec=1 / ?debug=1;
+// nothing is sent; it reaches us only if the tester sends the file). See auratests/test_gravity_telemetry_2711.js.
+function gravityLatchedFields(prev, next, round, by) {
+  const p = typeof prev === "number" ? prev : 0;
+  if (next !== 1 && next !== 2 && next !== 3) return null;
+  if (p !== 0 && next >= p) return null;
+  if (by !== 1 && by !== 2) return null;
+  const turn = Number.isInteger(round) && round >= 0 ? Math.min(round, 9999) : 0;
+  return { n: next, turn, by };
+}
 // ADR «11 Οκτωβρίου (ε)» (SAFETY, §0.1 / §25) — AURA's OWN reply refers the user to mental-health help. Found by the stress
 // test with the real model: after «χρειάζεται έναν ειδικό… Ψυχολόγο ή ψυχίατρο» the €6 offer followed the root card. The
 // professions only — the adjective «ψυχολογικά» and the field «ψυχολογία» are not a referral, and «έναν ειδικό» alone could be a
@@ -8080,6 +8094,7 @@ export default function AURAv2() {
   const askedActionBeforeRoot = useRef(false); // the user asked for action before the root card ever opened
   const rootCardOpenedOnce    = useRef(false); // set when the root card first opens (step 3.5)
   const riskSignalKind        = useRef(0);
+  const submitRound           = useRef(0);     // ADR «27 Νοεμβρίου» (2): how many messages the user has submitted in this session — the round of the «gravity_latched» record; «Νέα συνεδρία» starts it again
   const dangerFromOther       = useRef(false); // Ο5: danger from another person seen in this session — never cleared before «Νέα συνεδρία»
   const dangerLineShown       = useRef([]);    // Ο5: what of the danger line the app already wrote ("self", "child", "112")
   const labelLeaks            = useRef(0);     // ADR «8 Οκτωβρίου (β)»: internal labels removed from model replies (count only)     // §4 latch: 0 none · 1 crisis A · 2 crisis B · 3 DISTRESS (heaviest kept)
@@ -9282,7 +9297,9 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
       }
       // SAFETY (ADR «11 Οκτωβρίου (ε)»): AURA's own reply referred the user to mental-health help → the session counts as one with
       // a risk signal (DISTRESS): the root card stays, no €6 offer, no paywall. Only ever raises the latch (heavier signals stay).
+      const _gravBefore2 = riskSignalKind.current;
       if (detectsMentalHealthReferral(text)) riskSignalKind.current = mergeRiskKind(riskSignalKind.current, "DISTRESS", null);
+      { const _gr2 = gravityLatchedFields(_gravBefore2, riskSignalKind.current, submitRound.current, 2); if (_gr2) recordTelemetry("gravity_latched", _gr2); } // ADR «27 Νοεμβρίου» (2): by 2 = AURA's own reply
 
       // ROOT-CAUSE FIX (Clarity + Ownership Scale gate — real-transcript evidence: the user's
       // message "Θα το κάνω" correctly set concreteStepStated=true via detectsConcreteStep, but the
@@ -10210,7 +10227,10 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     if (!_probe.ok) { setInput(userText); const _sf = safeFailFor({ inBox: true, latch: { tier: "unknown" } }); setError(_sf.error); if (_sf.line) setCrisisFallback(_sf.line); return; }
     // STAGE A §4 — the session's risk latch sees EVERY submitted message, before any branch below. Updated with the
     // switch closed too (ADR «7 Οκτωβρίου (β)», 3): passive — read only by Stage A and by the 6€ paywall below.
+    submitRound.current += 1; // ADR «27 Νοεμβρίου» (2): the round of this message (before the latch is read)
+    const _gravBefore = riskSignalKind.current;
     riskSignalKind.current = mergeRiskKind(riskSignalKind.current, detectSafetySignal(userText), classifyCrisisTier(userText));
+    { const _gr = gravityLatchedFields(_gravBefore, riskSignalKind.current, submitRound.current, 1); if (_gr) recordTelemetry("gravity_latched", _gr); } // one record per change of the latch, numbers only
     // Ο5 (John, 23/10/2026): danger from another person — a latch of its own, never cleared before «Νέα συνεδρία» (an «Όχι τώρα» or a
     // «Δεν ξέρω αν είμαι ασφαλής» after it changes nothing). Set with the switch closed too: only Stage A reads it; the old flow shows the
     // app's line only (generateResponse).
@@ -10788,6 +10808,7 @@ IF A ΒΡΗΚΕΣ IS COMPOSED, it may draw on what THEY said about the map: whic
     roadTraceLast.current = null;
     roadTraceTotals.current = { rawLabels: 0, rawMap: 0, strippedMap: 0 };
     roadAnswersFinal.current = [];
+    submitRound.current = 0; // ADR «27 Νοεμβρίου» (2): «Νέα συνεδρία» numbers the rounds again
     roadMapDelivered.current = false;
     roadMapRecovered.current = false;
     familiesUsed.current = [];

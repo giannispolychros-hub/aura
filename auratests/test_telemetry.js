@@ -200,6 +200,21 @@ assert('No call site passes message content, a word, or the input box',
     return !BAD.test(args);
   }));
 
+// UPDATED (27/11/2026, John's order, ADR «27 Νοεμβρίου» (2)): a fifth event of numbers — «gravity_latched» (the heaviness latch lit, or got heavier): n, turn, by. John asked that THIS check say it too: no text is sent.
+// It is wired at TWO call sites, and each passes only the three numbers of the helper gravityLatchedFields (never a message, a word or the input box); and if a call site ever put a text in n, turn or by, the recorder
+// would drop it (the schema, as for every event). The behaviour of the latch itself is in auratests/test_gravity_telemetry_2711.js.
+assert('Event wired at real call sites: gravity_latched, exactly two (the user\'s message and AURA\'s own referral)',
+  (CODE.match(/recordTelemetry\(\s*["']gravity_latched["']/g) || []).length === 2);
+assert('gravity_latched passes only the helper\'s numbers: no message, no word, no input box, no object written at the call site',
+  SITES.filter(s => /recordTelemetry\(\s*["']gravity_latched["']/.test(s)).length === 2 &&
+  SITES.filter(s => /recordTelemetry\(\s*["']gravity_latched["']/.test(s)).every(s => { const args = s.slice(0, s.indexOf(')') + 1); return !BAD.test(args) && /,\s*_gr2?\)$/.test(args); }));
+if (typeof recordTelemetry === 'function') {
+  reset();
+  const rg = recordTelemetry('gravity_latched', { n: CONTENT, turn: [CONTENT], by: { msg: CONTENT } });
+  assert('gravity_latched: a text (or an array, an object) in n, turn or by is dropped by the recorder — no text reaches the log',
+    !!rg && !('n' in rg) && !('turn' in rg) && !('by' in rg) && !JSON.stringify(log()).includes('4000'));
+}
+
 // ── 6. G1: the Road Map is measured, because the decision depends on it ─────
 // The audit's leading finding cannot be decided without this one boolean. If it is ever
 // dropped, the Road Map question becomes unanswerable again and this suite must object.

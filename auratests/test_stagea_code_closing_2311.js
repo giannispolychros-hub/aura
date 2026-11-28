@@ -64,7 +64,7 @@ const call = (n, ...a) => { try { return F[n](...a); } catch (e) { return 'threw
   assert('NEW — (2.2) ANY risk latch (1 crisis A, 2 crisis B, 3 distress) → NOT from code: the old closing stays (the model\'s text under the safety filters and the final check)', g(1) === false && g(2) === false && g(3) === false);
   assert('NEW — (2.3) an unknown latch (undefined, null, "0", NaN, an object) is NOT taken as «no risk»: the old closing (the safe side)', [undefined, null, '0', NaN, {}, false].every(r => g(r) === false));
   assert('NEW — (2.4) danger from another person is NOT read again here: the ONE caller sits inside the word branch whose own condition says «not (Stage A and the danger latch)» — so the danger latch has no new read in the file (20, as pinned by test_speak_right (8.2)) and the latch of heaviness exactly one more (43; pinned by (12.8), UPDATED)',
-    count(raw, /dangerFromOther\.current/g) === 20 && count(raw, /riskSignalKind\.current/g) === 43);
+    count(raw, /dangerFromOther\.current/g) === 20 && count(raw, /riskSignalKind\.current/g) === 47); // UPDATED (27/11/2026, John's order, ADR «27 Νοεμβρίου» (2)): FOUR more reads of the latch of heaviness (43 → 47) — the record «gravity_latched» reads it before and after the two places that raise it, only to write numbers; the danger latch is still 20
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════

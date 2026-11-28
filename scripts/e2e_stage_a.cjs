@@ -1030,6 +1030,101 @@ async function runMock() {
   await runMockRX(); // 22/11: more checks on the root list (John) — a tap and a change, «Καμία» / «Δεν το βρήκα ακόμα», the phone (heading always in view, the hint line), the safety path with the list on the screen, what the device log can tell
   await runMockCC(); // 23/11: the closing from code in Stage A (John, order Α) — no model call after the word; the line, the card of the pattern, the map
   await runMockEN(); // 24/11: the four fixed texts of the first screens (John, order Β) — the AI line, the privacy line, the microphone line, the 4th line of the old first screen
+  await runMockGV(); // 27/11: the heaviness latch leaves a record — gravity_latched, numbers only (John, ADR «27 Νοεμβρίου» (2))
+}
+
+// ── GV: THE HEAVINESS LATCH LEAVES A RECORD (John, 27/11/2026, ADR «27 Νοεμβρίου» (2), branch root-list) — Stage A (?stageA=1&rec=1), fake model, cost $0. One record «gravity_latched» when the latch lights for the first
+// time and one more each time it gets heavier — numbers only: n (1 crisis A · 2 crisis B · 3 DISTRESS), turn (the number of messages the user has submitted, the one in which it changed included), by (1 the user's words, 2
+// AURA's own reply). GV1 DISTRESS twice, crisis B, crisis A twice → exactly 3 records · GV2 AURA's own referral to a professional lights it (by 2), then nothing more · GV3 a new visit starts the round again · GV4 without
+// ?rec=1 nothing is written to the device (the page's memory only) · GV5 the old flow (?stageA=0) records the same. Every record holds only numbers: the device log never contains a word the user typed. Unit tests:
+// auratests/test_gravity_telemetry_2711.js. Alone: --only GV.
+async function runMockGV() {
+  const PLAIN = 'Έχω πολλή δουλειά αυτή την εβδομάδα.', DIST = 'Το πένθος για τη μητέρα μου με έχει παραλύσει.', DIST2 = 'Και το πένθος δεν φεύγει.', B = 'Δεν αντέχω άλλο.', A = 'Θέλω να πεθάνω.', A2 = 'Θέλω να πεθάνω πραγματικά.';
+  const REPLY = 'Σε ακούω. Είμαι εδώ.', REFER = 'Ακούγεται σαν να σε βαραίνει πολύ. Ίσως βοηθήσει να μιλήσεις με έναν ψυχολόγο.';
+  const sess = async (query, replies) => {
+    const browser = await launch();
+    const page = await browser.newPage({ viewport: vpOr({ width: 390, height: 844 }) });
+    let k = 0;
+    await page.route('**/api/aura', async route => {
+      const text = (replies && replies[k]) || REPLY; k++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await page.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/?' + query);
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    await page.waitForTimeout(300);
+    return { browser, page };
+  };
+  const say = async (page, t) => { try { await page.locator('textarea.textarea').waitFor({ state: 'visible', timeout: 3000 }); await send(page, t); await page.waitForTimeout(500); return true; } catch (e) { return false; } };
+  const mem = page => page.evaluate(() => (window.__auraTelemetry || []).filter(r => r && r.ev === 'gravity_latched'));
+  const dev = page => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]').filter(r => r && r.ev === 'gravity_latched'); } catch (e) { return ['unreadable']; } });
+  const devRaw = page => page.evaluate(() => localStorage.getItem('aura_telemetry_log') || '');
+  const shape = r => !!r && Object.keys(r).sort().join() === 'by,ev,n,t,turn' && ['n', 'turn', 'by', 't'].every(k => Number.isInteger(r[k]));
+  const nt = (r, n, turn, by) => !!r && r.n === n && r.turn === turn && r.by === by;
+
+  // GV1 — the user's own words: DISTRESS (round 2), DISTRESS again (3), crisis B (5), crisis A (6), crisis A again (7)
+  {
+    const s = await sess('stageA=1&rec=1');
+    const steps = [[PLAIN, 0], [DIST, 1], [DIST2, 1], [PLAIN, 1], [B, 2], [A, 3], [A2, 3]];
+    let i = 0; const counts = [];
+    for (const [t, expected] of steps) { i++; await say(s.page, t); counts.push([i, expected, (await mem(s.page)).length]); }
+    ok('GV1: a plain message first — no record', counts[0][2] === 0);
+    ok('GV1: DISTRESS in the 2nd message → ONE record', counts[1][2] === 1);
+    ok('GV1: DISTRESS again (3rd) and a plain message (4th) → still one record', counts[2][2] === 1 && counts[3][2] === 1);
+    ok('GV1: crisis B (5th) → a second record', counts[4][2] === 2);
+    ok('GV1: crisis A (6th) → a third record', counts[5][2] === 3);
+    ok('GV1: crisis A again (7th) → no fourth record: one per change, not per message', counts[6][2] === 3);
+    const m = await mem(s.page), d = await dev(s.page);
+    ok('GV1: the three records are n 3 / turn 2, n 2 / turn 5, n 1 / turn 6, all by the user (1)', m.length === 3 && nt(m[0], 3, 2, 1) && nt(m[1], 2, 5, 1) && nt(m[2], 1, 6, 1));
+    ok('GV1: each record is the event, a time and three whole numbers — nothing else', m.every(shape));
+    ok('GV1: with ?rec=1 the same three are in the device log', d.length === 3 && d.every(shape) && d.map(r => r.n).join() === '3,2,1' && d.map(r => r.turn).join() === '2,5,6');
+    const raw = await devRaw(s.page);
+    ok('GV1: no word the user typed is in the device log (πένθος, πεθάνω, αντέχω, δουλειά)', !/πένθος|πεθάνω|αντέχω|δουλειά|μητέρα/.test(raw));
+    ok('GV1: …and none in the page\'s memory log', !/πένθος|πεθάνω|αντέχω|δουλειά|μητέρα/.test(JSON.stringify(await s.page.evaluate(() => window.__auraTelemetry || []))));
+    await s.browser.close();
+  }
+  // GV2 — AURA's own reply refers the user to a professional: by 2; the 3rd message and a DISTRESS word after it add nothing
+  {
+    const s = await sess('stageA=1&rec=1', [REPLY, REFER, REPLY, REPLY]);
+    await say(s.page, PLAIN); const c1 = (await mem(s.page)).length;
+    await say(s.page, 'Δεν έχω κέφι για τίποτα εδώ και μέρες.'); const m2 = await mem(s.page);
+    await say(s.page, 'Και σήμερα το ίδιο.'); const c3 = (await mem(s.page)).length;
+    await say(s.page, DIST2); const m4 = await mem(s.page);
+    ok('GV2: before the referral — no record', c1 === 0);
+    ok('GV2: AURA\'s reply with «ψυχολόγο» (to the 2nd message) → one record: n 3, turn 2, by 2', m2.length === 1 && nt(m2[0], 3, 2, 2) && shape(m2[0]));
+    ok('GV2: the next message adds nothing, and neither does a DISTRESS word of the user after it (the latch is already 3)', c3 === 1 && m4.length === 1);
+    await s.browser.close();
+  }
+  // GV3 — a new visit starts the round again: the first message of the new session is round 1, and the old records stay in the device log
+  {
+    const s = await sess('stageA=1&rec=1');
+    await say(s.page, PLAIN); await say(s.page, DIST);
+    const before = await dev(s.page);
+    await s.page.goto(BASE + '/?stageA=1&rec=1');
+    await s.page.getByText('Ξεκίνα με το πρόβλημά σου').click(); await s.page.waitForTimeout(300);
+    await say(s.page, DIST);
+    const after = await dev(s.page);
+    ok('GV3: the first visit left one record (round 2)', before.length === 1 && before[0].turn === 2);
+    ok('GV3: the new visit\'s DISTRESS in its FIRST message is round 1 — the round started again — and the old record is still in the device log', after.length === 2 && after[0].turn === 2 && after[1].turn === 1 && after[1].n === 3 && after[1].by === 1);
+    await s.browser.close();
+  }
+  // GV4 — without ?rec=1 nothing is written to the device: the record lives in the page's memory only
+  {
+    const s = await sess('stageA=1');
+    await say(s.page, DIST);
+    const m = await mem(s.page);
+    ok('GV4: no ?rec=1 — the record is in the page\'s memory (n 3, turn 1, by 1)', m.length === 1 && nt(m[0], 3, 1, 1));
+    ok('GV4: …and NOTHING is in the device log: the key does not exist', (await devRaw(s.page)) === '');
+    await s.browser.close();
+  }
+  // GV5 — the old flow records the same (the latch is the same one)
+  {
+    const s = await sess('stageA=0&rec=1');
+    await say(s.page, DIST);
+    const d = await dev(s.page);
+    ok('GV5: the old flow (?stageA=0): DISTRESS in the first message → one record n 3, turn 1, by 1, in the device log', d.length === 1 && nt(d[0], 3, 1, 1) && shape(d[0]));
+    await s.browser.close();
+  }
 }
 
 // ── CC: «ΚΛΕΙΣΙΜΟ ΑΠΟ ΚΩΔΙΚΑ» (John, 23/11/2026, order Α, branch root-list) — Stage A (?stageA=1&rec=1), fake model, cost $0. After the user's «one word» the model is NOT called any more: only what the CODE builds from the
@@ -9196,7 +9291,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else if (opt('--only', '') === 'RX') await runMockRX(); else if (opt('--only', '') === 'LP') await runMockLP(); else if (opt('--only', '') === 'CC') await runMockCC(); else if (opt('--only', '') === 'EN') await runMockEN(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else if (opt('--only', '') === 'RX') await runMockRX(); else if (opt('--only', '') === 'LP') await runMockLP(); else if (opt('--only', '') === 'CC') await runMockCC(); else if (opt('--only', '') === 'EN') await runMockEN(); else if (opt('--only', '') === 'GV') await runMockGV(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');
