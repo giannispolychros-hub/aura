@@ -314,7 +314,8 @@ const view = (m, over) => call('rootPickView', Object.assign({}, SAFE, { message
 {
   const SH = {
     stageAStep: '67bb9bcb504396e8', initialStageAState: '514233db37b55461', stageAFlowTelemetry: '92646b9fff31a68f',
-    detectSafetySignal: '838fe96cf161fcae', classifyCrisisTier: 'afa5cf7a370bb0d5', detectsDangerFromOther: '59e2f828fda103fa', stageASafetyHold: 'f1fbe27ef7643815',
+    // UPDATED (27/11/2026, John's explicit order, ADR «27 Νοεμβρίου»): the DISTRESS word «κρίση» of detectSafetySignal became four patterns (a crisis the person is in or has, or one relative of a closed list has) — proved first by auratests/test_krisi_narrowing_2711.js; no other function or line moved. Only the value below moved (838fe96c→f3746eee×1); the check itself is the same.
+    detectSafetySignal: 'f3746eeee8392a34', classifyCrisisTier: 'afa5cf7a370bb0d5', detectsDangerFromOther: '59e2f828fda103fa', stageASafetyHold: 'f1fbe27ef7643815',
     detectsMentalHealthReferral: 'd03b71d681025b79', answersReadinessQuestion: '70fd1f273d6f0e07', detectsCoreReadinessAsked: 'c84bd93559579f9e',
     rootTextHasSubstance: '272756a0bd1f3345', rootAnswerIsDismissal: 'a57d7cd4781f1876', rootAnswerIsUnsure: '2c6461315a960668', pickBranches: '0514402718894bd8',
     branchSessionSafe: 'd31fee2247097e13', rootAuraShare: '24cb967ba5b0626b', trailingQuestionReplies: 'efc1f14f6a437d7c', userSaysDontKnowTwice: '79a0fc114472fef5',

@@ -255,6 +255,10 @@ assert('(3.7) the collision logger and the families are not told about it (it ad
   // (both old sentences → «Μετά βρίσκεις εσύ ένα μικρό βήμα και πότε θα το κάνεις.»), (2) the second sentence of the AI line of the entry screen, (3) the two new lines under the start button (the privacy line and the microphone line — a pure addition,
   // the old text is empty). The check and its value are the same: with all of them taken out src/App.jsx is release-candidate e4b2ae6, byte for byte (sha256 1860c046…) — so these are the only changes of the item (proved first: applying only
   // the three to the new file gives 6ad4343 byte for byte).
+  // UPDATED (27/11/2026, John's explicit order, ADR «27 Νοεμβρίου»): the data file holds two more entries (38 changes now) — the DISTRESS word «κρίση», new → old (the old texts are HEAD's, 9e9828e): the bare word in the Greek DISTRESS pattern becomes four
+  // patterns (a crisis the person is in or has, or one relative of a closed list has), and the lists of their words stand at the top of detectSafetySignal (a pure addition: its old text is empty). The check and its value are the same: with all of them taken out
+  // src/App.jsx is release-candidate e4b2ae6, byte for byte (sha256 1860c046…) — so these are the only changes of the item (proved first: applying only these two to the new file gives 9e9828e byte for byte). The safety-code check below moves for ONE function on
+  // purpose — detectSafetySignal (see its UPDATED line).
   const UNDO = JSON.parse(fs.readFileSync(path.join(__dirname, 'conversation_v1_undo.json'), 'utf8'));
   const present = UNDO.filter(([nw]) => raw.split(nw).length === 2).length;
   let back = raw; for (const [nw, old] of UNDO) back = back.split(nw).join(old);
@@ -271,7 +275,8 @@ assert('(3.7) the collision logger and the families are not told about it (it ad
   assert('(Ω1) the screen filter (the internal label heads and stripInternalLabels) is as in e4b2ae6, byte for byte',
     sha(raw.slice(raw.indexOf('const INTERNAL_LABEL_HEADS'), raw.indexOf('function stripAraDeclarative'))).startsWith('f3f9a30b63578889'));
   const SAFETY = {
-    detectSafetySignal: '838fe96cf161fcae',
+    // UPDATED (27/11/2026, John's explicit order, ADR «27 Νοεμβρίου»): the DISTRESS word «κρίση» of detectSafetySignal became four patterns (a crisis the person is in or has, or one relative of a closed list has) — proved first by auratests/test_krisi_narrowing_2711.js; no other function or line moved. Only the value below moved (838fe96c→f3746eee×1); the check itself is the same.
+    detectSafetySignal: 'f3746eeee8392a34',
     detectsDangerFromOther: '59e2f828fda103fa',
     classifyCrisisTier: 'afa5cf7a370bb0d5',
     perTurnSafety: '42c868d331e2229a',

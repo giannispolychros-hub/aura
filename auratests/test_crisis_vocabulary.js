@@ -173,13 +173,26 @@ if (typeof D === 'function') {
 
   // ── 5. DISTRESS IS UNTOUCHED ─────────────────────────────────────────────────────────────────
   assert('DISTRESS unchanged: «έχω κρίση πανικού»', D('έχω κρίση πανικού') === 'DISTRESS');
-  assert('DISTRESS unchanged: «είμαι σε οικονομική κρίση» (known false DISTRESS, not touched here)', D('είμαι σε οικονομική κρίση') === 'DISTRESS');
+  // UPDATED (27/11/2026, John's EXPLICIT order, ADR «27 Νοεμβρίου», Constitution §0.1): «είμαι σε οικονομική κρίση» was pinned here as a «known false DISTRESS, not touched here». It is touched now, on purpose,
+  // and it STOPS lighting: the DISTRESS word «κρίση» lights only where the person says THEY are in a crisis or HAVE one («κρίση πανικού», «είμαι σε κρίση», «έχω κρίση», «μου ήρθε κρίση»…) or a relative of the closed list does («η κόρη μου είναι σε κρίση»), no longer as the world's economic crisis.
+  // WITHIN BOUNDS: (1) the CRISIS list — the emergency path, the lines 1018 / 112 / 10306 — is untouched, and a message that also says «δεν αντέχω άλλο» or «θέλω να πεθάνω» is still CRISIS
+  // (auratests/test_krisi_narrowing_2711.js §3); (2) DISTRESS shows no line and no number — it only cut the step, the closing from code, the list and the map; (3) the whole stored body of data had no emergency
+  // that says «κρίση» (0 of 196 emergency-type messages), and the one real session that did say it meant judgement. The assertion keeps its place and its count; only its expected value moved.
+  assert('DISTRESS: «είμαι σε οικονομική κρίση» (a known false DISTRESS until 27/11/2026) no longer lights — UPDATED, John\'s order', D('είμαι σε οικονομική κρίση') === null);
   assert('DISTRESS unchanged: «πένθος»', D('περνάω πένθος') === 'DISTRESS');
   assert('DISTRESS unchanged: English «grief»', D('i am in grief') === 'DISTRESS');
   assert('a CRISIS phrase still wins over a DISTRESS word in the same message',
     D('έχω κρίση και θέλω να πεθάνω') === 'CRISIS');
-  assert('the DISTRESS pattern is byte-identical',
-    CODE.includes('/(πένθος|τραύμα|κατάρρευση|κρίση|κακοποίηση|απώλεια αγαπημένου)/i,') &&
+  // UPDATED (27/11/2026, John's explicit order, ADR «27 Νοεμβρίου»): the Greek DISTRESS pattern is now the unchanged words, byte for byte as before minus «κρίση», and FOUR patterns of «κρίση» (a crisis the person is in or has, or one relative of
+  // a closed list has; their four lines are pinned here, their word lists in auratests/test_krisi_narrowing_2711.js). The English pattern is byte for byte as before.
+  assert('the DISTRESS patterns are byte-identical (UPDATED 27/11/2026: «κρίση» is four patterns of its own)',
+    CODE.includes('/(πένθος|τραύμα|κατάρρευση|κακοποίηση|απώλεια αγαπημένου)/i,') &&
+    [
+      '    kw("(κρίση πανικού|κρίση άγχους|κρίση ταυτότητας|κρίση ζωής|κρίσης πανικού|κρίσης άγχους|κρίσης ταυτότητας|κρίσης ζωής|(?:ψυχολογική|ψυχική|νευρική|υπαρξιακή|ψυχωτική|μανιακή|υστερική) κρίση|(?:ψυχολογικής|ψυχικής|νευρικής|υπαρξιακής|ψυχωτικής|μανιακής|υστερικής) κρίσης)"),\n',
+      '    kw("(" + kV + " " + kQ + "κρίση|(?:είμαι|βρίσκομαι|ήμουν|βρέθηκα) σε κατάσταση κρίσης)"),\n',
+      '    kw("((?:μου ήρθε|με έπιασε) " + kQ + "κρίση|σε " + kQ + "κρίση (?:είμαι|βρίσκομαι|ήμουν|είμαστε|βρισκόμαστε))"),\n',
+      '    kw("(" + kR + ",? " + kW + kT + " " + kQ + "κρίση|" + kT + " " + kQ + "κρίση,? " + kW + kR + ")"),\n'
+    ].every(l => CODE.includes(l)) &&
     CODE.includes('/\\b(grief|bereaved|bereavement|trauma|traumatic|abuse|abused|assault|crisis|breakdown|panic attack)\\b/i,'));
   // UPDATED 2026-10-02: this assertion used to pin the OLD unconditional «…10306 — είναι εκεί.» append as untouched, while the
   // founder confirmed the number. He then approved the two-tier design (test_crisis_tiers.js): the old inline append is

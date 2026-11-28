@@ -1540,6 +1540,14 @@ function describeLastFiredFamilyCtx(family, streak, offSafetyPath) {
 // ─────────────────────────────────────────────
 
 function detectSafetySignal(text, tierB) {
+  // The words of the four «κρίση» patterns of the DISTRESS list below (the comment there says what they are for). In them a space is any white space (kw), and the lists are CLOSED: a word that is not here
+  // does not light the pattern. kQ = the only words allowed between a verb and «κρίση»; kV = first-person verbs; kT = third-person verbs, used only next to a relative; kR = the relatives.
+  const kQ = "(?:(?:η|σε|μια|μία|τέτοια|πολύ|πάρα|ακόμα|ξανά|μεγάλη|σοβαρή|βαριά|βαθιά|τεράστια|τρομερή|φοβερή|έντονη|οξεία|δύσκολη|ξαφνική|καρδιακή|επιληπτική|περάσει|πάθει|μπει|πέσει) )*";
+  const kV = "(?:είμαι|βρίσκομαι|είμαστε|βρισκόμαστε|ήμουν|ήμασταν|βρέθηκα|έχω|είχα|περνάω|περνώ|περνάμε|πέρασα|περάσω|έπαθα|πάθω|μπήκα|μπαίνω|μπω|έπεσα|πέφτω|πέσω)";
+  const kT = "(?:είναι|βρίσκεται|ήταν|έχει|είχε|περνάει|περνά|πέρασε|έπαθε|μπήκε|μπαίνει|έπεσε|πέφτει|έπιασε)";
+  const kR = "(?:κόρη|γιος|γιο|παιδί|άντρας|άντρα|γυναίκα|μάνα|μητέρα|πατέρας|πατέρα|μπαμπάς|μπαμπά|μαμά|αδελφός|αδελφό|αδελφή|αδερφός|αδερφό|αδερφή) μου";
+  const kW = "(?:[^\\s.!?;]+ ){0,2}";
+  const kw = s => new RegExp(s.replace(/ /g, "\\s+"), "i");
   const crisis = [
     /\b(suicide|suicidal|self.harm|self.hurt|kill myself|end my life|don't want to (live|be here)|want to die|want to disappear|can't go on)\b/i,
     // RT-CRITICAL-fix: \b does not recognize Greek letters as word characters in JS regex —
@@ -1584,7 +1592,20 @@ function detectSafetySignal(text, tierB) {
   const distress = [
     /\b(grief|bereaved|bereavement|trauma|traumatic|abuse|abused|assault|crisis|breakdown|panic attack)\b/i,
     // Same fix applied here — no \b on Greek patterns.
-    /(πένθος|τραύμα|κατάρρευση|κρίση|κακοποίηση|απώλεια αγαπημένου)/i,
+    /(πένθος|τραύμα|κατάρρευση|κακοποίηση|απώλεια αγαπημένου)/i,
+    // «κρίση» — John's EXPLICIT order of 27/11/2026 (ADR «27 Νοεμβρίου», Constitution §0.1; it replaces the bare word that ADR «18 Οκτωβρίου» had kept). It lights only where the person says
+    // THEY are in a crisis or HAVE one — or one relative of the closed list does — and no longer as judgement («καλή κρίση», «την κρίση μου»), the world's or a family's crisis («οικονομική»,
+    // «κρίση της οικογένειας», «του δικαστηρίου») or a fit of laughing: the real session of 24/11 lit the latch at its 2nd message, where «κρίση» meant the user's own judgement. Four patterns; every alternative of each
+    // needs the stem «κρίση»: (1) the named kinds, in any person («κρίση πανικού / άγχους / ταυτότητας / ζωής», «ψυχολογική / ψυχική / νευρική / υπαρξιακή / ψυχωτική / μανιακή / υστερική κρίση»);
+    // (2) a first-person verb, then only words of kQ, then «κρίση» («έχω / είμαι σε / περνάω / έπαθα [καρδιακή] κρίση»); (3) «μου ήρθε / με έπιασε … κρίση» and «σε … κρίση είμαι»; (4) a relative of
+    // kR — the closed list: κόρη, γιος, παιδί, άντρας, γυναίκα, μάνα, πατέρας, αδελφός / αδελφή μου — within two words of a third-person verb (kT) and «κρίση», in either order. A word that is
+    // not in the lists does not light it («την κρίση μου», «καλή», «οικονομική», «πιο καθαρή κρίση»). Negations are not read (no new semantic logic): «δεν είμαι σε κρίση» lights, as it did.
+    // The CRISIS list, its tiers, the other words and the order of the checks are untouched. The lists kQ / kV / kT / kR / kW and the helper kw are at the top of this function.
+    // See auratests/test_krisi_narrowing_2711.js.
+    kw("(κρίση πανικού|κρίση άγχους|κρίση ταυτότητας|κρίση ζωής|κρίσης πανικού|κρίσης άγχους|κρίσης ταυτότητας|κρίσης ζωής|(?:ψυχολογική|ψυχική|νευρική|υπαρξιακή|ψυχωτική|μανιακή|υστερική) κρίση|(?:ψυχολογικής|ψυχικής|νευρικής|υπαρξιακής|ψυχωτικής|μανιακής|υστερικής) κρίσης)"),
+    kw("(" + kV + " " + kQ + "κρίση|(?:είμαι|βρίσκομαι|ήμουν|βρέθηκα) σε κατάσταση κρίσης)"),
+    kw("((?:μου ήρθε|με έπιασε) " + kQ + "κρίση|σε " + kQ + "κρίση (?:είμαι|βρίσκομαι|ήμουν|είμαστε|βρισκόμαστε))"),
+    kw("(" + kR + ",? " + kW + kT + " " + kQ + "κρίση|" + kT + " " + kQ + "κρίση,? " + kW + kR + ")"),
   ];
   // FIX 2: model-level safety fallback already in A6 prompt — client catches obvious misses only
   // MATCHED ON THE ACCENT-STRIPPED TEXT (2026-10-01, closes a measured gap): "θελω να πεθανω" typed without

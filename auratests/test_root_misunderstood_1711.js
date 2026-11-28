@@ -141,7 +141,8 @@ assert('(6.6) the fixed text itself is as John approved it (16/10): «Πες τ�
 assert('(7.1) the fixed prompt is the same: 313.386 characters, sha256 7e52268becda7360 6e92e481…', T(() => { const p = lit('AURA_CORE_PERSONALITY');
   return p.length === 313386 && sha(p) === '7e52268becda7360d060ac9448480616ada5a879f6c992e618d4c527977052c3'; }));
 assert('(7.2) api/aura.js is the file of 2bb2e81, byte for byte (sha256 e791b194…) — the guard and its fingerprints do not move', sha(api).startsWith('675564a7985438c8'));
-const PINS = { detectSafetySignal: '838fe96cf161fcae', detectsDangerFromOther: '59e2f828fda103fa', stageACaptureAllowed: 'f8a46ebc62fe4ecd' };
+// UPDATED (27/11/2026, John's explicit order, ADR «27 Νοεμβρίου»): the DISTRESS word «κρίση» of detectSafetySignal became four patterns (a crisis the person is in or has, or one relative of a closed list has) — proved first by auratests/test_krisi_narrowing_2711.js; no other function or line moved. Only the value below moved (838fe96c→f3746eee×1); the check itself is the same.
+const PINS = { detectSafetySignal: 'f3746eeee8392a34', detectsDangerFromOther: '59e2f828fda103fa', stageACaptureAllowed: 'f8a46ebc62fe4ecd' };
 assert('(7.3) the safety detectors and the check that stops a crisis from becoming a root are untouched (detectSafetySignal, detectsDangerFromOther, stageACaptureAllowed: same source, byte for byte)',
   Object.entries(PINS).every(([n, h]) => fnSrc(n) !== '' && sha(fnSrc(n)).slice(0, 16) === h));
 const PINS2 = { answersReadinessQuestion: '70fd1f273d6f0e07', detectsCoreReadinessAsked: 'c84bd93559579f9e', detectsAffirmativeShort: '0a6f1957c0594d60', detectsSpontaneousCoreRecognition: '6bc032dfcdda93cb' };

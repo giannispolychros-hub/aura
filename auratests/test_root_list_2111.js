@@ -226,7 +226,8 @@ const viewTexts = (m, over) => { const v = view(m, over); return v && isArr(v.se
   const apiRaw = fs.readFileSync(path.join(ROOT, 'api', 'aura.js'), 'utf8');
   assert('GUARD — (8.2) api/aura.js did not change (sha256 675564a7985438c8…), and it carries the same core fingerprint', sha(apiRaw).startsWith('675564a7985438c8') && /core: \{ length: 313386, sha256: "7e52268becda7360/.test(apiRaw));
   const PINS = {
-    branchSessionSafe: 'd31fee2247097e13', detectSafetySignal: '838fe96cf161fcae', classifyCrisisTier: 'afa5cf7a370bb0d5', detectsDangerFromOther: '59e2f828fda103fa', stageASafetyHold: 'f1fbe27ef7643815',
+    // UPDATED (27/11/2026, John's explicit order, ADR «27 Νοεμβρίου»): the DISTRESS word «κρίση» of detectSafetySignal became four patterns (a crisis the person is in or has, or one relative of a closed list has) — proved first by auratests/test_krisi_narrowing_2711.js; no other function or line moved. Only the value below moved (838fe96c→f3746eee×1); the check itself is the same.
+    branchSessionSafe: 'd31fee2247097e13', detectSafetySignal: 'f3746eeee8392a34', classifyCrisisTier: 'afa5cf7a370bb0d5', detectsDangerFromOther: '59e2f828fda103fa', stageASafetyHold: 'f1fbe27ef7643815',
     detectsMentalHealthReferral: 'd03b71d681025b79', rootTextHasSubstance: '272756a0bd1f3345', rootAnswerIsDismissal: 'a57d7cd4781f1876', rootAnswerIsUnsure: '2c6461315a960668',
     detectsCoreReadinessAsked: 'c84bd93559579f9e', stageAStep: '67bb9bcb504396e8', initialStageAState: '514233db37b55461', pickBranches: '0514402718894bd8',
   };

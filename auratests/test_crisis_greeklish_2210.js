@@ -101,7 +101,8 @@ for (const t of WHOLE) assert('NOTHING: «' + t + '»', D(t) === null);
   const added = f.indexOf('    // FINAL STRESS TEST BEFORE THE 20 (A9');
   assert('UNCHANGED: the crisis phrase list, byte for byte (ea16fa93…), apart from the phrases of A9 at its end',
     b > 0 && added > b && added < e && h(f.slice(b, added) + f.slice(f.indexOf('\n  ];\n', b) + 1, e)) === 'ea16fa93aae344f6');
-  assert('UNCHANGED: the distress list, byte for byte (64fbf2a9…)', d > 0 && h(f.slice(d, de)) === '64fbf2a953170f24');
+  // UPDATED (27/11/2026, John's explicit order, ADR «27 Νοεμβρίου»): the DISTRESS word «κρίση» of detectSafetySignal became four patterns (a crisis the person is in or has, or one relative of a closed list has) — proved first by auratests/test_krisi_narrowing_2711.js; no other function or line moved. Only the values below moved (64fbf2a9→6c9b7f20×2); the check itself is the same.
+  assert('UNCHANGED: the distress list, byte for byte (6c9b7f20…)', d > 0 && h(f.slice(d, de)) === '6c9b7f20df21da0f');
   // UPDATED (22/10, A9 (α)): the same exact check, on the message as written and made plain («views»)
   const exact = '  if (views.some(v => crisis.some(p => new RegExp(fold(p.source), "i").test(fold(v))))) return "CRISIS";\n';
   assert('ORDER: the exact check comes first; the by-sound check comes after it and before DISTRESS',
