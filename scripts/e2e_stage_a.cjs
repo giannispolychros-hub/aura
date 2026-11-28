@@ -1032,6 +1032,7 @@ async function runMock() {
   await runMockEN(); // 24/11: the four fixed texts of the first screens (John, order Β) — the AI line, the privacy line, the microphone line, the 4th line of the old first screen
   await runMockGV(); // 27/11: the heaviness latch leaves a record — gravity_latched, numbers only (John, ADR «27 Νοεμβρίου» (2))
   await runMockER(); // 27/11: the counter of requests for advice sees the questions of advice (John, ADR «27 Νοεμβρίου» (3))
+  await runMockRP(); // 28/11: the session of 13 rounds replayed with synthetic words — the flag stays 0, the list, the step, the closing from code (John, step Β1)
 }
 
 // ── GV: THE HEAVINESS LATCH LEAVES A RECORD (John, 27/11/2026, ADR «27 Νοεμβρίου» (2), branch root-list) — Stage A (?stageA=1&rec=1), fake model, cost $0. One record «gravity_latched» when the latch lights for the first
@@ -1183,6 +1184,127 @@ async function runMockER() {
     !!a && !!g && strip(a, cases[0][1]) === strip(g, cases[5][1]));
   ok('ERf: …and it is one request in both sessions (the typed answers of Stage A are not sent)', out.ERa.calls.length === 1 && out.ERg.calls.length === 1);
 }
+
+// ── RP: THE SESSION OF 13 ROUNDS, REPLAYED WITH SYNTHETIC WORDS (John, 28/11/2026, order «ενοποιημένη», step Β1, branch root-list) — Stage A (?stageA=1&rec=1), fake model, cost $0. The real session of 24/11 (the third) lit the
+// heaviness latch at its 2nd message, because «κρίση» there meant JUDGEMENT («βελτιώσω την κρίση μου»); from then on the list of the user's own sentences (Λ1), the step flow, the closing from code and the map were cut. Here a session with the same SHAPE
+// is played with words written for this test (a person who buys in a hurry; no word of any real user is stored): 13 messages, the 2nd and the 12th with «κρίση» as judgement, the 10th and the 12th with a question of advice, short ones («Δηλαδή;»), the button «Νομίζω βρήκα…» after the 13th,
+// then the root, the step, «Πότε;», the clarity number, the word. RPa the flag stays 0, the list of the user's own sentences appears, the root card, the step question and its card, the closing by code (no model call after the word), the tester numbers ·
+// RPb the same 13 rounds, but the answer to the root question is a COMPLAINT addressed to AURA — it pins what the app does TODAY (it is not changed by this commit): the words become the root card ·
+// RPc the 12th message carries a phrase of recognition («αυτό ακριβώς θέλω», as the real one did): with the flag at 0 the card of the root opens BY ITSELF after the reply (door 3); before, the latch cut it. Unit tests: auratests/test_krisi_narrowing_2711.js. Alone: --only RP.
+async function runMockRP() {
+  const T = APP.texts;
+  const NONE = (ROOT_PICK_TEXTS && ROOT_PICK_TEXTS.none) || 'Καμία από αυτές';
+  // the words are written ONCE, in the tool's library (scripts/e2e_stress_lib.cjs, session 9205 — the same session the paid run plays): the 13 lines, the root, the step, «Πότε», the word
+  const FX = SL.REPLAY_PERSONAS[0].fixed;
+  const U = FX.filter(st => st.say !== undefined).map(st => st.say);
+  const ROOT = FX.find(st => st.root !== undefined).root, STEP = FX.find(st => st.step !== undefined).step, WHEN = FX.find(st => st.when !== undefined).when, WORD = FX.find(st => st.word !== undefined).word;
+  // the shape of the real 12th message: a phrase of RECOGNITION («αυτό ακριβώς θέλω») — door 3: with the flag at 0 the card opens by itself after the reply (RPc)
+  const U12_RECOGNISES = U[11].replace('εντάξει. ', 'εντάξει, αυτό ακριβώς θέλω. ');
+  const COMPLAINT = 'Όλα αυτά τα ήξερα από την αρχή. Σε ρώτησα πώς να το κάνω και δεν μου έδωσες καμία απάντηση.';
+  const QS = ['Τι ακριβώς γίνεται τη στιγμή που πατάς το κουμπί;', 'Πότε έγινε η τελευταία φορά;', 'Η απόφαση παίρνεται πριν ή μετά που δεις την τιμή;', 'Από πού νομίζεις ότι προέρχεται αυτός ο τρόπος;', 'Τι έρχεται πρώτο;', 'Τι εννοείς με το πρώτο;', 'Τι περιμένεις να γίνει όταν πατάς το κουμπί;', 'Και μετά, τι λες στον εαυτό σου;', 'Τι αλλάζει αυτό για σένα;', 'Σε ποιον απευθύνεται ο θυμός;', 'Και η ντροπή πότε εμφανίζεται;', 'Τι θα συνέβαινε αν περίμενες λίγο;', 'Σε ποιο σημείο ξεκινά όλο αυτό;'];
+  const MODEL = 'Αυτό είναι το κείμενο του μοντέλου μετά τη λέξη.', MAPCLOSE = 'Ωραία, το πρώτο επόμενο βήμα είναι αυτό.';
+  const btn = (page, name) => page.getByRole('button', { name, exact: true });
+  const tap = async (page, name) => { const b = btn(page, name); if (await b.count()) { await b.first().click({ timeout: 4000 }); await page.waitForTimeout(400); return true; } return false; };
+  const say = async (page, text) => { if (await page.locator('textarea.textarea').count()) await send(page, text); };
+  const settle = async page => { for (let i = 0; i < 20 && (await page.locator('.typing').count()); i++) await page.waitForTimeout(250); await page.waitForTimeout(900); };
+  const log = page => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aura_telemetry_log') || '[]'); } catch (e) { return []; } });
+  const body = page => page.locator('body').innerText();
+  const open = async () => {
+    const browser = await launch();
+    const ctx = await browser.newContext({ viewport: vpOr({ width: 390, height: 844 }), isMobile: true, hasTouch: true });
+    const page = await ctx.newPage();
+    const calls = []; let n = 0;
+    await page.route('**/api/aura', async route => {
+      calls.push(JSON.parse(route.request().postData() || '{}'));
+      const reply = n < QS.length ? QS[n] : MODEL; n++;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: reply }], usage: { input_tokens: 10, output_tokens: 10 } }) });
+    });
+    await ctx.addInitScript(() => { try { localStorage.setItem('aura_intro_seen', '1'); } catch (e) {} });
+    await page.goto(BASE + '/?stageA=1&rec=1');
+    await page.getByText('Ξεκίνα με το πρόβλημά σου').click();
+    return { browser, page, calls };
+  };
+  // the 13 rounds, then the button «Νομίζω βρήκα…» (door 1): the root question
+  const thirteen = async s => { s.seen = []; for (const m of U) { await say(s.page, m); const bb = await s.page.locator('.turn-aura .msg-aura').allInnerTexts(); s.seen.push(bb.length ? bb[bb.length - 1].trim() : null); s.nBubbles = bb.length; } await settle(s.page); const nCalls = s.calls.length; s.cardsBefore = await s.page.locator('.warning-card').count(); await tap(s.page, T.button); return nCalls; };
+  const ownButtons = async page => { const all = await page.getByRole('button').allInnerTexts(); const mine = U.join(' '); return all.map(t => t.trim()).filter(t => t.length >= 15 && mine.includes(t)); };
+
+  // ── RPa — the 13 rounds, the root, the step, «Πότε;», the clarity number, the word ──
+  {
+    const s = await open();
+    const calls13 = await thirteen(s);
+    const L13 = await log(s.page);
+    ok('RPa: the 13 messages made 13 requests to the model — one for each (' + calls13 + ')', calls13 === 13);
+    ok('RPa: the heaviness latch stayed at 0 — there is NO «gravity_latched» record after 13 messages, two of them with «κρίση» as judgement (' + L13.filter(r => r.ev === 'gravity_latched').length + ')', L13.filter(r => r.ev === 'gravity_latched').length === 0);
+    // the VISIBLE result of the counter at a request for a way (John, step Β2): the 10th and the 12th message are requests, and the counter sees both — and the screen shows the model's reply and nothing else of the app's
+    ok('RPa [B2]: at the 10th and the 12th message — the two requests for a way — the screen shows ONLY the model\'s reply, word for word (no sentence, card or button that the app wrote), and the same at every other message from the 2nd on; 13 bubbles of AURA in all (' + s.nBubbles + ')',
+      s.seen[9] === QS[9] && s.seen[11] === QS[11] && s.seen.slice(1).every((t, i) => t === QS[i + 1]) && s.nBubbles === 13 && s.cardsBefore === 0);
+    const asked = await s.page.getByText(T.ask, { exact: true }).count();
+    const own = await ownButtons(s.page), none = await btn(s.page, NONE).count();
+    ok('RPa: the button → the root question once (' + asked + '), with NO new request to the model (' + (s.calls.length - calls13) + ')', asked === 1 && s.calls.length === calls13);
+    ok('RPa: the LIST of the user\'s own sentences is there (Λ1): ' + own.length + ' of his sentences as buttons (at least 3, at most 8) and «' + NONE + '» (' + none + ')', own.length >= 3 && own.length <= 8 && none === 1);
+    const ys = []; for (const t of own) ys.push(((await btn(s.page, t).first().boundingBox({ timeout: 2000 }).catch(() => null)) || {}).y);
+    const order = own.map(t => U.join(' ').indexOf(t));
+    ok('RPa: the sentences stand in the order they were written, one under the other (' + order.join(' < ') + ')', order.every((v, i, a) => i === 0 || a[i - 1] < v) && ys.every((v, i, a) => typeof v === 'number' && (i === 0 || a[i - 1] < v)));
+    await say(s.page, ROOT);
+    ok('RPa: the root, typed in the box → the card «Τι βρήκες» with exactly those words, 0 requests to the model', (await btn(s.page, T.yes).count()) === 1 && (await s.page.getByText('«' + ROOT + '»', { exact: false }).count()) >= 1 && s.calls.length === calls13);
+    await tap(s.page, T.yes);
+    const stepQ = await s.page.getByText(T.stepQ, { exact: true }).count();
+    ok('RPa: after «' + T.yes + '» the STEP question is asked («' + T.stepQ + '», ' + stepQ + '), the box is there, still 0 requests to the model', stepQ >= 1 && (await s.page.locator('textarea.textarea').count()) === 1 && s.calls.length === calls13);
+    await say(s.page, STEP);
+    const fits = await s.page.getByText(T.fitsQ, { exact: true }).count(), fitsBtn = await btn(s.page, 'Ναι').count();
+    ok('RPa: the step written → the app\'s own question «' + T.fitsQ + '» (' + fits + ') with its «Ναι» button (' + fitsBtn + ')', fits >= 1 && fitsBtn >= 1);
+    await tap(s.page, 'Ναι');
+    ok('RPa: «' + T.whenQ + '» is asked (' + (await s.page.getByText(T.whenQ, { exact: true }).count()) + ')', (await s.page.getByText(T.whenQ, { exact: true }).count()) >= 1);
+    await say(s.page, WHEN);
+    ok('RPa: the clarity question is asked (' + (await s.page.getByText(T.clarityQ, { exact: false }).count()) + ') with its numbers', (await s.page.getByText(T.clarityQ, { exact: false }).count()) >= 1 && (await btn(s.page, '8').count()) === 1);
+    await tap(s.page, '8');
+    ok('RPa: the word question is asked and its box is there', (await s.page.getByText(T.word, { exact: true }).count()) >= 1 && (await s.page.locator('textarea.textarea').count()) === 1);
+    const n0 = s.calls.length;
+    await say(s.page, WORD); await settle(s.page);
+    const b = await body(s.page);
+    ok('RPa: THE CLOSING IS WRITTEN BY THE CODE — after the word NOT ONE request goes out (' + (s.calls.length - n0) + '), the model\'s text never shows, and there is no request at all after the 13th round (' + (s.calls.length - calls13) + ')', s.calls.length === n0 && s.calls.length === calls13 && !b.includes(MODEL));
+    const tmClose = (await s.page.locator('[data-tm-closing="1"]').count()) ? await s.page.locator('[data-tm-closing="1"]').first().innerText() : null;
+    const tmRoot = (await s.page.locator('[data-tm-root-text="1"]').count()) ? await s.page.locator('[data-tm-root-text="1"]').first().innerText() : null;
+    ok('RPa: the map of the session is on the screen — the root as the user wrote it, and the fixed line «' + MAPCLOSE + '»', tmRoot === '«' + ROOT + '»' && tmClose === MAPCLOSE && (await s.page.locator('[data-thought-map="1"]').count()) === 1);
+    ok('RPa: the end is there once: «η συνομιλία σταμάτησε εδώ» + the button of a new session', (await s.page.getByText('η συνομιλία σταμάτησε εδώ').count()) === 1 && (await btn(s.page, 'Νέα συνεδρία').count()) === 1);
+    ok('RPa: no safety line and no number of a line anywhere on the screen (it was no crisis: «112», «1018», «15900»)', !/\b(112|1018|15900|1056)\b/.test(b));
+    const L = await log(s.page), one = n => L.filter(r => r.ev === n);
+    ok('RPa (tester numbers): step_shown 1 · step_written 1 · when_written 1 · clarity_scale 8 · the session completed once · NO gravity_latched',
+      one('step_shown').length === 1 && one('step_shown')[0].value === 1 && one('step_written').length === 1 && one('step_written')[0].value === 1 && one('when_written').length === 1 && one('when_written')[0].value === 1
+      && one('clarity_scale').length === 1 && one('clarity_scale')[0].value === 8 && one('session_completed').length === 1 && one('gravity_latched').length === 0);
+    ok('RPa (tester numbers): the counter of requests for advice saw the two questions of advice of the session (the 10th «Τι να κάνω;» and the 12th «Πώς θα το κάνω;») — explicitRequests ' + (one('session_completed')[0] && one('session_completed')[0].explicitRequests), one('session_completed')[0] && one('session_completed')[0].explicitRequests === 2);
+    await s.browser.close();
+  }
+
+  // ── RPb — the same 13 rounds; the answer to the root question is a COMPLAINT addressed to AURA. This pins what the app does TODAY (John asked to declare it; it is NOT changed by this commit) ──
+  {
+    const s = await open();
+    const calls13 = await thirteen(s);
+    await say(s.page, COMPLAINT); await settle(s.page);
+    const card = (await btn(s.page, T.yes).count()) === 1, shown = (await s.page.getByText('«' + COMPLAINT + '»', { exact: false }).count()) >= 1, nAfter = s.calls.length;
+    ok('RPb (TODAY, not changed): a complaint addressed to AURA, typed at the root question, becomes the ROOT CARD with exactly those words (' + card + '/' + shown + ') and is NOT sent to the model (' + (nAfter - calls13) + ' requests) — the app does not tell it from a root',
+      card && shown && nAfter === calls13);
+    results.push('INFO — RPb: what the app does with a complaint at the root question: it opens the card «' + T.yes + '» / «' + T.correct + '» with the complaint as the root; no request to the model; the user can correct it or confirm it (then the step question follows, with the complaint as the root)');
+    await tap(s.page, T.yes);
+    ok('RPb (TODAY): confirming it leads on to the step question with the complaint as the root (' + (await s.page.getByText(T.stepQ, { exact: true }).count()) + ') — the same flow as RPa', (await s.page.getByText(T.stepQ, { exact: true }).count()) >= 1);
+    await s.browser.close();
+  }
+
+  // ── RPc — the 12th message holds a phrase of recognition («αυτό ακριβώς θέλω»), as the real one did ──
+  {
+    const s = await open();
+    for (const m of U.slice(0, 11)) await say(s.page, m);
+    await say(s.page, U12_RECOGNISES); await settle(s.page);
+    const L = await log(s.page), cards = L.filter(r => r.ev === 'root_card_shown');
+    ok('RPc: the flag is 0 after the 12 messages — no «gravity_latched» (' + L.filter(r => r.ev === 'gravity_latched').length + ')', L.filter(r => r.ev === 'gravity_latched').length === 0);
+    ok('RPc: a phrase of recognition at the 12th message → after the model\'s reply the card of the root opens BY ITSELF (door 3: ' + cards.map(r => r.door).join() + '), with the user\'s words, 12 requests in all (' + s.calls.length + ')',
+      cards.length === 1 && cards[0].door === 3 && (await btn(s.page, T.yes).count()) === 1 && (await s.page.locator('.warning-card').allInnerTexts()).join(' ').includes(U12_RECOGNISES.split('.')[0]) && s.calls.length === 12);
+    await tap(s.page, T.yes);
+    ok('RPc: «' + T.yes + '» → the step question (' + (await s.page.getByText(T.stepQ, { exact: true }).count()) + ') — the flow goes on as in RPa', (await s.page.getByText(T.stepQ, { exact: true }).count()) >= 1);
+    await s.browser.close();
+  }
+}
+
 
 // ── CC: «ΚΛΕΙΣΙΜΟ ΑΠΟ ΚΩΔΙΚΑ» (John, 23/11/2026, order Α, branch root-list) — Stage A (?stageA=1&rec=1), fake model, cost $0. After the user's «one word» the model is NOT called any more: only what the CODE builds from the
 // user's own data (the line «Η λέξη «X» έχει εμφανιστεί συνολικά N φορές στις καταγραφές σου.» when the word was kept before; the recognition card of the Κ4 gate, moved into one shared function), then the card of the map and its fixed
@@ -9141,6 +9263,7 @@ async function mainStress() {
   if (only.length && !has('--hard')) PEOPLE.splice(PEOPLE.length - (SL.COMPOSITE_PERSONAS || []).length, 0, ...(SL.DANGER_FIXED_PERSONAS || [])); // 9/11 (round 11): 173, 174, before 171–172
   if (only.length && !has('--hard')) PEOPLE.push(...(SL.TWO_SESSIONS_PERSONAS || [])); // 21/11 (John, test-two-sessions): 9201–9203 — tool only, asked by number
   if (only.length && !has('--hard')) PEOPLE.push(...(SL.FULL_SESSION_PERSONAS || [])); // 21/11 (John, test-two-sessions, the whole session): 9204 — tool only, asked by number
+  if (only.length && !has('--hard')) PEOPLE.push(...(SL.REPLAY_PERSONAS || [])); // 28/11 (John, order «ενοποιημένη», step Γ): 9205 — the session of 13 rounds replayed with fixed words, tool only, asked by number
   // 31/10 (John, ADR «31 Οκτωβρίου (ε)» / «(η)»): numbers 9001–9199 are the benchmark (benchmark/scenarios.json) — on their own, never mixed
   const BENCH = only.length > 0 && only.every(x => BL.isBenchAlias(x));
   // 9/11/2026 (John, round 11, ADR «9 Νοεμβρίου»): the benchmark's SAFETY scenarios S1–S9 (9001–9009: fixed messages only, no simulator,
@@ -9348,7 +9471,7 @@ async function mainStress() {
   BASE = app.url;
   try {
     if (MODE === 'mock') {
-      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else if (opt('--only', '') === 'RX') await runMockRX(); else if (opt('--only', '') === 'LP') await runMockLP(); else if (opt('--only', '') === 'CC') await runMockCC(); else if (opt('--only', '') === 'EN') await runMockEN(); else if (opt('--only', '') === 'GV') await runMockGV(); else if (opt('--only', '') === 'ER') await runMockER(); else await runMock();
+      if (opt('--only', '') === 'ST') await runMockST(); else if (opt('--only', '') === 'W') await runMockW(); else if (opt('--only', '') === 'X') await runMockX(); else if (opt('--only', '') === 'Y') await runMockY(); else if (opt('--only', '') === 'Z') await runMockZ(); else if (opt('--only', '') === 'CX') await runMockCX(); else if (opt('--only', '') === 'O5') await runMockO5(); else if (opt('--only', '') === 'PI') await runMockPI(); else if (opt('--only', '') === 'LC') await runMockLC(); else if (opt('--only', '') === 'SN') await runMockSN(); else if (opt('--only', '') === 'AR') await runMockAR(); else if (opt('--only', '') === 'PM') await runMockPM(); else if (opt('--only', '') === 'GL') await runMockGL(); else if (opt('--only', '') === 'DF') await runMockDF(); else if (opt('--only', '') === 'MC') await runMockMC(); else if (opt('--only', '') === 'MH') await runMockMH(); else if (opt('--only', '') === 'PV') await runMockPV(); else if (opt('--only', '') === 'IM') await runMockIM(); else if (opt('--only', '') === 'OF') await runMockOF(); else if (opt('--only', '') === 'FT') await runMockFT(); else if (opt('--only', '') === 'LR') await runMockLR(); else if (opt('--only', '') === 'R3') await runMockR3(); else if (opt('--only', '') === 'R4') await runMockR4(); else if (opt('--only', '') === 'TX') await runMockTX(); else if (opt('--only', '') === 'VO') await runMockVO(); else if (opt('--only', '') === 'AP') await runMockAP(); else if (opt('--only', '') === 'PZ') await runMockPZ(); else if (opt('--only', '') === 'FC') await runMockFC(); else if (opt('--only', '') === 'MF') await runMockMF(); else if (opt('--only', '') === 'NT') await runMockNT(); else if (opt('--only', '') === 'RU') await runMockRU(); else if (opt('--only', '') === 'FL') await runMockFL(); else if (opt('--only', '') === 'CH') await runMockCH(); else if (opt('--only', '') === 'DS') await runMockDS(); else if (opt('--only', '') === 'CL') await runMockCL(); else if (opt('--only', '') === 'FK') await runMockFK(); else if (opt('--only', '') === 'LM') await runMockLM(); else if (opt('--only', '') === 'MK') await runMockMK(); else if (opt('--only', '') === 'TO') await runMockTO(); else if (opt('--only', '') === 'CT') await runMockCT(); else if (opt('--only', '') === 'BX') await runMockBX(); else if (opt('--only', '') === 'SD') await runMockSD(); else if (opt('--only', '') === 'WS') await runMockWS(); else if (opt('--only', '') === 'NQ') await runMockNQ(); else if (opt('--only', '') === 'NQS') await runMockNQS(); else if (opt('--only', '') === 'CV') await runMockCV(); else if (opt('--only', '') === 'SR') await runMockSR(); else if (opt('--only', '') === 'DBG') await runMockDBG(); else if (opt('--only', '') === 'MU') await runMockMU(); else if (opt('--only', '') === 'TM') await runMockTM(); else if (opt('--only', '') === 'P1') await runMockP1(); else if (opt('--only', '') === 'RL') await runMockRL(); else if (opt('--only', '') === 'RX') await runMockRX(); else if (opt('--only', '') === 'LP') await runMockLP(); else if (opt('--only', '') === 'CC') await runMockCC(); else if (opt('--only', '') === 'EN') await runMockEN(); else if (opt('--only', '') === 'GV') await runMockGV(); else if (opt('--only', '') === 'ER') await runMockER(); else if (opt('--only', '') === 'RP') await runMockRP(); else await runMock();
       writeOut('mock-results.txt', results.join('\n') + '\n');
       console.log(results.join('\n'));
       console.log(results.filter(r => r.startsWith('PASS')).length + ' passed, ' + results.filter(r => r.startsWith('FAIL')).length + ' failed');

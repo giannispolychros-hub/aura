@@ -265,6 +265,9 @@ assert('(3.7) the collision logger and the families are not told about it (it ad
   // UPDATED (27/11/2026, John's order, ADR «27 Νοεμβρίου» (3)): the data file holds one more entry (46 changes now) — the counter of requests for advice (detectsExplicitProductionRequest): the block that sees «τι να κάνω», «πώς να το κάνω»,
   // «τι μπορώ να κάνω» (new → old: a pure addition, the old text is empty). The check and its value are the same: with all of them taken out src/App.jsx is release-candidate e4b2ae6, byte for byte (sha256 1860c046…) — so these are the only changes of
   // the item (proved first: applying only this one to the new file gives 55cc781 byte for byte).
+  // UPDATED (28/11/2026, John's order «ενοποιημένη», step Α): the data file holds 47 entries now — THREE pairs were REBASED (commit 4 edits lines that the commits of 27/11/2026 had added: their `new` text is what stands in src/App.jsx now, their `old` text, the base
+  // file's, is untouched) and ONE pair was added at the end (the counter's «τι άλλο» line, original code). The check and its value are the same: with all of them taken out src/App.jsx is release-candidate e4b2ae6, byte for byte (sha256 1860c046…). The
+  // safety-code check below moves for the same ONE function as before — detectSafetySignal (see its UPDATED line).
   const UNDO = JSON.parse(fs.readFileSync(path.join(__dirname, 'conversation_v1_undo.json'), 'utf8'));
   const present = UNDO.filter(([nw]) => raw.split(nw).length === 2).length;
   let back = raw; for (const [nw, old] of UNDO) back = back.split(nw).join(old);
@@ -282,7 +285,8 @@ assert('(3.7) the collision logger and the families are not told about it (it ad
     sha(raw.slice(raw.indexOf('const INTERNAL_LABEL_HEADS'), raw.indexOf('function stripAraDeclarative'))).startsWith('f3f9a30b63578889'));
   const SAFETY = {
     // UPDATED (27/11/2026, John's explicit order, ADR «27 Νοεμβρίου»): the DISTRESS word «κρίση» of detectSafetySignal became four patterns (a crisis the person is in or has, or one relative of a closed list has) — proved first by auratests/test_krisi_narrowing_2711.js; no other function or line moved. Only the value below moved (838fe96c→f3746eee×1); the check itself is the same.
-    detectSafetySignal: 'f3746eeee8392a34',
+    // UPDATED (28/11/2026, John's order «ενοποιημένη», step Α): the function detectSafetySignal grew — four constants (kK, kA, kRP, kTP), the optional article kA in two of the «κρίση» patterns and a FIFTH pattern for the plural relatives of the closed list — proved first by auratests/test_krisi_narrowing_2711.js; and the counter detectsExplicitProductionRequest got the boundary of «τι άλλο» and three phrases — proved first by auratests/test_explicit_request_2711.js. No other function or line moved. Only the value below moved (f3746eee→3c81e4ad×1); the check itself is the same.
+    detectSafetySignal: '3c81e4ade048a1b3',
     detectsDangerFromOther: '59e2f828fda103fa',
     classifyCrisisTier: 'afa5cf7a370bb0d5',
     perTurnSafety: '42c868d331e2229a',

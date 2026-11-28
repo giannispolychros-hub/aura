@@ -102,7 +102,8 @@ for (const t of WHOLE) assert('NOTHING: «' + t + '»', D(t) === null);
   assert('UNCHANGED: the crisis phrase list, byte for byte (ea16fa93…), apart from the phrases of A9 at its end',
     b > 0 && added > b && added < e && h(f.slice(b, added) + f.slice(f.indexOf('\n  ];\n', b) + 1, e)) === 'ea16fa93aae344f6');
   // UPDATED (27/11/2026, John's explicit order, ADR «27 Νοεμβρίου»): the DISTRESS word «κρίση» of detectSafetySignal became four patterns (a crisis the person is in or has, or one relative of a closed list has) — proved first by auratests/test_krisi_narrowing_2711.js; no other function or line moved. Only the values below moved (64fbf2a9→6c9b7f20×2); the check itself is the same.
-  assert('UNCHANGED: the distress list, byte for byte (6c9b7f20…)', d > 0 && h(f.slice(d, de)) === '6c9b7f20df21da0f');
+  // UPDATED (28/11/2026, John's order «ενοποιημένη», step Α): the function detectSafetySignal grew — four constants (kK, kA, kRP, kTP), the optional article kA in two of the «κρίση» patterns and a FIFTH pattern for the plural relatives of the closed list — proved first by auratests/test_krisi_narrowing_2711.js; and the counter detectsExplicitProductionRequest got the boundary of «τι άλλο» and three phrases — proved first by auratests/test_explicit_request_2711.js. No other function or line moved. Only the value below moved (6c9b7f20→9ea75c4a×1); the check itself is the same.
+  assert('UNCHANGED: the distress list, byte for byte (6c9b7f20…)', d > 0 && h(f.slice(d, de)) === '9ea75c4af22b6832');
   // UPDATED (22/10, A9 (α)): the same exact check, on the message as written and made plain («views»)
   const exact = '  if (views.some(v => crisis.some(p => new RegExp(fold(p.source), "i").test(fold(v))))) return "CRISIS";\n';
   assert('ORDER: the exact check comes first; the by-sound check comes after it and before DISTRESS',

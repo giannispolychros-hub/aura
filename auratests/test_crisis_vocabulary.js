@@ -185,13 +185,16 @@ if (typeof D === 'function') {
     D('έχω κρίση και θέλω να πεθάνω') === 'CRISIS');
   // UPDATED (27/11/2026, John's explicit order, ADR «27 Νοεμβρίου»): the Greek DISTRESS pattern is now the unchanged words, byte for byte as before minus «κρίση», and FOUR patterns of «κρίση» (a crisis the person is in or has, or one relative of
   // a closed list has; their four lines are pinned here, their word lists in auratests/test_krisi_narrowing_2711.js). The English pattern is byte for byte as before.
-  assert('the DISTRESS patterns are byte-identical (UPDATED 27/11/2026: «κρίση» is four patterns of its own)',
+  // UPDATED (28/11/2026, John's order «ενοποιημένη», step Α): «κρίση» is now FIVE patterns (the fifth is the plural relatives of the closed list; the article kA stands in the second and the fourth); the five lines are pinned here, their word lists in
+  // auratests/test_krisi_narrowing_2711.js. The Greek words before them and the English pattern are byte for byte as before.
+  assert('the DISTRESS patterns are byte-identical (UPDATED 28/11/2026: «κρίση» is five patterns of its own)',
     CODE.includes('/(πένθος|τραύμα|κατάρρευση|κακοποίηση|απώλεια αγαπημένου)/i,') &&
     [
       '    kw("(κρίση πανικού|κρίση άγχους|κρίση ταυτότητας|κρίση ζωής|κρίσης πανικού|κρίσης άγχους|κρίσης ταυτότητας|κρίσης ζωής|(?:ψυχολογική|ψυχική|νευρική|υπαρξιακή|ψυχωτική|μανιακή|υστερική) κρίση|(?:ψυχολογικής|ψυχικής|νευρικής|υπαρξιακής|ψυχωτικής|μανιακής|υστερικής) κρίσης)"),\n',
-      '    kw("(" + kV + " " + kQ + "κρίση|(?:είμαι|βρίσκομαι|ήμουν|βρέθηκα) σε κατάσταση κρίσης)"),\n',
+      '    kw("(" + kV + " " + kQ + kA + "κρίση|(?:είμαι|βρίσκομαι|ήμουν|βρέθηκα) σε κατάσταση κρίσης)"),\n',
       '    kw("((?:μου ήρθε|με έπιασε) " + kQ + "κρίση|σε " + kQ + "κρίση (?:είμαι|βρίσκομαι|ήμουν|είμαστε|βρισκόμαστε))"),\n',
-      '    kw("(" + kR + ",? " + kW + kT + " " + kQ + "κρίση|" + kT + " " + kQ + "κρίση,? " + kW + kR + ")"),\n'
+      '    kw("(" + kR + ",? " + kW + kT + " " + kQ + kA + "κρίση|" + kT + " " + kQ + kA + "κρίση,? " + kW + kR + ")"),\n',
+      '    kw("(" + kRP + ",? " + kW + kTP + " " + kQ + kA + "κρίση|" + kTP + " " + kQ + kA + "κρίση,? " + kW + kRP + ")"),\n'
     ].every(l => CODE.includes(l)) &&
     CODE.includes('/\\b(grief|bereaved|bereavement|trauma|traumatic|abuse|abused|assault|crisis|breakdown|panic attack)\\b/i,'));
   // UPDATED 2026-10-02: this assertion used to pin the OLD unconditional «…10306 — είναι εκεί.» append as untouched, while the

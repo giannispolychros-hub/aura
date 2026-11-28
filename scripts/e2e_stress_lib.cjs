@@ -955,6 +955,37 @@ const FULL_SESSION_PERSONAS = [
       { fits: 'yes' },
       { when: 'Αύριο το απόγευμα.' } ] },
 ];
+// 28/11/2026 (John, order «ενοποιημένη», step Γ): the ONE paid replay of the session of 13 rounds — the REAL model, FIXED words of the user, no simulated user, no judge. The words are written for this test (a person who buys in a hurry) and
+// have the SHAPE of the real session of 24/11, not its words: the 2nd and the 12th line say «κρίση» as judgement («την κρίση μου», «πιο ήρεμη κρίση»), the 10th and the 12th ask for a way, one line is a short pick («Το πρώτο, νομίζω.»), one is a question back («Δηλαδή τι εννοείς;») — and no line
+// is a phrase that opens the root card by itself (door 3), so that the root QUESTION, with the list of the user's own sentences, comes from the button. Then the root, the card's «Ναι», the step, the size question's «Ναι», «Πότε», the clarity
+// number and the word — and the closing, which the CODE writes (no model call after the word). A separate list: it runs only when asked by number (--sessions 9205); the three versions and the whole session of 21/11 stay as they were.
+// The estimate of the tool counts 6 calls for a fixed session; this one makes 14 (the 13 lines and the one that reads the first request), so the plan's cost is read with { fixedCalls: 14 } — the budget cap of the run is what holds.
+const REPLAY_PERSONAS = [
+  { id: 9205, key: 'replay13', runs: 1, noJudge: true, maxTyped: 20, name: 'Η συνεδρία των 13 γύρων ξανά · σταθερά (συνθετικά) λόγια του χρήστη, ως το κλείσιμο από τον κώδικα',
+    hiddenRoot: '—', situation: 'Συνθετικό σενάριο με σταθερά μηνύματα μόνο.', behavior: 'Fixed messages only.',
+    fixed: [
+      { say: 'Παίρνω βιαστικές αποφάσεις όταν αγοράζω κάτι ακριβό για το γραφείο. Μετά θυμώνω με τον εαυτό μου. Θέλω να το περιορίσω.' },
+      { say: 'Όλα μαζί. Αν βελτιώσω την κρίση μου στις αγορές, μάλλον θα μετανιώνω λιγότερο.' },
+      { say: 'Ναι, συνήθως έτσι γίνεται. Βλέπω την τιμή, τη βρίσκω εύκολη στο μυαλό μου και πατάω το κουμπί.' },
+      { say: 'Δεν το σκέφτομαι. Μου βγαίνει από μόνο του, σαν αυτόματο.' },
+      { say: 'Απλά υπάρχει. Δεν ξέρω από πού ήρθε, ίσως από το ότι θέλω να τελειώνω γρήγορα.' },
+      { say: 'Το πρώτο, νομίζω.' },
+      { say: 'Δηλαδή τι εννοείς;' },
+      { say: 'Δεν είμαι σίγουρος... ίσως.' },
+      { say: 'Η αίσθηση ότι κερδίζω χρόνο.' },
+      { say: 'Στην αρχή ανακουφίζομαι και μετά θυμώνω που δεν περίμενα. Πώς να το περιορίσω αυτό; Τι να κάνω;' },
+      { say: 'Όχι θυμός, περισσότερο ντροπή που ξανάκανα το ίδιο.' },
+      { say: 'Με πιο ήρεμη κρίση τη στιγμή της αγοράς θα ήμουν εντάξει. Πώς θα το κάνω;' },
+      { say: 'Όταν γεμίσει το καλάθι στο μυαλό μου και το ποσό μού φαίνεται μικρό.' },
+      { press: true },
+      { root: 'Ότι αγοράζω βιαστικά και μετά νιώθω ντροπή.' },
+      { card: 'yes' },
+      { step: 'Να περιμένω μία νύχτα πριν πατήσω αγορά.' },
+      { fits: 'yes' },
+      { when: 'Απόψε.' },
+      { clarity: 8 },
+      { word: 'Ηρεμία' } ] },
+];
 // 21/11/2026 (John, the same run): his report — every line of the user, every reply of AURA and every text of the app (bubbles, cards, buttons), word for word, in ONE numbered
 // sequence; which replies of the model were a question (the last visible character is a question mark, or there is one inside); whether a step was written and with which words;
 // the real cost and the calls. What the code can know it says as ΝΑΙ / ΟΧΙ; the report gives no verdict on the quality of the replies.
@@ -2712,5 +2743,6 @@ module.exports = {
   LOOP_PERSONAS, MECHANISM_PERSONAS, noteLabels, STRATEGY_NOTES, SUPPRESSED_NOTES, mechanismRounds, mechanismCheck, mechanismMarks, MECH_JUDGE_SCHEMA, MECH_JUDGE_SYSTEM, mechanismJudgePrompt, mechanismReport, masterStage, loopRounds, stageOrderFindings, LOOP_JUDGE_SCHEMA, LOOP_JUDGE_SYSTEM, loopJudgePrompt, CRISIS_JUDGE_SCHEMA, CRISIS_JUDGE_SYSTEM, crisisJudgePrompt, politePlural, genericWhy, loopReport,
 };
 // 21/11/2026 (John, test-two-sessions, the whole session): added after the list above, which stays as it was
+module.exports.REPLAY_PERSONAS = REPLAY_PERSONAS;
 module.exports.FULL_SESSION_PERSONAS = FULL_SESSION_PERSONAS;
 module.exports.fullSessionReport = fullSessionReport;

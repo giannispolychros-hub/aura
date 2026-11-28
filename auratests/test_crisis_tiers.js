@@ -169,12 +169,15 @@ assert('(δ) the ref is only ever set TRUE from the crisis result', (CODE.match(
 // everything that must NOT have changed
 // UPDATED (27/11/2026, John's explicit order, ADR «27 Νοεμβρίου»): the Greek DISTRESS pattern is now the unchanged words (minus «κρίση») and FOUR patterns of «κρίση» (a crisis the person is in or has, or one relative of a closed list has) — their
 // four lines are pinned here word for word, their word lists in auratests/test_krisi_narrowing_2711.js. Still no tier, no number.
-assert('DISTRESS is untouched: same patterns (UPDATED 27/11/2026: «κρίση» is four patterns of its own), no tier, no number', CODE.includes('/(πένθος|τραύμα|κατάρρευση|κακοποίηση|απώλεια αγαπημένου)/i,') &&
+// UPDATED (28/11/2026, John's order «ενοποιημένη», step Α): «κρίση» is now FIVE patterns (the fifth is the plural relatives of the closed list; the article kA stands in the second and the fourth) — their five lines are pinned here word for word, their word lists in
+// auratests/test_krisi_narrowing_2711.js. Still no tier, no number.
+assert('DISTRESS is untouched: same patterns (UPDATED 28/11/2026: «κρίση» is five patterns of its own), no tier, no number', CODE.includes('/(πένθος|τραύμα|κατάρρευση|κακοποίηση|απώλεια αγαπημένου)/i,') &&
   [
     '    kw("(κρίση πανικού|κρίση άγχους|κρίση ταυτότητας|κρίση ζωής|κρίσης πανικού|κρίσης άγχους|κρίσης ταυτότητας|κρίσης ζωής|(?:ψυχολογική|ψυχική|νευρική|υπαρξιακή|ψυχωτική|μανιακή|υστερική) κρίση|(?:ψυχολογικής|ψυχικής|νευρικής|υπαρξιακής|ψυχωτικής|μανιακής|υστερικής) κρίσης)"),\n',
-    '    kw("(" + kV + " " + kQ + "κρίση|(?:είμαι|βρίσκομαι|ήμουν|βρέθηκα) σε κατάσταση κρίσης)"),\n',
+    '    kw("(" + kV + " " + kQ + kA + "κρίση|(?:είμαι|βρίσκομαι|ήμουν|βρέθηκα) σε κατάσταση κρίσης)"),\n',
     '    kw("((?:μου ήρθε|με έπιασε) " + kQ + "κρίση|σε " + kQ + "κρίση (?:είμαι|βρίσκομαι|ήμουν|είμαστε|βρισκόμαστε))"),\n',
-    '    kw("(" + kR + ",? " + kW + kT + " " + kQ + "κρίση|" + kT + " " + kQ + "κρίση,? " + kW + kR + ")"),\n'
+    '    kw("(" + kR + ",? " + kW + kT + " " + kQ + kA + "κρίση|" + kT + " " + kQ + kA + "κρίση,? " + kW + kR + ")"),\n',
+    '    kw("(" + kRP + ",? " + kW + kTP + " " + kQ + kA + "κρίση|" + kTP + " " + kQ + kA + "κρίση,? " + kW + kRP + ")"),\n'
   ].every(l => CODE.includes(l)) &&
   !/if \(safetySignal === "DISTRESS"\) \{[\s\S]{0,900}classifyCrisisTier/.test(CODE));
 assert('the DISTRESS branch still calls the normal generateResponse path', /if \(safetySignal === "DISTRESS"\) \{[\s\S]{0,900}await generateResponse\(distressMsgs, mode\);/.test(CODE));

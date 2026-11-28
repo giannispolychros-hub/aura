@@ -1547,6 +1547,12 @@ function detectSafetySignal(text, tierB) {
   const kT = "(?:είναι|βρίσκεται|ήταν|έχει|είχε|περνάει|περνά|πέρασε|έπαθε|μπήκε|μπαίνει|έπεσε|πέφτει|έπιασε)";
   const kR = "(?:κόρη|γιος|γιο|παιδί|άντρας|άντρα|γυναίκα|μάνα|μητέρα|πατέρας|πατέρα|μπαμπάς|μπαμπά|μαμά|αδελφός|αδελφό|αδελφή|αδερφός|αδερφό|αδερφή) μου";
   const kW = "(?:[^\\s.!?;]+ ){0,2}";
+  // 28/11/2026 (John, order «ενοποιημένη», step Α1): kK = the KNOWN KINDS of crisis that an article may stand in front of (with an optional «του / της»); kA = an optional article before «κρίση», allowed ONLY when a kind of kK follows
+  // (a look-ahead — the kinds are not consumed), so «την κρίση της μέσης ηλικίας» lights and the bare «την κρίση» / «αυτή την κρίση» do not; kRP / kTP = the PLURAL relatives of the closed list and their verbs (the fifth pattern).
+  const kK = "(?:(?:του|της) )?(?:πανικού|άγχους|ταυτότητας|ζωής|μέσης ηλικίας)";
+  const kA = "(?:(?:αυτή )?(?:την|τη|στην|στη) (?=κρίση " + kK + "))?";
+  const kRP = "(?:γονείς|παιδιά|αδέλφια|αδέρφια) μου";
+  const kTP = "(?:είναι|βρίσκονται|ήταν|έχουν|είχαν|περνάνε|περνούν|πέρασαν|έπαθαν|μπήκαν|μπαίνουν|έπεσαν|πέφτουν)";
   const kw = s => new RegExp(s.replace(/ /g, "\\s+"), "i");
   const crisis = [
     /\b(suicide|suicidal|self.harm|self.hurt|kill myself|end my life|don't want to (live|be here)|want to die|want to disappear|can't go on)\b/i,
@@ -1600,12 +1606,16 @@ function detectSafetySignal(text, tierB) {
     // (2) a first-person verb, then only words of kQ, then «κρίση» («έχω / είμαι σε / περνάω / έπαθα [καρδιακή] κρίση»); (3) «μου ήρθε / με έπιασε … κρίση» and «σε … κρίση είμαι»; (4) a relative of
     // kR — the closed list: κόρη, γιος, παιδί, άντρας, γυναίκα, μάνα, πατέρας, αδελφός / αδελφή μου — within two words of a third-person verb (kT) and «κρίση», in either order. A word that is
     // not in the lists does not light it («την κρίση μου», «καλή», «οικονομική», «πιο καθαρή κρίση»). Negations are not read (no new semantic logic): «δεν είμαι σε κρίση» lights, as it did.
+    // UPDATED 28/11/2026 (John, step Α1): (5) the plural relatives (kRP, kTP) — «οι γονείς μου είναι σε κρίση», «τα παιδιά μου περνάνε κρίση», «τα αδέλφια μου έχουν κρίση»; and an ARTICLE (kA) in (2), (4) and (5) only when a known kind follows
+    // («περνάω την κρίση της μέσης ηλικίας», «την κρίση πανικού»). The bare «η κρίση με πνίγει», «δεν αντέχω αυτή την κρίση», «περνάω την κρίση» stay quiet — a known limit, written in the test.
     // The CRISIS list, its tiers, the other words and the order of the checks are untouched. The lists kQ / kV / kT / kR / kW and the helper kw are at the top of this function.
     // See auratests/test_krisi_narrowing_2711.js.
     kw("(κρίση πανικού|κρίση άγχους|κρίση ταυτότητας|κρίση ζωής|κρίσης πανικού|κρίσης άγχους|κρίσης ταυτότητας|κρίσης ζωής|(?:ψυχολογική|ψυχική|νευρική|υπαρξιακή|ψυχωτική|μανιακή|υστερική) κρίση|(?:ψυχολογικής|ψυχικής|νευρικής|υπαρξιακής|ψυχωτικής|μανιακής|υστερικής) κρίσης)"),
-    kw("(" + kV + " " + kQ + "κρίση|(?:είμαι|βρίσκομαι|ήμουν|βρέθηκα) σε κατάσταση κρίσης)"),
+    kw("(" + kV + " " + kQ + kA + "κρίση|(?:είμαι|βρίσκομαι|ήμουν|βρέθηκα) σε κατάσταση κρίσης)"),
     kw("((?:μου ήρθε|με έπιασε) " + kQ + "κρίση|σε " + kQ + "κρίση (?:είμαι|βρίσκομαι|ήμουν|είμαστε|βρισκόμαστε))"),
-    kw("(" + kR + ",? " + kW + kT + " " + kQ + "κρίση|" + kT + " " + kQ + "κρίση,? " + kW + kR + ")"),
+    kw("(" + kR + ",? " + kW + kT + " " + kQ + kA + "κρίση|" + kT + " " + kQ + kA + "κρίση,? " + kW + kR + ")"),
+    // (5) UPDATED 28/11/2026 (John, step Α1): the same for the PLURAL relatives of the closed list — «οι γονείς μου», «τα παιδιά μου», «τα αδέλφια / αδέρφια μου» — with the plural verbs (kTP), in either order.
+    kw("(" + kRP + ",? " + kW + kTP + " " + kQ + kA + "κρίση|" + kTP + " " + kQ + kA + "κρίση,? " + kW + kRP + ")"),
   ];
   // FIX 2: model-level safety fallback already in A6 prompt — client catches obvious misses only
   // MATCHED ON THE ACCENT-STRIPPED TEXT (2026-10-01, closes a measured gap): "θελω να πεθανω" typed without
@@ -6986,17 +6996,18 @@ function detectsExplicitProductionRequest(text) {
   if (/θελω τη βοηθεια|θελω βοηθεια|χρειαζομαι βοηθεια|βοηθησε με/.test(f)) return true;
   // Asking for a hypothesis or an opinion — the exact thing session 3 asked for twelve times.
   if (/μια υποθεση|υποθεσε|τι θα υπεθετεσ|τι πιστευεισ εσυ|τι θα ελεγεσ|πιστευεισ\?/.test(f)) return true;
-  // Asking for MORE of what was just produced. "αλλεσ 2" and "τι αλλο" are both real.
-  if (/τι αλλο|αλλεσ \d|αλλα \d/.test(f)) return true;
+  // Asking for MORE of what was just produced. "αλλεσ 2" and "τι αλλο" are both real. UPDATED 28/11/2026 (John, step Α2): «τι αλλο» needs a non-letter (or the start) before it — it no longer fires inside «κατι αλλο».
+  if (/(^|[^α-ω])τι αλλο|αλλεσ \d|αλλα \d/.test(f)) return true;
   // Asking for information as such.
   if (/πληροφοριεσ/.test(f)) return true;
   // ADR «27 Νοεμβρίου» (3), John: the questions of advice the counter did not see — «τι να κάνω», «πώς να το κάνω / πώς θα το κάνω», «τι μπορώ να κάνω» (also «πώς μπορώ να το …», «τι πρέπει / οφείλω να κάνω»,
   // and «τι κάνω;» ONLY as a question) — and the closed phrase «μπορείς να με βοηθήσεις». A closed list of phrases, read sentence by sentence; no semantic logic. «δεν ξέρω τι να κάνω» is a STATE, not a request: a
   // phrase directly after a verb of knowing («(δεν) ξέρω / έχω ιδέα / είμαι σίγουρος / καταλαβαίνω / βρίσκω» and up to three words) is not counted — so «ξέρω τι να κάνω» is not either. Observation only, like the
   // rest of this function: nothing reads the counter to change a reply. See auratests/test_explicit_request_2711.js.
+  // UPDATED 28/11/2026 (John, step Α2): three more closed phrases of the same kind — «τι θα έκανες», «τι λες να κάνω», «τι μου προτείνεις» (measured: +12 of 202 simulated requests, no false one) — and the boundary of «τι άλλο» above.
   if (/μπορεισ να με βοηθησεισ/.test(f)) return true;
   const KNOW = /(^|[^α-ω])((δεν|δε|ουτε|μη)\s+)?(ξερω|ξερουμε|ηξερα|εχω ιδεα|ειμαι σιγουρ[οη]σ?|καταλαβαινω|βρισκω)(\s+[α-ω]+){0,3}\s*$/;
-  const ASK = /(^|[^α-ω])(τι να κανω|τι να κανουμε|τι μπορω να κανω|τι μπορουμε να κανουμε|τι πρεπει να κανω|τι οφειλω να κανω|πωσ (να|θα|μπορω να) (το|τα|την|τον) [α-ω]+)/;
+  const ASK = /(^|[^α-ω])(τι να κανω|τι να κανουμε|τι μπορω να κανω|τι μπορουμε να κανουμε|τι πρεπει να κανω|τι οφειλω να κανω|τι θα εκανεσ|τι λεσ να κανω|τι μου προτεινεισ|πωσ (να|θα|μπορω να) (το|τα|την|τον) [α-ω]+)/;
   const parts = f.split(/([.;!?…\n]+)/);
   for (let i = 0; i < parts.length; i += 2) {
     const s = parts[i], q = /[;?]/.test(parts[i + 1] || "");
